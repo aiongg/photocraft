@@ -52,7 +52,12 @@ pub(super) mod type_transform;
 pub mod vector_ui;
 
 #[cfg(test)]
+mod art_history_default_style_tests;
+#[cfg(test)]
 mod gradient_mode_greyed_tests;
+
+#[cfg(test)]
+mod line_live_handles_tests;
 
 #[cfg(test)]
 mod count_show_extras_tests;
@@ -62,3 +67,18 @@ mod crop_mode_tests;
 mod gradient_options_bar_mode_tests;
 #[cfg(test)]
 mod line_tool_defaults_tests;
+<<<<<<< HEAD
+=======
+#[cfg(test)]
+mod object_selection_mode_tests;
+#[cfg(test)]
+mod path_selection_ctrl_direct_tests;
+#[cfg(test)]
+mod path_selection_shape_over_saved_path_tests;
+
+#[cfg(test)]
+mod remove_default_size_tests;
+
+#[cfg(test)]
+mod ellipse_center_mark_tests;
+>>>>>>> upstream/main

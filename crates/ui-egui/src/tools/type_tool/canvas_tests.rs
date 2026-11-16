@@ -1461,11 +1461,19 @@ fn variable_faces_list_the_weights_of_their_axis() {
 /// Families the host serves are in the picker's source before they are fetched.
 #[test]
 fn the_font_menu_lists_served_families() {
+<<<<<<< HEAD
     photocraft_text::served::add_families(["Served Menu Test Serif".to_string()]);
     let app = new_app();
     let mut state = super::font_state(&app);
     let source = state.source();
     assert!(source.served.iter().any(|f| f == "Served Menu Test Serif"));
+=======
+    {
+        let _catalog = crate::served_fonts::changing_catalog();
+        photocraft_text::served::add_families(["Served Menu Test Serif".to_string()]);
+    }
+    assert!(super::families().iter().any(|f| f == "Served Menu Test Serif"));
+>>>>>>> upstream/main
 }
 
 /// #2236: formatting applies to the selected type layers, while an active text edit stays local.
@@ -1597,6 +1605,7 @@ mod multi_layer_formatting {
 
     #[test]
     fn options_font_family_preserves_peer_faces_and_batches_layer_flags() {
+        let _catalog = crate::served_fonts::steady_catalog();
         let (app, ids) = fixture();
         let before = ids.map(|id| style(&app, id, 0));
         let mut h = controls(app, false);
@@ -1686,10 +1695,45 @@ mod multi_layer_formatting {
         assert_eq!(shown(&h), mono, "no type target: the tool defaults");
     }
 
+<<<<<<< HEAD
     /// A style picked in the Character panel's Style menu, with type layers selected, sets them
     /// and is kept for new type: the pick is one `{font, fontStyle}` change.
+=======
+    /// Other engines registering fonts and the served catalog growing (tests running in parallel)
+    /// used to move the key of the font menu's preview cache, so its samples re-rendered and asked
+    /// for a repaint every pass and `Harness::run` never settled (a flaky `exceeded max_steps`).
+    /// Here both happen on every pass.
+    #[test]
+    fn the_font_menu_settles_while_other_engines_register_fonts() {
+        let _catalog = crate::served_fonts::changing_catalog();
+        let (app, _) = fixture();
+        let mut pass = 0u32;
+        let mut h = Harness::builder().with_size(vec2(1100.0, 800.0)).build_ui_state(
+            move |ui, app| {
+                photocraft_text::TextEngine::new();
+                // The served catalog is process-wide: names that sort last.
+                photocraft_text::served::add_families([format!("zz Churn Test {pass:03}")]);
+                pass = pass.saturating_add(1);
+                if ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                    ui.horizontal(|ui| super::super::options_bar(app, ui));
+                }
+            },
+            app,
+        );
+        PhotocraftApp::setup_context(&h.ctx, Default::default());
+        h.run_steps(4);
+        h.get_all_by_role(Role::TextInput).next().unwrap().click();
+        // The font menu's search caret repaints every pass; step a bounded number of times.
+        h.run_steps(2);
+        h.run_steps(2);
+    }
+
+    /// A style picked under a family's ">" in the Character section's font menu, with type
+    /// layers selected, sets them and is kept for new type, as the options bar's menu does.
+>>>>>>> upstream/main
     #[test]
     fn a_style_picked_in_the_character_sections_font_menu_is_kept_for_new_type() {
+        let _catalog = crate::served_fonts::steady_catalog();
         let (app, ids) = fixture();
         // The first style of the family other than the defaults'.
         let pick = super::super::fonts::styles("Inter").into_iter().find(|s| s != "Regular" && s != "Bold Italic").expect("Inter has several styles");

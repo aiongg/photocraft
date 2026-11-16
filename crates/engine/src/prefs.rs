@@ -117,6 +117,11 @@ choice!(
     /// fastest and softest. Photoshop's Camera Raw has no such choice.
     RawDemosaic { Ahd = "ahd", Mhc = "mhc", Bilinear = "bilinear" } default Ahd
 );
+choice!(
+    /// MCP › When PhotoCraft Is Closed: what `photocraft-cli mcp` does when an
+    /// agent calls a tool and the app isn't running.
+    WhenAppClosed { Launch = "launch", Headless = "headless", Error = "error" } default Launch
+);
 
 impl Unit {
     /// Document pixels → this unit. `dpi` is the document resolution, `extent` the 100% length
@@ -555,6 +560,8 @@ pub use photocraft_paint::ResponseCurve as PressureCurve;
 mod cmds;
 mod customize;
 mod files;
+#[cfg(test)]
+mod menus_hideable_tests;
 mod shortcuts;
 mod store;
 mod validate;
@@ -1223,18 +1230,62 @@ impl Default for RawDefaults {
     }
 }
 
+/// Before the agents switch, a Control Port other than 0 started the control server by itself.
+/// A saved `integrations` section like that keeps its connection: the port now means "on, at this
+/// port". Every reader of the saved section applies this (the app, its launch read, and
+/// `photocraft-cli mcp`), so they agree.
+pub fn migrate_integrations(section: &mut Value) {
+    if let Some(integrations) = section.as_object_mut()
+        && !integrations.contains_key("connectAgents")
+        && integrations.get("controlPort").and_then(Value::as_u64).is_some_and(|p| (1..=65535).contains(&p))
+    {
+        integrations.insert("connectAgents".into(), json!(true));
+    }
+}
+
+/// A saved `integrations` section read as the app's preference load reads it: migrated, and
+/// leniently (a value of the wrong type keeps its default, the rest still loads). The desktop
+/// app's launch read and `photocraft-cli mcp` use it, so a bad value can't reset, say, When
+/// PhotoCraft Is Closed for them alone.
+pub fn read_integrations_section(mut section: Value) -> Integrations {
+    migrate_integrations(&mut section);
+    read_section(section)
+}
+
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Integrations {
     /// Allow agents to drive the app over the loopback control channel / MCP bridge.
     pub allow_agent_control: bool,
-    /// Default control port (0 = only when `--control` is given).
+    /// Port agents connect to (0 = any free port, published in the connection file).
     pub control_port: u32,
+    /// The folder automation may read from when no `--automation-read-root` is given (empty =
+    /// none). Applied at once while agents are connected.
+    pub read_root: String,
+    /// The folder automation may write to when no `--automation-write-root` is given (empty =
+    /// none). Applied at once while agents are connected.
+    pub write_root: String,
+    /// Without the suite's `AI-MCP` flag, agents may connect: the desktop app serves the control
+    /// protocol on loopback for `photocraft-cli mcp` without `--control`, and starts or stops it at
+    /// once when this changes (off by default; launch flags still win). Set from a saved Control
+    /// Port ([`migrate_integrations`]); not in the dialog. With the flag the ArtCraft Launcher's
+    /// switch decides instead. After the older fields, so a
+    /// section saved as a list still reads them where they were.
+    pub connect_agents: bool,
+    /// What `photocraft-cli mcp` does while agents may use the app but it is closed.
+    pub when_app_closed: WhenAppClosed,
 }
 
 impl Default for Integrations {
     fn default() -> Self {
-        Self { allow_agent_control: true, control_port: 0 }
+        Self {
+            allow_agent_control: true,
+            control_port: 0,
+            read_root: String::new(),
+            write_root: String::new(),
+            connect_agents: false,
+            when_app_closed: WhenAppClosed::Launch,
+        }
     }
 }
 
@@ -1315,10 +1366,12 @@ pub struct MenuCustomization {
 }
 
 impl MenuCustomization {
-    /// False for the items Edit › Menus can't hide (#5096): the way back into this dialog
-    /// (Edit › Menus, Edit › Keyboard Shortcuts), Preferences, Save, Save As and Exit.
+    /// False for the items Edit › Menus can't hide, as measured in the reference application
+    /// (#14335): File › Clear Recent File List, Close, Save, Save As…, Save a Copy… and Exit, and
+    /// Edit › Menus… (the way back into this dialog). Edit › Keyboard Shortcuts…, the Preferences
+    /// pages and the Help items can be hidden; any item can still be coloured.
     pub fn hideable(id: &str) -> bool {
-        !matches!(id, "edit.menus" | "edit.keyboardShortcuts" | "file.save" | "file.saveAs" | "file.exit") && !id.starts_with("edit.preferences")
+        !matches!(id, "file.clearRecent" | "file.close" | "file.save" | "file.saveAs" | "file.saveACopy" | "file.exit" | "edit.menus")
     }
 
     /// Whether the menus leave `id` out. Items that can't be hidden stay shown even when an
@@ -1328,12 +1381,20 @@ impl MenuCustomization {
     }
 }
 
+<<<<<<< HEAD
 /// Edit › Toolbar: hidden tools and the Edit Toolbar drawer's arrangement (tool names as in
 /// `ui.set {tool}`).
+=======
+/// Edit › Toolbar: the toolbar's group layout (tool names as in `ui.set {tool}`), plus the older
+/// flat `hidden` list and the unused `order` list.
+>>>>>>> upstream/main
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ToolbarCustomization {
+    /// Tools taken off the toolbar one by one (the Keyboard Shortcuts dialog's Toolbar tab). The
+    /// layout moves each into `extras` as its own group.
     pub hidden: Vec<String>,
+<<<<<<< HEAD
     /// The toolbar's slots in order; empty means the default arrangement.
     pub slots: Vec<SavedSlot>,
 }
@@ -1348,6 +1409,123 @@ pub struct SavedSlot {
     pub tools: Vec<String>,
     /// The slot is the last of its group (a divider follows it).
     pub group_end: bool,
+=======
+    pub order: Vec<String>,
+    /// The toolbar's slots in order, each a group of tools in flyout order. `None` is the
+    /// default layout ([`DEFAULT_TOOLBAR`]).
+    pub toolbar: Option<Vec<Vec<String>>>,
+    /// Extra Tools: groups that get no slot of their own. Like `toolbar`, `null` is the default
+    /// (stored as such, so `prefs.reset` of one path finds its default).
+    pub extras: Option<Vec<Vec<String>>>,
+}
+
+/// The default toolbar layout: one group per slot, in toolbar order (the same as the toolbar's
+/// `TOOL_SECTIONS` read slot by slot).
+pub const DEFAULT_TOOLBAR: &[&[&str]] = &[
+    &["Move", "Artboard"],
+    &["RectMarquee", "EllipseMarquee", "SingleRowMarquee", "SingleColumnMarquee"],
+    &["Lasso", "PolygonLasso", "MagneticLasso"],
+    &["ObjectSelection", "QuickSelection", "MagicWand"],
+    &["Crop", "PerspectiveCrop", "Slice", "SliceSelect"],
+    &["Frame"],
+    &["Eyedropper", "ColorSampler", "Ruler", "Note", "Count"],
+    &["SpotHealing", "Remove", "Healing", "Patch", "ContentAwareMove", "RedEye"],
+    &["Brush", "Pencil", "ColorReplacement", "MixerBrush"],
+    &["CloneStamp", "PatternStamp"],
+    &["HistoryBrush", "ArtHistoryBrush"],
+    &["Eraser", "BackgroundEraser", "MagicEraser"],
+    &["Gradient", "PaintBucket"],
+    &["Blur", "Sharpen", "Smudge"],
+    &["Dodge", "Burn", "Sponge"],
+    &["Pen", "FreeformPen", "CurvaturePen", "AddAnchorPoint", "DeleteAnchorPoint", "ConvertPoint"],
+    &["Type", "VerticalType", "VerticalTypeMask", "HorizontalTypeMask"],
+    &["PathSelection", "DirectSelection"],
+    &["Rectangle", "EllipseShape", "Triangle", "Polygon", "Star", "Line", "CustomShape"],
+    &["Hand", "RotateView"],
+    &["Zoom"],
+];
+
+/// A toolbar layout with every name resolved: the slots' groups and the Extra Tools groups.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ToolbarLayout {
+    pub toolbar: Vec<Vec<String>>,
+    pub extras: Vec<Vec<String>>,
+}
+
+impl ToolbarCustomization {
+    /// The tool `name` means, as its canonical name (the `tools.select.<tool>` id with a capital
+    /// first letter, which is the toolbar's `Tool` name). Matches like `ui.set {tool}`: case,
+    /// spaces, `_` and `-` don't count, a marquee may drop "Marquee", and the tool's own name
+    /// works with or without "Tool". `None` for a name that isn't a tool.
+    pub fn tool_name(name: &str) -> Option<String> {
+        let canonical = |key: &str| -> String { key.chars().take(1).flat_map(char::to_uppercase).chain(key.chars().skip(1)).collect() };
+        // Stored layouts hold canonical names: find those without allocating (the toolbar
+        // resolves its layout every frame).
+        if let Some(key) = crate::shell_commands::TOOLS.iter().filter_map(|(id, _, _)| id.strip_prefix("tools.select.")).find(|k| k.eq_ignore_ascii_case(name))
+        {
+            return Some(canonical(key));
+        }
+        let squash = |s: &str| s.to_ascii_lowercase().replace([' ', '_', '-'], "");
+        let n = squash(name);
+        if n.is_empty() {
+            return None;
+        }
+        crate::shell_commands::TOOLS.iter().find_map(|(id, label, _)| {
+            let key = id.strip_prefix("tools.select.")?;
+            let k = key.to_ascii_lowercase();
+            let label = squash(label);
+            let hit = n == k || n == k.replace("marquee", "") || n == label || Some(n.as_str()) == label.strip_suffix("tool");
+            hit.then(|| canonical(key))
+        })
+    }
+
+    /// The layout the toolbar shows. Unknown names are skipped and a tool listed twice keeps its
+    /// first place (the toolbar before the extras); empty groups are dropped. Each `hidden` tool
+    /// leaves its toolbar group for a group of its own in the extras, in toolbar order, and a
+    /// tool listed nowhere is added to the extras as its own group.
+    pub fn layout(&self) -> ToolbarLayout {
+        let hidden: Vec<String> = self.hidden.iter().filter_map(|h| Self::tool_name(h)).collect();
+        let stored = match &self.toolbar {
+            Some(groups) => groups.clone(),
+            None => DEFAULT_TOOLBAR.iter().map(|g| g.iter().map(|t| (*t).to_string()).collect()).collect(),
+        };
+        // `moved` collects the hidden tools when given; without it they stay in their group.
+        fn resolve(groups: &[Vec<String>], seen: &mut Vec<String>, hidden: &[String], mut moved: Option<&mut Vec<Vec<String>>>) -> Vec<Vec<String>> {
+            let mut out = Vec::new();
+            for group in groups {
+                let mut tools = Vec::new();
+                for name in group.iter().filter_map(|n| ToolbarCustomization::tool_name(n)) {
+                    if seen.contains(&name) {
+                        continue;
+                    }
+                    seen.push(name.clone());
+                    match moved.as_deref_mut() {
+                        Some(moved) if hidden.contains(&name) => moved.push(vec![name]),
+                        _ => tools.push(name),
+                    }
+                }
+                if !tools.is_empty() {
+                    out.push(tools);
+                }
+            }
+            out
+        }
+        let mut seen: Vec<String> = Vec::new();
+        let mut moved = Vec::new();
+        let toolbar = resolve(&stored, &mut seen, &hidden, Some(&mut moved));
+        let mut extras = resolve(self.extras.as_deref().unwrap_or_default(), &mut seen, &hidden, None);
+        extras.append(&mut moved);
+        for (id, _, _) in crate::shell_commands::TOOLS {
+            if let Some(name) = Self::tool_name(id.trim_start_matches("tools.select."))
+                && !seen.contains(&name)
+            {
+                seen.push(name.clone());
+                extras.push(vec![name]);
+            }
+        }
+        ToolbarLayout { toolbar, extras }
+    }
+>>>>>>> upstream/main
 }
 
 /// Layer Mask Display Options (double-click the layer mask's row in the Channels panel, or Mask
@@ -1861,6 +2039,7 @@ impl Session {
     /// [`Session::set_saved_prefs`]. The returned list names the values both left at their
     /// defaults. Only text that isn't a JSON object fails as a whole.
     pub fn load_prefs_json(&mut self, s: &str) -> std::result::Result<Vec<InvalidPref>, String> {
+<<<<<<< HEAD
         let (saved, mut invalid) = parse_prefs_json(s)?;
         invalid.extend(self.set_saved_prefs(saved));
         Ok(invalid)
@@ -1877,6 +2056,52 @@ impl Session {
     /// put back to their defaults (or the nearest accepted value) and returned.
     pub fn set_saved_prefs(&mut self, saved: SavedPrefs) -> Vec<InvalidPref> {
         let SavedPrefs { mut prefs, color_settings, presets } = saved;
+=======
+        let mut v: Value = serde_json::from_str(s).map_err(|e| format!("preferences: {e}"))?;
+        if !v.is_object() {
+            return Err("preferences: expected a JSON object".into());
+        }
+        // Files before version 2 hold Use Shift Key for Tool Switch off because that was the
+        // default when they were written: every key is saved, chosen or not. Like Photoshop it is
+        // on by default now (#3528), so those files take the new default (#5647: a tool letter
+        // pressed again kept cycling its group). A choice made since is saved as version 2.
+        if v.get("version").and_then(Value::as_u64).unwrap_or(0) < 2
+            && let Some(tools) = v.get_mut("tools").and_then(Value::as_object_mut)
+            && tools.get("useShiftKeyForToolSwitch") == Some(&json!(false))
+        {
+            tools.remove("useShiftKeyForToolSwitch");
+        }
+        // Saved preferences before appearance modes had one concrete theme. Preserve its
+        // appearance instead of silently switching established users to Auto.
+        if let Some(interface) = v.get_mut("interface").and_then(Value::as_object_mut)
+            && !interface.contains_key("appearanceMode")
+            && let Some(theme) = interface.get("theme").and_then(Value::as_str).and_then(Theme::parse)
+        {
+            let (mode, slot) = match theme {
+                Theme::Pro | Theme::ProMedium | Theme::Studio | Theme::SolarizedDark | Theme::AdwaitaDark | Theme::BreezeDark | Theme::SoftDark => {
+                    ("dark", "darkTheme")
+                }
+                Theme::StudioLight | Theme::ProLightGray | Theme::ProLight | Theme::Classic | Theme::Adwaita | Theme::BreezeLight | Theme::SoftLight => {
+                    ("light", "lightTheme")
+                }
+            };
+            interface.insert("appearanceMode".into(), json!(mode));
+            // A partially migrated file may already contain a newer theme selection (#5139).
+            interface.entry(slot).or_insert_with(|| json!(theme.name()));
+        }
+        // The Serbian interface catalog was `sr`; since the catalogs moved to craft-i18n it is
+        // `sr-latn`, the same Latin text. A saved `sr` loads as `sr-latn` and is saved that way next.
+        if let Some(language) = v.get_mut("interface").and_then(|interface| interface.get_mut("language"))
+            && language.as_str().is_some_and(|code| code.eq_ignore_ascii_case("sr"))
+        {
+            *language = json!("sr-latn");
+        }
+        if let Some(integrations) = v.get_mut("integrations") {
+            migrate_integrations(integrations);
+        }
+        let color = v.as_object_mut().and_then(|m| m.remove("colorSettings"));
+        let presets = v.as_object_mut().and_then(|m| m.remove("presets"));
+>>>>>>> upstream/main
         let mut invalid = Vec::new();
         // An Effect Cache the field no longer accepts (above the 32-bit cap, saved before the cap
         // or by a 64-bit build; a hand-edited 0) loads as the nearest value it does. Otherwise

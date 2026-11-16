@@ -522,6 +522,7 @@ fn menus_and_toolbar_customisation_persist() {
     assert_eq!(back.toolbar.hidden, vec!["Sponge".to_string()]);
 }
 
+<<<<<<< HEAD
 // PLAN: the sheet has an old `order` key read into `slots` by alias; the set's decision (pn.PC4)
 // drops the flat field, so an old key reads as the default (empty) slots and the test asserts that.
 /// The Edit Toolbar drawer's arrangement saved as `toolbar.slots` reads back as saved; a file with
@@ -551,10 +552,14 @@ fn toolbar_slots_round_trip_and_an_old_order_key_reads_as_slots() {
 }
 
 /// #5096: Edit › Menus can't hide the way back into itself, Preferences, Save or Exit.
+=======
+/// #5096, measured in #14335: Edit › Menus can't hide the way back into itself or File's Close,
+/// Save, Save As, Save a Copy, Clear Recent File List and Exit.
+>>>>>>> upstream/main
 #[test]
 fn menus_refuse_to_hide_essential_items() {
     let mut s = session();
-    for id in ["edit.menus", "edit.keyboardShortcuts", "edit.preferences.general", "file.save", "file.saveAs", "file.exit"] {
+    for id in ["edit.menus", "file.close", "file.save", "file.saveAs", "file.saveACopy", "file.clearRecent", "file.exit"] {
         assert!(s.execute("edit.menus", json!({"hide": ["edit.fade", id]})).is_err(), "{id}");
         assert!(s.prefs().menus.hidden.is_empty(), "{id}: a refused call changes nothing");
     }
@@ -1296,4 +1301,22 @@ fn an_effect_cache_above_the_cap_loads_clamped_and_does_not_block_apply() {
         s.execute("prefs.set", json!({"path": "", "value": values})).unwrap();
         assert_eq!(s.execute("prefs.get", json!({"path": "fileHandling.recentFileCount"})).unwrap(), json!(7), "{saved} MB");
     }
+}
+
+/// A file from before the agents switch whose Control Port started the control server keeps
+/// it on; one without a port, or that already says, is left as it is.
+#[test]
+fn a_saved_control_port_turns_the_agent_connection_on() {
+    let load = |text: &str| {
+        let mut session = Session::new();
+        session.load_prefs_json(text).unwrap();
+        session.prefs().integrations.clone()
+    };
+    let legacy = load(r#"{"integrations":{"allowAgentControl":true,"controlPort":7878}}"#);
+    assert!(legacy.connect_agents);
+    assert_eq!(legacy.control_port, 7878);
+    assert!(!load(r#"{"integrations":{"controlPort":0}}"#).connect_agents);
+    assert!(!load(r#"{"integrations":{"controlPort":70000}}"#).connect_agents, "not a usable port");
+    assert!(!load(r#"{"integrations":{"controlPort":7878,"connectAgents":false}}"#).connect_agents, "an explicit choice wins");
+    assert!(!load("{}").connect_agents, "off by default");
 }

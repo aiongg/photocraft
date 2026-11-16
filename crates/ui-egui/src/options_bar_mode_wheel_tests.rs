@@ -13,7 +13,7 @@ use crate::PhotocraftApp;
 use crate::state::Tool;
 
 /// The app with a new document and `tool` chosen.
-fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
+pub(super) fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default());
@@ -26,10 +26,11 @@ fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
 }
 
 /// The options bar's Mode dropdown: the highest one showing `Normal` (the Layers panel's is lower).
-fn mode_dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
+pub(super) fn mode_dropdown(h: &Harness<'_, PhotocraftApp>) -> Rect {
     h.query_all_by_role(Role::ComboBox).filter(|n| n.value().as_deref() == Some("Normal")).map(|n| n.rect()).min_by(|a, b| a.top().total_cmp(&b.top())).unwrap()
 }
 
+<<<<<<< HEAD
 /// `lines` wheel lines at `at` in one turn through the window host (a line is 40 points): negative is down.
 fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
     use craft::keymap::Mods;
@@ -43,9 +44,23 @@ fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
         }
     }
     h.run_steps(2);
+=======
+/// `lines` wheel lines at `at` in one event: negative is down.
+pub(super) fn wheel(h: &mut Harness<'_, PhotocraftApp>, at: Pos2, lines: f32) {
+    h.hover_at(at);
+    h.run_steps(1);
+    h.event(egui::Event::MouseWheel {
+        source: egui::MouseWheelSource::Unknown,
+        unit: egui::MouseWheelUnit::Line,
+        delta: vec2(0.0, lines),
+        phase: egui::TouchPhase::Move,
+        modifiers: Default::default(),
+    });
+    h.run_steps(3);
+>>>>>>> upstream/main
 }
 
-fn brush_mode(h: &Harness<'_, PhotocraftApp>) -> BlendMode {
+pub(super) fn brush_mode(h: &Harness<'_, PhotocraftApp>) -> BlendMode {
     h.state().session.tools.brush.mode
 }
 
@@ -103,6 +118,27 @@ fn the_pattern_stamp_mode_dropdown_has_behind() {
     wheel(&mut h, at, 1.0);
     assert!(h.state().session.tools.brush.behind, "and back");
     assert_eq!(h.state().ui.tool, Tool::PatternStamp);
+}
+
+/// The centre of a dropdown showing `value`.
+fn combo(h: &Harness<'_, PhotocraftApp>, value: &str) -> Option<Pos2> {
+    h.query_all_by_role(Role::ComboBox).find(|n| n.value().as_deref() == Some(value)).map(|n| n.rect().center())
+}
+
+/// In an Indexed Color document the Pattern Stamp's Mode reads "Threshold" for Normal (#12887); the
+/// other entries weren't measured there, so the list and the wheel stay as today.
+#[test]
+fn the_pattern_stamp_mode_reads_threshold_in_an_indexed_document() {
+    let mut h = harness(Tool::PatternStamp);
+    h.state_mut().run("image.mode.indexedColor", json!({"palette": "exact", "forced": "none", "dither": "none"})).unwrap();
+    h.run_steps(4);
+    let at = combo(&h, "Threshold").expect("Mode reads Threshold");
+    wheel(&mut h, at, -1.0);
+    assert_eq!(brush_mode(&h), BlendMode::Dissolve);
+    assert!(combo(&h, "Dissolve").is_some() && combo(&h, "Threshold").is_none(), "Dissolve reads as itself");
+    wheel(&mut h, at, 1.0);
+    assert_eq!(brush_mode(&h), BlendMode::Normal);
+    assert!(combo(&h, "Threshold").is_some());
 }
 
 /// The Paint Bucket's Mode dropdown has Clear after Dissolve, as the Brush's does.

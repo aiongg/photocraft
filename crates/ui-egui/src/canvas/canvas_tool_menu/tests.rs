@@ -609,6 +609,214 @@ fn type_edit_menu_lists_spelling_suggestions_for_the_word_under_the_pointer() {
 }
 
 #[test]
+<<<<<<< HEAD
+=======
+fn right_click_outside_the_image_picks_the_pasteboard_color() {
+    let mut app = app();
+    app.ui.tool = Tool::RectMarquee;
+    let mut h = harness(app);
+    let rect = h.state().last_canvas_rect;
+    let outside = rect.min + vec2(5.0, 5.0);
+    right_click(&mut h, rect.center(), Modifiers::NONE);
+    assert!(h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| !m.pasteboard), "inside: the tool's own menu");
+    h.state_mut().ui.canvas_tool_menu = None;
+    right_click(&mut h, outside, Modifiers::NONE);
+    let menu = h.state().ui.canvas_tool_menu.clone().unwrap();
+    assert!(menu.pasteboard && rows(&menu) == PASTEBOARD_MENU, "outside: the pasteboard menu");
+    let ctx = h.ctx.clone();
+    choose(h.state_mut(), &ctx, "pasteboard.black");
+    assert_eq!(crate::prefs_ui::pasteboard_color(h.state()), Some(egui::Color32::BLACK));
+    // Select Custom Color… opens the Color Picker; OK makes its colour the custom pasteboard.
+    right_click(&mut h, outside, Modifiers::NONE);
+    choose(h.state_mut(), &ctx, PASTEBOARD_PICK);
+    let mut f = h.state().ui.dialogs.last().unwrap().fields.clone();
+    f.insert("color".into(), json!("#123456"));
+    crate::color_picker_ui::confirm(h.state_mut(), &f).unwrap();
+    assert_eq!(crate::prefs_ui::pasteboard_color(h.state()), Some(egui::Color32::from_rgb(0x12, 0x34, 0x56)));
+    // A painting tool keeps its Brush Preset picker there.
+    h.state_mut().ui.tool = Tool::Brush;
+    h.run_steps(2);
+    right_click(&mut h, outside, Modifiers::NONE);
+    assert!(h.state().ui.canvas_tool_menu.is_none() && h.state().ui.brush_picker.is_some());
+}
+
+/// #2832: right-click over an open Free Transform box: Photoshop's transform menu. Skew
+/// switches the box's mode; Rotate and Flip turn the box about its reference point without
+/// committing it; Content-Aware Scale and Puppet Warp are greyed.
+#[test]
+fn right_click_during_free_transform_switches_modes_rotates_and_flips_the_box() {
+    let mut app = app();
+    app.ui.tool = Tool::RectMarquee;
+    app.run("layer.new.layer", json!({})).unwrap();
+    app.run("select.rect", json!({"x": 4, "y": 6, "width": 10, "height": 8})).unwrap();
+    app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
+    app.run("select.deselect", json!({})).unwrap();
+    let mut h = harness(app);
+    let ctx = h.ctx.clone();
+    crate::menus::invoke(h.state_mut(), &ctx, "edit.freeTransform", json!({})).unwrap();
+    h.run_steps(2);
+    let center = h.state().last_canvas_rect.center();
+    let (revision, journal) = (h.state().session.active().unwrap().revision, h.state().session.journal.len());
+    right_click(&mut h, center, Modifiers::NONE);
+    let menu = h.state().ui.canvas_tool_menu.clone().expect("the transform menu");
+    assert!(menu.transform && rows(&menu) == TRANSFORM_MENU);
+    for (id, on) in [("edit.contentAwareScale", false), ("edit.puppetWarp", false), ("edit.transform.rotate90Cw", true), ("edit.transform.flipVertical", true)]
+    {
+        assert_eq!(entry_enabled(h.state(), &menu, id), on, "{id}");
+    }
+    choose(h.state_mut(), &ctx, "edit.transform.skew");
+    assert_eq!(h.state().ui.transform.as_ref().unwrap().mode, crate::state::TransformMode::Skew);
+    let t = h.state().ui.transform.clone().unwrap();
+    let (q0, c) = (t.quad, t.pivot);
+    right_click(&mut h, center, Modifiers::NONE);
+    choose(h.state_mut(), &ctx, "edit.transform.flipHorizontal");
+    let q = h.state().ui.transform.as_ref().expect("the box stays open").quad;
+    for (a, b) in q.iter().zip(q0) {
+        assert!((a[0] - (2.0 * c[0] - b[0])).abs() < 1e-9 && (a[1] - b[1]).abs() < 1e-9, "mirrored about the reference point: {q0:?} -> {q:?}");
+    }
+    right_click(&mut h, center, Modifiers::NONE);
+    choose(h.state_mut(), &ctx, "edit.transform.rotate180");
+    let q = h.state().ui.transform.as_ref().unwrap().quad;
+    for (a, b) in q.iter().zip(q0) {
+        assert!((a[1] - (2.0 * c[1] - b[1])).abs() < 1e-9 && (a[0] - b[0]).abs() < 1e-9, "flipped then turned 180°: {q0:?} -> {q:?}");
+    }
+    let st = h.state().session.active().unwrap();
+    assert_eq!((st.revision, h.state().session.journal.len()), (revision, journal), "nothing is committed");
+}
+
+#[test]
+fn transform_menu_follows_photoshop_order() {
+    assert_eq!(
+        labels(TRANSFORM_MENU),
+        vec![
+            Some("Free Transform"),
+            Some("Scale"),
+            Some("Rotate"),
+            Some("Skew"),
+            Some("Distort"),
+            Some("Perspective"),
+            Some("Warp"),
+            None,
+            Some("Content-Aware Scale"),
+            Some("Puppet Warp"),
+            None,
+            Some("Rotate 180°"),
+            Some("Rotate 90° Clockwise"),
+            Some("Rotate 90° Counter Clockwise"),
+            None,
+            Some("Flip Horizontal"),
+            Some("Flip Vertical"),
+        ]
+    );
+    // Over a box on editable type, Distort and Perspective are greyed (#2630).
+    let mut app = app();
+    app.run("type.create", json!({"x": 2, "y": 20, "text": "Hi", "size": 16})).unwrap();
+    crate::transform_tool::begin(&mut app, &Context::default()).unwrap();
+    assert!(open_transform(&mut app, &Context::default(), [10.0, 10.0]));
+    let menu = app.ui.canvas_tool_menu.clone().unwrap();
+    for (id, on) in [("edit.transform.skew", true), ("edit.transform.distort", false), ("edit.transform.perspective", false)] {
+        assert_eq!(entry_enabled(&app, &menu, id), on, "{id}");
+    }
+}
+
+pub(super) fn labels(rows: &[Row]) -> Vec<Option<&str>> {
+    rows.iter().map(|row| row.map(|(label, _)| label)).collect()
+}
+
+#[test]
+fn selection_menus_follow_photoshop_order() {
+    assert_eq!(
+        labels(SELECTION_MENU),
+        vec![
+            Some("Deselect"),
+            Some("Select Inverse"),
+            Some("Feather…"),
+            Some("Select and Mask…"),
+            None,
+            Some("Save Selection…"),
+            Some("Make Work Path…"),
+            None,
+            Some("Layer Via Copy"),
+            Some("Layer Via Cut"),
+            Some("New Layer…"),
+            None,
+            Some("Free Transform"),
+            Some("Transform Selection"),
+            Some("Distort"),
+            Some("Perspective"),
+            None,
+            Some("Delete and Fill Selection"),
+            Some("Fill…"),
+            Some("Stroke…"),
+            Some("Content-Aware Fill…"),
+            None,
+            Some("Last Filter"),
+            None,
+            Some("Fade…"),
+        ]
+    );
+    assert_eq!(labels(NO_SELECTION_MENU), vec![Some("Select All"), Some("Reselect"), Some("Color Range…"), None, Some("Load Selection…")]);
+    // Every row runs a real command: one the menu bar has, or an engine command.
+    let app = app();
+    let items = crate::menus::menu_items(&app);
+    for (label, id) in [SELECTION_MENU, NO_SELECTION_MENU, PEN_MENU, TRANSFORM_MENU].into_iter().flatten().flatten() {
+        assert!(items.iter().any(|i| i.id == *id) || photocraft_engine::commands::find(id).is_some(), "{label}: unknown command {id}");
+    }
+}
+
+#[test]
+fn selection_menu_routes_actions_through_commands() {
+    let mut app = app();
+    app.ui.tool = Tool::RectMarquee;
+    app.run("select.rect", json!({"x": 1, "y": 1, "width": 8, "height": 8})).unwrap();
+    assert!(open(&mut app, &Context::default(), Tool::RectMarquee, [10.0, 10.0]));
+    assert_eq!(rows(app.ui.canvas_tool_menu.as_ref().unwrap()), SELECTION_MENU);
+    let before = app.session.journal.len();
+    choose(&mut app, &Context::default(), "select.inverse");
+    assert!(app.ui.canvas_tool_menu.is_none());
+    assert!(app.session.journal[before..].iter().any(|(id, _)| id == "select.inverse"));
+    let before = app.session.journal.len();
+    assert!(open(&mut app, &Context::default(), Tool::RectMarquee, [10.0, 10.0]));
+    choose(&mut app, &Context::default(), "select.deselect");
+    assert!(app.session.active().unwrap().doc.selection.is_none());
+    assert!(app.session.journal[before..].iter().any(|(id, _)| id == "select.deselect"));
+    // Nothing selected: the menu that makes a selection.
+    assert!(open(&mut app, &Context::default(), Tool::RectMarquee, [10.0, 10.0]));
+    assert_eq!(rows(app.ui.canvas_tool_menu.as_ref().unwrap()), NO_SELECTION_MENU);
+    choose(&mut app, &Context::default(), "select.reselect");
+    assert!(app.session.active().unwrap().doc.selection.is_some());
+    assert!(app.session.journal.iter().any(|(id, _)| id == "select.reselect"));
+    app.run("select.deselect", json!({})).unwrap();
+    assert!(open(&mut app, &Context::default(), Tool::Lasso, [10.0, 10.0]));
+    choose(&mut app, &Context::default(), "select.all");
+    assert!(app.session.active().unwrap().doc.selection.is_some());
+}
+
+#[test]
+fn selection_menu_layer_and_path_actions() {
+    let mut app = app();
+    app.ui.tool = Tool::EllipseMarquee;
+    app.run("layer.new.layer", json!({})).unwrap();
+    app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
+    app.run("select.rect", json!({"x": 4, "y": 4, "width": 10, "height": 10})).unwrap();
+    let layers = app.session.active().unwrap().doc.layers.len();
+    assert!(open(&mut app, &Context::default(), Tool::EllipseMarquee, [10.0, 10.0]));
+    choose(&mut app, &Context::default(), "layer.new.layerViaCopy");
+    assert_eq!(app.session.active().unwrap().doc.layers.len(), layers + 1, "Layer via Copy adds a layer");
+    assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("layer.new.layerViaCopy"));
+    // Make Work Path… asks for the tolerance, then traces the selection.
+    app.run("select.rect", json!({"x": 4, "y": 4, "width": 10, "height": 10})).unwrap();
+    assert!(open(&mut app, &Context::default(), Tool::EllipseMarquee, [10.0, 10.0]));
+    choose(&mut app, &Context::default(), "select.toWorkPath");
+    let dialog = app.ui.dialogs.last().map(|d| d.id).expect("tolerance dialog");
+    assert!(app.session.active().unwrap().doc.work_path.is_none(), "nothing happens before OK");
+    crate::dialogs::confirm(&mut app, dialog).unwrap();
+    assert!(app.session.active().unwrap().doc.work_path.is_some());
+    assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("select.toWorkPath"));
+}
+
+#[test]
+>>>>>>> upstream/main
 fn disabled_selection_rows_do_nothing() {
     let mut app = app();
     app.ui.tool = Tool::MagicWand;

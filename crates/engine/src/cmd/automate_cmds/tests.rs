@@ -6,7 +6,7 @@ fn list_of(actions: Vec<Action>) -> ActionList {
     ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions, sets: Vec::new() })
 }
 
-fn tmp(name: &str) -> String {
+pub(super) fn tmp(name: &str) -> String {
     let d = std::env::temp_dir().join(format!("photocraft-automate-{}-{name}", std::process::id()));
     let _ = std::fs::remove_dir_all(&d);
     std::fs::create_dir_all(&d).unwrap();
@@ -14,7 +14,7 @@ fn tmp(name: &str) -> String {
 }
 
 /// Writes `n` small PNGs (w×h, grey level i·40) into `dir`.
-fn images(dir: &str, n: usize, w: u32, h: u32) -> Vec<String> {
+pub(super) fn images(dir: &str, n: usize, w: u32, h: u32) -> Vec<String> {
     (0..n)
         .map(|i| {
             let mut s = Session::new();

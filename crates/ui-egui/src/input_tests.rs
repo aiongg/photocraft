@@ -773,6 +773,109 @@ fn type_tool_format_keys_survive_hostile_state() {
     assert!(app.session.active().is_none());
 }
 
+<<<<<<< HEAD
+=======
+/// The Character panel's kerning field reads and parses Photoshop's values.
+#[test]
+fn kerning_field_values() {
+    use photocraft_doc::text::Kerning;
+    assert_eq!(crate::type_tool::kerning_label((Kerning::Metrics, 0.0)), "Metrics");
+    assert_eq!(crate::type_tool::kerning_label((Kerning::Optical, 0.0)), "Optical");
+    assert_eq!(crate::type_tool::kerning_label((Kerning::Off, 0.0)), "0");
+    assert_eq!(crate::type_tool::kerning_label((Kerning::Off, -49.6)), "-50");
+    for (s, v) in [("metrics", Some(json!("metrics"))), (" Optical ", Some(json!("optical"))), ("120", Some(json!(120.0))), ("-25.4", Some(json!(-25.0)))] {
+        assert_eq!(crate::type_tool::parse_kerning(s), v, "{s}");
+    }
+    for s in ["", "tight", "1e9", "-5000", "NaN", "inf"] {
+        assert_eq!(crate::type_tool::parse_kerning(s), None, "{s}");
+    }
+}
+
+/// Sampling shows a pipette instead of the crosshair: the Eyedropper tool, and a painting tool
+/// with ⌥ held. Preferences › Cursors › Other Cursors = Precise keeps the crosshair.
+#[test]
+fn eyedropper_and_alt_sampling_show_a_pipette() {
+    let mut h = harness();
+    let p = h.state().last_canvas_rect.center();
+    let cursor = |h: &mut Harness<'static, PhotocraftApp>| {
+        h.hover_at(p);
+        h.run_steps(2);
+        h.output().platform_output.cursor_icon
+    };
+    h.state_mut().ui.tool = crate::state::Tool::Eyedropper;
+    cursor(&mut h);
+    assert_pipette(&h);
+    h.state_mut().ui.tool = crate::state::Tool::Brush;
+    h.event(egui::Event::ModifiersChanged(Modifiers::ALT));
+    cursor(&mut h);
+    assert_pipette(&h);
+    h.state_mut().run("prefs.set", json!({"values": {"cursors.other": "precise"}})).unwrap();
+    // Every platform reports the crosshair. The desktop builds also hand the OS a black-and-white
+    // bitmap for it (`tool_cursor`, #1160, #1343), with `Crosshair` underneath as the fallback.
+    let precise = |h: &mut Harness<'static, PhotocraftApp>| {
+        let icon = cursor(h);
+        (icon, h.output().platform_output.cursor_image.is_some())
+    };
+    let desktop = cfg!(not(target_arch = "wasm32"));
+    assert_eq!(precise(&mut h), (egui::CursorIcon::Crosshair, desktop), "Precise keeps the crosshair");
+    h.event(egui::Event::ModifiersChanged(Modifiers::NONE));
+    h.state_mut().ui.tool = crate::state::Tool::Eyedropper;
+    assert_eq!(precise(&mut h), (egui::CursorIcon::Crosshair, desktop));
+}
+
+/// The bucket and fill target share one pointer bitmap or one painted image, and Precise Other Cursors hides both.
+#[test]
+fn paint_bucket_shows_a_bucket_cursor() {
+    fn cursor_area_visible(h: &Harness<'static, PhotocraftApp>, id: &str) -> bool {
+        let layer = egui::LayerId::new(egui::Order::Tooltip, egui::Id::unique(id));
+        h.ctx.memory(|memory| memory.areas().visible_layer_ids().contains(&layer))
+    }
+
+    let mut h = harness();
+    let p = h.state().last_canvas_rect.center();
+    h.state_mut().ui.tool = crate::state::Tool::PaintBucket;
+    h.hover_at(p);
+    h.run_steps(2);
+
+    let output = h.output();
+    if cfg!(not(target_arch = "wasm32")) {
+        assert_eq!(output.platform_output.cursor_icon, egui::CursorIcon::Crosshair, "the bitmap keeps a visible fallback");
+        let cursor = output.platform_output.cursor_image.as_ref().expect("native root viewport uses the unified bucket bitmap");
+        let [hot_x, hot_y] = cursor.hotspot;
+        let hot_pixel = (usize::from(hot_y) * usize::from(cursor.size[0]) + usize::from(hot_x)) * 4 + 3;
+        assert!(cursor.rgba[hot_pixel] > 128, "the arrow tip is drawn on the exact bitmap hotspot");
+        let side = usize::from(cursor.size[0]);
+        assert!(
+            cursor.rgba.as_chunks::<4>().0.iter().enumerate().any(|(i, pixel)| {
+                let x = (i % side) as u16;
+                let y = (i / side) as u16;
+                pixel[3] > 200 && x > hot_x + 2 && y > hot_y + 2
+            }),
+            "the bucket artwork is opaque below-right of the same hotspot"
+        );
+        assert!(!cursor_area_visible(&h, "pc-icon-cursor"), "native cursor has no frame-painted icon overlay");
+        assert!(!cursor_area_visible(&h, "pc-tool-cursor"), "native cursor does not create a painted cursor Area");
+    } else {
+        assert_eq!(output.platform_output.cursor_icon, egui::CursorIcon::None, "the painted image hides the OS arrow");
+        assert!(cursor_area_visible(&h, "pc-tool-cursor"), "scaled or web cursor uses one unified image Area");
+        assert!(!cursor_area_visible(&h, "pc-icon-cursor"), "the old icon overlay is absent");
+    }
+    assert_eq!(h.ctx.pointer_latest_pos(), Some(p), "the click target stays at the cursor hotspot");
+
+    h.state_mut().run("prefs.set", json!({"values": {"cursors.other": "precise"}})).unwrap();
+    h.run_steps(2);
+    let precise = h.output();
+    assert_eq!(precise.platform_output.cursor_icon, egui::CursorIcon::Crosshair);
+    assert_eq!(
+        precise.platform_output.cursor_image.is_some(),
+        cfg!(not(target_arch = "wasm32")),
+        "Precise uses its crosshair bitmap on native and the system cursor on web"
+    );
+    assert!(!cursor_area_visible(&h, "pc-icon-cursor"), "Precise omits the bucket artwork");
+    assert!(!cursor_area_visible(&h, "pc-tool-cursor"), "Precise omits the painted bucket image");
+}
+
+>>>>>>> upstream/main
 #[test]
 fn move_alt_copy_cursor_follows_the_latched_duplication_drag() {
     let mut h = harness();
@@ -808,12 +911,14 @@ fn move_alt_copy_cursor_follows_the_latched_duplication_drag() {
 fn esc_ends_a_pen_path_and_keeps_it() {
     let mut h = harness();
     h.state_mut().ui.tool = crate::state::Tool::Pen;
+    h.state_mut().ui.views[0].rotation = 40.0;
     let owner = crate::vector_ui::capture_pen_owner(h.state());
 
     h.state_mut().ui.pen = Some(crate::vector_ui::PenPath::corners(&[[50.0, 50.0], [150.0, 50.0], [150.0, 120.0]], owner));
     h.key_press(Key::Escape);
     h.run_steps(2);
     assert!(h.state().ui.pen.is_none(), "the Pen leaves drawing state");
+    assert_eq!(h.state().ui.views[0].rotation, 40.0, "the active path owns Escape");
     let doc = &h.state().session.active().unwrap().doc;
     let path = doc.work_path.as_ref().expect("the path is kept as the work path");
     assert_eq!(path.subpaths.len(), 1);
@@ -846,6 +951,27 @@ fn pen_shows_the_close_path_pointer_over_the_first_anchor() {
     assert_eq!(pointer(&mut h, 50.0, 50.0), close, "back on the first anchor");
 }
 
+/// A rotated view takes the first idle Esc; the next retains normal deselection.
+#[test]
+fn escape_resets_rotation_before_idle_deselection_for_paint_tools() {
+    for tool in [crate::state::Tool::Brush, crate::state::Tool::Pencil] {
+        let mut h = harness();
+        h.state_mut().ui.tool = tool;
+        h.state_mut().ui.views[0].rotation = 40.0;
+        h.state_mut().run("select.all", json!({})).unwrap();
+        h.run_steps(1);
+        let history = h.state().session.active().unwrap().history.entries().len();
+        h.key_press(Key::Escape);
+        h.run_steps(2);
+        assert_eq!(h.state().ui.views[0].rotation, 0.0, "{tool:?}");
+        assert!(h.state().session.active().unwrap().doc.selection.is_some(), "first Esc keeps the selection");
+        assert_eq!(h.state().session.active().unwrap().history.entries().len(), history, "view reset is not an edit");
+        h.key_press(Key::Escape);
+        h.run_steps(2);
+        assert!(h.state().session.active().unwrap().doc.selection.is_none(), "second Esc deselects normally");
+    }
+}
+
 /// Esc with no active operation deselects (#2674), like ⌘D.
 #[test]
 fn escape_deselects_when_nothing_else_needs_cancelling() {
@@ -869,11 +995,13 @@ fn escape_deselects_when_nothing_else_needs_cancelling() {
 fn escape_with_a_dialog_open_cancels_the_dialog_not_the_selection() {
     let mut h = harness();
     h.state_mut().run("select.all", json!({})).unwrap();
+    h.state_mut().ui.views[0].rotation = 40.0;
     open_dialog(&mut h);
     h.key_press(Key::Escape);
     h.run_steps(2);
     assert!(!h.state().dialog_open(), "Esc cancelled the dialog");
     assert!(h.state().session.active().unwrap().doc.selection.is_some(), "the selection stays");
+    assert_eq!(h.state().ui.views[0].rotation, 40.0, "the dialog owns the first Esc");
 }
 
 /// How much of the 400 × 300 document is on screen: the visible document span on each axis,

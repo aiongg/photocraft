@@ -1656,7 +1656,7 @@ fn transform_preview_preserves_displayed_profile_colors() {
         app.session
             .edit("original color sample", |doc, active| {
                 if wide_gamut {
-                    doc.icc_profile = Some(photocraft_cms::Builtin::AdobeRgbCompat.profile().to_bytes());
+                    doc.icc_profile = Some(craft_cms::Builtin::AdobeRgbCompat.profile().to_bytes());
                 }
                 doc.layer_mut(active.unwrap()).unwrap().surface_mut().unwrap().fill_rect(bounds, &[0.55, 0.35, 0.2, 1.0]);
                 Ok(())
@@ -2151,6 +2151,105 @@ fn a_cylinder_commits_the_wrapped_pixels() {
     assert!(alpha(13, 9) > 0.5, "and stays up at the silhouettes: {}", alpha(13, 9));
 }
 
+<<<<<<< HEAD
+=======
+#[test]
+fn cylinder_cursors_point_along_their_handles() {
+    let w = Warp::cylinder(&[10.0, 40.0, 60.0, 10.0, 0.3, 0.3, 0.5], [10.0, 10.0, 60.0, 40.0]).unwrap();
+    let screen = egui::Rect::from_min_size(Pos2::ZERO, vec2(800.0, 600.0));
+    let level = ViewXform { rect: screen, zoom: 1.0, center: [35.0, 25.0], flip: false, rotation: 0.0, aspect: 1.0 };
+    assert_eq!(cylinder_cursor(&w, [60.0, 10.0], 3.0, &level), CursorIcon::ResizeNeSw);
+    assert_eq!(cylinder_cursor(&w, [10.0, 40.0], 3.0, &level), CursorIcon::ResizeNeSw);
+    assert_eq!(cylinder_cursor(&w, [35.0, 17.5], 3.0, &level), CursorIcon::ResizeVertical);
+    assert_eq!(cylinder_cursor(&w, [35.0, 47.5], 3.0, &level), CursorIcon::ResizeVertical);
+    let wrap = cylinder_handles(&cylinder_values(&w).unwrap())[4].0;
+    assert_eq!(cylinder_cursor(&w, wrap, 3.0, &level), CursorIcon::ResizeHorizontal);
+    assert_eq!(cylinder_cursor(&w, [20.0, 30.0], 3.0, &level), CursorIcon::Move);
+    assert_eq!(cylinder_cursor(&w, [90.0, 90.0], 3.0, &level), CursorIcon::Default);
+    // The arrows turn with the view.
+    let turned = ViewXform { rotation: 90.0, ..level };
+    assert_eq!(cylinder_cursor(&w, wrap, 3.0, &turned), CursorIcon::ResizeVertical);
+    assert_eq!(cylinder_cursor(&w, [35.0, 17.5], 3.0, &turned), CursorIcon::ResizeHorizontal);
+    // Through the transform tool's cursor, a cylinder is never a split: its surface moves it.
+    let mut app = app_with_square(128, photocraft_geom::Rect::new(8, 8, 104, 104));
+    begin_warp(&mut app, &egui::Context::default()).unwrap();
+    let b = app.ui.transform.as_ref().unwrap().rect;
+    app.ui.transform.as_mut().unwrap().warp = Some(cylinder_default(b).unwrap());
+    app.transform_preview.as_mut().unwrap().split_tool = Some(SplitTool::Cross);
+    let xf = ViewXform { center: [56.0, 56.0], ..level };
+    assert_eq!(cursor(&app, &xf, [30.0, 56.0], cmd()), Some(CursorIcon::Move));
+}
+
+/// The Warp bar keeps Bend, H and V for a cylinder, greyed like Split, Grid and the orientation
+/// switch: its handles are its only controls, as in the reference.
+#[test]
+fn the_warp_bar_greys_its_fields_for_a_cylinder() {
+    use egui_kittest::kittest::{NodeT, Queryable};
+    let h = bar_harness(|app| {
+        let t = app.ui.transform.as_mut().unwrap();
+        t.warp = Some(cylinder_default(t.rect).unwrap());
+    });
+    // A field's caption and the field itself share the label: every match is greyed.
+    for name in ["Bend:", "H:", "V:", "Split Warp Crosswise", "Change warp orientation"] {
+        let nodes: Vec<_> = h.get_all_by_label(name).collect();
+        assert!(!nodes.is_empty() && nodes.iter().all(|n| n.accesskit_node().is_disabled()), "{name} is greyed");
+    }
+    assert!(h.query_by_label("Top depth").is_none() && h.query_by_label("Wrap").is_none(), "no cylinder fields");
+}
+
+#[test]
+fn a_multi_layer_box_follows_opacity_and_visibility_edits() {
+    let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let red = app.session.active().unwrap().active_layer.unwrap();
+    app.session.execute("layer.new.layer", json!({})).unwrap();
+    app.session
+        .edit("paint", |doc, a| {
+            doc.layer_mut(a.unwrap()).unwrap().surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(40, 40, 56, 56), &[0.0, 0.0, 1.0, 1.0]);
+            Ok(())
+        })
+        .unwrap();
+    let blue = app.session.active().unwrap().active_layer.unwrap();
+    app.session.execute("layer.select", json!({"layer": red.0, "mode": "add"})).unwrap();
+    app.sync_views();
+    begin(&mut app, &egui::Context::default()).unwrap();
+    let texel = |app: &PhotocraftApp, x: usize, y: usize| app.transform_preview.as_ref().unwrap().texture.texel(x, y).unwrap();
+    // The box is (8, 8)-(56, 56): red at its top-left texel, blue at (32, 32).
+    assert_eq!(texel(&app, 0, 0).a(), 255);
+    assert_eq!(texel(&app, 40, 40).a(), 255);
+    app.session
+        .edit("opacity", |doc, _| {
+            doc.layer_mut(red).unwrap().opacity = 0.5;
+            doc.layer_mut(blue).unwrap().visible = false;
+            Ok(())
+        })
+        .unwrap();
+    follow_edits(&mut app);
+    let a = texel(&app, 0, 0).a();
+    assert!((120..=135).contains(&a), "half-opaque red: {a}");
+    assert_eq!(texel(&app, 40, 40).a(), 0, "hidden blue drops out of the preview");
+    let pv = app.transform_preview.as_ref().unwrap();
+    assert!(!pv.doc.layer(red).unwrap().visible && !pv.doc.layer(blue).unwrap().visible, "both still hidden under the box");
+    assert_eq!(app.ui.transform.as_ref().unwrap().layers, vec![red.0, blue.0]);
+}
+
+#[test]
+fn several_layers_reuse_the_transform_interpolation_preference() {
+    let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
+    let st = app.session.active_mut().unwrap();
+    let first = st.active_layer.unwrap();
+    let mut second = photocraft_doc::Layer::raster("second", photocraft_color::PixelFormat::RGBA8);
+    second.surface_mut().unwrap().fill_rect(photocraft_geom::Rect::new(32, 8, 48, 24), &[0., 1., 0., 1.]);
+    let second_id = second.id;
+    Arc::make_mut(&mut st.doc).layers.push(second);
+    st.selected_layers = vec![first, second_id];
+    app.ui.tool_options.transform_interpolation = Some(photocraft_engine::prefs::Interpolation::Nearest);
+    begin(&mut app, &egui::Context::default()).unwrap();
+    let transform = app.ui.transform.as_ref().unwrap();
+    assert_eq!(transform.layers.len(), 2);
+    assert_eq!(transform.interpolation, "nearest");
+}
+
+>>>>>>> upstream/main
 /// #9974: the click waiting for the commit acts on the layer selected when it was made: no other
 /// layer can be picked while the commit runs (the engine refuses document commands meanwhile).
 #[test]

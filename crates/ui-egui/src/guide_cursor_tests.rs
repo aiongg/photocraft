@@ -9,7 +9,8 @@ use serde_json::json;
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
-fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
+/// The canvas at 100 % on a 400 × 300 document with `tool` and a vertical guide at x = 200.
+pub(crate) fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.sync_views();
@@ -28,11 +29,26 @@ fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
     h
 }
 
+<<<<<<< HEAD
 fn screen(h: &Harness<'static, PhotocraftApp>, x: f32, y: f32) -> Pos2 {
     crate::canvas::testing::to_screen(h.state(), [f64::from(x), f64::from(y)])
+=======
+pub(crate) fn screen(h: &Harness<'static, PhotocraftApp>, x: f32, y: f32) -> Pos2 {
+    let app = h.state();
+    let v = &app.ui.views[0];
+    ViewXform {
+        rect: crate::rulers::content_rect(app, app.last_canvas_rect),
+        zoom: v.zoom,
+        center: v.center,
+        flip: app.ui.view.flip_horizontal,
+        rotation: v.rotation,
+        aspect: app.ui.view.display_aspect(),
+    }
+    .to_screen(x, y)
+>>>>>>> upstream/main
 }
 
-fn hover(h: &mut Harness<'static, PhotocraftApp>, x: f32, y: f32, m: Modifiers) -> egui::CursorIcon {
+pub(crate) fn hover(h: &mut Harness<'static, PhotocraftApp>, x: f32, y: f32, m: Modifiers) -> egui::CursorIcon {
     h.event(egui::Event::ModifiersChanged(m));
     let p = screen(h, x, y);
     h.event(egui::Event::PointerMoved(p));

@@ -1,11 +1,21 @@
 //! Window › Swatches: named colours in groups (folders), as in Photoshop's Swatches panel.
 //!
+<<<<<<< HEAD
 //! The swatch model is craft-color's (`craft::color::palette`), re-exported here: a swatch keeps
 //! its colour in the model it was made in (RGB, HSB, CMYK, Lab or grayscale) as `f32` components
 //! that hold 16-bit file values exactly, plus colour-book entries we cannot evaluate kept
 //! verbatim. Nothing assumes sRGB: RGB and HSB components are in the RGB working space, CMYK and
 //! gray in the CMYK and gray working spaces (Edit › Color Settings), Lab is D50. Turning a swatch
 //! into the RGB the foreground colour holds goes through `photocraft-cms` ([`SwatchConv`]).
+=======
+//! A swatch keeps its colour in the model it was made in: RGB, HSB, CMYK, Lab or grayscale,
+//! as `f32` components that hold 16-bit file values exactly (an `.aco` → `.aco` round trip is
+//! lossless), plus colour-book entries we cannot evaluate kept verbatim. Nothing assumes sRGB:
+//! RGB and HSB components are in the RGB working space, CMYK and gray in the CMYK and gray
+//! working spaces (Edit › Color Settings), Lab is D50. Turning a swatch into the RGB the
+//! foreground colour holds (and the panel shows) goes through `craft-cms`
+//! ([`SwatchConv`]).
+>>>>>>> upstream/main
 //!
 //! The library persists with the preferences document (`presets.swatches`, see
 //! [`super::PresetState::to_json`]). The default set is `default_swatches()`. The commands live in
@@ -13,7 +23,7 @@
 
 use std::sync::Arc;
 
-use photocraft_cms::{Builtin, Profile, Transform, TransformOptions};
+use craft_cms::{Builtin, Profile, Transform, TransformOptions};
 use photocraft_color::ColorMode;
 use serde_json::{Value, json};
 
@@ -169,7 +179,7 @@ pub fn color_json(c: &SwatchColor) -> Value {
 
 // ------------------------------------------------------------------ colour management
 
-/// Converts swatch colours to the RGB working space through `photocraft-cms` (relative
+/// Converts swatch colours to the RGB working space through `craft-cms` (relative
 /// colorimetric + black point compensation, Photoshop's default). Build one per library or
 /// colour-settings change; evaluating is cheap.
 pub struct SwatchConv {
@@ -205,8 +215,8 @@ impl SwatchConv {
 
     fn with(s: Option<&Session>) -> Self {
         let rgb = working(s, ColorMode::Rgb);
-        let opts = TransformOptions { intent: photocraft_cms::Intent::RelativeColorimetric, bpc: true, ..Default::default() };
-        let link = |src: &Profile| photocraft_cms::cached(src, &rgb, opts).ok();
+        let opts = TransformOptions { intent: craft_cms::Intent::RelativeColorimetric, bpc: true, ..Default::default() };
+        let link = |src: &Profile| craft_cms::cached(src, &rgb, opts).ok();
         SwatchConv { cmyk: link(&working(s, ColorMode::Cmyk)), lab: link(Builtin::LabD50.profile()), gray: link(&working(s, ColorMode::Grayscale)) }
     }
 
@@ -216,7 +226,7 @@ impl SwatchConv {
         let eval = |t: &Option<Arc<Transform>>, input: &[f32]| -> Option<[f32; 3]> {
             let t = t.as_ref()?;
             let mut o = [0.0f32; 16];
-            t.eval(input, &mut o);
+            t.eval(input, &mut o).ok()?;
             Some([unit(o[0]), unit(o[1]), unit(o[2])])
         };
         match *c {

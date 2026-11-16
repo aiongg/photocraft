@@ -29,6 +29,89 @@ fn pick(app: &mut PhotocraftApp, tool: Tool) {
     app.sync_views();
 }
 
+<<<<<<< HEAD
+=======
+/// Size, hardness, spacing, angle and roundness of the live brush, as `brush.get` reports them
+/// (rounded: they are `f32`s).
+fn tip(app: &mut PhotocraftApp) -> [f64; 5] {
+    let b = app.run("brush.get", json!({})).unwrap();
+    ["size", "hardness", "spacing", "angle", "roundness"].map(|k| (b[k].as_f64().unwrap() * 1e4).round() / 1e4)
+}
+
+/// Give the live brush a tip that is neither default, so a reset has something to undo.
+fn scramble(app: &mut PhotocraftApp) {
+    let b = &mut app.session.tools.brush;
+    (b.size, b.hardness, b.spacing, b.angle, b.roundness) = (57.0, 0.4, 0.6, 30.0, 0.5);
+}
+
+const BRUSH_TIP: [f64; 5] = [13.0, 0.0, 0.25, 0.0, 1.0];
+const DEFAULT_TIP: [f64; 5] = [20.0, 1.0, 0.1, 0.0, 1.0];
+
+#[test]
+fn reset_tool_gives_the_brush_a_13_px_soft_tip() {
+    let mut app = app();
+    pick(&mut app, Tool::Brush);
+    scramble(&mut app);
+    control(&mut app, "ui.menu.invoke", json!({"id": "tool.reset"}));
+    assert_eq!(tip(&mut app), BRUSH_TIP);
+}
+
+#[test]
+fn reset_all_tools_gives_the_brush_its_tip() {
+    let mut app = app();
+    pick(&mut app, Tool::Brush);
+    scramble(&mut app);
+    control(&mut app, "ui.menu.invoke", json!({"id": "tool.resetAll", "params": {"confirmed": true}}));
+    assert_eq!(tip(&mut app), BRUSH_TIP);
+}
+
+/// Reset All Tools from another painting tool: the Brush gets its own tip when picked, not the
+/// live brush.
+#[test]
+fn reset_all_tools_from_another_tool_gives_the_brush_its_tip() {
+    let mut app = app();
+    pick(&mut app, Tool::Brush);
+    scramble(&mut app);
+    // The Sharpen tool, which has no reset tip of its own (the Eraser has since #11936).
+    pick(&mut app, Tool::Sharpen);
+    scramble(&mut app);
+    control(&mut app, "ui.menu.invoke", json!({"id": "tool.resetAll", "params": {"confirmed": true}}));
+    assert_eq!(tip(&mut app), DEFAULT_TIP, "the Sharpen tool");
+    pick(&mut app, Tool::Brush);
+    assert_eq!(tip(&mut app), BRUSH_TIP, "the Brush");
+}
+
+/// Reset All Tools from the Brush: the other painting tools get the default tip when picked, not
+/// the Brush's.
+#[test]
+fn reset_all_tools_from_the_brush_gives_the_other_tools_the_default_tip() {
+    let mut app = app();
+    pick(&mut app, Tool::Brush);
+    control(&mut app, "ui.menu.invoke", json!({"id": "tool.resetAll", "params": {"confirmed": true}}));
+    for tool in [Tool::Sharpen, Tool::Blur] {
+        pick(&mut app, tool);
+        assert_eq!(tip(&mut app), DEFAULT_TIP, "{tool:?}");
+    }
+}
+
+#[test]
+fn other_painting_tools_keep_the_default_reset_tip() {
+    for tool in [Tool::Sharpen, Tool::Blur] {
+        let mut a = app();
+        pick(&mut a, tool);
+        scramble(&mut a);
+        control(&mut a, "ui.menu.invoke", json!({"id": "tool.reset"}));
+        assert_eq!(tip(&mut a), DEFAULT_TIP, "{tool:?}");
+    }
+}
+
+#[test]
+fn a_session_brush_keeps_the_default_tip() {
+    let mut app = app();
+    assert_eq!(tip(&mut app), DEFAULT_TIP, "what `paint.stroke` paints with when no `brush` is given");
+}
+
+>>>>>>> upstream/main
 /// The reference's click with the reset Brush at 100,100 paints layer bounds 89,89 to 110,110:
 /// the soft tip reaches past its nominal diameter. Ours reaches 89,89 to 112,112: the outermost
 /// pixels are the stroke's 8-bit dither at 1/255 alpha, which the paint engine owns (not the reset

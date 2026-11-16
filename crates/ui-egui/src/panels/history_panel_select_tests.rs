@@ -11,8 +11,13 @@ use serde_json::json;
 use super::history::{self, apply, can_delete, rows};
 use super::*;
 
+<<<<<<< HEAD
 /// Open, then New Layer, Fill, New Layer, Fill.
 fn app() -> PhotocraftApp {
+=======
+/// New (the opening state of File › New), then New Layer, Fill, New Layer, Fill.
+fn harness() -> Harness<'static, PhotocraftApp> {
+>>>>>>> upstream/main
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
     for (cmd, p) in
@@ -91,6 +96,7 @@ fn clicking_a_state_jumps_there_with_one_command() {
     assert_eq!(state(&app), (4, 0, rev + 2));
 }
 
+<<<<<<< HEAD
 /// The rows are the snapshots, then the states with the later ones dimmed; a state's key survives a step back.
 #[test]
 fn rows_list_snapshots_then_states_then_redo_states() {
@@ -130,6 +136,50 @@ fn history_rows_wait_for_an_open_transform() {
             assert!(app.ui.transform.is_some());
         } else {
             assert!(after < before, "the click steps back: {before} -> {after}");
+=======
+/// #14029: a document from File › New lists its opening state as "New" (an opened file's reads
+/// "Open"), at the top of the states, with the opening state's icon.
+#[test]
+fn a_new_documents_opening_state_reads_new_with_the_opening_icon() {
+    let h = harness();
+    assert!(h.query_by_label("Open").is_none(), "no state reads Open");
+    let new = h.get_by_label("New").rect();
+    let first_step = h.get_all_by_label("New Layer").next().expect("the first New Layer row").rect();
+    assert!(new.bottom() <= first_step.top() + 0.5, "New is the row above the first step: {new:?} {first_step:?}");
+    assert_eq!(history_step_icon("New"), "image");
+    assert_eq!(history_step_icon("New"), history_step_icon("Open"));
+}
+
+/// The ghost label that follows a History row being dragged to the trash (the text painted at
+/// the pointer, `layer_transfer::ghost`), if one is drawn.
+fn ghost_label(h: &Harness<'_, PhotocraftApp>, p: egui::Pos2) -> Option<String> {
+    let at = p + vec2(20.0, -6.0);
+    h.output().shapes.iter().find_map(|c| match &c.shape {
+        egui::Shape::Text(t) if (t.pos - at).length() < 1.0 => Some(t.galley.job.text.clone()),
+        _ => None,
+    })
+}
+
+/// Allow Non-Linear History lets a later (dimmed) state be dragged onto the trash: its row's
+/// label follows the pointer, as a past state's does.
+#[test]
+fn dragging_a_later_state_shows_its_label_at_the_pointer() {
+    let mut h = harness();
+    h.state_mut().run("history.options", json!({"allowNonLinearHistory": true})).unwrap();
+    h.state_mut().run("edit.undo", json!({})).unwrap();
+    h.run_steps(2);
+    // Rows: New, New Layer, Fill, New Layer (current), the dimmed Fill.
+    for (label, row) in [("New Layer", 1), ("Fill", 1)] {
+        let from = h.get_all_by_label(label).nth(row).expect("the row").rect().center();
+        let to = from + vec2(-60.0, 40.0);
+        h.hover_at(from);
+        h.run_steps(1);
+        h.event(egui::Event::PointerButton { pos: from, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
+        h.run_steps(1);
+        for i in 1..=4 {
+            h.hover_at(from + (to - from) * (i as f32 / 4.0));
+            h.run_steps(1);
+>>>>>>> upstream/main
         }
     }
 }
@@ -229,6 +279,7 @@ fn non_linear_trash_click_never_targets_the_oldest_state() {
     for _ in 0..3 {
         app.run("edit.undo", json!({})).unwrap();
     }
+<<<<<<< HEAD
     let counts = |app: &PhotocraftApp| {
         let st = app.session.active().unwrap();
         (st.history.past_len(), st.history.redo_labels().count())
@@ -252,6 +303,60 @@ fn non_linear_trash_click_never_targets_the_oldest_state() {
     assert_eq!(counts(&app).0, 1);
     apply(&mut app, HistoryEvent::Delete(None));
     assert_eq!(counts(&app).0, 0, "the click deleted the current state");
+=======
+    let mut ready = false;
+    let mut h = Harness::builder().with_size(vec2(280.0, 120.0)).build_ui_state(
+        move |ui, app: &mut PhotocraftApp| {
+            if !ready {
+                PhotocraftApp::setup_context(ui.ctx(), theme::ThemeKind::ProMedium);
+                ready = true;
+                return;
+            }
+            history(app, ui);
+        },
+        app,
+    );
+    h.run_steps(4);
+    let row = h.get_all_by_label("New Layer").last().expect("the latest New Layer state").rect();
+    let view = h.ctx.input(|i| i.viewport_rect());
+    assert!(view.contains_rect(row), "the current history row must scroll into view: row {row:?} view {view:?}",);
+}
+
+/// New plus 18 New Layer states in a dock that shows only a few rows.
+fn long_harness() -> Harness<'static, PhotocraftApp> {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
+    for n in 0..18 {
+        app.run("layer.new.layer", json!({"name": format!("Layer {n}")})).unwrap();
+    }
+    let mut ready = false;
+    let mut h = Harness::builder().with_size(vec2(280.0, 220.0)).build_ui_state(
+        move |ui, app: &mut PhotocraftApp| {
+            if !ready {
+                PhotocraftApp::setup_context(ui.ctx(), theme::ThemeKind::ProMedium);
+                ready = true;
+                return;
+            }
+            history(app, ui);
+        },
+        app,
+    );
+    h.run_steps(4);
+    h
+}
+
+/// Top of the `n`th New Layer row from the end (0 = the last).
+fn row_top(h: &Harness<'_, PhotocraftApp>, n: usize) -> f32 {
+    let rows: Vec<_> = h.get_all_by_label("New Layer").map(|r| r.rect()).collect();
+    rows[rows.len() - 1 - n].top()
+}
+
+/// The rows' visible band: below the window top, above the footer.
+fn shown(h: &Harness<'_, PhotocraftApp>, n: usize) -> bool {
+    let footer = h.get_by_label("Delete current state").rect().top();
+    let top = row_top(h, n);
+    top >= h.ctx.input(|i| i.viewport_rect()).top() && top + 24.0 <= footer + 0.5
+>>>>>>> upstream/main
 }
 
 /// Without Allow Non-Linear History a later (dimmed) state is not deletable.

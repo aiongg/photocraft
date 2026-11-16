@@ -80,6 +80,7 @@ fn top_dialog(app: &PhotocraftApp) -> DialogId {
 fn color_settings_working_spaces_list_installed_profiles_of_their_space() {
     // #6323: a press condition installed in the system can be the CMYK working space, as in
     // Photoshop's Color Settings; each working-space menu lists only profiles of its space.
+<<<<<<< HEAD
     use photocraft_cms::{ColorSpace, ProfileClass};
     let p = |path: &str, class, color_space| photocraft_engine::installed_profiles::InstalledProfile {
         path: path.into(),
@@ -87,6 +88,10 @@ fn color_settings_working_spaces_list_installed_profiles_of_their_space() {
         class,
         color_space,
     };
+=======
+    use craft_cms::{ColorSpace, ProfileClass};
+    let p = |path: &str, class, color_space| InstalledProfile { path: path.into(), description: path.to_uppercase(), class, color_space };
+>>>>>>> upstream/main
     let installed = [
         p("gracol.icc", ProfileClass::Output, ColorSpace::Cmyk),
         p("monitor.icc", ProfileClass::Display, ColorSpace::Rgb),
@@ -108,7 +113,7 @@ fn color_settings_working_spaces_list_installed_profiles_of_their_space() {
 
 #[test]
 fn indexed_matte_tool_seeds_use_document_encoded_rgb() {
-    use photocraft_cms::Transform;
+    use craft_cms::Transform;
 
     let mut session = photocraft_engine::Session::new();
     session.color.settings.working_rgb = "display-p3".into();
@@ -125,11 +130,76 @@ fn indexed_matte_tool_seeds_use_document_encoded_rgb() {
     let transform = Transform::new(&source, &destination, app.session.color.settings.intent(), app.session.color.settings.bpc).unwrap();
     for (value, input) in [("foreground", [0.2, 0.4, 0.8]), ("background", [0.8, 0.4, 0.2])] {
         let mut output = [0.0; 16];
+<<<<<<< HEAD
         transform.eval(&input, &mut output);
         let got = rows::indexed_matte_seed(&colors, value).unwrap_or_else(|| panic!("{value}: no seed"));
         for c in 0..3 {
             assert!((got[c] - output[c]).abs() < 1e-4, "{value}: channel {c} is {} want {}", got[c], output[c]);
         }
+=======
+        transform.eval(&input, &mut output).unwrap();
+        let expected = crate::color_picker_ui::hex([output[0], output[1], output[2]]);
+        assert_eq!(fields.get(key).and_then(Value::as_str), Some(expected.as_str()), "{key}");
+        assert_eq!(
+            indexed_matte_seed(&fields, if key == INDEXED_MATTE_FOREGROUND { "foreground" } else { "background" }),
+            crate::color_picker_ui::parse_hex(&expected)
+        );
+    }
+}
+/// Convert to Profile's and Proof Setup's `bpc` read "Bpc": spelled out.
+#[test]
+fn black_point_compensation_is_spelled_out() {
+    assert_eq!(source_label("bpc"), "Black Point Compensation");
+}
+
+fn key() -> FilterPreviewKey {
+    FilterPreviewKey {
+        doc: photocraft_doc::DocId(7),
+        revision: 11,
+        sources: Vec::new(),
+        dialog: 3,
+        active: Some(photocraft_doc::LayerId(2)),
+        target: Default::default(),
+        command: "filter.blur.gaussianBlur".into(),
+        params: json!({"radius": 4.0}),
+        k: 1,
+        tool_colors: ([0.0, 0.0, 0.0, 1.0], [1.0; 4]),
+    }
+}
+
+#[test]
+fn same_target_ignores_parameters_but_nothing_else() {
+    // A drag only changes the parameters, and that must not hide the finished frame.
+    let mut base = key();
+    base.sources = vec![(photocraft_doc::DocId(9), 1)];
+    let mut moved = base.clone();
+    moved.params = json!({"radius": 40.0});
+    assert!(base.same_target(&moved));
+    assert!(moved.same_target(&base));
+
+    // Anything else names a different preview and must not be shown.
+    for break_it in [
+        |k: &mut FilterPreviewKey| k.doc = photocraft_doc::DocId(8),
+        |k: &mut FilterPreviewKey| k.revision = 12,
+        |k: &mut FilterPreviewKey| k.sources[0].0 = photocraft_doc::DocId(10),
+        |k: &mut FilterPreviewKey| k.sources[0].1 = 2,
+        |k: &mut FilterPreviewKey| k.sources.clear(),
+        |k: &mut FilterPreviewKey| k.dialog = 4,
+        |k: &mut FilterPreviewKey| k.active = Some(photocraft_doc::LayerId(5)),
+        |k: &mut FilterPreviewKey| k.active = None,
+        |k: &mut FilterPreviewKey| k.target = photocraft_engine::channel_cmds::ChannelTarget::LayerMask,
+        |k: &mut FilterPreviewKey| k.command = "filter.blur.motionBlur".into(),
+        |k: &mut FilterPreviewKey| k.k = 2,
+        |k: &mut FilterPreviewKey| k.tool_colors.0 = [0.2, 0.4, 0.8, 1.0],
+        |k: &mut FilterPreviewKey| k.tool_colors.1 = [0.8, 0.4, 0.2, 1.0],
+    ] {
+        let mut other = base.clone();
+        break_it(&mut other);
+        assert!(!other.same_target(&base), "{other:?} must not pass as {base:?}");
+        assert!(!base.same_target(&other));
+        // The canvas's display gate forgives the factor alone (#10474), nothing else.
+        assert_eq!(other.same_target_at_any_scale(&base), other.k != base.k, "{other:?}");
+>>>>>>> upstream/main
     }
 }
 

@@ -57,6 +57,7 @@ pub(crate) fn toolbar_position(tool: Tool) -> usize {
     TOOL_SECTIONS.iter().flat_map(|section| section.iter()).flat_map(|slot| slot.iter()).position(|&t| t == tool).unwrap_or(usize::MAX)
 }
 
+<<<<<<< HEAD
 /// Opens the Edit Toolbar drawer beside the rail. The rail's "…" button and the `edit.toolbar` command both come here.
 pub(crate) fn open_drawer(app: &mut PhotocraftApp) {
     app.ui.toolbar_drawer = true;
@@ -69,14 +70,89 @@ fn last_used(slots: &[ToolSlot<Tool>], group_tools: &[Tool]) -> LastUsed<Tool> {
     for slot in slots {
         if let Some(tool) = group_tools.iter().find(|tool| slot.tools.iter().any(|held| held.id == **tool)) {
             last.set(slot.id, *tool);
+=======
+/// The toolbar's group layout from Edit › Toolbar (`edit.toolbar`), as tools: the slots' groups
+/// in order, then the Extra Tools groups. Names were resolved by the engine
+/// (`ToolbarCustomization::layout`), which writes `Tool` debug names.
+pub(crate) fn tool_layout(custom: &photocraft_engine::prefs::ToolbarCustomization) -> (Vec<Vec<Tool>>, Vec<Vec<Tool>>) {
+    let layout = custom.layout();
+    let tools = |groups: Vec<Vec<String>>| -> Vec<Vec<Tool>> {
+        groups.iter().map(|g| g.iter().filter_map(|n| Tool::from_name(n)).collect::<Vec<Tool>>()).filter(|g| !g.is_empty()).collect()
+    };
+    (tools(layout.toolbar), tools(layout.extras))
+}
+
+/// Every tool in layout order: the slots' groups, then the extras. Shift+letter steps through a
+/// key's tools in this order, across slots.
+pub(crate) fn layout_order(custom: &photocraft_engine::prefs::ToolbarCustomization) -> Vec<Tool> {
+    let (toolbar, extras) = tool_layout(custom);
+    toolbar.into_iter().chain(extras).flatten().collect()
+}
+
+/// The default slot (section, index in [`TOOL_SECTIONS`] read slot by slot) that holds `tool`.
+fn home_slot(tool: Tool) -> Option<(usize, usize)> {
+    let mut index = 0usize;
+    for (si, section) in TOOL_SECTIONS.iter().enumerate() {
+        for slot in section.iter() {
+            if slot.contains(&tool) {
+                return Some((si, index));
+            }
+            index += 1;
+        }
+    }
+    None
+}
+
+/// The slots the toolbar draws: one per toolbar group of the stored layout, in order, each
+/// listing its group's tools in order. Consecutive groups whose first tools come from the same
+/// default section share a section, so the default layout keeps its dividers. Each slot carries
+/// the index of its first tool's default slot in `TOOL_SECTIONS` (or one past the defaults when
+/// that index is taken), so its flyout stays put when other slots are hidden or moved.
+pub(crate) fn layout_sections(custom: &photocraft_engine::prefs::ToolbarCustomization) -> Vec<Vec<(usize, Vec<Tool>)>> {
+    let (groups, _) = tool_layout(custom);
+    let defaults: usize = TOOL_SECTIONS.iter().map(|section| section.len()).sum();
+    let mut used: Vec<usize> = Vec::new();
+    let mut sections: Vec<Vec<(usize, Vec<Tool>)>> = Vec::new();
+    let mut last_section = None;
+    for (i, group) in groups.into_iter().enumerate() {
+        let home = group.first().copied().and_then(home_slot);
+        let index = match home {
+            Some((_, slot)) if !used.contains(&slot) => slot,
+            _ => defaults + i,
+        };
+        used.push(index);
+        let section = home.map(|(si, _)| si);
+        if sections.is_empty() || section != last_section {
+            sections.push(Vec::new());
+        }
+        last_section = section;
+        if let Some(current) = sections.last_mut() {
+            current.push((index, group));
+>>>>>>> upstream/main
         }
     }
     last
 }
 
+<<<<<<< HEAD
 /// The rail's edge for the physical side the toolbar sits on: the rail names its edge by the interface direction.
 fn rail_edge(side: ToolbarSide) -> PaneEdge {
     if (side.resolve() == ToolbarSide::Right) != crate::direction::is_rtl() { PaneEdge::End } else { PaneEdge::Start }
+=======
+/// [`layout_sections`] for the default layout without the tools hidden in Edit › Toolbar
+/// (`hidden` holds tool names: the dialog writes `Tool` debug names, `edit.toolbar` takes any
+/// name `Tool::from_name` reads). A slot keeps only its visible tools, so its flyout lists just
+/// those; a slot with none left is dropped, and so is a section with no slots.
+#[cfg(test)]
+pub(super) fn visible_sections(hidden: &[String]) -> Vec<Vec<(usize, Vec<Tool>)>> {
+    layout_sections(&photocraft_engine::prefs::ToolbarCustomization { hidden: hidden.to_vec(), ..Default::default() })
+}
+
+/// A primary-button gesture started on this tool; open only after it leaves its hit area.
+/// Using pointer origin rather than `Response::dragged` also works for click-only icon buttons.
+pub(super) fn tool_flyout_drag_open(button: Rect, origin: Option<Pos2>, pointer: Option<Pos2>, primary_down: bool) -> bool {
+    primary_down && origin.is_some_and(|p| button.contains(p)) && pointer.is_some_and(|p| !button.contains(p))
+>>>>>>> upstream/main
 }
 
 /// The tool palette: a `ToolRail` over the slots, with the Quick Mask and Screen Mode buttons and the colour chips in
@@ -201,6 +277,7 @@ fn show_drawer(
     }
 }
 
+<<<<<<< HEAD
 /// Photoshop's foreground / background colour chips: `SwatchPair` in host-picker mode, the
 /// foreground in front, Default Colors (D) and Switch Colors (X) over them, centred in the tool
 /// column.
@@ -225,6 +302,62 @@ pub(super) fn color_chips(app: &mut PhotocraftApp, ui: &mut egui::Ui, column: f3
     match out.clicked {
         Some(Well::Secondary) => {
             crate::color_picker_ui::open(app, "background");
+=======
+/// The tool palette panel, on the side `panels.toolbar_side` resolves to, with its width
+/// toggle and Move Toolbar header buttons.
+pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+    let t = Tokens::get(ui.ctx());
+    let (_, bx) = toolbar_columns(t.pro);
+    let m = if t.pro { 5i8 } else { 7i8 };
+    let sections = layout_sections(&app.session.prefs().toolbar);
+    // Two columns when the header chevron asks for them; a column that doesn't fit scrolls.
+    let double = app.ui.panels.toolbar_double;
+    let w = toolbar_width(t.pro, double);
+    let side = app.ui.panels.toolbar_side.resolve();
+    let panel = if side == ToolbarSide::Right { egui::Panel::right("toolbar") } else { egui::Panel::left("toolbar") };
+    panel.resizable(false).exact_size(w).frame(egui::Frame::NONE.fill(t.chrome).inner_margin(egui::Margin::symmetric(m, 8))).show(ui, |ui| {
+        // Toolbar width is a user preference, not a Pro-only feature. The two header buttons share
+        // the narrow toolbar column (14-point targets in every theme, including RTL layouts), so
+        // their tooltips carry the full names.
+        ui.allocate_ui_with_layout(vec2(bx, 14.0), egui::Layout::left_to_right(egui::Align::Center), |ui| {
+            ui.spacing_mut().item_spacing.x = 2.0;
+            let (cr, resp) = ui.allocate_exact_size(vec2(bx.min(14.0), 14.0), Sense::click());
+            let (shrink, grow) = if side == ToolbarSide::Right { ("chevrons-right", "chevrons-left") } else { ("chevrons-left", "chevrons-right") };
+            icons::paint(ui, cr, if double { shrink } else { grow }, 11.0, if resp.hovered() { t.text } else { t.text_faint });
+            resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Toolbar")));
+            if resp.clicked() {
+                app.ui.panels.toolbar_double = !double;
+            }
+            let other = side.other();
+            let (dock_tip, dock_icon) = match other {
+                ToolbarSide::Right => (tl!("Move Toolbar to the Right"), "panel-right"),
+                _ => (tl!("Move Toolbar to the Left"), "panel-left"),
+            };
+            let (dr, dock) = ui.allocate_exact_size(vec2((bx - 16.0).max(14.0), 14.0), Sense::click());
+            icons::paint(ui, dr, dock_icon, 11.0, if dock.hovered() { t.text } else { t.text_faint });
+            dock.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, dock_tip));
+            if dock.on_hover_text(dock_tip).clicked() {
+                app.ui.panels.toolbar_side = other;
+                // Persist the side as a discrete change; the dock may not be drawn this frame.
+                crate::dock::persist_panels(app, ui.ctx());
+            }
+        });
+        ui.add_space(4.0);
+        // Subtle violet wash at the bottom of the toolbar.
+        let full = ui.max_rect();
+        if !t.bevel && !t.pro && t.dark() {
+            let mut mesh = egui::Mesh::default();
+            let r = Rect::from_min_max(pos2(full.left() - 7.0, full.bottom() - 260.0), pos2(full.right() + 7.0, full.bottom() + 8.0));
+            let top = Color32::TRANSPARENT;
+            let bottom = Color32::from_rgba_unmultiplied(90, 70, 190, 34);
+            mesh.colored_vertex(r.left_top(), top);
+            mesh.colored_vertex(r.right_top(), top);
+            mesh.colored_vertex(r.right_bottom(), bottom);
+            mesh.colored_vertex(r.left_bottom(), bottom);
+            mesh.add_triangle(0, 1, 2);
+            mesh.add_triangle(0, 2, 3);
+            ui.painter().add(mesh);
+>>>>>>> upstream/main
         }
         Some(_) => {
             crate::color_picker_ui::open(app, "foreground");

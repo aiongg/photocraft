@@ -86,3 +86,17 @@ fn a_drag_makes_a_live_star_shape_layer_with_one_undo_step() {
     app.run("edit.undo", json!({})).unwrap();
     assert!(live_shape(&app).is_none(), "undo takes the star away");
 }
+<<<<<<< HEAD
+=======
+
+#[test]
+fn shift_and_alt_constrain_and_centre_the_star_like_the_polygon_tool() {
+    let mut app = app();
+    app.ui.tool = Tool::Star;
+    drag(&mut app, [100.0, 100.0], [140.0, 120.0], Modifiers::SHIFT | Modifiers::ALT);
+    match live_shape(&app) {
+        Some(LiveShape::Polygon { rect, .. }) => assert_eq!(rect, [80.0, 80.0, 40.0, 40.0], "a square box of the shorter side drawn from the centre (#13222)"),
+        other => panic!("a live star shape, got {other:?}"),
+    }
+}
+>>>>>>> upstream/main

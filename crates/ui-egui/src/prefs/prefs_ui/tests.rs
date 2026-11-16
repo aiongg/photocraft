@@ -476,7 +476,267 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
     assert_eq!(listed.len(), 2, "the settings row and the one favourite: {listed:?}");
 }
 
+<<<<<<< HEAD
 // --- the settings store -------------------------------------------------------------------------------------------
+=======
+/// The favourite star badge overhangs its swatch; showing it on hover must not move the swatches
+/// after it, or the row would shift under the pointer.
+#[test]
+fn theme_star_badge_on_hover_does_not_move_the_next_swatch() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let (mut app, _) = app_with_store();
+    open_preferences(&mut app, "interface");
+    let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    let first = h.get_by_label("Classic").rect();
+    let next = h.get_by_label("Adwaita").rect();
+    h.hover_at(first.right_top() + vec2(-3.0, 3.0));
+    h.run_steps(3);
+    assert!(h.query_by_label("Add to favorites: Classic").is_some(), "the badge shows while the swatch is hovered");
+    assert_eq!(h.get_by_label("Classic").rect(), first);
+    assert_eq!(h.get_by_label("Adwaita").rect(), next);
+}
+
+#[test]
+fn preferences_interface_shows_language_without_scrolling() {
+    // #2532: in a small window the theme cards filled the page and Language sat out of view
+    // below them. Like Photoshop, Presentation follows Appearance and both fit.
+    use egui_kittest::{Harness, kittest::Queryable};
+    let (mut app, _) = app_with_store();
+    app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
+    open_preferences(&mut app, "interface");
+    let mut h = Harness::builder().with_size(vec2(1000.0, 750.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    let language = h.query_all_by_label("Language").next().expect("the Language row").rect();
+    let dark = h.query_all_by_label("Dark Theme").next().expect("the dark theme row").rect();
+    let ok = h.get_by_label("OK").rect();
+    assert!(dark.bottom() < language.top(), "Presentation {language:?} follows the theme swatches {dark:?}");
+    assert!(language.bottom() < ok.top() - 20.0, "Language {language:?} must show above the buttons {ok:?} without scrolling");
+    // Every theme in the option lists gets a swatch, Breeze included.
+    for (id, _) in LIGHT_THEME_OPTIONS.iter().chain(DARK_THEME_OPTIONS) {
+        let label = choice_label(id);
+        assert!(h.query_by_label(&label).is_some(), "missing theme swatch {label}");
+    }
+    assert!(h.query_by_label("Breeze light").is_some() && h.query_by_label("Breeze dark").is_some());
+}
+
+#[test]
+fn preferences_interface_search_hides_rows_and_skips_empty_groups() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let render = |search: &str| {
+        let (mut app, _) = app_with_store();
+        app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
+        let id = open_preferences(&mut app, "interface");
+        app.ui.dialog_mut(id).unwrap().fields.insert("__search".into(), json!(search));
+        let mut h = Harness::builder().with_size(vec2(1000.0, 750.0)).build_eframe(move |cc| {
+            PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+            app
+        });
+        h.run_steps(4);
+        h
+    };
+    let shown = |h: &Harness<'_, PhotocraftApp>, label: &str| h.query_all_by_label(label).next().is_some();
+
+    let h = render("language");
+    assert!(shown(&h, "Language") && shown(&h, "Presentation"));
+    for gone in ["Appearance", "Appearance Mode", "Dark Theme", "Options", "UI scale"] {
+        assert!(!shown(&h, gone), "\"language\" must not show {gone}");
+    }
+
+    let h = render("theme");
+    assert!(shown(&h, "Appearance") && shown(&h, "Light Theme") && shown(&h, "Dark Theme") && shown(&h, "Breeze dark"));
+    for gone in ["Appearance Mode", "Presentation", "Language", "Options"] {
+        assert!(!shown(&h, gone), "\"theme\" must not show {gone}");
+    }
+
+    let h = render("");
+    for group in ["Appearance", "Appearance Mode", "Presentation", "Options", "UI scale"] {
+        assert!(shown(&h, group), "an empty search shows {group}");
+    }
+}
+
+pub(super) fn app_with_store() -> (PhotocraftApp, Arc<Mutex<Option<String>>>) {
+    app_with_saved(None)
+}
+
+fn app_with_saved(text: Option<String>) -> (PhotocraftApp, Arc<Mutex<Option<String>>>) {
+    let store: Arc<Mutex<Option<String>>> = Arc::new(Mutex::new(text));
+    (app_on(&store, Arc::default()), store)
+}
+
+/// An app whose preferences live in `store`; writes fail while `fail` is set.
+fn app_on(store: &Arc<Mutex<Option<String>>>, fail: Arc<std::sync::atomic::AtomicBool>) -> PhotocraftApp {
+    let (a, b) = (store.clone(), store.clone());
+    let services = crate::Services {
+        load_prefs: Some(Box::new(move || a.lock().unwrap().clone())),
+        save_prefs: Some(Box::new(move |s: &str| {
+            if fail.load(std::sync::atomic::Ordering::Relaxed) {
+                return Err("storage is full".into());
+            }
+            *b.lock().unwrap() = Some(s.to_string());
+            Ok(())
+        })),
+        ..Default::default()
+    };
+    PhotocraftApp::new(photocraft_engine::Session::new(), services)
+}
+
+fn stored(store: &Arc<Mutex<Option<String>>>) -> Value {
+    serde_json::from_str(store.lock().unwrap().as_deref().unwrap_or("null")).unwrap()
+}
+>>>>>>> upstream/main
+
+#[test]
+fn saving_preferences_waits_for_the_actions_write_only_for_its_shortcuts() {
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    let old = "actions.playById:00112233445566778899aabbccddeeff";
+    let new = "actions.playById:ffeeddccbbaa99887766554433221100";
+    let (mut app, store) = app_with_saved(Some(json!({"shortcuts": {(old): "F2"}, "alternateShortcuts": {(old): ["F3"]}}).to_string()));
+    let pending = Arc::new(AtomicBool::new(false));
+    let observed = pending.clone();
+    app.services.actions_write_pending = Some(Box::new(move || observed.load(Ordering::Relaxed)));
+    let ctx = egui::Context::default();
+    tick(&mut app, &ctx);
+
+    pending.store(true, Ordering::Relaxed);
+    app.session.edit_prefs(|prefs| {
+        prefs.shortcuts.remove(old);
+        prefs.shortcuts.insert(new.into(), "F2".into());
+        prefs.alternate_shortcuts.remove(old);
+        prefs.file_handling.recent_file_count = 12;
+    });
+    tick(&mut app, &ctx);
+    let before_commit = stored(&store);
+    assert_eq!(before_commit["fileHandling"]["recentFileCount"], 12);
+    assert_eq!(before_commit["shortcuts"][old], "F2");
+    assert_eq!(before_commit["alternateShortcuts"][old], json!(["F3"]));
+    assert!(before_commit["shortcuts"].get(new).is_none());
+
+    pending.store(false, Ordering::Relaxed);
+    tick(&mut app, &ctx);
+    let after_commit = stored(&store);
+    assert!(after_commit["shortcuts"].get(old).is_none());
+    assert!(after_commit["alternateShortcuts"].get(old).is_none());
+    assert_eq!(after_commit["shortcuts"][new], "F2");
+}
+
+#[test]
+fn desktop_shortcuts_wait_for_the_actions_definition_write() {
+    use photocraft_engine::actions_cmds;
+    use photocraft_engine::preset_store::{ACTIONS_FILE, MemBackend, PresetBackend, open};
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct RetriableActionsWrite {
+        store: MemBackend,
+        reject: Arc<AtomicBool>,
+    }
+
+    impl PresetBackend for RetriableActionsWrite {
+        fn list(&self) -> Result<Vec<(String, u64)>, String> {
+            self.store.list()
+        }
+
+        fn read(&self, name: &str, max: u64) -> Result<Vec<u8>, String> {
+            self.store.read(name, max)
+        }
+
+        fn write(&self, name: &str, bytes: &[u8]) -> Result<(), String> {
+            if name == ACTIONS_FILE && self.reject.load(Ordering::Relaxed) {
+                return Err("injected Actions write rejection".into());
+            }
+            self.store.write(name, bytes)
+        }
+
+        fn remove(&self, name: &str) -> Result<(), String> {
+            self.store.remove(name)
+        }
+    }
+
+    let old_id = "00112233445566778899aabbccddeeff";
+    let old = actions_cmds::occurrence_key(old_id);
+    let original = json!({"version":1, "actions":[{"name":"Saved", "action_id":old_id}]});
+    let ctx = egui::Context::default();
+    for attach in [true, false] {
+        let (tx, rx) = std::sync::mpsc::channel();
+        let (mut app, prefs) = app_with_saved(Some(json!({"shortcuts":{(&old):"F4"}, "alternateShortcuts":{(&old):["F4","F8"]}}).to_string()));
+        app.services.preset_store = Some(rx);
+        app.run("actions.record", json!({"name":"Early"})).unwrap();
+        app.run("actions.stop", json!({})).unwrap();
+        crate::actions::assign_shortcut(&mut app, 0, "F4").unwrap();
+        let new_id = app.session.actions.list[0].action_id.clone().unwrap();
+        let new = actions_cmds::occurrence_key(&new_id);
+        let assert_held = |ordinary| {
+            let saved = stored(&prefs);
+            assert_eq!(saved["fileHandling"]["recentFileCount"], ordinary);
+            assert_eq!(saved["shortcuts"][&old], "F4");
+            assert_eq!(saved["alternateShortcuts"][&old], json!(["F4", "F8"]));
+            assert!(saved["shortcuts"].get(&new).is_none());
+        };
+
+        app.session.edit_prefs(|p| p.file_handling.recent_file_count = 12);
+        save_preferences(&mut app).unwrap();
+        assert_held(12);
+        app.session.edit_prefs(|p| p.file_handling.recent_file_count = 13);
+        tick(&mut app, &ctx);
+        assert_held(13);
+
+        let definitions = MemBackend::default();
+        definitions.write(ACTIONS_FILE, original.to_string().as_bytes()).unwrap();
+        let reject = Arc::new(AtomicBool::new(true));
+        if attach {
+            tx.send(open(Box::new(RetriableActionsWrite { store: definitions.clone(), reject: reject.clone() }))).unwrap();
+        }
+        drop(tx);
+        tick(&mut app, &ctx);
+        assert!(app.services.preset_store.is_none());
+        assert_eq!(app.session.preset_store.is_some(), attach);
+        app.session.edit_prefs(|p| p.file_handling.recent_file_count = 14);
+        save_preferences(&mut app).unwrap();
+        assert_held(14);
+        assert_eq!(serde_json::from_slice::<Value>(&definitions.read(ACTIONS_FILE, 4096).unwrap()).unwrap(), original);
+
+        if attach {
+            reject.store(false, Ordering::Relaxed);
+            // A normal command retries the failed Actions write before preferences are saved.
+            app.run("file.new", json!({"width":2,"height":2})).unwrap();
+            save_preferences(&mut app).unwrap();
+            let durable = serde_json::from_slice::<Value>(&definitions.read(ACTIONS_FILE, 4096).unwrap()).unwrap();
+            assert_eq!(durable["actions"][0]["action_id"], new_id);
+            let saved = stored(&prefs);
+            assert_eq!(saved["shortcuts"][&new], "F4");
+            assert_ne!(saved["shortcuts"][&old], "F4");
+            assert_eq!(saved["alternateShortcuts"][&old], json!(["F8"]));
+            assert_eq!(saved["fileHandling"]["recentFileCount"], 14);
+        } else {
+            app.run("actions.record", json!({"name":"After disconnect"})).unwrap();
+            app.run("actions.stop", json!({})).unwrap();
+            crate::actions::assign_shortcut(&mut app, 1, "F8").unwrap();
+            let late_id = app.session.actions.list[1].action_id.clone().unwrap();
+            let late = actions_cmds::occurrence_key(&late_id);
+            save_preferences(&mut app).unwrap();
+            assert_held(14);
+            assert!(stored(&prefs)["shortcuts"].get(&late).is_none());
+
+            let (tx, rx) = std::sync::mpsc::channel();
+            tx.send(open(Box::new(definitions.clone()))).unwrap();
+            app.services.preset_store = Some(rx);
+            tick(&mut app, &ctx);
+            let durable = serde_json::from_slice::<Value>(&definitions.read(ACTIONS_FILE, 4096).unwrap()).unwrap();
+            assert_eq!(durable["actions"][1]["action_id"], late_id);
+            let saved = stored(&prefs);
+            assert_eq!(saved["shortcuts"][&new], "F4");
+            assert_eq!(saved["shortcuts"][&late], "F8");
+            assert!(saved["alternateShortcuts"][&old].as_array().is_none_or(Vec::is_empty));
+        }
+    }
+}
 
 #[test]
 fn a_wrongly_typed_value_resets_only_itself_and_is_repaired_on_disk() {
@@ -1271,23 +1531,29 @@ fn the_saved_brush_owner_follows_the_saved_last_brush() {
     app.session.tools.brush_changed();
     crate::last_brush::persist(&mut app, &ctx);
     crate::tool_memory::persist(&mut app, &ctx);
-    // The Brush's tip becomes a big sampled one, then the Eraser takes over that brush.
+    // The Brush's tip becomes a big sampled one, then the Blur tool takes over that brush (the Eraser has its own
+    // starting tip since #11936).
     app.session.tools.brush.tip = TipShape::Sampled(GrayTile::from_fn(400, 300, |x, y| ((x * y) % 7) as f32 / 7.0));
     app.session.tools.brush_changed();
-    app.ui.tool = Tool::Eraser;
+    app.ui.tool = Tool::Blur;
     crate::paint_mouse::sync_tool_brush(&mut app);
     crate::last_brush::persist(&mut app, &ctx);
     crate::tool_memory::persist(&mut app, &ctx);
     tick(&mut app, &ctx);
     let saved = stored(&store);
     assert_eq!(saved["lastBrush"]["brush"]["size"], json!(77.0), "the big tip is not remembered yet");
+<<<<<<< HEAD
     assert_ne!(saved["toolBrushes"]["owner"], json!("Eraser"), "{saved}");
     let mut app2 = app_on(&store);
+=======
+    assert_ne!(saved["toolBrushes"]["owner"], json!("Blur"), "{saved}");
+    let (mut app2, _) = app_with_saved(store.lock().unwrap().clone());
+>>>>>>> upstream/main
     tick(&mut app2, &ctx);
     assert_eq!(app2.ui.brush_tool, Tool::Brush, "the 77 px brush is the Brush's");
     assert_eq!(app2.session.tools.brush.size, 77.0);
 
-    // Once the Eraser's brush is saved, the Eraser owns it in the preferences too.
+    // Once the Blur tool's brush is saved, the Blur tool owns it in the preferences too.
     app.session.tools.brush.tip = TipShape::Round;
     app.session.tools.brush.size = 33.0;
     app.session.tools.brush_changed();
@@ -1295,7 +1561,7 @@ fn the_saved_brush_owner_follows_the_saved_last_brush() {
     crate::tool_memory::persist(&mut app, &ctx);
     tick(&mut app, &ctx);
     let saved = stored(&store);
-    assert_eq!(saved["toolBrushes"]["owner"], json!("Eraser"), "{saved}");
+    assert_eq!(saved["toolBrushes"]["owner"], json!("Blur"), "{saved}");
     assert_eq!(saved["lastBrush"]["brush"]["size"], json!(33.0));
 }
 
@@ -1347,7 +1613,209 @@ fn reset_tools_clear_the_remembered_options_and_brushes() {
     assert!(!app2.ui.tool_brushes.is_empty() && starting(&app2.ui.tool_brushes), "remembered across a restart");
 }
 
+<<<<<<< HEAD
 // --- the Preferences window ----------------------------------------------------------------------------------------
+=======
+#[test]
+fn view_show_items_survive_a_restart() {
+    let (mut app, store) = app_with_store();
+    let ctx = egui::Context::default();
+    tick(&mut app, &ctx);
+    // Untouched: nothing is stored, so later default changes still reach the user.
+    crate::view_cmds::persist(&mut app, &ctx);
+    tick(&mut app, &ctx);
+    assert!(stored(&store).get("viewExtras").is_none_or(Value::is_null));
+    // The menu commands, as a user toggles them (#3762: Pixel Grid off).
+    for id in ["view.show.pixelGrid", "view.show.grid", "view.snapTo.layers", "view.extras"] {
+        crate::menus::invoke(&mut app, &ctx, id, json!({})).unwrap();
+    }
+    crate::view_cmds::persist(&mut app, &ctx);
+    tick(&mut app, &ctx);
+    assert_eq!(stored(&store)["viewExtras"], json!({"extras": false, "grid": true, "show": {"pixelGrid": false}, "snapTo": {"layers": false}}));
+    // A restart gets them back.
+    let saved = store.lock().unwrap().clone().unwrap();
+    let (mut app2, _) = app_with_saved(Some(saved));
+    tick(&mut app2, &ctx);
+    let v = &app2.ui.view;
+    assert!(!v.extras && !v.show.pixel_grid && !v.snap_to.layers && app2.ui.extras.grid);
+    assert!(v.show.selection_edges && v.snap_to.guides && app2.ui.extras.guides, "the rest keep their defaults");
+    // A hand-edited file: unknown keys and non-booleans keep the defaults, good ones still load.
+    for bad in [json!("junk"), json!({"extras": 0, "show": {"pixelGrid": "no", "mesh": true, "bogus": true}, "snapTo": [1]})] {
+        let (mut app3, _) = app_with_saved(Some(json!({"viewExtras": bad}).to_string()));
+        tick(&mut app3, &ctx);
+        let v = &app3.ui.view;
+        assert!(v.extras && v.show.pixel_grid && v.snap_to.layers, "{bad}");
+        assert_eq!(v.show.mesh, bad.is_object());
+    }
+}
+
+#[test]
+fn view_snap_off_survives_a_restart() {
+    let (mut app, store) = app_with_store();
+    let ctx = egui::Context::default();
+    tick(&mut app, &ctx);
+    assert!(app.ui.extras.snap, "on by default");
+    crate::menus::invoke(&mut app, &ctx, "view.snap", json!({})).unwrap();
+    assert!(!app.ui.extras.snap);
+    crate::view_cmds::persist(&mut app, &ctx);
+    tick(&mut app, &ctx);
+    assert_eq!(stored(&store)["viewExtras"], json!({"snap": false}));
+    let saved = store.lock().unwrap().clone().unwrap();
+    let (mut app2, _) = app_with_saved(Some(saved));
+    tick(&mut app2, &ctx);
+    assert!(!app2.ui.extras.snap, "still off after a restart");
+    crate::menus::invoke(&mut app2, &ctx, "view.snap", json!({})).unwrap();
+    crate::view_cmds::persist(&mut app2, &ctx);
+    assert!(app2.session.prefs().view_extras.is_null());
+}
+
+#[test]
+fn show_tooltips_preferences_turn_tooltips_off() {
+    let (mut app, _) = app_with_store();
+    let ctx = egui::Context::default();
+    tick(&mut app, &ctx);
+    assert_eq!(ctx.global_style().interaction.tooltip_delay, crate::theme::TOOLTIP_DELAY);
+    for path in ["interface.showTooltips", "tools.showTooltips"] {
+        app.run("prefs.set", json!({"values": {path: false}})).unwrap();
+        tick(&mut app, &ctx);
+        assert!(ctx.global_style().interaction.tooltip_delay.is_infinite(), "{path} off hides tooltips");
+        app.run("prefs.set", json!({"values": {path: true}})).unwrap();
+        tick(&mut app, &ctx);
+        assert_eq!(ctx.global_style().interaction.tooltip_delay, crate::theme::TOOLTIP_DELAY);
+    }
+}
+
+#[test]
+fn a_saved_enable_animations_loads_and_leaves_egui_animating() {
+    // #9479: Interface › Enable animations is gone (Photoshop has none). A file saved with it
+    // off still loads whole, and egui's fades and scroll glides keep their defaults.
+    let style = egui::Style::default();
+    let both =
+        |ctx: &egui::Context| [egui::Theme::Dark, egui::Theme::Light].map(|t| (ctx.style_of(t).animation_time, ctx.style_of(t).scroll_animation.duration.max));
+    let expected = (style.animation_time, style.scroll_animation.duration.max);
+    assert!(expected.0 > 0.0 && expected.1 > 0.0);
+    for value in [json!(false), json!(true), json!("nope")] {
+        let saved = json!({"version": 2, "interface": {"enableAnimations": value, "showTooltips": false}});
+        let (mut app, _) = app_with_saved(Some(saved.to_string()));
+        let ctx = egui::Context::default();
+        tick(&mut app, &ctx);
+        assert!(app.ui.status.is_empty(), "{value}: {}", app.ui.status);
+        assert!(!app.session.prefs().interface.show_tooltips, "{value}: the rest of the file loads");
+        assert_eq!(both(&ctx), [expected, expected], "{value}");
+        app.apply_theme(&ctx, crate::theme::ThemeKind::StudioLight);
+        tick(&mut app, &ctx);
+        assert_eq!(both(&ctx), [expected, expected], "{value}: after a theme change");
+        assert!(app.run("prefs.set", json!({"values": {"interface.enableAnimations": true}})).is_err());
+    }
+}
+
+#[test]
+fn unimplemented_preferences_are_hidden_from_the_dialog() {
+    let values = prefs::Preferences::default().to_json();
+    assert!(has_visible_fields(&values, "general"));
+    assert!(has_visible_fields(&values, "fileHandling"));
+    assert!(has_visible_fields(&values, "scratchDisks"));
+    assert!(!prefs::is_hidden("scratchDisks.disks"));
+    // MCP: the agent connection and its folders apply at once (`agents.rs`).
+    assert!(has_visible_fields(&values, "integrations"));
+    assert!(!prefs::is_hidden("integrations.allowAgentControl"));
+    assert!(!prefs::is_hidden("integrations.controlPort"));
+    assert!(!prefs::is_hidden("integrations.readRoot"));
+    assert!(!prefs::is_hidden("integrations.writeRoot"));
+    assert!(!prefs::is_hidden("integrations.connectAgents"));
+    // "Fill new type layers with placeholder text" and "Use Escape to Commit" are live; other Type rows stay hidden.
+    assert!(has_visible_fields(&values, "type"));
+    assert!(!prefs::is_hidden("type.fillNewTypeLayersWithPlaceholder"));
+    assert!(!prefs::is_hidden("type.useEscToCommit"));
+    assert!(!prefs::is_hidden("type.smartQuotes"));
+    assert!(!prefs::is_hidden("type.showFontNamesInEnglish"));
+    // Rotate View with Trackpad, the pinch zoom and Enable Gestures are live; the other
+    // Enhanced Controls rows stay hidden.
+    assert!(has_visible_fields(&values, "enhancedControls"));
+    assert!(!prefs::is_hidden("enhancedControls.rotateViewWithTrackpad"));
+    assert!(!prefs::is_hidden("enhancedControls.zoomWithTrackpadPinch"));
+    assert!(!prefs::is_hidden("enhancedControls.touchGestures"));
+    assert!(prefs::is_hidden("enhancedControls.scrubbySliderAcceleration"));
+    // Camera Raw Defaults are all live: the dialog's Open applies them (camera_raw_ui).
+    assert!(has_visible_fields(&values, "rawDefaults"));
+    for k in ["openInCameraRaw", "demosaic", "applyAutoTone", "colorSpace", "bitDepth", "resolution", "sharpenFor", "openAsSmartObject", "writeXmpSidecars"] {
+        assert!(!prefs::is_hidden(&format!("rawDefaults.{k}")), "{k}");
+    }
+    assert!(!prefs::is_hidden("general.autoShowHomeScreen"));
+    assert!(!prefs::is_hidden("general.animatedZoom"));
+    assert!(!prefs::is_hidden("general.zoomResizesWindows"));
+    assert!(!prefs::is_hidden("interface.uiScale"));
+    assert!(!prefs::is_hidden("interface.uiFontSize"));
+    // Hidden values still round-trip through the dialog untouched.
+    let (mut app, _) = app_with_store();
+    app.run("prefs.set", json!({"values": {"type.smartQuotes": false}})).unwrap();
+    let id = open_preferences(&mut app, "type");
+    let fields = app.ui.dialogs.iter().find(|d| d.id == id).map(|d| d.fields.clone()).unwrap();
+    confirm(&mut app, &fields).unwrap();
+    assert!(!app.session.prefs().type_.smart_quotes);
+}
+
+#[test]
+fn preferences_persist_through_services_and_theme_follows() {
+    let (mut app, store) = app_with_store();
+    let ctx = egui::Context::default();
+    tick(&mut app, &ctx);
+    app.run("prefs.set", json!({"values": {"interface.theme": "studioLight", "performance.historyStates": 12}})).unwrap();
+    tick(&mut app, &ctx);
+    assert_eq!(app.ui.theme, ThemeKind::StudioLight);
+    let saved = store.lock().unwrap().clone().unwrap();
+    assert!(saved.contains("\"historyStates\": 12"));
+    // A new app instance loads them.
+    let (mut app2, store2) = app_with_saved(Some(saved));
+    tick(&mut app2, &ctx);
+    assert_eq!(app2.session.prefs().performance.history_states, 12);
+    assert_eq!(app2.ui.theme, ThemeKind::StudioLight);
+    // Picking a theme from the Window menu becomes the preference.
+    crate::menus::invoke(&mut app2, &ctx, "window.theme.classic", json!({})).unwrap();
+    tick(&mut app2, &ctx);
+    assert_eq!(app2.session.prefs().interface.theme, Theme::Classic);
+    assert!(store2.lock().unwrap().as_ref().unwrap().contains("classic"));
+}
+
+#[test]
+fn preset_export_dialog_offers_tool_presets() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    let ctx = egui::Context::default();
+    let opened = crate::menus::invoke(&mut app, &ctx, "edit.presets.exportImportPresets", json!({})).unwrap();
+    let fields = app.ui.dialog_mut(opened["dialog"].as_u64().unwrap()).unwrap().fields.clone();
+    assert_eq!(fields["tools"], true);
+    let mut h = Harness::builder().with_size(vec2(420.0, 260.0)).build_ui_state(presets_io_body, fields);
+    h.run_steps(2);
+    h.get_by_label("Tool Presets").click();
+    h.run_steps(2);
+    assert_eq!(h.state()["tools"], false);
+    assert_eq!(h.state()["brushes"], true);
+    assert_eq!(h.state()["customShapes"], true);
+}
+
+#[test]
+fn brush_preset_store_attaches_when_loaded_and_persists() {
+    use photocraft_engine::preset_store::{MemBackend, open};
+    let mem = MemBackend::default();
+    let ctx = egui::Context::default();
+    let (tx, rx) = std::sync::mpsc::channel();
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services { preset_store: Some(rx), ..Default::default() });
+    // Still loading: presets made now are kept and written once the store arrives.
+    tick(&mut app, &ctx);
+    app.run("brush.presets.save", json!({"name": "Early"})).unwrap();
+    assert!(mem.files.lock().unwrap().is_empty());
+    tx.send(open(Box::new(mem.clone()))).unwrap();
+    tick(&mut app, &ctx);
+    assert!(app.services.preset_store.is_none() && app.session.preset_store.is_some());
+    app.run("brush.presets.save", json!({"name": "Late"})).unwrap();
+    let mut s2 = photocraft_engine::Session::new();
+    assert!(s2.attach_preset_store(open(Box::new(mem))).is_empty());
+    for n in ["Early", "Late"] {
+        assert!(s2.tools.presets.iter().any(|p| p.name == n), "{n}");
+    }
+}
+>>>>>>> upstream/main
 
 #[test]
 fn preferences_dialog_round_trip() {
@@ -1358,10 +1826,289 @@ fn preferences_dialog_round_trip() {
     apply_window(&mut app).unwrap();
     assert_eq!(app.session.prefs().cursors.painting, prefs::PaintingCursor::FullSizeTip);
     assert_eq!(app.session.prefs().units_and_rulers.rulers, prefs::Unit::Inches);
+<<<<<<< HEAD
     // Reopening shows what the engine holds.
     let pages = serde_json::to_value(super::fields::PrefPages::of(app.session.prefs())).unwrap();
     assert_eq!(pages["cursors"]["painting"], "fullSizeTip");
     assert_eq!(pages["unitsAndRulers"]["rulers"], "inches");
+=======
+    // Invalid values are rejected and nothing changes.
+    let id = open_preferences(&mut app, "performance");
+    let mut values = app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields["values"].clone();
+    values["performance"]["historyStates"] = json!(0);
+    app.ui.dialog_mut(id).unwrap().fields.insert("values".into(), values);
+    assert!(crate::dialogs::confirm(&mut app, id).is_err());
+    assert_eq!(app.session.prefs().performance.history_states, 50);
+}
+
+#[test]
+fn preferences_apply_button_saves_without_closing_and_cancel_keeps_applied_values() {
+    use egui_kittest::{
+        Harness,
+        kittest::{NodeT, Queryable},
+    };
+
+    let (mut app, store) = app_with_store();
+    app.run("prefs.set", json!({"values": {"interface.language": "en", "type.smartQuotes": false}})).unwrap();
+    let id = open_preferences(&mut app, "interface");
+    let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    assert!(h.get_by_label("Apply").accesskit_node().is_disabled());
+
+    let values = h.state_mut().ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap();
+    values["interface"]["appearanceMode"] = json!("light");
+    values["interface"]["lightTheme"] = json!("studioLight");
+    values["interface"]["uiFontSize"] = json!("large");
+    values["performance"]["historyStates"] = json!(12);
+    h.run_steps(2);
+    assert!(!h.get_by_label("Apply").accesskit_node().is_disabled());
+    h.get_by_label("Apply").click();
+    h.run_steps(4);
+
+    assert_eq!(h.state().session.prefs().performance.history_states, 12);
+    assert_eq!(h.state().ui.theme, ThemeKind::StudioLight);
+    assert_eq!(h.ctx.fonts(|f| f.definitions().font_data["Inter"].tweak.scale), 16.0 / 12.0);
+    assert!(!h.state().session.prefs().type_.smart_quotes, "hidden settings round-trip unchanged");
+    let d = h.state().ui.dialogs.iter().find(|d| d.id == id).unwrap();
+    assert_eq!(d.fields["section"], "interface");
+    assert_eq!(d.fields["values"]["performance"]["historyStates"], 12);
+    assert!(h.get_by_label("Apply").accesskit_node().is_disabled());
+    let saved: Value = serde_json::from_str(store.lock().unwrap().as_ref().unwrap()).unwrap();
+    assert_eq!(saved["performance"]["historyStates"], 12);
+    assert_eq!(saved["interface"]["appearanceMode"], "light");
+    assert_eq!(saved["interface"]["lightTheme"], "studioLight");
+    assert_eq!(saved["interface"]["uiFontSize"], "large");
+
+    // Repeated Apply starts from the validated values, not the dialog's original snapshot.
+    h.state_mut().ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["performance"]["historyStates"] = json!(22);
+    h.run_steps(2);
+    h.get_by_label("Apply").click();
+    h.run_steps(4);
+    assert_eq!(h.state().session.prefs().performance.history_states, 22);
+    h.state_mut().ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["performance"]["historyStates"] = json!(33);
+    h.state_mut().ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiFontSize"] = json!("tiny");
+    h.run_steps(2);
+    h.get_by_label("Cancel").click();
+    h.run_steps(4);
+    assert!(h.state().ui.dialogs.iter().all(|d| d.id != id));
+    assert_eq!(h.state().session.prefs().performance.history_states, 22);
+    assert_eq!(h.ctx.fonts(|f| f.definitions().font_data["Inter"].tweak.scale), 16.0 / 12.0);
+    let saved = store.lock().unwrap().clone().unwrap();
+    let (mut restarted, _) = app_with_saved(Some(saved));
+    tick(&mut restarted, &egui::Context::default());
+    assert_eq!(restarted.session.prefs().performance.history_states, 22);
+    assert_eq!(restarted.ui.theme, ThemeKind::StudioLight);
+    assert_eq!(restarted.session.prefs().interface.ui_font_size, prefs::UiFontSize::Large);
+}
+
+#[cfg(all(not(target_arch = "wasm32"), not(target_os = "macos")))]
+#[test]
+fn system_title_bar_explains_next_launch_and_preserves_apply_and_cancel() {
+    use egui_kittest::{Harness, kittest::Queryable};
+
+    let (mut app, store) = app_with_store();
+    app.run("prefs.set", json!({"values": {"interface.language": "en"}})).unwrap();
+    app.custom_titlebar = true;
+    let id = open_preferences(&mut app, "interface");
+    let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        app
+    });
+    h.run_steps(4);
+    h.get_by_label("System title bar").scroll_to_me();
+    h.run_steps(4);
+    h.get_by_label("Applies at next launch.");
+    for desired in [true, false] {
+        h.get_by_label("System title bar").click();
+        h.run_steps(4);
+        assert_eq!(h.state().ui.dialogs.iter().find(|d| d.id == id).unwrap().fields["values"]["interface"]["systemTitleBar"], desired);
+        assert_eq!(h.state().session.prefs().interface.system_title_bar, !desired, "the draft is not applied yet");
+        h.get_by_label("Applies at next launch.");
+        h.get_by_label("Apply").click();
+        h.run_steps(4);
+        assert_eq!(h.state().session.prefs().interface.system_title_bar, desired);
+        assert_eq!(stored(&store)["interface"]["systemTitleBar"], desired);
+        assert!(h.state().custom_titlebar, "do not change the current window or restart it");
+        let (reloaded, _) = app_with_saved(store.lock().unwrap().clone());
+        assert_eq!(reloaded.session.prefs().interface.system_title_bar, desired);
+        h.get_by_label("Applies at next launch.");
+    }
+    h.get_by_label("System title bar").click();
+    h.run_steps(4);
+    h.get_by_label("Cancel").click();
+    h.run_steps(4);
+    assert!(h.state().ui.dialogs.iter().all(|d| d.id != id));
+    assert!(!h.state().session.prefs().interface.system_title_bar);
+    assert_eq!(stored(&store)["interface"]["systemTitleBar"], false);
+    assert!(h.state().custom_titlebar);
+}
+
+/// #7939: switching Rendering Mode waits for the next launch, and says so next to the setting.
+#[test]
+fn rendering_mode_explains_next_launch() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let obj = json!({"renderingMode": "auto", "historyStates": 50}).as_object().unwrap().clone();
+    let mut h = Harness::new_ui_state(
+        |ui, obj: &mut Map<String, Value>| section_fields(ui, "performance", obj, &[], crate::i18n::Lang::from_pref("en"), None, ""),
+        obj,
+    );
+    h.run_steps(4);
+    assert!(h.query_all_by_label("Rendering Mode").next().is_some(), "the Rendering Mode setting");
+    assert!(h.query_all_by_label("Applies at next launch.").next().is_some(), "its next-launch notice");
+    // A search that leaves Rendering Mode out leaves its notice out too.
+    let obj = json!({"renderingMode": "auto", "historyStates": 50}).as_object().unwrap().clone();
+    let mut h = Harness::new_ui_state(
+        |ui, obj: &mut Map<String, Value>| section_fields(ui, "performance", obj, &[], crate::i18n::Lang::from_pref("en"), None, "history"),
+        obj,
+    );
+    h.run_steps(4);
+    assert!(h.query_by_label("Applies at next launch.").is_none());
+}
+
+/// Integrations' rows apply at once, so none of them says "Applies at next launch." (it did
+/// before the agent connection followed the preferences live).
+#[test]
+fn integrations_apply_without_a_restart() {
+    for key in ["allowAgentControl", "connectAgents", "controlPort", "readRoot", "writeRoot", "whenAppClosed"] {
+        assert!(!graphics::read_at_launch(&format!("integrations.{key}")), "{key}");
+    }
+}
+
+#[test]
+fn next_launch_notice_does_not_mark_unrelated_interface_preferences() {
+    use egui_kittest::{Harness, kittest::Queryable};
+    let obj = json!({"showTooltips": true}).as_object().unwrap().clone();
+    let mut h =
+        Harness::new_ui_state(|ui, obj: &mut Map<String, Value>| section_fields(ui, "interface", obj, &[], crate::i18n::Lang::from_pref("en"), None, ""), obj);
+    h.run_steps(4);
+    assert!(h.query_by_label("Applies at next launch.").is_none());
+    h.get_by_label("Show tooltips").click();
+    h.run_steps(4);
+    assert_eq!(h.state()["showTooltips"], false);
+    assert!(h.query_by_label("Applies at next launch.").is_none());
+}
+
+#[test]
+fn preferences_confirm_after_apply_commits_later_edits() {
+    let (mut app, _) = app_with_store();
+    let id = open_preferences(&mut app, "cursors");
+    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["cursors"]["painting"] = json!("fullSizeTip");
+    apply(&mut app, id).unwrap();
+    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["unitsAndRulers"]["rulers"] = json!("inches");
+    crate::dialogs::confirm(&mut app, id).unwrap();
+    assert!(app.ui.dialogs.iter().all(|d| d.id != id));
+    assert_eq!(app.session.prefs().cursors.painting, prefs::PaintingCursor::FullSizeTip);
+    assert_eq!(app.session.prefs().units_and_rulers.rulers, prefs::Unit::Inches);
+}
+
+/// #11120: a live theme change made while Preferences is open survives Apply (and OK) of an
+/// unrelated setting, and the next draft shows it.
+#[test]
+fn preferences_apply_keeps_a_live_theme_change_made_while_open() {
+    let ctx = egui::Context::default();
+    for ok in [false, true] {
+        let (mut app, store) = app_with_store();
+        app.set_theme(&ctx, ThemeKind::Studio);
+        let id = open_preferences(&mut app, "interface");
+        assert_eq!(app.ui.dialog_mut(id).unwrap().fields["values"]["interface"]["theme"], "studio");
+        app.set_theme(&ctx, ThemeKind::Classic);
+        assert!(!preferences_changed(&app, &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields), "a change made elsewhere is not a dialog edit");
+        app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiScale"] = json!("200");
+        assert!(preferences_changed(&app, &app.ui.dialogs.iter().find(|d| d.id == id).unwrap().fields));
+        if ok {
+            crate::dialogs::confirm(&mut app, id).unwrap();
+            assert!(app.ui.dialogs.iter().all(|d| d.id != id));
+        } else {
+            apply(&mut app, id).unwrap();
+            let d = app.ui.dialogs.iter().find(|d| d.id == id).unwrap();
+            assert_eq!(d.fields["values"]["interface"]["theme"], "classic", "the next draft follows the live theme");
+            assert!(!preferences_changed(&app, &d.fields));
+        }
+        let p = app.session.prefs();
+        assert_eq!((p.interface.theme, p.interface.ui_scale), (Theme::Classic, prefs::UiScale::P200), "ok: {ok}");
+        assert_eq!(app.ui.theme, ThemeKind::Classic);
+        tick(&mut app, &ctx);
+        let saved = stored(&store);
+        assert_eq!((saved["interface"]["theme"].as_str(), saved["interface"]["uiScale"].as_str()), (Some("classic"), Some("200")));
+    }
+}
+
+/// A setting edited both in the dialog and elsewhere while it is open takes the dialog's value.
+#[test]
+fn preferences_apply_prefers_the_dialog_edit_of_a_setting_changed_elsewhere() {
+    let ctx = egui::Context::default();
+    let (mut app, store) = app_with_store();
+    app.set_theme(&ctx, ThemeKind::Studio);
+    let id = open_preferences(&mut app, "interface");
+    app.set_theme(&ctx, ThemeKind::Classic);
+    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["theme"] = json!("studioLight");
+    apply(&mut app, id).unwrap();
+    assert_eq!(app.session.prefs().interface.theme, Theme::StudioLight);
+    // The dialog's value is the one shown (from the next frame) and saved, not only the one held.
+    tick(&mut app, &ctx);
+    assert_eq!(app.ui.theme, ThemeKind::StudioLight);
+    assert_eq!(stored(&store)["interface"]["theme"].as_str(), Some("studioLight"));
+}
+
+/// Apply makes the committed values the next base: a live change made after one Apply survives
+/// the next one too.
+#[test]
+fn preferences_apply_twice_keeps_each_live_change() {
+    let ctx = egui::Context::default();
+    let (mut app, store) = app_with_store();
+    app.set_theme(&ctx, ThemeKind::Studio);
+    let id = open_preferences(&mut app, "interface");
+    app.set_theme(&ctx, ThemeKind::Classic);
+    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiScale"] = json!("200");
+    apply(&mut app, id).unwrap();
+    app.set_theme(&ctx, ThemeKind::StudioLight);
+    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiScale"] = json!("150");
+    apply(&mut app, id).unwrap();
+    let p = app.session.prefs();
+    assert_eq!((p.interface.theme, p.interface.ui_scale), (Theme::StudioLight, prefs::UiScale::P150));
+    assert_eq!(app.ui.theme, ThemeKind::StudioLight);
+    tick(&mut app, &ctx);
+    let saved = stored(&store);
+    assert_eq!((saved["interface"]["theme"].as_str(), saved["interface"]["uiScale"].as_str()), (Some("studioLight"), Some("150")));
+}
+
+/// The merge is not about the theme: a setting changed elsewhere (History States, by command)
+/// survives Apply of a theme edited in the dialog.
+#[test]
+fn preferences_apply_keeps_a_setting_changed_elsewhere_beside_a_dialog_theme_edit() {
+    let ctx = egui::Context::default();
+    let (mut app, store) = app_with_store();
+    app.set_theme(&ctx, ThemeKind::Studio);
+    let id = open_preferences(&mut app, "interface");
+    app.run("prefs.set", json!({"path": "performance.historyStates", "value": 30})).unwrap();
+    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["theme"] = json!("classic");
+    apply(&mut app, id).unwrap();
+    let p = app.session.prefs();
+    assert_eq!((p.interface.theme, p.performance.history_states), (Theme::Classic, 30));
+    tick(&mut app, &ctx);
+    assert_eq!(app.ui.theme, ThemeKind::Classic);
+    let saved = stored(&store);
+    assert_eq!((saved["interface"]["theme"].as_str(), saved["performance"]["historyStates"].as_u64()), (Some("classic"), Some(30)));
+}
+
+/// A Preferences dialog without `__base` (opened before it was kept) commits its draft as it is:
+/// a change made elsewhere meanwhile is not kept.
+#[test]
+fn preferences_without_a_base_commit_the_draft_as_it_is() {
+    let ctx = egui::Context::default();
+    let (mut app, _store) = app_with_store();
+    app.set_theme(&ctx, ThemeKind::Studio);
+    let id = open_preferences(&mut app, "interface");
+    app.ui.dialog_mut(id).unwrap().fields.remove("__base");
+    app.set_theme(&ctx, ThemeKind::Classic);
+    app.ui.dialog_mut(id).unwrap().fields.get_mut("values").unwrap()["interface"]["uiScale"] = json!("200");
+    apply(&mut app, id).unwrap();
+    let p = app.session.prefs();
+    assert_eq!((p.interface.theme, p.interface.ui_scale), (Theme::Studio, prefs::UiScale::P200), "the draft's theme");
+>>>>>>> upstream/main
 }
 
 #[test]

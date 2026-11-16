@@ -100,9 +100,30 @@ fn shape_layer_paths_are_edited_and_the_added_anchor_replaces_the_selection() {
     assert_eq!(info["path"]["subpaths"][0]["knots"].as_array().unwrap().len(), 4);
 }
 
+<<<<<<< HEAD
 /// #4144: with Auto Add/Delete (on by default) and no path being drawn, a Pen click on a segment of
 /// the active path adds an anchor and a click on one of its anchors deletes it, one step each, and
 /// no Pen path starts.
+=======
+#[test]
+fn the_cursor_shows_plus_or_minus() {
+    use crate::tool_feedback::{Badge, badge};
+    let mut app = app(Tool::AddAnchorPoint);
+    assert_eq!(badge(&app, Tool::AddAnchorPoint, Modifiers::NONE), None, "no path targeted, no segment under the pointer (#12729)");
+    with_path(&mut app);
+    app.ui.selected_path = Some("work".into());
+    app.hover_doc = Some([80.0, 80.0]);
+    assert_eq!(badge(&app, Tool::AddAnchorPoint, Modifiers::NONE), None, "off the path's segments");
+    app.hover_doc = Some([80.0, 120.0]);
+    assert_eq!(badge(&app, Tool::AddAnchorPoint, Modifiers::NONE), Some(Badge::Add));
+    assert_eq!(badge(&app, Tool::AddAnchorPoint, Modifiers::ALT), Some(Badge::Subtract));
+    assert_eq!(badge(&app, Tool::DeleteAnchorPoint, Modifiers::NONE), Some(Badge::Subtract));
+    assert_eq!(badge(&app, Tool::DeleteAnchorPoint, Modifiers::COMMAND), None, "⌘ is Direct Selection");
+}
+
+/// #4144: with Auto Add/Delete (on by default) a Pen click on a segment of the active path adds
+/// an anchor and a click on one of its anchors deletes it, one step each, and no Pen path starts.
+>>>>>>> upstream/main
 #[test]
 fn the_pen_adds_and_deletes_anchors_on_the_active_path() {
     let mut app = app(Tool::Pen);

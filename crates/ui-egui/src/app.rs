@@ -86,9 +86,18 @@ impl PhotocraftApp {
             brush_resize: Default::default(),
             move_pick: None,
             caps_lock: false,
+<<<<<<< HEAD
             opacity_keys: craft::behavior::DigitKeys::default(),
             #[cfg(not(target_arch = "wasm32"))]
             control: None,
+=======
+            opacity_keys: None,
+            control_rx: None,
+            agent_link: crate::AgentLinkStatus::default(),
+            captures: crate::screenshot::Captures::default(),
+            type_ime: type_tool::ImeState::default(),
+            input_waiters: Vec::new(),
+>>>>>>> upstream/main
             live_adjust: None,
             frame: 0,
             notices_live: notices::Live::default(),
@@ -143,6 +152,12 @@ impl PhotocraftApp {
             programmatic_playback: false,
             run_depth: 0,
             paused_playbacks: Default::default(),
+<<<<<<< HEAD
+=======
+            held_actions_library: None,
+            channel_thumbs: None,
+            channel_views: HashMap::new(),
+>>>>>>> upstream/main
             type_layout: None,
             type_path_preview: None,
             type_transform_preview: None,

@@ -8,7 +8,12 @@
 //!   canvas to marquee-select anchors, click empty canvas to deselect.
 //! * Drag selected anchors to move them, a direction handle to turn it (a smooth point keeps its
 //!   handles collinear; ⌥ breaks them apart), or a segment to bend it (straight segments move).
+<<<<<<< HEAD
 //!   The arrow keys nudge the selected anchors.
+=======
+//!   The arrow keys nudge the selected anchors 1 px (⇧ 10 px), one history step per press.
+//!   ⌥-drag on a segment drags a copy of its subpath, appended to the path (⌥-click selects it).
+>>>>>>> upstream/main
 //! * Convert Point (the tool, or Pen + ⌥): click an anchor to make it a corner, drag from it to
 //!   pull out smooth handles, drag a handle to move it alone.
 //! * While a Pen path is being drawn, ⌘/Ctrl edits it in place (its anchors, handles and
@@ -106,8 +111,14 @@ pub struct DirectSelection {
     pub anchors: Vec<[usize; 2]>,
     /// A clicked segment (`[subpath, knot]` it leaves): its two handles show.
     pub segment: Option<[usize; 2]>,
+<<<<<<< HEAD
     /// The document, revision and target the running overlay gesture began on: its commit runs
     /// only while they still hold.
+=======
+    /// The subpaths of `target` whose anchors are drawn (Delete Anchor Point on a saved path, #12769);
+    /// `None` draws all of them, as right after the path is targeted.
+    pub shown: Option<Vec<usize>>,
+>>>>>>> upstream/main
     #[serde(skip)]
     pub(crate) editing: Option<Owner>,
     #[serde(skip)]
@@ -282,6 +293,7 @@ pub(crate) fn editing(app: &PhotocraftApp) -> bool {
     app.ui.direct_selection.editing.is_some()
 }
 
+<<<<<<< HEAD
 /// The overlay's path tool for `tool` with `mods` held. ⌘/Ctrl makes the Freeform Pen Direct
 /// Selection (the Pen's table resolves it); the Freeform Pen has no other overlay.
 pub(crate) fn path_tool(tool: Tool, mods: Mods) -> Option<PathTool> {
@@ -294,9 +306,33 @@ pub(crate) fn path_tool(tool: Tool, mods: Mods) -> Option<PathTool> {
         Tool::DirectSelection => Some(PathTool::DirectSelection),
         Tool::FreeformPen if mods.cmd => Some(PathTool::Pen),
         _ => None,
+=======
+#[derive(Clone, Debug, PartialEq)]
+pub enum Edit {
+    Anchors(Vec<[usize; 2]>),
+    /// The Curvature Pen dragging anchors: the smooth knots around them reflow.
+    Curvature(Vec<[usize; 2]>),
+    /// A handle, where it was at the press, and whether it moves alone (⌥).
+    Handle([usize; 2], Handle, Point, bool),
+    Segment([usize; 2], f64),
+    /// The Convert Point tool dragging a whole selected path by a segment: its anchors, all of them.
+    Path(Vec<[usize; 2]>),
+    /// Pen + ⌥ on an anchor: a click makes a corner, a drag pulls out smooth handles.
+    Convert([usize; 2]),
+    /// ⌥-drag on a segment: a moved copy of the subpath of these anchors (all of them) goes last.
+    Duplicate(Vec<[usize; 2]>),
+}
+
+impl Edit {
+    /// The drag's end with ⇧ held: moving anchors locks to multiples of 45°, as in Photoshop (#5475),
+    /// with the measured (+60, -25) drag kept on the axis (#13207).
+    fn constrain(&self, start: [f64; 2], p: [f64; 2], shift: bool) -> [f64; 2] {
+        if shift && matches!(self, Edit::Anchors(_) | Edit::Duplicate(_)) { crate::stroke_constraint::snap45_anchor(start, p) } else { p }
+>>>>>>> upstream/main
     }
 }
 
+<<<<<<< HEAD
 /// The selection the overlay shows: this selection while it still holds, else none.
 pub(crate) fn selection(app: &PhotocraftApp) -> PathSelection {
     let ds = &app.ui.direct_selection;
@@ -331,6 +367,42 @@ pub(crate) fn edit_paths(app: &PhotocraftApp, bezier: BezierTool) -> (Vec<EditPa
                 paths.retain(|(r, _)| *r == PathRef::Work);
             }
             paths
+=======
+    /// The edit for a drag from `start` to `end`, as a command and its params (without target).
+    fn command(&self, start: [f64; 2], end: [f64; 2]) -> (&'static str, Value) {
+        let d = [end[0] - start[0], end[1] - start[1]];
+        match self {
+            // One anchor is "Drag Anchor Point" in History, two or more the default "Drag Anchor
+            // Points", as in Photoshop (#13205).
+            Edit::Anchors(a) if a.len() == 1 => ("path.moveAnchors", json!({"anchors": a, "move": d, "stepName": "Drag Anchor Point"})),
+            Edit::Anchors(a) => ("path.moveAnchors", json!({"anchors": a, "move": d})),
+            Edit::Curvature(a) => ("path.moveAnchors", json!({"anchors": a, "move": d, "curvature": true})),
+            Edit::Handle([s, k], h, from, independent) => {
+                ("path.moveHandle", json!({"subpath": s, "knot": k, "handle": h.name(), "to": [from.x + d[0], from.y + d[1]], "independent": independent}))
+            }
+            Edit::Segment([s, k], t) => ("path.bendSegment", json!({"subpath": s, "knot": k, "t": t, "move": d})),
+            Edit::Path(a) => ("path.moveAnchors", json!({"anchors": a, "move": d, "stepName": "Drag Path"})),
+            Edit::Convert([s, k]) => ("path.convertPoint", json!({"subpath": s, "knot": k, "out": end})),
+            Edit::Duplicate(a) => ("path.moveAnchors", json!({"anchors": a, "move": d, "duplicate": true, "stepName": "Drag Path"})),
+        }
+    }
+
+    /// `base` edited as the command would: the drag preview.
+    fn preview(&self, base: &Path, start: [f64; 2], end: [f64; 2]) -> Option<Path> {
+        let d = [end[0] - start[0], end[1] - start[1]];
+        let mut p = base.clone();
+        match self {
+            Edit::Anchors(a) | Edit::Path(a) => edit::move_anchors(&mut p, a, d),
+            Edit::Curvature(a) => edit::move_anchors_curvature(&mut p, a, d),
+            Edit::Handle(k, h, from, independent) => edit::move_handle(&mut p, *k, *h, Point::new(from.x + d[0], from.y + d[1]), *independent),
+            Edit::Segment(k, t) => edit::bend_segment(&mut p, *k, *t, d),
+            Edit::Convert(k) => edit::convert_point(&mut p, *k, Some(Point::new(end[0], end[1]))),
+            Edit::Duplicate(a) => {
+                p.subpaths.push(p.subpaths.get(a.first()?[0])?.clone());
+                let last = p.subpaths.len() - 1;
+                edit::move_anchors(&mut p, &a.iter().map(|&[_, k]| [last, k]).collect::<Vec<_>>(), d)
+            }
+>>>>>>> upstream/main
         }
         _ => active_paths(app).into_iter().take(1).collect(),
     };
@@ -347,6 +419,7 @@ pub(crate) fn edit_paths(app: &PhotocraftApp, bezier: BezierTool) -> (Vec<EditPa
     (paths, refs)
 }
 
+<<<<<<< HEAD
 /// The anchor tools ignore a click on a shape with only its own position lock set (#12730, #12825).
 pub(crate) fn ignores(app: &PhotocraftApp, r: &PathRef) -> bool {
     if let PathRef::Layer(id) = *r
@@ -360,6 +433,16 @@ pub(crate) fn ignores(app: &PhotocraftApp, r: &PathRef) -> bool {
         return true;
     }
     false
+=======
+/// Is Direct Selection what the pointer does now: its own tool, or a Pen (the Pen, Freeform Pen
+/// or Curvature Pen), an anchor point tool or Convert Point with ⌘/Ctrl held, or Path Selection
+/// with ⌘/Ctrl alone (#13284; with ⌥ or ⇧ too, the reference was not measured, so as today).
+fn direct(tool: Tool, mods: Modifiers) -> bool {
+    tool == Tool::DirectSelection
+        || (tool == Tool::PathSelection && mods.command && !mods.alt && !mods.shift)
+        || (matches!(tool, Tool::Pen | Tool::FreeformPen | Tool::CurvaturePen | Tool::AddAnchorPoint | Tool::DeleteAnchorPoint | Tool::ConvertPoint)
+            && mods.command)
+>>>>>>> upstream/main
 }
 
 /// The Pen path being drawn, when it is on the active document and has an anchor.
@@ -386,6 +469,30 @@ fn owns(tool: Tool) -> bool {
     matches!(tool, Tool::DirectSelection | Tool::ConvertPoint)
 }
 
+<<<<<<< HEAD
+=======
+/// Does the canvas draw Direct Selection's overlay instead of the plain path outlines? The Add /
+/// Delete Anchor Point tools show it too: they edit the same paths. So does the idle Pen while an
+/// anchor its Auto Add put on a path is selected.
+pub fn shows(app: &PhotocraftApp, mods: Modifiers) -> bool {
+    let ds = &app.ui.direct_selection;
+    direct(app.ui.tool, mods)
+        || curvature_idle(app, mods)
+        || ds.drag.is_some()
+        || matches!(app.ui.tool, Tool::AddAnchorPoint | Tool::DeleteAnchorPoint | Tool::ConvertPoint)
+        || (app.ui.tool == Tool::Pen && app.ui.pen.is_none() && !ds.anchors.is_empty() && still_valid(app, ds))
+}
+
+/// Are the anchors of subpath `s` of `r` drawn now (#12769)?
+pub(crate) fn anchors_shown(app: &PhotocraftApp, r: PathRef, s: usize) -> bool {
+    let ds = &app.ui.direct_selection;
+    if ds.target != Some(r) || !still_valid(app, ds) {
+        return true;
+    }
+    ds.shown.as_ref().is_none_or(|shown| shown.contains(&s))
+}
+
+>>>>>>> upstream/main
 /// The active paths, front first: the targeted vector mask, the active shape layer's path or the
 /// active type layer's Type Path (#9114), then the work path. The Pen's Auto Add/Delete edits these.
 pub(crate) fn active_paths(app: &PhotocraftApp) -> Vec<(PathRef, Path)> {
@@ -470,6 +577,512 @@ fn targeted(app: &PhotocraftApp) -> Vec<(PathRef, Path)> {
     out
 }
 
+<<<<<<< HEAD
+=======
+/// What a Convert Point tool press at `p` works on: `hit_target` over the targeted paths only, so a
+/// top-level shape layer that is not active is left alone (#12735). Not measured, so as today: a
+/// shape layer inside a group, a hidden active layer, the active layer's path behind a path
+/// selected in the Paths panel, and a Work Path hidden after ⌘↩ or Load as Selection (#8459).
+fn hit_converting(app: &PhotocraftApp, p: [f64; 2]) -> Option<(PathRef, Path, Hit)> {
+    let zoom = f64::from(app.point_zoom().max(0.01));
+    let tol = 6.0 / zoom;
+    // An anchor is in reach within 5 points (5 screen px at display scale 1, as measured, #12748);
+    // other display scales weren't measured and keep the points unit, like every canvas tolerance.
+    // The 0.01 point covers the f32 screen-to-document mapping, so a press 5 px away always hits.
+    // Shown handles and segments weren't measured and keep `tol`.
+    let reach = 5.01 / zoom;
+    let beyond = |path: &Path, k: [usize; 2]| {
+        path.subpaths.get(k[0]).and_then(|s| s.knots.get(k[1])).is_some_and(|kn| (kn.anchor.x - p[0]).hypot(kn.anchor.y - p[1]) > reach)
+    };
+    let ds = &app.ui.direct_selection;
+    let valid = still_valid(app, ds);
+    let mut paths = targeted(app);
+    if !paths.iter().any(|(r, _)| *r == PathRef::Work) {
+        paths.extend(app.session.active().and_then(|st| st.doc.work_path.clone()).map(|p| (PathRef::Work, p)));
+    }
+    paths
+        .into_iter()
+        .find_map(|(r, path)| {
+            let shown = if valid && ds.target.as_ref() == Some(&r) { shown_handles(ds, &path) } else { Vec::new() };
+            edit::hit(&path, Point::new(p[0], p[1]), tol.max(reach), &shown).map(|h| (r, path, h))
+        })
+        // The front path's anchor out of reach swallows the press, as today, rather than handing it
+        // to a path behind.
+        .filter(|(_, path, h)| !matches!(h, Hit::Anchor(k) if beyond(path, *k)))
+}
+
+fn retracted(k: &photocraft_doc::Knot, h: Handle) -> bool {
+    let c = if h == Handle::In { k.in_ctrl } else { k.out_ctrl };
+    (c.x - k.anchor.x).abs() < 1e-9 && (c.y - k.anchor.y).abs() < 1e-9
+}
+
+/// The handles shown on `path`: both of every selected anchor and the two of a clicked segment
+/// (retracted handles sit on their anchor and don't show).
+fn shown_handles(ds: &DirectSelection, path: &Path) -> Vec<([usize; 2], Handle)> {
+    let knot = |r: [usize; 2]| path.subpaths.get(r[0]).and_then(|s| s.knots.get(r[1]));
+    let mut out: Vec<([usize; 2], Handle)> = ds.anchors.iter().flat_map(|&r| [(r, Handle::In), (r, Handle::Out)]).collect();
+    if let Some([s, k]) = ds.segment
+        && let Some(sp) = path.subpaths.get(s)
+    {
+        let n = sp.knots.len();
+        let next = k.checked_add(1).filter(|&j| j < n).or((sp.closed && n > 1).then_some(0));
+        out.push(([s, k], Handle::Out));
+        out.extend(next.map(|j| ([s, j], Handle::In)));
+    }
+    out.retain(|&(r, h)| knot(r).is_some_and(|k| !retracted(k, h)));
+    out
+}
+
+/// Canvas pointer events for Direct Selection and the Pen's ⌘ / ⌥ modes; false when the event is
+/// not theirs.
+pub fn pointer(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> bool {
+    cancel_stale(app);
+    if app.ui.direct_selection.cancelled_drag {
+        // The rest of a gesture cancelled on another document or target goes nowhere.
+        match ev {
+            ToolEvent::Down { .. } => app.ui.direct_selection.cancelled_drag = false,
+            ToolEvent::Up { .. } => {
+                app.ui.direct_selection.cancelled_drag = false;
+                return true;
+            }
+            ToolEvent::Move { .. } => return true,
+        }
+    }
+    let tool = app.ui.tool;
+    match ev {
+        ToolEvent::Down { x, y, .. } => {
+            if curvature_idle(app, mods) {
+                return curvature_press(app, [x, y]);
+            }
+            let pen_idle = app.ui.pen.is_none();
+            // Pen + ⌥ is Convert Point only while no path is being drawn.
+            let convert = converting(tool, mods, pen_idle);
+            if !(direct(tool, mods) || convert) {
+                return false;
+            }
+            if !pen_idle && tool != Tool::DirectSelection && !hits_pen(app, [x, y]) {
+                // ⌘-click off the path being drawn ends it, which becomes editable, as in
+                // Photoshop. A press on it edits it in place and the Pen carries on (#4022). A
+                // refused commit keeps the draft and the press does nothing more.
+                if !crate::vector_ui::pen_commit(app, false) {
+                    app.ui.direct_selection.cancelled_drag = true;
+                    return true;
+                }
+            }
+            if tool == Tool::FreeformPen {
+                // The same for a Freeform Pen path waiting for its next ⌥-click.
+                crate::lasso_ui::commit(app);
+                if app.ui.pen.is_some() {
+                    app.ui.direct_selection.cancelled_drag = true;
+                    return true;
+                }
+            }
+            press(app, [x, y], mods, convert)
+        }
+        ToolEvent::Move { x, y, .. } => {
+            let ds = &mut app.ui.direct_selection;
+            match &mut ds.drag {
+                Some(Drag::Edit { base, edit, start, end, preview, .. }) => {
+                    *end = edit.constrain(*start, [x, y], mods.shift);
+                    *preview = edit.preview(base, *start, *end);
+                }
+                Some(Drag::Marquee { end, .. }) => *end = [x, y],
+                None => return owns(tool),
+            }
+            true
+        }
+        ToolEvent::Up { x, y } => match app.ui.direct_selection.drag.take() {
+            Some(Drag::Edit { target, base, edit, start, .. }) => {
+                let end = edit.constrain(start, [x, y], mods.shift);
+                release(app, target, &base, &edit, start, end, mods);
+                app.ui.direct_selection.coalesce = None;
+                true
+            }
+            Some(Drag::Marquee { start, add, .. }) => {
+                marquee(app, start, [x, y], add);
+                true
+            }
+            None => owns(tool),
+        },
+    }
+}
+
+/// Does a press at `p` hit the Pen path being drawn: one of its anchors, shown handles or segments?
+fn hits_pen(app: &PhotocraftApp, p: [f64; 2]) -> bool {
+    hit_target(app, p, true).is_some_and(|(r, ..)| r == PathRef::Pen)
+}
+
+/// A press: pick what's under the pointer and start a drag. False lets the Pen handle a ⌥-press
+/// that hit nothing; the Convert Point tool has nothing else to do, so it keeps the press.
+fn press(app: &mut PhotocraftApp, p: [f64; 2], mods: Modifiers, convert: bool) -> bool {
+    let own_tool = app.ui.tool == Tool::ConvertPoint;
+    // The tool's ⌘ is Direct Selection, which still reaches every visible shape layer.
+    let hit = if own_tool && convert { hit_converting(app, p) } else { hit_target(app, p, true) };
+    let Some((target, base, hit)) = hit else {
+        if convert {
+            return own_tool;
+        }
+        let owner = Owner::current(app);
+        let ds = &mut app.ui.direct_selection;
+        ds.drag = Some(Drag::Marquee { start: p, end: p, add: mods.shift });
+        ds.owner = owner;
+        return true;
+    };
+    if let PathRef::Layer(id) | PathRef::TypePath(id) = target
+        && app.session.active().and_then(|st| st.active_layer).map(|l| l.0) != Some(id)
+    {
+        let _ = app.run("layer.select", json!({"layer": id}));
+    }
+    let owner = Owner::current(app);
+    let tool_is_path_selection = app.ui.tool == Tool::PathSelection;
+    // ⌥-drag on a segment duplicates its subpath (#13211). With ⌘/Ctrl or ⇧ too, or on the Pen
+    // path or a Type Path, the reference was not measured: it moves the subpath, as before.
+    let alt_duplicates =
+        app.ui.tool == Tool::DirectSelection && !mods.command && !mods.ctrl && !mods.shift && !matches!(target, PathRef::Pen | PathRef::TypePath(_));
+    let ds = &mut app.ui.direct_selection;
+    if ds.target.as_ref() != Some(&target) {
+        *ds = DirectSelection { target: Some(target), ..Default::default() };
+    }
+    ds.owner = owner;
+    let edit = match hit {
+        Hit::Handle(k, h) => {
+            let kn = base.subpaths.get(k[0]).and_then(|s| s.knots.get(k[1]));
+            let from = kn.map_or(Point::new(p[0], p[1]), |kn| if h == Handle::In { kn.in_ctrl } else { kn.out_ctrl });
+            // Converting moves a handle on its own, as ⌥ does with Direct Selection.
+            Edit::Handle(k, h, from, mods.alt || convert)
+        }
+        Hit::Anchor(k) if convert => {
+            if own_tool {
+                // The tool selects the anchor it works on, so the anchor's handles show.
+                ds.segment = None;
+                ds.anchors = vec![k];
+            }
+            Edit::Convert(k)
+        }
+        // Pen + ⌥ on a segment does nothing; so does the tool where the reference was not
+        // measured: with ⇧ or ⌥, on a curve, or with part of the path selected.
+        Hit::Segment(k, t) if convert => {
+            if !own_tool || mods.alt || mods.shift || !straight(&base, k) {
+                return true;
+            }
+            let all: Vec<[usize; 2]> = (0..base.subpaths.len()).flat_map(|s| edit::subpath_anchors(&base, s)).collect();
+            if ds.anchors.is_empty() {
+                Edit::Segment(k, t)
+            } else if all.iter().all(|a| ds.anchors.contains(a)) {
+                Edit::Path(all)
+            } else {
+                return true;
+            }
+        }
+        Hit::Anchor(k) => {
+            ds.segment = None;
+            if mods.alt {
+                ds.anchors = edit::subpath_anchors(&base, k[0]);
+            } else if mods.shift {
+                // ⇧-click toggles the anchor; a click that deselects drags nothing.
+                if let Some(i) = ds.anchors.iter().position(|a| *a == k) {
+                    ds.anchors.remove(i);
+                    return true;
+                }
+                ds.anchors.push(k);
+            } else if !ds.anchors.contains(&k) || tool_is_path_selection {
+                // Path Selection's ⌘/Ctrl moves the anchor pressed alone, not the selected
+                // component it belongs to (#13284).
+                ds.anchors = vec![k];
+            }
+            Edit::Anchors(ds.anchors.clone())
+        }
+        Hit::Segment(k, _) if mods.alt => {
+            ds.segment = None;
+            ds.anchors = edit::subpath_anchors(&base, k[0]);
+            if alt_duplicates { Edit::Duplicate(ds.anchors.clone()) } else { Edit::Anchors(ds.anchors.clone()) }
+        }
+        Hit::Segment(k, t) => {
+            ds.anchors.clear();
+            ds.segment = Some(k);
+            Edit::Segment(k, t)
+        }
+    };
+    ds.drag = Some(Drag::Edit { target, base, edit, start: p, end: p, preview: None });
+    true
+}
+
+/// Is the segment leaving knot `k` straight: both of its handles retracted? The distance test is
+/// the one `edit::bend_segment` uses, so a segment counted straight here moves as straight there.
+fn straight(path: &Path, [s, k]: [usize; 2]) -> bool {
+    let Some(sub) = path.subpaths.get(s) else { return false };
+    let next = if k + 1 < sub.knots.len() { k + 1 } else { 0 };
+    let near = |c: Point, a: Point| (c.x - a.x).hypot(c.y - a.y) < 1e-9;
+    match (sub.knots.get(k), sub.knots.get(next)) {
+        (Some(a), Some(b)) => near(a.out_ctrl, a.anchor) && near(b.in_ctrl, b.anchor),
+        _ => false,
+    }
+}
+
+/// What the idle Curvature Pen has under document point `p` on the active paths: an anchor or a
+/// segment, with the path it is on. Handles don't count.
+fn curvature_target(app: &PhotocraftApp, p: [f64; 2]) -> Option<(PathRef, Path, Hit)> {
+    let tol = 6.0 / f64::from(app.point_zoom().max(0.01));
+    active_paths(app).into_iter().find_map(|(r, path)| match edit::hit(&path, Point::new(p[0], p[1]), tol, &[]) {
+        Some(h @ (Hit::Anchor(_) | Hit::Segment(..))) => Some((r, path, h)),
+        _ => None,
+    })
+}
+
+/// What a Curvature Pen press at `p` would do to an existing point, for its cursor: the anchor
+/// under it (idle: one of the active path's; drawing: one of the path being drawn), or the active
+/// path's segment it would add an anchor to.
+pub fn curvature_hover(app: &PhotocraftApp, p: [f64; 2], mods: Modifiers) -> Option<Hit> {
+    if app.ui.tool != Tool::CurvaturePen || mods.command {
+        return None;
+    }
+    if !curvature_idle(app, mods) {
+        return crate::vector_ui::curvature_anchor_at(app, p[0], p[1]).map(|i| Hit::Anchor([0, i]));
+    }
+    curvature_target(app, p).map(|(.., h)| h)
+}
+
+/// The idle Curvature Pen's double-click on an anchor of the active path: smooth ↔ corner, and
+/// the subpath reflows (one `path.convertPoint` with `curvature`).
+pub(crate) fn curvature_toggle_active(app: &mut PhotocraftApp, p: [f64; 2]) {
+    let Some((target, _, Hit::Anchor([s, k]))) = curvature_target(app, p) else { return };
+    let mut params = json!({"subpath": s, "knot": k, "curvature": true});
+    if let (Some(o), Some(tp)) = (params.as_object_mut(), target.params(app).as_object()) {
+        o.extend(tp.clone());
+    }
+    if let Err(e) = app.run("path.convertPoint", params) {
+        app.ui.status = e;
+        app.ui.status_error = true;
+    }
+    app.ui.direct_selection = DirectSelection { target: Some(target), anchors: vec![[s, k]], ..Default::default() };
+}
+
+/// Curvature Pen press with no path being drawn, on the active path: an anchor is grabbed and
+/// dragged; a segment gets a new anchor there (`path.addAnchor`), dragged the same way. Either
+/// way the curve reflows smoothly through the moved anchor, as in Photoshop (`path.moveAnchors`
+/// with `curvature` on release), and an added anchor and its drag are one history step. False
+/// when the press hits neither, so it starts a new path.
+fn curvature_press(app: &mut PhotocraftApp, p: [f64; 2]) -> bool {
+    let Some((target, mut base, hit)) = curvature_target(app, p) else { return false };
+    let mut coalesce = None;
+    let k = match hit {
+        Hit::Anchor(k) => k,
+        Hit::Segment([s, k], t) => {
+            let key = format!("curvature-add-{}", app.ui.alloc_id());
+            let mut params = json!({"subpath": s, "knot": k, "t": t.clamp(0.01, 0.99), "coalesce": key});
+            if let (Some(o), Some(tp)) = (params.as_object_mut(), target.params(app).as_object()) {
+                o.extend(tp.clone());
+            }
+            let added = match app.run("path.addAnchor", params) {
+                Ok(v) => v,
+                Err(e) => {
+                    app.ui.status = e;
+                    app.ui.status_error = true;
+                    return true;
+                }
+            };
+            let n = |f: &str| added["anchor"][f].as_u64().and_then(|v| usize::try_from(v).ok());
+            let (Some(s), Some(k), Some(path)) = (n("subpath"), n("knot"), active_paths(app).into_iter().find(|(r, _)| *r == target).map(|(_, p)| p)) else {
+                return true;
+            };
+            base = path;
+            coalesce = Some(key);
+            [s, k]
+        }
+        Hit::Handle(..) => return false,
+    };
+    app.ui.direct_selection = DirectSelection { target: Some(target), anchors: vec![k], coalesce, owner: Owner::current(app), ..Default::default() };
+    app.ui.direct_selection.drag = Some(Drag::Edit { target, base, edit: Edit::Curvature(vec![k]), start: p, end: p, preview: None });
+    true
+}
+
+/// After Add Anchor Point (or the Pen's Auto Add) put anchor `k` on `target` at the press `p`:
+/// select it and start dragging it. `base` is the path with the anchor in it; `coalesce` joins the
+/// move to the add's history step. A click without a drag leaves just the selection.
+pub(crate) fn grab_added(app: &mut PhotocraftApp, target: PathRef, base: Path, k: [usize; 2], p: [f64; 2], coalesce: Option<String>) {
+    app.ui.direct_selection = DirectSelection { target: Some(target), anchors: vec![k], coalesce, owner: Owner::current(app), ..Default::default() };
+    app.ui.direct_selection.drag = Some(Drag::Edit { target, base, edit: Edit::Anchors(vec![k]), start: p, end: p, preview: None });
+}
+
+/// Did the pointer move between `start` and `end` (document points): a screen pixel or more?
+pub(crate) fn moved(app: &PhotocraftApp, start: [f64; 2], end: [f64; 2]) -> bool {
+    (end[0] - start[0]).hypot(end[1] - start[1]) * f64::from(app.point_zoom()) >= 1.0
+}
+
+/// End of an edit drag: commit it as one command. A click (no movement) commits nothing, except
+/// Pen + ⌥ on an anchor, which makes it a corner. The Pen path being drawn takes the edit directly.
+fn release(app: &mut PhotocraftApp, target: PathRef, base: &Path, edit: &Edit, start: [f64; 2], end: [f64; 2], mods: Modifiers) {
+    let moved = moved(app, start, end);
+    if target == PathRef::Pen {
+        let edited = match edit {
+            Edit::Convert(k) if !moved => {
+                let mut p = base.clone();
+                edit::convert_point(&mut p, *k, None).ok().map(|_| p)
+            }
+            _ if !moved => None,
+            e => e.preview(base, start, end),
+        };
+        if let Some(p) = edited {
+            crate::vector_ui::pen_replace(app, &p);
+        }
+        return;
+    }
+    let (id, mut params) = match edit {
+        Edit::Convert([s, k]) if !moved => ("path.convertPoint", json!({"subpath": s, "knot": k})),
+        _ if !moved => return,
+        e => e.command(start, end),
+    };
+    // The Convert Point tool names its steps as the reference does; the Pen's ⌥ and Direct
+    // Selection (Convert Point with ⌘ too) keep the commands' own names.
+    let convert_tool = app.ui.tool == Tool::ConvertPoint && !direct(app.ui.tool, mods);
+    let step_name = match edit {
+        Edit::Convert(_) if convert_tool => Some("Change Anchor Point"),
+        Edit::Handle(.., true) if convert_tool => Some("Corner Drag"),
+        _ => None,
+    };
+    if let (Some(p), Some(name)) = (params.as_object_mut(), step_name) {
+        p.insert("stepName".into(), json!(name));
+    }
+    if let (Some(p), Some(t)) = (params.as_object_mut(), target.params(app).as_object()) {
+        p.extend(t.clone());
+    }
+    if let (Some(p), Some(key)) = (params.as_object_mut(), app.ui.direct_selection.coalesce.take()) {
+        p.insert("coalesce".into(), json!(key));
+    }
+    // sync_views checks ownership while the command runs: keep this selection off the live UI
+    // until its own command is done, then bind it to the revision that made.
+    let mut selection = std::mem::take(&mut app.ui.direct_selection);
+    match app.run(id, params) {
+        Ok(_) => {
+            if let Edit::Duplicate(a) = edit {
+                // The copy is what was dragged: it ends up selected, not the source.
+                selection.anchors = a.iter().map(|&[_, k]| [base.subpaths.len(), k]).collect();
+                if let Some(shown) = selection.shown.as_mut() {
+                    shown.push(base.subpaths.len());
+                }
+            }
+            keep_after_command(app, selection)
+        }
+        Err(e) => {
+            if selection.owner.as_ref().is_some_and(|owner| owner.valid(app)) {
+                app.ui.direct_selection = selection;
+            }
+            app.ui.status = e;
+            app.ui.status_error = true;
+        }
+    }
+}
+
+/// End of a marquee: select the anchors inside it on the frontmost path that has any (⇧ adds).
+/// A click on empty canvas deselects.
+fn marquee(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2], add: bool) {
+    let rect = [start[0], start[1], end[0], end[1]];
+    let hits = candidates(app).into_iter().map(|(r, path)| (r, edit::anchors_in(&path, rect))).find(|(_, a)| !a.is_empty());
+    let owner = Owner::current(app);
+    let ds = &mut app.ui.direct_selection;
+    match hits {
+        Some((r, anchors)) if add && ds.target.as_ref() == Some(&r) => {
+            for a in anchors {
+                if !ds.anchors.contains(&a) {
+                    ds.anchors.push(a);
+                }
+            }
+            ds.segment = None;
+        }
+        Some((r, anchors)) => *ds = DirectSelection { target: Some(r), anchors, ..Default::default() },
+        None if add => {}
+        None => {
+            ds.anchors.clear();
+            ds.segment = None;
+        }
+    }
+    ds.owner = owner;
+}
+
+/// Arrow keys with Direct Selection and selected anchors (#4486), as in Photoshop: nudge them
+/// 1 px (⇧ 10 px) through `path.moveAnchors`, one history step per press. Not while a drag is
+/// in progress. Returns true when a key was used.
+pub fn arrow_keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
+    cancel_stale(app);
+    let ds = &app.ui.direct_selection;
+    let Some(target) = ds.target.filter(|_| app.ui.tool == Tool::DirectSelection && !ds.anchors.is_empty() && ds.drag.is_none()) else {
+        return false;
+    };
+    // The anchors belong to a path the canvas no longer offers (another saved path picked in the
+    // Paths panel, the path deleted): drop them rather than nudge that path, or another one that
+    // took its index.
+    if !candidates(app).iter().any(|(r, _)| *r == target) {
+        app.ui.direct_selection = DirectSelection::default();
+        return false;
+    }
+    let anchors = app.ui.direct_selection.anchors.clone();
+    use egui::Key;
+    let keys = [(Key::ArrowLeft, -1.0, 0.0), (Key::ArrowRight, 1.0, 0.0), (Key::ArrowUp, 0.0, -1.0), (Key::ArrowDown, 0.0, 1.0)];
+    for (key, ux, uy) in keys {
+        // ⇧ first: `consume_key` ignores an extra ⇧.
+        for mods in [Modifiers::SHIFT, Modifiers::NONE] {
+            if ctx.input_mut(|i| i.consume_key(mods, key)) {
+                let k = if mods.shift { 10.0 } else { 1.0 };
+                let mut params = json!({"anchors": anchors, "move": [ux * k, uy * k]});
+                if let (Some(p), Some(t)) = (params.as_object_mut(), target.params(app).as_object()) {
+                    p.extend(t.clone());
+                }
+                // The nudge makes a new revision: the selection follows it, as after a drag.
+                let selection = std::mem::take(&mut app.ui.direct_selection);
+                match app.run("path.moveAnchors", params) {
+                    Ok(_) => keep_after_command(app, selection),
+                    Err(e) => {
+                        app.ui.direct_selection = selection;
+                        app.ui.status = e;
+                        app.ui.status_error = true;
+                    }
+                }
+                return true;
+            }
+        }
+    }
+    false
+}
+
+/// Paths with their anchors (selected ones filled), the shown handles, the drag's preview in
+/// place of its path, and the marquee. `paths` false (View › Show › Target Path off) leaves only
+/// the marquee.
+pub fn draw_overlay(app: &PhotocraftApp, painter: &egui::Painter, to_scr: &dyn Fn([f64; 2]) -> Pos2, accent: Color32, paths: bool) {
+    let ds = &app.ui.direct_selection;
+    // The idle Curvature Pen shows the anchors of the path it edits, not every shape's.
+    let shown = if !paths {
+        Vec::new()
+    } else if curvature_idle(app, painter.ctx().input(|i| i.modifiers)) {
+        active_paths(app)
+    } else {
+        candidates(app)
+    };
+    for (r, path) in shown {
+        let path = match &ds.drag {
+            Some(Drag::Edit { target, preview: Some(p), .. }) if *target == r => p.clone(),
+            _ => path,
+        };
+        crate::vector_ui::draw_outline(painter, &path, to_scr, accent);
+        let ours = ds.target.as_ref() == Some(&r);
+        for &(k, h) in if ours { shown_handles(ds, &path) } else { Vec::new() }.iter() {
+            if let Some(kn) = path.subpaths.get(k[0]).and_then(|s| s.knots.get(k[1])) {
+                let c = if h == Handle::In { kn.in_ctrl } else { kn.out_ctrl };
+                crate::vector_ui::draw_handle(painter, to_scr([kn.anchor.x, kn.anchor.y]), to_scr([c.x, c.y]), accent);
+            }
+        }
+        for (s, sp) in path.subpaths.iter().enumerate().filter(|(s, _)| !ours || anchors_shown(app, r, *s)) {
+            for (k, kn) in sp.knots.iter().enumerate() {
+                crate::vector_ui::draw_anchor(painter, to_scr([kn.anchor.x, kn.anchor.y]), ours && ds.anchors.contains(&[s, k]), accent);
+            }
+        }
+    }
+    if let Some(Drag::Marquee { start, end, .. }) = &ds.drag {
+        let pts = [*start, [end[0], start[1]], *end, [start[0], end[1]]].map(to_scr);
+        crate::tool_feedback::draw_ants(painter, &pts, true);
+    }
+}
+
+>>>>>>> upstream/main
 #[cfg(test)]
 mod tests;
 
@@ -481,6 +1094,21 @@ mod convert_point_targeted_path_tests;
 
 #[cfg(test)]
 mod convert_point_drag_segment_tests;
+
+#[cfg(test)]
+mod delete_key_tests;
+
+#[cfg(test)]
+mod history_names_tests;
+
+#[cfg(test)]
+mod shift_angle_tests;
+
+#[cfg(test)]
+mod options_bar_tests;
+
+#[cfg(test)]
+mod alt_drag_duplicate_tests;
 
 #[cfg(test)]
 mod freeform_command_tests {

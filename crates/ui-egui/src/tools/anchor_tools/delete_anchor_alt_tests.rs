@@ -49,6 +49,21 @@ fn alt_click_on_a_segment_still_adds_an_anchor() {
 }
 
 #[test]
+<<<<<<< HEAD
+=======
+fn a_plain_click_on_an_anchor_still_deletes_it() {
+    let mut app = square();
+    let n = steps(&app);
+    click(&mut app, [300.0, 500.0]);
+    assert_eq!(knots(&app), 3);
+    assert_eq!(steps(&app), n + 1);
+    assert_eq!(app.session.active().unwrap().history.undo_label(), Some("Delete Anchor Point"));
+    // #12769: the anchor that followed the deleted one is selected, not nothing.
+    assert_eq!(app.ui.direct_selection.anchors.len(), 1);
+}
+
+#[test]
+>>>>>>> upstream/main
 fn alt_drag_from_an_anchor_selects_nothing() {
     let mut app = square();
     let n = steps(&app);

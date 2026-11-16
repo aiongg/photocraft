@@ -9,6 +9,8 @@ use egui::{Key, Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use photocraft_doc::LayerContent;
+use photocraft_engine::actions_cmds;
+use photocraft_engine::preset_store::{ACTIONS_FILE, MemBackend, PresetBackend};
 use serde_json::json;
 
 use super::{Outcome, command_rows, set_dry_run, take_log};
@@ -488,11 +490,328 @@ fn delete_key_targets() {
     assert_eq!(names(&h), before, "no layer was deleted");
 }
 
+<<<<<<< HEAD
 #[test]
 fn named_action_function_key_replays_and_survives_preferences_roundtrip() {
     let mut h = harness();
     add_action(&mut h, "LivePrint 2R", &[("layer.new.layer", json!({"name": "F6 overlay"}))]);
     crate::actions::assign_shortcut(h.state_mut(), "LivePrint 2R", "F6").unwrap();
+=======
+fn is_clipped(h: &Harness<'_, PhotocraftApp>, id: photocraft_doc::LayerId) -> bool {
+    h.state().session.active().unwrap().doc.layer(id).unwrap().clipped
+}
+
+/// The Layer menu's clipping mask items: (id, label, shortcut, enabled).
+fn clip_items(h: &Harness<'_, PhotocraftApp>) -> Vec<(String, String, Option<String>, bool)> {
+    crate::menus::menu_items(h.state()).into_iter().filter(|i| i.id.ends_with("ClippingMask")).map(|i| (i.id, i.label, i.shortcut, i.enabled)).collect()
+}
+
+fn clip_item(id: &str, label: &str) -> Vec<(String, String, Option<String>, bool)> {
+    vec![(id.into(), label.into(), Some("Cmd+Alt+G".into()), true)]
+}
+
+/// ⌥⌘G clips the selected layer and pressing it again releases it, as Photoshop's one Create /
+/// Release Clipping Mask item does; the Layer menu reads Release Clipping Mask, with the same
+/// shortcut, while the key would release.
+#[test]
+fn clip_key_toggles_the_clipping_mask() {
+    let mut h = harness();
+    put_focus(&mut h, Place::Canvas);
+    let paint = h.state().session.active().unwrap().active_layer.unwrap();
+    assert_eq!(clip_items(&h), clip_item("layer.createClippingMask", "Create Clipping Mask"));
+    press(&mut h, "Cmd+Alt+G");
+    assert_eq!(logged(&h), ["layer.createClippingMask"]);
+    assert!(is_clipped(&h, paint));
+    assert_eq!(clip_items(&h), clip_item("layer.releaseClippingMask", "Release Clipping Mask"));
+    press(&mut h, "Cmd+Alt+G");
+    assert_eq!(logged(&h), ["layer.releaseClippingMask"]);
+    assert!(!is_clipped(&h, paint), "the second press releases it");
+    assert_eq!(clip_items(&h), clip_item("layer.createClippingMask", "Create Clipping Mask"));
+    press(&mut h, "Cmd+Z");
+    assert!(is_clipped(&h, paint), "one undo puts the clip back");
+}
+
+/// With several layers selected the key clips every one above the lowest, and releases them once
+/// they all are: a selection where only some are clipped clips the rest first.
+#[test]
+fn clip_key_toggles_several_selected_layers() {
+    let mut h = harness();
+    put_focus(&mut h, Place::Canvas);
+    let s = &mut h.state_mut().session;
+    let paint = s.active().unwrap().active_layer.unwrap();
+    let base = s.active().unwrap().doc.walk().into_iter().find(|(_, _, l)| l.name == "Hello").unwrap().2.id;
+    let top = photocraft_doc::LayerId(s.execute("layer.new.layer", json!({"name": "top"})).unwrap()["layer"].as_u64().unwrap());
+    s.execute("layer.createClippingMask", json!({"layer": paint.0})).unwrap();
+    s.execute("layer.select", json!({"layer": base.0, "mode": "replace"})).unwrap();
+    for id in [paint, top] {
+        s.execute("layer.select", json!({"layer": id.0, "mode": "add"})).unwrap();
+    }
+    assert_eq!(s.active().unwrap().selected_layers().len(), 3);
+    h.run_steps(2);
+    press(&mut h, "Cmd+Alt+G");
+    assert_eq!(logged(&h), ["layer.createClippingMask"], "the top layer isn't clipped yet");
+    assert!(is_clipped(&h, paint) && is_clipped(&h, top) && !is_clipped(&h, base));
+    press(&mut h, "Cmd+Alt+G");
+    assert_eq!(logged(&h), ["layer.releaseClippingMask"]);
+    assert!(!is_clipped(&h, paint) && !is_clipped(&h, top) && !is_clipped(&h, base));
+}
+
+fn action_key(h: &Harness<'_, PhotocraftApp>, index: usize) -> String {
+    actions_cmds::occurrence_key(h.state().session.actions.list[index].action_id.as_deref().unwrap())
+}
+
+fn repeated_reset_shortcuts(h: &mut Harness<'_, PhotocraftApp>) {
+    for _ in 0..2 {
+        h.state_mut().run("actions.reset", json!({"confirm":true,"mode":"append"})).unwrap();
+    }
+    for (index, key, name) in [(0, "F2", "first occurrence"), (2, "F3", "second occurrence")] {
+        h.state_mut().session.actions.list[index].steps = vec![("layer.new.layer".into(), json!({"name":name}))];
+        crate::actions::assign_shortcut(h.state_mut(), index, key).unwrap();
+    }
+}
+
+#[test]
+fn f2_dispatches_only_the_first_same_named_action() {
+    let mut h = harness();
+    repeated_reset_shortcuts(&mut h);
+    let count = h.state().session.active().unwrap().doc.layers.len();
+    press(&mut h, "F2");
+    assert_eq!(active_name(&h), "first occurrence");
+    assert_eq!(h.state().session.active().unwrap().doc.layers.len(), count + 1);
+}
+
+#[test]
+fn f3_dispatches_only_the_second_same_named_action_after_reorder_and_reopen() {
+    use photocraft_engine::preset_store::{MemBackend, open};
+
+    let mut h = harness();
+    let store = MemBackend::default();
+    h.state_mut().session.attach_preset_store(open(Box::new(store.clone())));
+    h.state_mut().session.actions.set_rows.push("Before".into());
+    repeated_reset_shortcuts(&mut h);
+    let first_key = action_key(&h, 0);
+    let second_key = action_key(&h, 2);
+    h.state_mut().run("actions.move", json!({"action":2,"to":0})).unwrap();
+    let (empty, _) = photocraft_engine::atn_cmds::export("Before", &[], &[], false).unwrap();
+    let data = photocraft_paint::tile::b64_encode(&empty);
+    h.state_mut().run("actions.load", json!({"data":data})).unwrap();
+    assert_eq!(h.state().session.actions.list[0].set_slot, Some(1));
+    h.state_mut().session.sync_preset_store();
+    let prefs = h.state().session.prefs_to_json();
+
+    let mut h = harness();
+    h.state_mut().session.load_prefs_json(&prefs).unwrap();
+    h.state_mut().session.attach_preset_store(open(Box::new(store)));
+    assert_eq!(action_key(&h, 0), second_key);
+    let count = h.state().session.active().unwrap().doc.layers.len();
+    press(&mut h, "F3");
+    assert_eq!(active_name(&h), "second occurrence");
+    assert_eq!(h.state().session.active().unwrap().doc.layers.len(), count + 1);
+    h.state_mut().run("actions.delete", json!({"action":1})).unwrap();
+    assert!(!h.state().session.prefs().shortcuts.contains_key(&first_key));
+    assert_eq!(h.state().session.prefs().shortcuts[&second_key], "F3");
+    press(&mut h, "F2");
+    assert_eq!(h.state().session.active().unwrap().doc.layers.len(), count + 1);
+}
+
+#[test]
+fn attachment_preserves_disk_keys_and_calls_without_changing_name_lookup() {
+    use photocraft_engine::preset_store::{ACTIONS_FILE, MemBackend, PresetBackend, open};
+
+    let store = MemBackend::default();
+    let file = json!({"version":1,"set_rows":["Saved"],"actions":[
+        {"name":"Target","set":"Saved","set_slot":0,"steps":[["layer.new.layer",{"name":"disk target"}]]},
+        {"name":"Disk caller","steps":[["actions.play",{"action":"Target"}]]},
+        {"name":"Disk conditional","steps":[["actions.conditional",{"if":"always","then":"Target"}]]}
+    ]});
+    store.write(ACTIONS_FILE, file.to_string().as_bytes()).unwrap();
+
+    let mut h = harness();
+    h.state_mut().session.load_prefs_json(r#"{"shortcuts":{"actions.play:Target":"F2"},"alternateShortcuts":{"actions.play:Target":["F3"]}}"#).unwrap();
+    h.state_mut().session.actions.list.push(actions_cmds::Action::new("Target", vec![("layer.new.layer".into(), json!({"name":"memory target"}))]));
+    assert!(h.state_mut().session.attach_preset_store(open(Box::new(store.clone()))).is_empty());
+    let disk_key = "actions.play:Target";
+    assert!(h.state().session.actions.list[1].legacy_shortcut_owner);
+    assert_eq!(h.state().session.prefs().shortcuts[disk_key], "F2");
+    assert_eq!(h.state().session.prefs().alternate_shortcuts[disk_key], ["F3"]);
+
+    h.state_mut().run("actions.play", json!({"action":"Target"})).unwrap();
+    assert_eq!(active_name(&h), "memory target");
+    press(&mut h, "F2");
+    assert_eq!(active_name(&h), "disk target");
+    let saved = h.state().session.prefs_to_json();
+
+    let mut h = harness();
+    h.state_mut().session.load_prefs_json(&saved).unwrap();
+    assert!(h.state_mut().session.attach_preset_store(open(Box::new(store))).is_empty());
+    press(&mut h, "F3");
+    assert_eq!(active_name(&h), "disk target");
+    for caller in ["Disk caller", "Disk conditional"] {
+        h.state_mut().run("actions.play", json!({"action":"Target"})).unwrap();
+        assert_eq!(active_name(&h), "memory target");
+        let result = h.state_mut().run("actions.play", json!({"action":caller})).unwrap();
+        assert!(result.get("failed").is_none(), "{result}");
+        assert_eq!(active_name(&h), "disk target");
+    }
+}
+
+#[test]
+fn new_occurrence_key_shadows_legacy_primary_until_the_identity_is_missing() {
+    let mut h = harness();
+    h.state_mut().session.actions.list.push(actions_cmds::Action::new("Target", Vec::new()));
+    h.state_mut().session.edit_prefs(|p| {
+        p.shortcuts.insert("actions.play:Target".into(), "F2".into());
+    });
+    crate::actions::assign_shortcut(h.state_mut(), 0, "F4").unwrap();
+    let key = action_key(&h, 0);
+    assert!(bindings(h.state()).iter().any(|(id, _)| id == &key));
+    assert!(!bindings(h.state()).iter().any(|(id, _)| id == "actions.play:Target"));
+    // An async backend may have saved the preferences but still have the old Actions file.
+    h.state_mut().session.actions.list[0].action_id = None;
+    assert!(!bindings(h.state()).iter().any(|(id, _)| id == &key));
+    assert!(bindings(h.state()).iter().any(|(id, _)| id == "actions.play:Target"));
+}
+
+struct RejectActionsWrite(MemBackend);
+impl PresetBackend for RejectActionsWrite {
+    fn list(&self) -> Result<Vec<(String, u64)>, String> {
+        self.0.list()
+    }
+    fn read(&self, name: &str, max: u64) -> Result<Vec<u8>, String> {
+        self.0.read(name, max)
+    }
+    fn write(&self, name: &str, bytes: &[u8]) -> Result<(), String> {
+        if name == ACTIONS_FILE {
+            return Err("injected Actions write failure".into());
+        }
+        self.0.write(name, bytes)
+    }
+    fn remove(&self, name: &str) -> Result<(), String> {
+        self.0.remove(name)
+    }
+}
+
+#[test]
+fn failed_action_id_write_keeps_the_legacy_shortcut_after_reopen() {
+    use photocraft_engine::preset_store::{ACTIONS_FILE, MemBackend, PresetBackend, open};
+
+    let store = MemBackend::default();
+    let file = json!({"version":1,"actions":[{"name":"Target","steps":[["layer.new.layer",{"name":"legacy target"}]]}]});
+    let original = file.to_string().into_bytes();
+    store.write(ACTIONS_FILE, &original).unwrap();
+
+    let mut h = harness();
+    h.state_mut().session.load_prefs_json(r#"{"shortcuts":{"actions.play:Target":"F2"},"alternateShortcuts":{"actions.play:Target":["F3"]}}"#).unwrap();
+    h.state_mut().session.attach_preset_store(open(Box::new(RejectActionsWrite(store.clone()))));
+    let failure = crate::actions::assign_shortcut(h.state_mut(), 0, "F4").unwrap_err();
+    assert!(failure.contains("injected Actions write failure"));
+    assert!(h.state().session.actions.list[0].action_id.is_none());
+    assert_eq!(store.read(ACTIONS_FILE, 4096).unwrap(), original);
+    let saved_prefs = h.state().session.prefs_to_json();
+
+    let mut h = harness();
+    h.state_mut().session.load_prefs_json(&saved_prefs).unwrap();
+    h.state_mut().session.attach_preset_store(open(Box::new(store)));
+    assert_eq!(h.state().session.prefs().shortcuts["actions.play:Target"], "F2");
+    assert_eq!(h.state().session.prefs().alternate_shortcuts["actions.play:Target"], ["F3"]);
+    assert!(!h.state().session.prefs().shortcuts.values().any(|key| key == "F4"));
+    press(&mut h, "F2");
+    assert_eq!(active_name(&h), "legacy target");
+}
+
+#[test]
+fn deferred_action_shortcut_conflicts_clear_only_after_matching_native_write() {
+    use photocraft_engine::preset_store::{ACTIONS_FILE, MemBackend, PresetBackend, open};
+
+    let loser = "actions.play:Disk";
+    let edited = "actions.play:Edited";
+    let own = "actions.play:Winner";
+    let orphan = "actions.play:Missing";
+    for (reject, winner_drift) in [(false, false), (true, false), (false, true)] {
+        let store = MemBackend::default();
+        let original = br#"{"version":1,"actions":[{"name":"Disk"},{"name":"Edited"}]}"#;
+        store.write(ACTIONS_FILE, original).unwrap();
+        let (tx, rx) = std::sync::mpsc::channel();
+        let mut h = harness();
+        let app = h.state_mut();
+        app.services.preset_store = Some(rx);
+        app.session.actions.list.push(actions_cmds::Action::new("Winner", vec![("layer.new.layer".into(), json!({"name":"winner ran"}))]));
+        app.session.edit_prefs(|prefs| {
+            for key in [loser, edited, own, orphan] {
+                prefs.shortcuts.insert(key.into(), "F4".into());
+                prefs.alternate_shortcuts.insert(key.into(), vec!["F4".into(), "F8".into()]);
+            }
+        });
+        crate::actions::assign_shortcut(app, 0, "F4").unwrap();
+        let winner = actions_cmds::occurrence_key(app.session.actions.list[0].action_id.as_deref().unwrap());
+        assert_eq!(app.session.prefs().shortcuts[loser], "F4");
+        assert_eq!(app.session.prefs().alternate_shortcuts[loser], ["F4", "F8"]);
+        assert_eq!(store.read(ACTIONS_FILE, 4096).unwrap(), original);
+        app.session.edit_prefs(|prefs| {
+            prefs.shortcuts.insert(edited.into(), "F6".into());
+            prefs.alternate_shortcuts.insert(edited.into(), vec!["F4".into(), "F9".into()]);
+            if winner_drift {
+                prefs.shortcuts.insert(winner.clone(), "F5".into());
+            }
+        });
+        let backend: Box<dyn PresetBackend> = if reject { Box::new(RejectActionsWrite(store.clone())) } else { Box::new(store.clone()) };
+        tx.send(open(backend)).unwrap();
+        h.run_steps(2);
+        let app = h.state();
+        assert!(app.services.preset_store.is_none() && app.session.preset_store.is_some());
+        let prefs = app.session.prefs();
+        assert_eq!(prefs.shortcuts[&winner], if winner_drift { "F5" } else { "F4" });
+        assert_eq!(prefs.shortcuts[edited], "F6");
+        assert_eq!(prefs.alternate_shortcuts[edited], ["F4", "F9"]);
+        for key in [own, orphan] {
+            assert_eq!(prefs.shortcuts[key], "F4");
+            assert_eq!(prefs.alternate_shortcuts[key], ["F4", "F8"]);
+        }
+        if reject || winner_drift {
+            assert_eq!(prefs.shortcuts[loser], "F4");
+            assert_eq!(prefs.alternate_shortcuts[loser], ["F4", "F8"]);
+        } else {
+            assert!(prefs.shortcuts.get(loser).is_none_or(String::is_empty));
+            assert_eq!(prefs.alternate_shortcuts[loser], ["F8"]);
+            press(&mut h, "F4");
+            assert_eq!(active_name(&h), "winner ran");
+        }
+
+        let mut reopened = photocraft_engine::Session::new();
+        assert!(reopened.attach_preset_store(open(Box::new(store.clone()))).is_empty());
+        if reject {
+            assert_eq!(store.read(ACTIONS_FILE, 4096).unwrap(), original);
+            assert!(actions_cmds::shortcut_row(&reopened.actions.list, &winner).is_none());
+        } else {
+            assert_eq!(actions_cmds::shortcut_row(&reopened.actions.list, &winner), Some(0));
+        }
+    }
+}
+
+#[test]
+fn denied_shortcut_assignment_leaves_identity_and_bindings_unmodified() {
+    let mut h = harness();
+    h.state_mut().session.actions.list.push(actions_cmds::Action::new("Action", Vec::new()));
+    h.state_mut().services.automation_command = Some(Box::new(|_, _| Err("denied shortcut edit".into())));
+    h.state_mut().automation_input = true;
+    let prefs = h.state().session.prefs().shortcuts.clone();
+    assert!(crate::actions::assign_shortcut(h.state_mut(), 0, "F2").is_err());
+    assert!(h.state().session.actions.list[0].action_id.is_none());
+    assert_eq!(h.state().session.prefs().shortcuts, prefs);
+}
+
+#[test]
+fn named_action_function_key_replays_and_survives_preferences_roundtrip() {
+    let mut h = harness();
+    let action = photocraft_engine::actions_cmds::Action {
+        name: "LivePrint 2R".into(),
+        steps: vec![("layer.new.layer".into(), json!({"name": "F6 overlay"}))],
+        disabled: Default::default(),
+        ..Default::default()
+    };
+    h.state_mut().session.actions.list.push(action);
+    crate::actions::assign_shortcut(h.state_mut(), 0, "F6").unwrap();
+>>>>>>> upstream/main
     let saved = serde_json::to_value(h.state().session.prefs()).unwrap();
     let restored = serde_json::from_value(saved).unwrap();
     h.state_mut().session.edit_prefs(|p| *p = restored);
@@ -502,14 +821,19 @@ fn named_action_function_key_replays_and_survives_preferences_roundtrip() {
     assert_eq!(active_name(&h), "F6 overlay");
     assert_eq!(h.state().ui.status, "Played 1 step");
     assert!(!h.state().ui.status_error);
-    assert_eq!(take_log(&h.ctx), vec![(crate::actions::shortcut_id("LivePrint 2R"), Outcome::Ran)]);
+    assert_eq!(take_log(&h.ctx), vec![(action_key(&h, 0), Outcome::Ran)]);
     h.state_mut().run("actions.delete", json!({"action": "LivePrint 2R"})).unwrap();
+<<<<<<< HEAD
     h.run_steps(2);
     assert!(command_rows(h.state()).iter().all(|row| !row.command.id.starts_with(crate::actions::SHORTCUT_PREFIX)));
     // F6 goes back to the command it belongs to by default.
     press(&mut h, "F6");
     let log = take_log(&h.ctx);
     assert!(matches!(log.as_slice(), [(id, _)] if !id.starts_with(crate::actions::SHORTCUT_PREFIX)), "{log:?}");
+=======
+    assert!(bindings(h.state()).iter().all(|(id, _)| !actions_cmds::is_action_key(id)));
+    assert!(bindings(h.state()).iter().any(|(_, sc)| *sc == parse("F6").unwrap()));
+>>>>>>> upstream/main
 }
 
 #[test]
@@ -518,24 +842,42 @@ fn assigning_action_function_key_moves_it_and_reports_failed_steps() {
     for name in ["first", "second"] {
         add_action(&mut h, name, &[("no.such.command", json!({}))]);
     }
+<<<<<<< HEAD
     crate::actions::assign_shortcut(h.state_mut(), "first", "F6").unwrap();
     crate::actions::assign_shortcut(h.state_mut(), "second", "F6").unwrap();
     assert_eq!(h.state().session.prefs().shortcuts[&crate::actions::shortcut_id("first")], "");
     h.run_steps(2);
+=======
+    crate::actions::assign_shortcut(h.state_mut(), 0, "F6").unwrap();
+    crate::actions::assign_shortcut(h.state_mut(), 1, "F6").unwrap();
+    assert_eq!(h.state().session.prefs().shortcuts[&action_key(&h, 0)], "");
+    h.state_mut().ui.actions.selected = Some(0);
+>>>>>>> upstream/main
     press(&mut h, "F6");
     assert!(h.state().ui.status_error);
     assert!(h.state().ui.status.contains("Step 1 (no.such.command) failed"));
-    assert!(matches!(&take_log(&h.ctx)[..], [(id, Outcome::Failed(_))] if id == "actions.play:second"));
+    assert!(matches!(&take_log(&h.ctx)[..], [(id, Outcome::Failed(_))] if id == &action_key(&h, 1)));
 }
 
 #[test]
 fn action_function_key_checks_automation_authorization() {
     let mut h = harness();
+<<<<<<< HEAD
     add_action(&mut h, "restricted", &[("layer.new.layer", json!({"name": "should not exist"}))]);
     crate::actions::assign_shortcut(h.state_mut(), "restricted", "F6").unwrap();
+=======
+    h.state_mut().session.actions.list.push(photocraft_engine::actions_cmds::Action {
+        name: "restricted".into(),
+        steps: vec![("layer.new.layer".into(), json!({"name": "should not exist"}))],
+        disabled: Default::default(),
+        ..Default::default()
+    });
+    crate::actions::assign_shortcut(h.state_mut(), 0, "F6").unwrap();
+>>>>>>> upstream/main
     h.state_mut().services.automation_command = Some(Box::new(|id, _| if id == "actions.play" { Err("denied action playback".into()) } else { Ok(()) }));
     h.state_mut().automation_input = true;
-    super::dispatch(h.state_mut(), &egui::Context::default(), "actions.play:restricted");
+    let id = action_key(&h, 0);
+    super::dispatch(h.state_mut(), &egui::Context::default(), &id);
     assert_eq!(h.state().ui.status, "denied action playback");
     assert_eq!(active_name(&h), "paint");
 }
@@ -547,6 +889,7 @@ fn fit_shortcut_records_and_f6_fits_the_resized_canvas() {
     h.state_mut().run("image.canvasSize", json!({"width": 1800, "height": 1080})).unwrap();
     press(&mut h, "Cmd+0");
     h.state_mut().run("actions.stop", json!({})).unwrap();
+<<<<<<< HEAD
     assert_eq!(
         h.state().session.actions.list.actions()[0].steps.iter().map(|s| s.command.as_str()).collect::<Vec<_>>(),
         ["image.canvasSize", "view.fitOnScreen"]
@@ -554,6 +897,12 @@ fn fit_shortcut_records_and_f6_fits_the_resized_canvas() {
     let item = crate::menus::menu_rows(h.state()).into_iter().find(|i| i.command.id == "view.fitOnScreen").unwrap();
     assert_eq!(item.shortcut.as_ref().map(|c| c.portable()).as_deref(), Some("Cmd+0"));
     crate::actions::assign_shortcut(h.state_mut(), "Resize and fit", "F6").unwrap();
+=======
+    assert_eq!(h.state().session.actions.list[0].steps.iter().map(|s| s.0.as_str()).collect::<Vec<_>>(), ["image.canvasSize", "view.fitOnScreen"]);
+    let item = crate::menus::menu_items(h.state()).into_iter().find(|i| i.id == "view.fitOnScreen").unwrap();
+    assert_eq!(item.shortcut.as_deref(), Some("Cmd+0"));
+    crate::actions::assign_shortcut(h.state_mut(), 0, "F6").unwrap();
+>>>>>>> upstream/main
     h.state_mut().ui.views[0].zoom = 0.1;
     h.state_mut().ui.views[0].center = [0.0, 0.0];
     h.run_steps(2);
@@ -568,15 +917,30 @@ fn fit_shortcut_records_and_f6_fits_the_resized_canvas() {
 #[test]
 fn f6_while_recording_records_a_named_call_not_the_child_steps() {
     let mut h = harness();
+<<<<<<< HEAD
     add_action(&mut h, "LivePrint 2R", &[("layer.new.layer", json!({"name": "Nested overlay"})), ("view.fitOnScreen", json!({}))]);
     crate::actions::assign_shortcut(h.state_mut(), "LivePrint 2R", "F6").unwrap();
+=======
+    h.state_mut().session.actions.list.push(photocraft_engine::actions_cmds::Action {
+        name: "LivePrint 2R".into(),
+        steps: vec![("layer.new.layer".into(), json!({"name":"Nested overlay"})), ("view.fitOnScreen".into(), json!({}))],
+        disabled: Default::default(),
+        ..Default::default()
+    });
+    crate::actions::assign_shortcut(h.state_mut(), 0, "F6").unwrap();
+    let action_id = h.state().session.actions.list[0].action_id.clone().expect("the shortcut target has a stable identity");
+>>>>>>> upstream/main
     h.state_mut().run("actions.record", json!({"name":"Action 2"})).unwrap();
     h.run_steps(2);
     press(&mut h, "F6");
     assert_eq!(active_name(&h), "Nested overlay");
     h.state_mut().run("actions.stop", json!({})).unwrap();
+<<<<<<< HEAD
     let recorded: Vec<_> = h.state().session.actions.list.actions()[1].steps.iter().map(|s| (s.command.clone(), s.params.clone())).collect();
     assert_eq!(recorded, [("actions.play".to_string(), json!({"action": "LivePrint 2R"}))]);
+=======
+    assert_eq!(h.state().session.actions.list[1].steps, [("actions.play".into(), json!({"action":"LivePrint 2R","actionId":action_id}))]);
+>>>>>>> upstream/main
 }
 
 /// The type size keys act on the selected text while typing, on the whole layer from the canvas. (Which key they are

@@ -19,6 +19,7 @@ mod crop_task_bar;
 mod crop_turn_keeps_frame_inside;
 mod display_shadows;
 mod drag_preview_canvas;
+mod eraser_reset_defaults;
 mod export_as_scaling;
 mod full_res_preview;
 mod gpu_device_loss;

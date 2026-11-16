@@ -57,6 +57,7 @@ fn side(before: bool) -> usize {
     usize::from(before)
 }
 
+<<<<<<< HEAD
 /// The index of a region in the per-region arrays: 0 whole frame, 1 selected region.
 fn region_index(region: bool) -> usize {
     usize::from(region)
@@ -139,6 +140,85 @@ impl ScopeData {
     /// selected region, for the control channel's reply.
     pub(crate) fn vectorscope(&self, before: bool, region: bool) -> &Vectorscope {
         &self.vectorscopes[side(before)][region_index(region)]
+=======
+impl CameraRawDialog {
+    fn pixels(&self) -> &[[f32; 4]] {
+        if self.show_before { &self.proxy } else { &self.processed }
+    }
+    fn pixel(&self, p: [f32; 2]) -> Option<[f32; 4]> {
+        if !p.iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v)) || self.pw == 0 || self.ph == 0 {
+            return None;
+        }
+        let x = ((p[0] * self.pw as f32) as usize).min(self.pw - 1);
+        let y = ((p[1] * self.ph as f32) as usize).min(self.ph - 1);
+        let q = self
+            .detail
+            .sample(p, self.preview_revision, self.show_before, &self.params)
+            .or_else(|| self.pixels().get(y.checked_mul(self.pw)?.checked_add(x)?).copied())?;
+        (q[3] > 0.0 && q.iter().all(|v| v.is_finite())).then_some(q)
+    }
+    pub(crate) fn readout(&self, p: [f32; 2], lab: bool) -> Option<Value> {
+        let q = self.pixel(p)?;
+        let rgb = [q[0], q[1], q[2]];
+        let values = if lab {
+            let mut l = [0.0; 3];
+            self.lab_transform.eval(&rgb, &mut l).ok()?;
+            [l[0] * 100.0, l[1] * 255.0 - 128.0, l[2] * 255.0 - 128.0]
+        } else {
+            rgb.map(|v| v * 255.0)
+        };
+        Some(json!({"position":p,"space":if lab {"lab"}else{"rgb"},"values":values,"alpha":q[3]}))
+    }
+    pub(crate) fn hover_sample(&self, vectorscope: bool) -> Option<HoverSample> {
+        let position = self.scope.pointer_sample?;
+        let q = self.pixel(position)?;
+        let rgb = [q[0], q[1], q[2]];
+        let hue_saturation = if vectorscope {
+            let mut scope_rgb = [0.0; 3];
+            if self.scope_transform.eval(&rgb, &mut scope_rgb).is_ok() && scope_rgb.iter().all(|x| x.is_finite()) {
+                let (h, s) = photocraft_algo::vectorscope::hue_saturation(scope_rgb.map(|x| x.clamp(0.0, 1.0)));
+                Some([h, s])
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        Some(HoverSample { position, rgb, hue_saturation })
+    }
+    pub(crate) fn ensure_scope(&mut self, selected: bool) {
+        if self
+            .scope
+            .cache
+            .as_ref()
+            .is_some_and(|(revision, before, masked, _)| *revision == self.preview_revision && *before == self.show_before && *masked == selected)
+        {
+            return;
+        }
+        let start = crate::gpu_canvas::now_ms();
+        // A fixed 2-D grid bounds CMS and analysis work independently of the image size. Rows
+        // and columns step separately, so a stride can't alias with the row width into stripes.
+        let step = ((self.pixels().len() as f64 / SCOPE_SAMPLES as f64).sqrt().ceil() as usize).max(1);
+        let (pw, ph) = (self.pw, self.ph);
+        let pixels: Vec<_> = (0..ph)
+            .step_by(step)
+            .flat_map(|y| (0..pw).step_by(step).map(move |x| y * pw + x))
+            .filter_map(|i| self.pixels().get(i).map(|p| (i, p)))
+            .filter(|(i, p)| {
+                p[3] > 0.0 && p.iter().all(|v| v.is_finite()) && (!selected || self.selection.as_ref().and_then(|m| m.get(*i)).is_some_and(|v| *v > 0.0))
+            })
+            .map(|(_, p)| {
+                let mut rgb = [0.0; 3];
+                // An RGB → RGB transform over an RGB pixel; were it refused, the sample plots as black.
+                let _ = self.scope_transform.eval(&p[..3], &mut rgb);
+                [rgb[0], rgb[1], rgb[2], p[3]]
+            })
+            .collect();
+        let scope = Vectorscope::from_rgba(&pixels);
+        self.scope.cache = Some((self.preview_revision, self.show_before, selected, scope));
+        self.scope.ms = crate::gpu_canvas::now_ms() - start;
+        self.scope.revision = self.scope.revision.saturating_add(1);
+>>>>>>> upstream/main
     }
 }
 

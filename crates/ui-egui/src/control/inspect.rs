@@ -100,12 +100,32 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "typeBoxOverflow": app.ui.text_edit.is_some() && app.ui.type_box_overflow,
         "typeTransform": crate::type_transform::inspect(app),
         "camTransform": app.ui.cam_transform,
+<<<<<<< HEAD
         "layerMenu": menu.zip(kind).and_then(|(menu, kind)| match kind {
             MenuKind::Layers { layers } => Some(json!({
                 "pos": menu.pos,
                 "layers": layers.iter().map(|(id, name)| json!({"id": id, "name": name})).collect::<Vec<_>>(),
             })),
             _ => None,
+=======
+        "layerMenu": app.ui.layer_menu,
+        "layerPicker": app.ui.layer_picker,
+        "brushModeMenu": app.ui.brush_mode_menu.map(|pos| {
+            use crate::brush_mode_menu as m;
+            let tool = app.ui.tool;
+            let current = m::current(app, tool);
+            let checked = m::checked(app, ctx, tool);
+            json!({
+                "pos": pos,
+                "tool": tool,
+                "mode": current.and_then(m::Item::label),
+                "choices": m::labels(tool),
+                "items": m::items(tool).into_iter().map(|i| match i.label() {
+                    Some(label) => json!({"label": label, "enabled": m::enabled(app, i), "checked": Some(i) == checked}),
+                    None => json!({"separator": true}),
+                }).collect::<Vec<_>>(),
+            })
+>>>>>>> upstream/main
         }),
         "layerPicker": app.ui.layer_picker,
         "brushModeMenu": menu.filter(|menu| matches!(menu.kind, MenuKind::BrushMode)).map(|menu| brush_mode_menu(app, menu)),
@@ -175,6 +195,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "brush": {"size": app.session.tools.brush.size, "hardness": app.session.tools.brush.hardness, "opacity": app.session.tools.brush.opacity},
         "distort": app.distort.describe(),
         "jobs": crate::jobs_ui::inspect(app),
+        "agentLink": app.agent_link,
         "histogram": crate::histogram_panel::inspect(app),
         "cameraRaw": crate::camera_raw_ui::describe(app),
     })

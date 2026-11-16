@@ -84,7 +84,13 @@ pub(crate) struct Developed {
     pub(crate) settings: CameraRaw,
     /// The developed proxy (straight RGBA).
     pub(crate) processed: Vec<[f32; 4]>,
+<<<<<<< HEAD
     /// The developed proxy's histogram.
+=======
+    pub(crate) lab_transform: std::sync::Arc<craft_cms::Transform>,
+    pub(crate) scope_transform: std::sync::Arc<craft_cms::Transform>,
+    pub(crate) scope: crate::camera_raw_scope_ui::ScopeView,
+>>>>>>> upstream/main
     pub(crate) after_histogram: RgbHistogram,
     /// Milliseconds of the whole job, of the develop alone and of the histogram.
     pub(crate) render_ms: f64,

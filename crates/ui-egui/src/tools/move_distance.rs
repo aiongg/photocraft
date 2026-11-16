@@ -11,6 +11,7 @@
 //! so a pointer resting on the canvas costs nothing per frame. The snapped lines of a move are the
 //! tool host's; this overlay draws only the distances and their dashed extension lines.
 
+<<<<<<< HEAD
 use craft::behavior::Axis;
 use craft::behavior::kurbo::Rect;
 use craft::draw::ui::measure::box_distances;
@@ -18,16 +19,86 @@ use craft::ui::canvas_controls::SmartGuides;
 use craft::ui::contract::{Show as _, ShowContainer as _};
 use photocraft_doc::{DocId, Document, LayerId};
 use photocraft_engine::snap::{layer_rect, union};
+=======
+use egui::{Color32, Pos2, Stroke, pos2, vec2};
+use photocraft_doc::{DocId, LayerId};
+use photocraft_engine::snap::union;
+>>>>>>> upstream/main
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
 
+<<<<<<< HEAD
 /// The bounds of layer `id` and, for a group, of the layers in it (`snap::layer_rect`: what the
 /// Move tool moves and snaps).
 fn tree_rect(doc: &Document, id: LayerId) -> Option<[f64; 4]> {
     let rows = doc.walk();
     let (prefix, _, _) = rows.iter().find(|(_, _, l)| l.id == id)?;
     union(rows.iter().filter(|(p, _, _)| p.starts_with(prefix)).filter_map(|(_, _, l)| layer_rect(doc, l.id)))
+=======
+/// One measured distance: a line along x (`horizontal`, at y = `at`) or along y (at x = `at`),
+/// from `from` to `to` on that axis (`from < to`).
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct Measure {
+    pub horizontal: bool,
+    pub at: f64,
+    pub from: f64,
+    pub to: f64,
+}
+
+impl Measure {
+    pub fn len(&self) -> f64 {
+        self.to - self.from
+    }
+}
+
+/// What to draw between two boxes: the measured lines, and dashed extensions `[x0, y0, x1, y1]`
+/// of the other box's edges where a line ends beside the box rather than on it.
+#[derive(Clone, Debug, Default, PartialEq)]
+pub(crate) struct Overlay {
+    pub measures: Vec<Measure>,
+    pub extensions: Vec<[f64; 4]>,
+}
+
+/// The distances from box `a` (the selection, `[x0, y0, x1, y1]`) to box `b` (the hovered layer
+/// or the canvas), per axis: the gap between facing edges when the boxes are apart on that axis,
+/// else the distances between their corresponding edges (left to left, right to right). Zero
+/// distances aren't shown. A line runs through the middle of where the boxes overlap on the other
+/// axis, or through `a`'s centre when they don't.
+pub(crate) fn measure(a: [f64; 4], b: [f64; 4]) -> Overlay {
+    let mut out = Overlay::default();
+    if !a.iter().chain(b.iter()).all(|v| v.is_finite()) {
+        return out;
+    }
+    for horizontal in [true, false] {
+        // Spans along the measured axis (`s`) and across it (`o`).
+        let (k, o) = if horizontal { (0, 1) } else { (1, 0) };
+        let (sa, sb) = ([a[k], a[k + 2]], [b[k], b[k + 2]]);
+        let (oa, ob) = ([a[o], a[o + 2]], [b[o], b[o + 2]]);
+        let (lo, hi) = (oa[0].max(ob[0]), oa[1].min(ob[1]));
+        let at = if lo < hi { (lo + hi) / 2.0 } else { (oa[0] + oa[1]) / 2.0 };
+        // Each pair: the two ends, and which of them lies on `b`'s edge.
+        let pairs: Vec<(f64, f64, f64)> = if sa[1] <= sb[0] {
+            vec![(sa[1], sb[0], sb[0])]
+        } else if sb[1] <= sa[0] {
+            vec![(sb[1], sa[0], sb[1])]
+        } else {
+            vec![(sa[0].min(sb[0]), sa[0].max(sb[0]), sb[0]), (sa[1].min(sb[1]), sa[1].max(sb[1]), sb[1])]
+        };
+        for (from, to, edge) in pairs {
+            if to - from <= 0.0 {
+                continue;
+            }
+            out.measures.push(Measure { horizontal, at, from, to });
+            // The line ends beside `b`: extend `b`'s edge to it.
+            if at < ob[0] || at > ob[1] {
+                let near = if at < ob[0] { ob[0] } else { ob[1] };
+                out.extensions.push(if horizontal { [edge, near, edge, at] } else { [near, edge, at, edge] });
+            }
+        }
+    }
+    out
+>>>>>>> upstream/main
 }
 
 /// The last answer: the boxes measured with the pointer at `at` on that revision and selection.
@@ -55,13 +126,13 @@ fn boxes(app: &mut PhotocraftApp, at: [f64; 2]) -> Option<([f64; 4], [f64; 4])> 
         return c.boxes;
     }
     let d = &st.doc;
-    let a = union(selected.iter().filter(|id| !d.is_background(**id)).filter_map(|id| tree_rect(d, *id)));
+    let a = union(selected.iter().filter(|id| !d.is_background(**id)).filter_map(|id| crate::snap_ui::tree_rect(d, *id)));
     let canvas = [0.0, 0.0, d.size.width as f64, d.size.height as f64];
     let hovered = photocraft_engine::pick_cmds::move_auto_select_target(d, at[0], at[1], group).filter(|id| {
         // The selection itself (or a layer in a selected group) isn't another layer.
         !d.is_background(*id) && !selected.iter().any(|s| *s == *id || d.path_of(*id).zip(d.path_of(*s)).is_some_and(|(p, q)| p.starts_with(&q)))
     });
-    let boxes = a.map(|a| (a, hovered.and_then(|id| tree_rect(d, id)).unwrap_or(canvas)));
+    let boxes = a.map(|a| (a, hovered.and_then(|id| crate::snap_ui::tree_rect(d, id)).unwrap_or(canvas)));
     app.move_distance = Some(Cache { doc, revision, at, group, selected, boxes });
     boxes
 }

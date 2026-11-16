@@ -53,9 +53,36 @@ fn state(app: &PhotocraftApp) -> (u64, usize, usize) {
     (st.revision, st.history.past_len(), app.session.journal.len())
 }
 
+<<<<<<< HEAD
 /// The reference also greys Group from Layers… and Load Selection…, but their menu-bar twins are
 /// live here (as in the Count tool's menu), and the rows follow the twins.
 const NO_SELECTION_GREY: [&str; 5] = ["Blending Options…", "Convert to Layers", "Rasterize Layer", "Rasterize Layer Style", "Free Transform"];
+=======
+const NO_SELECTION: [&str; 17] = [
+    "Blending Options…",
+    "―",
+    "Duplicate Layer…",
+    "Delete Layer",
+    "Group from Layers…",
+    "―",
+    "Convert to Smart Object",
+    "Convert to Layers",
+    "―",
+    "Rasterize Layer",
+    "Rasterize Layer Style",
+    "―",
+    "Free Transform",
+    "―",
+    "Color Range…",
+    "Load Selection…",
+    "Reselect",
+];
+
+/// Group from Layers… and Load Selection… follow their menu-bar twins, which grey them for the Background
+/// (#12866) and for a lone Background with no saved selection (#13293), as the reference does.
+const NO_SELECTION_GREY: [&str; 7] =
+    ["Blending Options…", "Group from Layers…", "Convert to Layers", "Rasterize Layer", "Rasterize Layer Style", "Free Transform", "Load Selection…"];
+>>>>>>> upstream/main
 
 fn select(app: &mut PhotocraftApp) {
     app.run("select.rect", json!({"x": 10, "y": 10, "width": 20, "height": 20})).unwrap();

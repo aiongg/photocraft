@@ -410,11 +410,34 @@ fn the_saved_path_selected_in_the_paths_panel_is_drawn() {
     // Path Selection (and the Pen tools, as for the work path) add anchor squares.
     app.ui.selected_path = Some("Path 1".into());
     app.ui.tool = Tool::Move;
+<<<<<<< HEAD
     assert_eq!(saved_anchors(&app), Some(AnchorsShown::Hidden));
     for tool in [Tool::PathSelection, Tool::Pen] {
         app.ui.tool = tool;
         assert_eq!(saved_anchors(&app), Some(AnchorsShown::All), "{tool:?}");
     }
+=======
+    let plain = overlay_shapes(&app, &ctx);
+    app.ui.tool = Tool::PathSelection;
+    assert!(overlay_shapes(&app, &ctx) > plain);
+    app.ui.tool = Tool::Pen;
+    assert!(overlay_shapes(&app, &ctx) > plain);
+}
+
+#[test]
+fn shape_drag_creates_layers_with_modifiers() {
+    let mut app = app();
+    finish_shape(&mut app, Tool::Rectangle, [10.0, 10.0], [60.0, 30.0], egui::Modifiers::SHIFT);
+    let st = app.session.active().unwrap();
+    let b = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds();
+    assert_eq!((b.width(), b.height()), (20, 20), "shift = square of the shorter side (#13222)");
+    finish_shape(&mut app, Tool::EllipseShape, [100.0, 100.0], [120.0, 110.0], egui::Modifiers::ALT);
+    let st = app.session.active().unwrap();
+    let b = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds();
+    assert!(b.x0.abs_diff(80) <= 1 && b.width().abs_diff(40) <= 1, "alt = from centre: {b:?}");
+    finish_shape(&mut app, Tool::Line, [10.0, 150.0], [90.0, 152.0], egui::Modifiers::SHIFT);
+    assert_eq!(app.session.active().unwrap().doc.layers.len(), 4);
+>>>>>>> upstream/main
 }
 
 /// #9453: in Path mode a Shape-tool drag adds its outline to the work path, one subpath per
@@ -597,7 +620,38 @@ fn a_short_shift_drag_line_keeps_its_45_degrees() {
         let (from, to) = line(&mut a, start, snapped, true);
         assert!(from.iter().chain(&to).all(|v| v.fract() == 0.0), "whole pixels: {from:?} {to:?}");
         let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
+<<<<<<< HEAD
         assert!(dx != 0.0 && dx.abs() == dy.abs(), "{start:?} → {end:?}: still 45°: {from:?} {to:?}");
+=======
+        assert!(dx != 0.0 && dx.abs() == dy.abs(), "{start:?} → {end:?}: still 45°: {g}");
+    }
+    // Without ⇧ each end still snaps to its nearest pixel, even on an exact diagonal.
+    let g = super::shapes::shape_geometry(&o, Tool::Line, [10.1, 10.49], [11.3, 11.69], egui::Modifiers::NONE).expect("a line");
+    assert_eq!((g["from"].clone(), g["to"].clone()), (json!([10.0, 10.0]), json!([11.0, 12.0])), "{g}");
+}
+
+#[test]
+fn shift_pressed_during_a_shape_drag_constrains_it() {
+    // #668: ⇧ only counted when held at the press; Photoshop constrains when it is pressed
+    // mid-drag (and stops when it is released).
+    use crate::canvas::{ToolEvent, tool_event};
+    for (tool, sides) in [(Tool::Polygon, 6), (Tool::Rectangle, 4), (Tool::EllipseShape, 0)] {
+        let mut app = app();
+        app.ui.tool = tool;
+        app.ui.tool_options.polygon_sides = 6;
+        let none = egui::Modifiers::NONE;
+        tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 10.0, pressure: 1.0 }, none);
+        tool_event(&mut app, ToolEvent::Move { x: 40.0, y: 30.0, pressure: 1.0 }, none);
+        tool_event(&mut app, ToolEvent::Move { x: 70.0, y: 40.0, pressure: 1.0 }, egui::Modifiers::SHIFT);
+        tool_event(&mut app, ToolEvent::Up { x: 70.0, y: 40.0 }, egui::Modifiers::SHIFT);
+        let st = app.session.active().unwrap();
+        let l = st.doc.layer(st.active_layer.unwrap()).unwrap();
+        assert!(matches!(l.content, LayerContent::Shape(_)), "{tool:?} ({sides} sides): a shape layer");
+        let b = l.surface().unwrap().content_bounds();
+        // The drag is 60 × 30; constrained, the shape's box is 30 × 30, the shorter side (#13222)
+        // (a hexagon is narrower than its box, so the height tells).
+        assert!(b.height().abs_diff(30) <= 1 && b.width() <= 31, "{tool:?}: ⇧ mid-drag keeps proportions: {b:?}");
+>>>>>>> upstream/main
     }
     // Without the snap each end still rounds on its own.
     let mut a = app();

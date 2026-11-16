@@ -45,18 +45,30 @@ pub fn sync_tool_brush(app: &mut PhotocraftApp) {
         // A tool seen for the first time takes what the brush has, at Photoshop's smoothing, but
         // in Normal mode: each tool's Mode starts at Normal, so a Multiply Brush doesn't make the
         // first Pattern Stamp stroke multiply (or give Healing a mode its menu doesn't have).
-        // The Art History Brush also starts at full opacity (#10263): its Opacity is its own.
-        // The Background Eraser, the Healing Brush, the Burn, Dodge and Sponge tools and the Clone
-        // Stamp start with their own measured tips instead, as the whole brush Reset Tool gives
-        // them (#11911, #12099, #12671, #12684, #13029, #12601).
-        None if matches!(tool, Tool::BackgroundEraser | Tool::Healing | Tool::Burn | Tool::Dodge | Tool::Sponge | Tool::CloneStamp) => {
+        // The Art History Brush also starts at full opacity (#10263), and the Pattern Stamp at full
+        // opacity and flow (#12616): those fields are their own.
+        // The Background Eraser, the Healing Brush, the Burn, Dodge and Sponge tools, the Clone
+        // Stamp and the Smudge tool start with their own measured tips instead, as the whole brush
+        // Reset Tool gives them (#11911, #12099, #12671, #12684, #13029, #12601, #12964).
+        None if matches!(tool, Tool::BackgroundEraser | Tool::Healing | Tool::Burn | Tool::Dodge | Tool::Sponge | Tool::CloneStamp | Tool::Smudge) => {
             fresh_brush(tool, &current)
         }
+        // The Pencil starts with its own 1 px hard round (#12200) regardless of the Brush, keeping
+        // the outgoing opacity.
+        None if tool == Tool::Pencil => BrushSettings { opacity: current.opacity, ..fresh_brush(tool, &current) },
+        // The Eraser starts with its Reset Tool tip and no smoothing (#11936), keeping the outgoing
+        // opacity and flow as before (a first use's are not measured).
+        None if tool == Tool::Eraser => BrushSettings { opacity: current.opacity, flow: current.flow, ..fresh_brush(tool, &current) },
         None => {
-            let opacity = if tool == Tool::ArtHistoryBrush { BrushSettings::default().opacity } else { current.opacity };
+            let fresh = BrushSettings::default();
+            let (opacity, flow) = match tool {
+                Tool::ArtHistoryBrush => (fresh.opacity, current.flow),
+                Tool::PatternStamp => (fresh.opacity, fresh.flow),
+                _ => (current.opacity, current.flow),
+            };
             // The Remove tool starts at its measured 19 px; the rest is the current brush (#12548).
             let size = if tool == Tool::Remove { REMOVE_TOOL_SIZE } else { current.size };
-            BrushSettings { smoothing: first_smoothing(), mode: photocraft_color::BlendMode::Normal, opacity, size, ..current }
+            BrushSettings { smoothing: first_smoothing(), mode: photocraft_color::BlendMode::Normal, opacity, flow, size, ..current }
         }
     };
     // The picked preset was the outgoing tool's brush: forget it, so Update Brush can't overwrite
@@ -83,10 +95,16 @@ fn session_fields(current: &BrushSettings, brush: &BrushSettings) -> BrushSettin
 /// The Brush tool's tip after Reset Tool, as the reference measures it (#11810): size, hardness
 /// and spacing of a 13 px soft round at 25 % spacing.
 const BRUSH_TOOL_TIP: (f32, f32, f32) = (13.0, 0.0, 0.25);
+/// The Eraser's tip after Reset Tool (#11936): a 13 px hard round at 25 % spacing, with no
+/// smoothing.
+const ERASER_TOOL_TIP: (f32, f32, f32) = (13.0, 1.0, 0.25);
 /// The Background Eraser's tip after Reset Tool (#11911): a 13 px hard round at 25 % spacing.
 const BACKGROUND_ERASER_TIP: (f32, f32, f32) = (13.0, 1.0, 0.25);
 /// The Healing Brush's tip after Reset Tool (#12099): a 19 px hard round at 25 % spacing.
 const HEALING_BRUSH_TIP: (f32, f32, f32) = (19.0, 1.0, 0.25);
+/// The Pencil tool's starting and Reset Tool tip, as the reference measures it (#12200): size,
+/// hardness and spacing of a 1 px hard round at 25 % spacing.
+const PENCIL_TOOL_TIP: (f32, f32, f32) = (1.0, 1.0, 0.25);
 /// The Burn, Dodge and Sponge tools' tip after Reset Tool (#12671, #12684, #13029): a 65 px soft
 /// round at 25 % spacing.
 const TONING_TOOL_TIP: (f32, f32, f32) = (65.0, 0.0, 0.25);
@@ -95,20 +113,29 @@ const CLONE_STAMP_TIP: (f32, f32, f32) = (21.0, 0.0, 0.25);
 /// The Remove tool's size after Reset Tool (#12548): 19 px. Its hardness and spacing are not
 /// measured, so they stay the default brush's.
 const REMOVE_TOOL_SIZE: f32 = 19.0;
+/// The Smudge tool's tip after Reset Tool (#12964): a 13 px soft round at 25 % spacing.
+const SMUDGE_TOOL_TIP: (f32, f32, f32) = (13.0, 0.0, 0.25);
 
 /// `tool`'s brush as it starts out (Reset Tool, #2825): the default brush at Photoshop's
 /// smoothing, with the session's own fields of `current`. The Brush tool's tip is
-/// [`BRUSH_TOOL_TIP`], the Background Eraser's [`BACKGROUND_ERASER_TIP`], the Healing Brush's
+/// [`BRUSH_TOOL_TIP`], the Eraser's [`ERASER_TOOL_TIP`] with no smoothing, the Background Eraser's [`BACKGROUND_ERASER_TIP`], the Healing Brush's
 /// [`HEALING_BRUSH_TIP`], the Burn, Dodge and Sponge tools' [`TONING_TOOL_TIP`], the Clone Stamp's
-/// [`CLONE_STAMP_TIP`] with no smoothing, the Remove tool's size [`REMOVE_TOOL_SIZE`]; the other
-/// tools keep the default tip.
+/// [`CLONE_STAMP_TIP`] with no smoothing, the Remove tool's size [`REMOVE_TOOL_SIZE`], the Smudge
+/// tool's [`SMUDGE_TOOL_TIP`] and the Pencil's [`PENCIL_TOOL_TIP`]; the other tools keep the
+/// default tip.
 pub(crate) fn fresh_brush(tool: Tool, current: &BrushSettings) -> BrushSettings {
     let mut brush = BrushSettings { smoothing: first_smoothing(), ..BrushSettings::default() };
     match tool {
         Tool::Brush => (brush.size, brush.hardness, brush.spacing) = BRUSH_TOOL_TIP,
+        Tool::Eraser => {
+            (brush.size, brush.hardness, brush.spacing) = ERASER_TOOL_TIP;
+            brush.smoothing.amount = 0.0;
+        }
         Tool::BackgroundEraser => (brush.size, brush.hardness, brush.spacing) = BACKGROUND_ERASER_TIP,
         Tool::Healing => (brush.size, brush.hardness, brush.spacing) = HEALING_BRUSH_TIP,
+        Tool::Pencil => (brush.size, brush.hardness, brush.spacing) = PENCIL_TOOL_TIP,
         Tool::Burn | Tool::Dodge | Tool::Sponge => (brush.size, brush.hardness, brush.spacing) = TONING_TOOL_TIP,
+        Tool::Smudge => (brush.size, brush.hardness, brush.spacing) = SMUDGE_TOOL_TIP,
         Tool::CloneStamp => {
             (brush.size, brush.hardness, brush.spacing) = CLONE_STAMP_TIP;
             brush.smoothing.amount = 0.0;
@@ -173,21 +200,254 @@ pub(crate) fn secondary_takes(app: &PhotocraftApp, tool: Tool, mods: Mods) -> Se
     if crate::brush_mode_menu::opens_on(app, tool, mods) {
         return SecondaryUse::None;
     }
+<<<<<<< HEAD
     let layer_menu = crate::layer_pick_ui::is_gesture(tool, mods);
     if crate::brush_resize::PaintResize::takes(tool, craft::behavior::PointerButton::Secondary, mods) {
         return SecondaryUse::Resize;
+=======
+    let ctx = &response.ctx;
+    let down = ctx.data(|d| d.get_temp::<Option<Pos2>>(right_pressed_id(response))).flatten()?;
+    let up = ctx.input(|i| i.pointer.button_released(PointerButton::Secondary).then(|| i.pointer.latest_pos()).flatten())?;
+    on_canvas(response, up).then(|| to_layer(response, down))
+}
+
+/// Is a right press down on this canvas that may still be a right-click (`right_click_at`)?
+pub fn right_click_pending(response: &Response) -> bool {
+    response.ctx.data(|d| d.get_temp::<Option<Pos2>>(right_pressed_id(response))).flatten().is_some()
+}
+
+/// The right press now down was used by a gesture, so its release is no right-click.
+pub fn right_press_used(response: &Response) {
+    response.ctx.data_mut(|d| d.insert_temp::<Option<Pos2>>(right_pressed_id(response), None));
+}
+
+/// How far, in points, the pointer may stray from a right press while the button is down for its
+/// release to still be a right-click: three times egui's click distance (6 points by default, so
+/// 18). That is the "few pixels" a high-DPI mouse moves as its button goes down, or a slow frame's
+/// move, at any display scale (points follow it), and well short of a deliberate drag, which is
+/// no click: a long right drag opens nothing, as before #10183, and the selected Hand's pans.
+fn right_click_reach(ctx: &egui::Context) -> f32 {
+    3.0 * ctx.options(|o| o.input_options.max_click_dist)
+}
+
+/// A screen point in the coordinates of `response`'s layer (its `rect`'s).
+fn to_layer(response: &Response, p: Pos2) -> Pos2 {
+    response.ctx.layer_transform_from_global(response.layer_id).map_or(p, |t| t * p)
+}
+
+/// Is screen point `p` on the canvas itself, so that a press there is the canvas's: inside it,
+/// under no popup or window, and on no widget drawn over it (a scrollbar). egui only hit-tests
+/// where the pointer is at the end of the frame, which a slow frame can have moved away from the
+/// press; this asks the same of last frame's widgets at `p`.
+fn on_canvas(response: &Response, p: Pos2) -> bool {
+    let ctx = &response.ctx;
+    let q = to_layer(response, p);
+    if !response.rect.contains(q) || ctx.layer_id_at(p).is_some_and(|l| l != response.layer_id) {
+        return false;
+    }
+    // A layer's widgets are listed back to front: the last one there that senses the press is on top.
+    let top = ctx.viewport(|v| {
+        v.prev_pass
+            .widgets
+            .get_layer(response.layer_id)
+            .filter(|w| w.enabled && (w.sense.senses_click() || w.sense.senses_drag()) && w.interact_rect.contains(q))
+            .last()
+            .map(|w| w.id)
+    });
+    top.is_none_or(|id| id == response.id)
+}
+
+/// Temp-data key, one per canvas: where the right press now down (or released this frame) went
+/// down, in screen points, when that was on this canvas and nothing has used it since; `None` once
+/// it is no right-click.
+fn right_pressed_id(response: &Response) -> egui::Id {
+    response.id.with("canvas-right-pressed")
+}
+
+/// Keeps `right_pressed_id` for this frame: set on a right press (on the canvas or not), dropped
+/// once the button is up again. A right-click is the right button on its own: a press made while
+/// another button is down is none, and another button pressed while it is held uses it. Escape
+/// pressed while it is held cancels it, and so does a move farther than `right_click_reach` from
+/// the press: every pointer position this frame's events had while the button was down counts,
+/// not just where the pointer ends up, so a drag out and back is no click either. The canvas runs
+/// this every frame, panning or not, before the open brush mode menu skips the buttons, so a
+/// press made while the menu is open is not mistaken for an older one.
+pub fn track_right_press(response: &Response) {
+    let id = right_pressed_id(response);
+    let reach = right_click_reach(&response.ctx);
+    let tracked = response.ctx.data(|d| d.get_temp::<Option<Pos2>>(id)).flatten();
+    let (pressed, released, held, origin, others, escape, far) = response.ctx.input(|i| {
+        let right_press = |e: &egui::Event| matches!(e, egui::Event::PointerButton { button: PointerButton::Secondary, pressed: true, .. });
+        // Where the button went down. With the release in the same frame, the pointer is
+        // already where it came up and egui has dropped the press origin: the event has it.
+        let last_press = i.events.iter().rposition(right_press);
+        let pressed_at = last_press.and_then(|k| i.events.get(k)).and_then(|e| match e {
+            egui::Event::PointerButton { pos, .. } => Some(*pos),
+            _ => None,
+        });
+        let pressed = i.pointer.button_pressed(PointerButton::Secondary);
+        let origin = pressed_at.or_else(|| i.pointer.press_origin());
+        // The pointer while the button was down this frame: after its press, up to its release.
+        let start = if pressed { last_press.map_or(0, |k| k.saturating_add(1)) } else { 0 };
+        let from = if pressed { origin } else { tracked };
+        let mut far = false;
+        for e in i.events.iter().skip(start) {
+            let (p, up) = match e {
+                egui::Event::PointerMoved(p) => (*p, false),
+                egui::Event::PointerButton { pos, button: PointerButton::Secondary, pressed: false, .. } => (*pos, true),
+                _ => continue,
+            };
+            far |= from.is_some_and(|o| o.distance(p) > reach);
+            if up {
+                break;
+            }
+        }
+        let others = [PointerButton::Primary, PointerButton::Middle, PointerButton::Extra1, PointerButton::Extra2]
+            .into_iter()
+            .any(|b| i.pointer.button_down(b) || i.pointer.button_pressed(b));
+        // The frame's own events: a shortcut, a closing popup or the HUD may already have
+        // consumed this Escape from `events`, and it still cancels the press.
+        let escape = i.raw.events.iter().any(|e| matches!(e, egui::Event::Key { key: egui::Key::Escape, pressed: true, .. }));
+        let b = PointerButton::Secondary;
+        (pressed, i.pointer.button_released(b), i.pointer.secondary_down(), origin, others, escape, far)
+    });
+    if pressed {
+        let at = origin.filter(|&p| !others && !escape && !far && on_canvas(response, p));
+        response.ctx.data_mut(|d| {
+            d.insert_temp(id, at);
+            d.remove_temp::<ViewKey>(right_view_id(response));
+        });
+    } else if !released && !held {
+        response.ctx.data_mut(|d| d.remove_temp::<Option<Pos2>>(id));
+    } else if others || escape || far {
+        right_press_used(response);
+    }
+}
+
+/// A canvas's camera and place on screen, as bits: the zoom, the document point at the centre, the
+/// rotation, the flip and the canvas rect.
+type ViewKey = [u32; 9];
+
+/// Temp-data key, one per canvas: the `ViewKey` the tracked right press went down in.
+fn right_view_id(response: &Response) -> egui::Id {
+    right_pressed_id(response).with("view")
+}
+
+/// Ties the tracked right press to the view it went down in. A scroll, a zoom or a turn of the
+/// view while the button is held moves the image under the press, so its release is no
+/// right-click: it would point at whatever is under the press's screen point now, not at what was
+/// pressed. `view` and `flip` are this frame's camera; the canvas calls this once the frame's
+/// navigation has moved it, before its menus read the click.
+pub fn track_right_press_view(response: &Response, view: &crate::state::View, flip: bool) {
+    let r = response.rect;
+    let now: ViewKey =
+        [view.zoom, view.center[0], view.center[1], view.rotation, f32::from(u8::from(flip)), r.min.x, r.min.y, r.max.x, r.max.y].map(f32::to_bits);
+    let key = right_view_id(response);
+    let tracked = response.ctx.data(|d| d.get_temp::<Option<Pos2>>(right_pressed_id(response))).flatten().is_some();
+    let then = response.ctx.data_mut(|d| {
+        if !tracked {
+            d.remove_temp::<ViewKey>(key);
+            return None;
+        }
+        let then = d.get_temp::<ViewKey>(key);
+        if then.is_none() {
+            d.insert_temp(key, now);
+        }
+        then
+    });
+    if then.is_some_and(|v| v != now) {
+        right_press_used(response);
+    }
+}
+
+/// Route the canvas response's buttons: the left one drives the tool; the right one resizes the
+/// brush with Alt held (#297), erases (Erase preference) or opens the Brush Preset picker. Arms
+/// `secondary_erase` or `brush_resize_armed` for this frame's `Down`. `xf` is this canvas's view,
+/// one cell of a Window › Arrange layout: it places a right-click on the image or the pasteboard.
+pub fn canvas_buttons(app: &mut PhotocraftApp, response: &Response, tool: Tool, xf: &crate::canvas::ViewXform) -> Buttons {
+    if crate::brush_mode_menu::blocks_canvas(app, &response.ctx) {
+        app.secondary_erase = false;
+        return Buttons::default();
+    }
+    let physical_right = app.services.right_button_down.as_ref().is_some_and(|f| f());
+    let (mods, mut right_down) = response.ctx.input(|i| (i.modifiers, i.pointer.secondary_down()));
+    right_down |= physical_right;
+    let right_started = response.drag_started_by(PointerButton::Secondary) || (physical_right && response.drag_started());
+    let right_dragged = response.dragged_by(PointerButton::Secondary) || (physical_right && response.dragged());
+    let resizing = app.brush_resize.is_some_and(|r| r.secondary);
+    let right_stopped = response.drag_stopped_by(PointerButton::Secondary) || (resizing && response.drag_stopped());
+
+    if physical_right && crate::brush_resize::is_right_gesture(crate::workspace_ui::sticky_mods(app, mods)) {
+        app.alt_sampling = false;
+    }
+
+    // Alt+right-drag resizes the brush (brush_resize.rs); its events reach `tool_event` like a
+    // left drag's, and nothing paints. A resize whose release was missed ends here.
+    crate::brush_resize::release_stale(app, right_down || response.drag_stopped_by(PointerButton::Secondary) || response.drag_stopped());
+    let resize_start = crate::brush_resize::applies(tool)
+        && app.drag.is_none()
+        && crate::brush_resize::is_right_gesture(crate::workspace_ui::sticky_mods(app, mods))
+        && (right_started || (physical_right && response.dragged() && app.brush_resize.is_none()));
+    let resizing = app.brush_resize.is_some_and(|r| r.secondary);
+    app.brush_resize_armed = resize_start || (physical_right && resizing);
+    // ⌘/Ctrl+right-click lists the layers under the pointer instead (layer_pick_ui.rs, #307).
+    let layer_menu = crate::layer_pick_ui::is_gesture(tool, mods);
+    // Decided by the modifiers held when the button went down, not by those of the release frame that reports the click.
+    let menu_mods = crate::workspace_ui::sticky_mods(app, crate::brush_mode_menu::gesture_mods(&response.ctx, mods));
+    let menu_at = right_click_at(response);
+    let mode_menu = crate::brush_mode_menu::opens_on(app, tool, menu_mods, menu_at.map(|p| xf.to_doc(p)));
+    if mode_menu && !resizing && app.drag.is_none() {
+        app.secondary_erase = false;
+        if let Some(p) = menu_at {
+            crate::brush_mode_menu::open(app, &response.ctx, [p.x, p.y], menu_mods);
+        }
+        return Buttons {
+            started: response.drag_started_by(PointerButton::Primary),
+            dragged: response.dragged_by(PointerButton::Primary),
+            stopped: response.drag_stopped_by(PointerButton::Primary),
+            clicked: response.clicked(),
+        };
+>>>>>>> upstream/main
     }
     // Cmd beats Erase: the layer list is `layer_pick_ui::is_gesture`'s.
     let erase = right_erases(app, tool) && !layer_menu;
     if erase {
         return SecondaryUse::Erase;
     }
+<<<<<<< HEAD
     if right_click_picker(tool) && !layer_menu && mods.shift && mods.alt {
         return SecondaryUse::Hud;
+=======
+    let right_stroke = erase && app.drag.is_some();
+    let right_start = erase && right_started;
+    if right_start || resize_start || resizing {
+        right_press_used(response);
+    }
+    let right_at = right_click_at(response);
+    let right_click = right_at.is_some();
+    if !erase
+        && !layer_menu
+        && !crate::color_hud::is_open(&app.ui)
+        && right_click_picker(tool)
+        && let Some(p) = right_at
+        && !crate::retouch_ui::remove_pending_live(app)
+    {
+        crate::brush_picker::open(&mut app.ui, &response.ctx, [p.x, p.y]);
+    }
+    let erase_click = erase && right_click;
+    app.secondary_erase = right_start || erase_click;
+    let right_drag = right_stroke || resizing;
+    Buttons {
+        started: response.drag_started_by(PointerButton::Primary) || right_start || resize_start,
+        dragged: response.dragged_by(PointerButton::Primary) || (right_drag && right_dragged),
+        stopped: response.drag_stopped_by(PointerButton::Primary) || (right_drag && right_stopped),
+        clicked: response.clicked() || erase_click,
+>>>>>>> upstream/main
     }
     SecondaryUse::None
 }
 
+<<<<<<< HEAD
 /// The popup a context press opens.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum ContextPopup {
@@ -195,6 +455,51 @@ pub(crate) enum ContextPopup {
     Menu(MenuKind),
     /// The Brush Preset picker.
     BrushPicker,
+=======
+/// `ui.pointer` with `"button": "secondary"`: true when its events should reach the tool (an
+/// Alt+right-drag brush resize, `brush_resize_armed` for its `Down`; or an erasing right stroke,
+/// `secondary_erase` armed for its `Down`). Otherwise a right-click with a painting tool opens
+/// the Brush Preset picker at screen point `at`, and nothing paints.
+pub fn pointer_secondary(app: &mut PhotocraftApp, ctx: &egui::Context, down: bool, mods: egui::Modifiers, at: [f32; 2]) -> bool {
+    let tool = app.ui.tool;
+    // Shift+Alt+right is Photoshop's HUD Color Picker (#6098): the down opens it, the up closes
+    // it. As on the canvas, the right-erase preference wins over the HUD, and a tool whose
+    // right-click is the canvas tool menu keeps that menu (handled by the caller).
+    let hud_gesture = right_click_picker(tool) && mods.shift && mods.alt && !right_erases(app, tool);
+    // A control-channel request carries one modifier set, so the Up need not repeat the Down's:
+    // the caller may release Shift and Alt first. Any Up therefore closes a non-held HUD that is
+    // still open; `release` leaves a real-mouse (held) one to its button release.
+    let hud_up = !down && app.ui.color_hud.is_some_and(|h| !h.hold);
+    if hud_gesture || hud_up {
+        if down {
+            crate::color_hud::open(app, at, false);
+        } else {
+            crate::color_hud::release(&mut app.ui);
+        }
+        return false;
+    }
+    if crate::brush_resize::applies(tool) && (crate::brush_resize::is_right_gesture(mods) || app.brush_resize.is_some_and(|r| r.secondary)) {
+        app.brush_resize_armed = down && app.drag.is_none();
+        return true;
+    }
+    // The control channel opens the pasteboard menu before it gets here (`secondary_canvas_menu_took`).
+    if crate::brush_mode_menu::opens_on(app, tool, mods, None) && app.drag.is_none() && app.brush_resize.is_none() {
+        app.secondary_erase = false;
+        if down {
+            crate::brush_mode_menu::open(app, ctx, at, mods);
+        }
+        return false;
+    }
+    if right_erases(app, tool) {
+        app.secondary_erase = down;
+        return true;
+    }
+    // Waiting Remove strokes take no right-click: nothing opens over their tint (#12551).
+    if down && right_click_picker(tool) && !crate::retouch_ui::remove_pending_live(app) {
+        crate::brush_picker::open(&mut app.ui, ctx, at);
+    }
+    false
+>>>>>>> upstream/main
 }
 
 /// The popup a context press (a press its tool refused, or a press with no tool use) of `tool` with
@@ -243,3 +548,11 @@ pub(crate) fn context_popup(app: &mut PhotocraftApp, tool: Tool, mods: Mods, doc
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+#[path = "../pencil_reset_defaults_tests.rs"]
+mod pencil_reset_defaults_tests;
+
+#[cfg(test)]
+#[path = "remove_right_click_tests.rs"]
+mod remove_right_click_tests;

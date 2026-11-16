@@ -1084,7 +1084,7 @@ fn an_unavailable_dialog_is_reported_and_a_cancelled_one_is_not() {
 }
 
 /// #3629: Layer › Export As with several artboards selected exports one file per board, at each
-/// board's size and with the dialog's settings, after one destination prompt.
+/// board's size and with the dialog's settings, after one destination prompt (a folder, #14808).
 #[test]
 fn export_as_with_several_artboards_selected_writes_one_file_each() {
     let (mut app, files, written) = app();
@@ -1104,6 +1104,7 @@ fn export_as_with_several_artboards_selected_writes_one_file_each() {
     let r = menus::invoke(&mut app, &ctx, "layer.exportAs", Value::Null).unwrap();
     let id: DialogId = serde_json::from_value(r["dialog"].clone()).expect("the command opened a dialog");
     // The dialog's settings apply to every file: JPG at 50 %.
+<<<<<<< HEAD
     app.framework.dialogs.set_json_field(&ctx, id, "format", json!("jpg")).unwrap();
     app.framework.dialogs.set_json_field(&ctx, id, "size", json!({"Scale": 50.0})).unwrap();
     crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
@@ -1124,6 +1125,19 @@ fn export_as_with_several_artboards_selected_writes_one_file_each() {
     let sibling = Path::new(&written[1]);
     assert_eq!(sibling.parent(), Path::new(&written[0]).parent());
     assert_eq!(sibling.file_name().and_then(|name| name.to_str()), Some("boards-2-Capsule.jpg"));
+=======
+    fields.insert("format".into(), json!("jpg"));
+    fields.insert("scale".into(), json!(50));
+    crate::export_dialog::confirm(&mut app, &fields).unwrap();
+    app.poll_file_dialog(&ctx, None);
+    assert_eq!(open.borrow().len(), 1, "one destination for every board");
+    // #14808: several files go into a chosen folder, one `<layer name>.<ext>` each.
+    answer(&open, Some(FileDialogAnswer::FolderTo("/out".into())));
+    app.poll_file_dialog(&ctx, None);
+    assert!(!app.ui.status_error, "{}", app.ui.status);
+    let want: Vec<String> = ["Header.jpg", "Capsule.jpg"].iter().map(|n| std::path::Path::new("/out").join(n).to_string_lossy().into_owned()).collect();
+    assert_eq!(*written.borrow(), want);
+>>>>>>> upstream/main
     let mut got = sizes.borrow().iter().map(|(_, w, h)| (*w, *h)).collect::<Vec<_>>();
     got.sort_unstable();
     assert_eq!(got, [(10, 25), (20, 15)], "each board at its own size, scaled to 50 %");

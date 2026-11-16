@@ -7,6 +7,7 @@ use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::Mutex;
 
+<<<<<<< HEAD
 use craft::behavior::PixelSize;
 use craft::ui::contract::SaveKey;
 use craft::ui::dialog::{DialogId, DialogResult};
@@ -17,6 +18,10 @@ use craft::ui::patterns::form_dialogs::{
 use craft::ui::patterns::presets::{GroupPath, NamedPresetEvent, PresetLibrary};
 use photocraft_cms::Profile;
 use photocraft_doc::{ColorMode, Document, LayerId};
+=======
+use craft_cms::Profile;
+use photocraft_doc::{ColorMode, Document};
+>>>>>>> upstream/main
 use serde_json::{Map, Value, json};
 
 use photocraft_engine::export_preset_cmds::{DEFAULT_RESAMPLE, export_resample};
@@ -121,6 +126,7 @@ pub(crate) fn options_of(f: &Map<String, Value>) -> ExportOptions {
             _ => Resample::Automatic,
         };
     }
+<<<<<<< HEAD
     let pixels = f.get("width").and_then(Value::as_f64).zip(f.get("height").and_then(Value::as_f64));
     if let (true, Some((w, h))) = (s(&f, "sizing") == "pixels", pixels) {
         o.size = DialogSize::pixels(w.round() as u32, h.round() as u32);
@@ -176,6 +182,160 @@ pub(crate) fn settings_from(options: &ExportOptions, source: PixelSize) -> Map<S
     f.insert("profile".into(), json!(if options.profile == ExportProfile::Srgb { "srgb" } else { "document" }));
     f.insert("embedProfile".into(), json!(options.embed_profile));
     f
+=======
+    if let Some(rows) = saved.get("scaleAll").filter(|v| valid_scale_rows(v)) {
+        f.insert("scaleAll".into(), rows.clone());
+    }
+}
+
+/// Scale All's sizes, in the menu's order.
+const SCALE_SIZES: [&str; 11] = ["0.1x", "0.25x", "0.3x", "0.33x", "0.5x", "0.75x", "1x", "1.25x", "1.5x", "2x", "3x"];
+/// The sizes + adds, as measured: the first one no row has yet (0.3x is never added).
+const SCALE_ADD_ORDER: [&str; 9] = ["0.5x", "0.75x", "0.25x", "2x", "0.33x", "1.5x", "0.1x", "3x", "1.25x"];
+/// Scale All's row limit, as measured.
+const MAX_SCALE_ROWS: usize = 10;
+/// Rows shown before the list scrolls, as measured.
+const SCALE_ROWS_SHOWN: f32 = 7.0;
+
+/// Whether `v` is a Scale All row list: 1..=10 rows of a listed size and a suffix.
+fn valid_scale_rows(v: &Value) -> bool {
+    v.as_array().is_some_and(|rows| {
+        (1..=MAX_SCALE_ROWS).contains(&rows.len())
+            && rows.iter().all(|r| {
+                r.get("size").and_then(Value::as_str).is_some_and(|s| SCALE_SIZES.contains(&s))
+                    && r.get("suffix").and_then(Value::as_str).is_some_and(|s| s.chars().count() <= 64)
+            })
+    })
+}
+
+/// The dialog's Scale All rows as (size, suffix); one 1x row with no suffix by default.
+fn scale_rows(f: &Map<String, Value>) -> Vec<(String, String)> {
+    let row = |r: &Value| (r["size"].as_str().unwrap_or("1x").to_string(), r["suffix"].as_str().unwrap_or_default().to_string());
+    match f.get("scaleAll").filter(|v| valid_scale_rows(v)).and_then(Value::as_array) {
+        Some(rows) => rows.iter().map(row).collect(),
+        None => vec![("1x".into(), String::new())],
+    }
+}
+
+fn scale_rows_value(rows: &[(String, String)]) -> Value {
+    Value::Array(rows.iter().map(|(size, suffix)| json!({"size": size, "suffix": suffix})).collect())
+}
+
+/// The row + adds: the next unused size with an `@<size>` suffix, none at the limit.
+fn next_scale_row(rows: &[(String, String)]) -> Option<(String, String)> {
+    if rows.len() >= MAX_SCALE_ROWS {
+        return None;
+    }
+    SCALE_ADD_ORDER.iter().find(|s| !rows.iter().any(|(size, _)| size == *s)).map(|s| ((*s).to_string(), format!("@{s}")))
+}
+
+fn scale_factor(size: &str) -> f64 {
+    size.strip_suffix('x').and_then(|v| v.parse().ok()).filter(|v: &f64| v.is_finite() && *v > 0.0).unwrap_or(1.0)
+}
+
+/// The dialog settings `f` with the export size multiplied by `factor` (a Scale All row).
+fn scaled_fields(f: &Map<String, Value>, factor: f64) -> Map<String, Value> {
+    let mut out = f.clone();
+    if (factor - 1.0).abs() > f64::EPSILON {
+        out.insert("scale".into(), json!(n(f, "scale", 100.0) * factor));
+        for key in ["width", "height"] {
+            if let Some(v) = f.get(key).and_then(Value::as_f64) {
+                out.insert(key.into(), json!((v * factor).round().max(1.0)));
+            }
+        }
+    }
+    out
+}
+
+/// A row's suffix as part of a file name: characters a file name can't hold become `_`.
+fn file_suffix(suffix: &str) -> String {
+    suffix.chars().map(|c| if c.is_control() || "<>:\"/\\|?*".contains(c) { '_' } else { c }).collect()
+}
+
+/// Export As › Scale All: one row per output size, each a Size and a Suffix, with + to add the
+/// next size and a trash button per row (greyed while one row is left).
+fn scale_all_fields(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
+    let t = Tokens::get(ui.ctx());
+    let mut rows = scale_rows(f);
+    ui.horizontal(|ui| {
+        ui.label(egui::RichText::new(tl!("Scale All")).font(crate::theme::semibold(12.0)).color(t.text));
+        if crate::icons::button(ui, "plus", 20.0, false, tl!("Add a size")).clicked()
+            && let Some(row) = next_scale_row(&rows)
+        {
+            rows.push(row);
+        }
+    });
+    let sizes: Vec<(String, &str)> = SCALE_SIZES.iter().map(|s| ((*s).to_string(), *s)).collect();
+    let single = rows.len() == 1;
+    let mut remove = None;
+    let row_height = ui.spacing().interact_size.y + ui.spacing().item_spacing.y;
+    egui::ScrollArea::vertical().id_salt("export-scale-all").max_height(row_height * SCALE_ROWS_SHOWN).show(ui, |ui| {
+        for (i, (size, suffix)) in rows.iter_mut().enumerate() {
+            ui.horizontal(|ui| {
+                let n = (i + 1).to_string();
+                let name = crate::i18n::fmt(tl!("Size {n}"), &[("n", &n)]);
+                crate::widgets::dropdown_literal(ui, &format!("export-scale-size-{i}"), &name, size, &sizes, 70.0);
+                let name = crate::i18n::fmt(tl!("Suffix {n}"), &[("n", &n)]);
+                // At most the accepted length (`valid_scale_rows`): a longer one would discard the whole list.
+                ui.add(egui::TextEdit::singleline(suffix).desired_width(110.0).char_limit(64).hint_text(tl!("Suffix"))).accessible_name(&name);
+                let name = crate::i18n::fmt(tl!("Remove size {n}"), &[("n", &n)]);
+                if ui.add_enabled_ui(!single, |ui| crate::icons::button(ui, "trash", 20.0, false, &name)).inner.clicked() {
+                    remove = Some(i);
+                }
+            });
+        }
+    });
+    if let Some(i) = remove {
+        rows.remove(i);
+    }
+    f.insert("scaleAll".into(), scale_rows_value(&rows));
+    ui.add_space(8.0);
+}
+
+/// Record the settings for the next Export As (see [`seed_remembered`]).
+fn remember(app: &mut PhotocraftApp, f: &Map<String, Value>) {
+    let mut saved = settings_of(f);
+    // Scale All's rows are remembered but not recorded with an action's single destination.
+    if let Some(rows) = f.get("scaleAll").filter(|v| valid_scale_rows(v)) {
+        saved.insert("scaleAll".into(), rows.clone());
+    }
+    app.session.prefs.edit(|p| {
+        p.dialogs.insert(COMMAND.into(), Value::Object(saved));
+    });
+}
+
+pub fn open(app: &mut PhotocraftApp) -> Result<u64, String> {
+    let size = app.session.active().ok_or("no document")?.doc.size;
+    open_sized(app, size.width, size.height)
+}
+
+/// The dialog with its size fields fitted to a `src_w` × `src_h` source: the document, or the
+/// layer Layer › Export As exports. Fitting the document first would replace a remembered pixel
+/// size the document can't take with the percent, even when the layer can take it.
+fn open_sized(app: &mut PhotocraftApp, src_w: u32, src_h: u32) -> Result<u64, String> {
+    let mut f = Map::new();
+    f.insert("__export".into(), json!(true));
+    f.insert("__label".into(), json!("Export As"));
+    f.insert("format".into(), json!("png"));
+    f.insert("quality".into(), json!(app.session.prefs().export.jpeg_quality));
+    f.insert("lossless".into(), json!(app.session.prefs().export.webp_lossless));
+    f.insert("transparency".into(), json!(true));
+    f.insert("scale".into(), json!(100));
+    f.insert("resample".into(), json!(DEFAULT_RESAMPLE));
+    f.insert("metadata".into(), json!("none"));
+    f.insert("tgaBits".into(), json!("auto"));
+    f.insert("sizing".into(), json!("scale"));
+    f.insert("lockAspect".into(), json!(true));
+    f.insert("profile".into(), json!("srgb"));
+    f.insert("embedProfile".into(), json!(true));
+    f.insert("width".into(), json!(src_w));
+    f.insert("height".into(), json!(src_h));
+    f.insert("__w".into(), json!(src_w));
+    f.insert("__h".into(), json!(src_h));
+    seed_remembered(app, &mut f);
+    fit_size(&mut f, f64::from(src_w), f64::from(src_h));
+    Ok(app.ui.open_dialog(DialogKind::Command, f))
+>>>>>>> upstream/main
 }
 
 /// What the open Export As dialog needs besides the dialog itself: which layers it exports, the
@@ -274,6 +434,13 @@ fn open_sized(app: &mut PhotocraftApp, stem: String, title: Option<String>, sour
     Ok(id)
 }
 
+/// Whether Enter answers the dialog with `f` as its fields the way its default button does. Export
+/// As starts only from a click on Export, as in Photoshop: Enter, with no text field taking it,
+/// leaves the dialog open (#13740). Every other dialog keeps Enter = OK.
+pub(crate) fn enter_confirms(f: &Map<String, Value>) -> bool {
+    !f.contains_key("__export")
+}
+
 /// Layer › Export As…: the same dialog for just the active layer (trimmed to its pixels).
 
 pub fn open_layer(app: &mut PhotocraftApp, layer: LayerId) -> Result<DialogId, String> {
@@ -288,6 +455,7 @@ pub fn open_layer(app: &mut PhotocraftApp, layer: LayerId) -> Result<DialogId, S
 
 /// Layer › Export As… with several layers (artboards, say) selected: the same dialog, then one
 /// file per layer with its settings (#3629). The preview shows the first layer.
+<<<<<<< HEAD
 pub fn open_layers(app: &mut PhotocraftApp, layers: &[LayerId]) -> Result<DialogId, String> {
     let first = match layers {
         [] => return Err("no selected layers".into()),
@@ -301,7 +469,62 @@ pub fn open_layers(app: &mut PhotocraftApp, layers: &[LayerId]) -> Result<Dialog
     let template = "Export As: {n} layers";
     let title = crate::i18n::fmt(tl!(template), &[("n", &layers.len().to_string())]);
     open_sized(app, stem, Some(title), PixelSize::new(ldoc.size.width, ldoc.size.height), layers.to_vec())
+=======
+pub fn open_layers(app: &mut PhotocraftApp, layers: &[photocraft_doc::LayerId]) -> Result<u64, String> {
+    let n = match layers {
+        [] => return Err("no selected layers".into()),
+        [one] => return open_layer(app, *one),
+        _ => layers.len(),
+    };
+    // The dialog opens on the first layer with pixels: an empty, adjustment or off-canvas layer
+    // at the bottom of the selection no longer stops it (#14806).
+    // Only an empty layer is skipped: any other failure (an unknown id, say) is the answer, whether or
+    // not a valid layer follows it.
+    let st = app.session.active().ok_or("no document")?;
+    let mut first = None;
+    for id in layers {
+        match photocraft_engine::layer_menu_cmds::layer_document(&st.doc, *id) {
+            Ok(_) => first = first.or(Some(*id)),
+            Err(e) if photocraft_engine::layer_menu_cmds::is_empty_layer(&e) => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    let id = open_layer(app, first.ok_or_else(|| tl!(NO_VALID_ASSET).to_string())?)?;
+    if let Some(d) = app.ui.dialogs.iter_mut().find(|d| d.id == id) {
+        d.fields.insert("__layers".into(), json!(layers.iter().map(|l| l.0).collect::<Vec<_>>()));
+        let template = "Export As: {n} layers";
+        d.fields.insert("__label".into(), json!(crate::i18n::fmt(tl!(template), &[("n", &n.to_string())])));
+    }
+    Ok(id)
+>>>>>>> upstream/main
 }
+
+/// What a several-layer export says when no selected layer has pixels, as in the reference
+/// application.
+const NO_VALID_ASSET: &str = "No valid asset to export. Please resolve any warnings and try again.";
+
+/// The export documents of the selected `ids` that have pixels on the canvas, in order. Empty,
+/// adjustment and off-canvas layers are skipped (#14806); any other failure is still an error,
+/// and so is a selection with nothing left to export.
+fn exportable_layers(doc: &Document, ids: &[photocraft_doc::LayerId]) -> Result<Vec<Document>, String> {
+    let mut docs = Vec::new();
+    for id in ids {
+        match photocraft_engine::layer_menu_cmds::layer_document(doc, *id) {
+            Ok(d) => docs.push(d),
+            Err(e) if photocraft_engine::layer_menu_cmds::is_empty_layer(&e) => {}
+            Err(e) => return Err(e.to_string()),
+        }
+    }
+    if docs.is_empty() {
+        return Err(tl!(NO_VALID_ASSET).into());
+    }
+    Ok(docs)
+}
+
+#[cfg(test)]
+mod layer_empty_skip_tests;
+#[cfg(test)]
+mod layer_folder_export_tests;
 
 /// Layer › Quick Export as PNG.
 pub fn quick_export_layer_png(app: &mut PhotocraftApp, layer: LayerId) -> Result<Value, String> {
@@ -326,8 +549,7 @@ pub fn quick_export_selected_layers_png(app: &mut PhotocraftApp) -> Result<Value
     }
     // Capture all sources before showing the dialog: changing selection or document while it
     // is open cannot change which layers get exported.
-    let docs: Vec<_> =
-        layers.into_iter().map(|id| photocraft_engine::layer_menu_cmds::layer_document(&st.doc, id).map_err(|e| e.to_string())).collect::<Result<_, _>>()?;
+    let docs = exportable_layers(&st.doc, &layers)?;
     let suggested = format!("{}.png", export_name(&st.doc.name));
     app.pick_export(&suggested, move |app, path| {
         if !path.to_ascii_lowercase().ends_with(".png") {
@@ -350,10 +572,24 @@ pub fn quick_export_selected_layers_png(app: &mut PhotocraftApp) -> Result<Value
     })
 }
 
+/// The first 80 characters of `name`, each control character and each character a file name
+/// can't hold (`< > : " / \ | ? *`) turned into `_`.
+fn file_name_chars(name: &str) -> String {
+    name.chars().take(80).map(|c| if c.is_control() || "<>:\"/\\|?*".contains(c) { '_' } else { c }).collect()
+}
+
 fn export_name(name: &str) -> String {
-    let name: String = name.chars().take(80).map(|c| if c.is_control() || "<>:\"/\\|?*".contains(c) { '_' } else { c }).collect();
+    let name = file_name_chars(name);
     let name = name.trim().trim_matches('.');
     if name.is_empty() { "layer".into() } else { name.into() }
+}
+
+/// A single layer's export name: like [`export_name`], but boundary spaces and dots stay as the
+/// name holds them; only a name that is empty or nothing but dots and whitespace falls back to
+/// "layer".
+fn layer_export_name(name: &str) -> String {
+    let name = file_name_chars(name);
+    if name.chars().all(|c| c.is_whitespace() || c == '.') { "layer".into() } else { name }
 }
 
 /// The files a multi-layer export writes: the chosen path, then numbered siblings named after
@@ -445,7 +681,7 @@ fn export_document(doc: &Document, f: &Map<String, Value>, max_side: Option<u32>
     }
     let mut session = photocraft_engine::Session::new();
     session.add_document(copy, None);
-    if srgb && (doc.mode != ColorMode::Rgb || !source_profile.same_bytes(photocraft_cms::Builtin::Srgb.profile())) {
+    if srgb && (doc.mode != ColorMode::Rgb || !source_profile.same_bytes(craft_cms::Builtin::Srgb.profile())) {
         session.execute("edit.convertToProfile", json!({"profile": "srgb", "intent": "perceptual"})).map_err(|e| e.to_string())?;
     }
     let (w, h) = export_pixels(f64::from(doc.size.width), f64::from(doc.size.height), f, max_side)?;
@@ -579,6 +815,9 @@ fn settings(f: &Map<String, Value>) -> ExportSettings {
         // Metadata: None drops EXIF and resolution as well as XMP. A missing key keeps them,
         // which is what Export As wrote before the choice existed.
         embed_metadata: metadata != "none",
+        // Export As's JPGs are progressive (SOF2) in the reference application, measured at its
+        // default quality; the scan layout is one setting for the whole dialog.
+        jpeg_format: photocraft_codecs::JpegFormat::Progressive,
         ..Default::default()
     }
 }
@@ -983,6 +1222,7 @@ fn finish(app: &mut PhotocraftApp, ctx: &egui::Context, open: &ExportOpen, resul
     Ok(exported)
 }
 
+<<<<<<< HEAD
 /// Exports the dialog's source (the document, or the layer `__layer`) to `path` with the settings
 /// `f`. A whole-document export is kept by an action being recorded, with its destination and
 /// settings (#7207); a layer's isn't, since its layer is this document's.
@@ -1005,6 +1245,242 @@ fn pick_and_export(app: &mut PhotocraftApp, f: Map<String, Value>) -> Result<Val
     let doc = source_document(app, &f)?;
     let suggested = format!("{}.{}", stem_of(&doc.name), s_fmt(&f));
     app.pick_export(&suggested, move |app, path| export_to(app, &f, &path))
+=======
+pub fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, f: &mut Map<String, Value>) {
+    let t = Tokens::get(ui.ctx());
+    let Some(doc) = app.session.active().map(|s| s.doc.clone()) else { return };
+    let source_profile = effective_source_profile(app, &doc);
+    ui.horizontal_top(|ui| {
+        // Left: settings.
+        ui.vertical(|ui| {
+            ui.set_width(248.0);
+            scale_all_fields(ui, f);
+            ui.label(egui::RichText::new(tl!("File Settings")).font(crate::theme::semibold(12.0)).color(t.text));
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(tl!("Format")).color(t.text_dim));
+                let mut fmt = s_fmt(f);
+                let opts: Vec<(String, &str)> = FORMATS.iter().map(|(k, l)| (k.to_string(), *l)).collect();
+                if crate::widgets::dropdown(ui, "export-format", tl!("Format"), &mut fmt, &opts, 130.0) {
+                    set_format_defaults(f, &fmt, &app.session.prefs().export);
+                }
+            });
+            let fmt = s_fmt(f);
+            if fmt == "webp" {
+                let mut ll = lossless(f);
+                crate::widgets::checkbox(ui, &mut ll, tl!("Lossless"));
+                f.insert("lossless".into(), json!(ll));
+            }
+            if fmt == "jpg" || (fmt == "webp" && !lossless(f)) {
+                let mut q = n(f, "quality", 85.0) as f32;
+                crate::widgets::slider_row(ui, tl!("Quality"), &mut q, 1.0..=100.0, "%", None);
+                f.insert("quality".into(), json!(q.round()));
+            }
+            if fmt == "tga" {
+                ui.horizontal(|ui| {
+                    ui.label(egui::RichText::new(tl!("Resolution")).color(t.text_dim));
+                    let mut bits = s(f, "tgaBits");
+                    let opts: Vec<(String, &str)> =
+                        vec![("auto".into(), tl!("Auto")), ("24".into(), tl!("24 bits/pixel")), ("32".into(), tl!("32 bits/pixel"))];
+                    if crate::widgets::dropdown(ui, "export-tga-bits", tl!("Depth"), &mut bits, &opts, 130.0) {
+                        f.insert("tgaBits".into(), json!(bits));
+                    }
+                });
+            }
+            if fmt != "jpg" {
+                let mut tr = f.get("transparency").and_then(Value::as_bool).unwrap_or(true);
+                crate::widgets::checkbox(ui, &mut tr, tl!("Transparency"));
+                f.insert("transparency".into(), json!(tr));
+            }
+            ui.horizontal(|ui| {
+                ui.label(egui::RichText::new(tl!("Metadata")).color(t.text_dim));
+                let mut m = s(f, "metadata");
+                let opts: Vec<(String, &str)> = vec![("none".into(), tl!("None")), ("exif".into(), tl!("EXIF")), ("all".into(), tl!("All"))];
+                if crate::widgets::dropdown(ui, "export-metadata", tl!("Metadata"), &mut m, &opts, 130.0) {
+                    f.insert("metadata".into(), json!(m));
+                }
+            });
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new(tl!("Color Space")).font(crate::theme::semibold(12.0)).color(t.text));
+            let mut srgb = s(f, "profile") == "srgb";
+            if crate::widgets::checkbox(ui, &mut srgb, tl!("Convert to sRGB")).changed() {
+                f.insert("profile".into(), json!(if srgb { "srgb" } else { "document" }));
+            }
+            let mut embed = f.get("embedProfile").and_then(Value::as_bool).unwrap_or(true);
+            crate::widgets::checkbox(ui, &mut embed, tl!("Embed Color Profile"));
+            f.insert("embedProfile".into(), json!(embed));
+            ui.add_space(8.0);
+            ui.label(egui::RichText::new(tl!("Image Size")).font(crate::theme::semibold(12.0)).color(t.text));
+            let (bw, bh) = (n(f, "__w", f64::from(doc.size.width)), n(f, "__h", f64::from(doc.size.height)));
+            size_fields(ui, f, bw, bh);
+            resample_field(ui, f);
+            let (w, h) = (n(f, "width", bw), n(f, "height", bh));
+            ui.label(egui::RichText::new(format!("{w} × {h} px")).color(t.text_dim).size(11.5));
+            if fmt == "ico" && (w > 256.0 || h > 256.0) {
+                ui.label(egui::RichText::new(tl!("ICO is limited to 256 × 256 pixels")).color(t.warning));
+            }
+            preset_fields(app, ui, f, bw, bh);
+        });
+        ui.add_space(12.0);
+        // Right: preview + estimated size.
+        ui.vertical(|ui| {
+            let layer = f.get("__layer").and_then(Value::as_u64);
+            let key = egui::Id::unique(("export-preview", doc.id.0, app.session.active().map_or(0, |s| s.revision), layer));
+            let sig = format!(
+                "{}{}{}{}{}{}{}{}{}{}{}{}{}",
+                s_fmt(f),
+                n(f, "quality", 85.0),
+                lossless(f),
+                f.get("transparency").map(|v| v.to_string()).unwrap_or_default(),
+                n(f, "scale", 100.0),
+                n(f, "width", 0.0),
+                n(f, "height", 0.0),
+                s(f, "metadata"),
+                s(f, "tgaBits"),
+                s(f, "profile"),
+                f.get("embedProfile").and_then(Value::as_bool).unwrap_or(true),
+                s(f, "sizing"),
+                s(f, "resample")
+            );
+            let sig = format!("{sig}:{}", source_profile.content_hash());
+            let cached: Option<CachedPreview> = ui.data(|d| d.get_temp(key));
+            let preview = match cached.filter(|cached| cached.signature == sig) {
+                Some(cached) => Some(cached),
+                None => {
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let result = if background_preview_needed(&doc) {
+                        poll_or_start_preview(ui, key, &sig, doc.clone(), f, source_profile.clone())
+                    } else {
+                        let source = source_document(app, f).unwrap_or_else(|_| doc.clone());
+                        Some(preview_sync(app, &source, f, &source_profile))
+                    };
+                    #[cfg(target_arch = "wasm32")]
+                    let result = {
+                        let source = source_document(app, f).unwrap_or_else(|_| doc.clone());
+                        Some(preview_sync(app, &source, f, &source_profile))
+                    };
+                    let filter = preview_filter(f);
+                    result.map(|result| cache_preview(ui, key, sig.clone(), result, filter))
+                }
+            };
+            let side = 300.0;
+            let (r, _) = ui.allocate_exact_size(egui::vec2(side, side), egui::Sense::hover());
+            crate::widgets::checker(ui.painter(), r, 8.0);
+            if let Some(tex) = preview.as_ref().and_then(|preview| preview.texture.as_ref()) {
+                let ts = tex.size_vec2();
+                let k = (side / ts.x.max(ts.y)).min(1.0e3);
+                let ir = egui::Rect::from_center_size(r.center(), ts * k);
+                ui.painter().image(tex.id(), ir, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)), egui::Color32::WHITE);
+            } else if preview.is_none() {
+                ui.put(egui::Rect::from_center_size(r.center(), egui::vec2(24.0, 24.0)), egui::Spinner::new());
+            } else {
+                ui.painter().text(r.center(), egui::Align2::CENTER_CENTER, tl!("Preview"), egui::FontId::proportional(12.0), t.text_dim);
+            }
+            ui.painter().rect_stroke(r, 0.0, egui::Stroke::new(1.0, t.separator), egui::StrokeKind::Outside);
+            #[cfg(not(target_arch = "wasm32"))]
+            let exact = poll_or_start_exact_estimate(ui, key, &sig, doc.clone(), f, source_profile.clone()).flatten();
+            #[cfg(target_arch = "wasm32")]
+            let exact: Option<u64> = None;
+            let est =
+                exact.or_else(|| preview.as_ref().and_then(|preview| preview.estimate)).map_or("—".to_string(), |b| crate::sizing::human_bytes(b as f64));
+            ui.label(egui::RichText::new(format!("{}  ≈ {est}", s_fmt(f).to_uppercase())).color(t.text_dim).size(11.5));
+        });
+    });
+}
+
+/// Export with the dialog's settings: choose a path, render, encode, write.
+pub fn confirm(app: &mut PhotocraftApp, f: &Map<String, Value>) -> Result<Value, String> {
+    remember(app, f);
+    if let Some(layers) = f.get("__layers").and_then(Value::as_array) {
+        let ids: Vec<_> = layers.iter().filter_map(Value::as_u64).map(photocraft_doc::LayerId).collect();
+        return confirm_layers(app, f, &ids);
+    }
+    let doc = source_document(app, f)?;
+    let source_profile = effective_source_profile(app, &doc);
+    let stem = doc.name.rsplit_once('.').map_or(doc.name.as_str(), |(a, _)| a).to_string();
+    // A layer's name may hold characters a file name can't (#14810): `a/b:c*?` suggests
+    // `a_b_c__`. Unlike the multi-layer export's `export_name`, boundary spaces and dots stay.
+    let stem = if f.get("__layer").and_then(Value::as_u64).is_some() { layer_export_name(&stem) } else { stem };
+    let ext = s_fmt(f);
+    let rows = scale_rows(f);
+    if rows.len() > 1 {
+        return confirm_sizes(app, f, doc, source_profile, &stem, rows);
+    }
+    let suggested = format!("{stem}.{ext}");
+    let f = scaled_fields(f, scale_factor(&rows[0].0));
+    app.pick_export(&suggested, move |app, path| {
+        let r = write_export(app, &doc, &f, &path, &source_profile)?;
+        // An action being recorded keeps a whole-document export with its destination and
+        // settings (#7207). A layer's export isn't recorded: its layer is this document's.
+        if !f.contains_key("__layer") {
+            let mut step = settings_of(&f);
+            step.insert("path".into(), json!(path));
+            let step = Value::Object(step);
+            photocraft_engine::actions_cmds::note_automation_step(&mut app.session, COMMAND, &step);
+            app.session.journal.push((COMMAND.into(), step));
+        }
+        Ok(r)
+    })
+>>>>>>> upstream/main
+}
+
+/// Why several Scale All rows cannot be exported here, if they cannot: the browser build writes no
+/// folder of files (a browser folder handle is not a path), so one size at a time is its limit.
+fn batch_unsupported(rows: usize, browser: bool) -> Option<&'static str> {
+    (browser && rows > 1).then_some("Exporting several sizes at once needs a folder, which the browser can't write to; export one size at a time")
+}
+
+/// The file names a batch writes, `<name><suffix>.<ext>` per row, or an error naming the first one two
+/// rows share (suffixes that sanitize alike, or differ only in case, count: a file system may fold them, by upper-casing as Windows does, so `σ` and `ς` are one).
+/// Nothing is written then; replacing a file that already exists is unchanged.
+fn batch_file_names(stem: &str, ext: &str, rows: &[(String, String)]) -> Result<Vec<String>, String> {
+    let names: Vec<String> = rows.iter().map(|(_, suffix)| format!("{stem}{}.{ext}", file_suffix(suffix))).collect();
+    for (i, name) in names.iter().enumerate() {
+        if names[..i].iter().any(|other| other.to_uppercase() == name.to_uppercase() || other.to_lowercase() == name.to_lowercase()) {
+            return Err(format!("Two sizes would write the same file, {name}; give each size its own suffix"));
+        }
+    }
+    Ok(names)
+}
+
+/// [`confirm`] with several Scale All rows: a folder choice, then `<name><suffix>.<ext>` there for
+/// each row, at the row's size.
+fn confirm_sizes(
+    app: &mut PhotocraftApp,
+    f: &Map<String, Value>,
+    doc: Arc<Document>,
+    source_profile: Arc<Profile>,
+    stem: &str,
+    rows: Vec<(String, String)>,
+) -> Result<Value, String> {
+    // The browser build has no folder to write into: its file dialog answers a folder request with
+    // nothing, so a batch would silently do nothing. Say so before asking.
+    if let Some(why) = batch_unsupported(rows.len(), cfg!(target_arch = "wasm32")) {
+        return Err(why.into());
+    }
+    let (f, stem) = (f.clone(), export_name(stem));
+    let names = batch_file_names(&stem, &s_fmt(&f), &rows)?;
+    app.ask_folder(move |app, dir| {
+        // Only a folder was chosen, so nothing already there is replaced without asking: any entry at
+        // a target path (a file, or a link the writer would follow) stops the whole batch before the
+        // first write.
+        #[cfg(not(target_arch = "wasm32"))]
+        for name in &names {
+            let path = std::path::Path::new(&dir).join(name);
+            if let Ok(meta) = path.symlink_metadata() {
+                let what = if meta.file_type().is_symlink() { "is a link" } else { "already exists" };
+                return Err(format!("{} {what}; nothing was written. Choose another folder or change the suffix", path.display()));
+            }
+        }
+        let mut exported = Vec::new();
+        for ((size, _), name) in rows.iter().zip(&names) {
+            let path = std::path::Path::new(&dir).join(name).to_string_lossy().into_owned();
+            exported.push(write_export(app, &doc, &scaled_fields(&f, scale_factor(size)), &path, &source_profile)?);
+        }
+        let template = "Exported {n} files";
+        app.ui.status = crate::i18n::fmt(tl!(template), &[("n", &exported.len().to_string())]);
+        app.ui.status_error = false;
+        Ok(json!({"exported": exported}))
+    })
 }
 
 /// Exports `doc` to `path` with the dialog settings `f` (Export As, and its replayed action step).
@@ -1047,11 +1523,10 @@ pub(crate) fn replay(app: &mut PhotocraftApp, params: &Value) -> Result<Value, S
 fn export_layers(app: &mut PhotocraftApp, f: &Map<String, Value>, ids: &[LayerId], path: &str) -> Result<Value, String> {
     let st = app.session.active().ok_or("no document")?;
     let source_profile = effective_source_profile(app, &st.doc);
-    let docs: Vec<Document> =
-        ids.iter().map(|id| photocraft_engine::layer_menu_cmds::layer_document(&st.doc, *id).map_err(|e| e.to_string())).collect::<Result<_, _>>()?;
-    if docs.is_empty() {
+    if ids.is_empty() {
         return Err("no selected layers".into());
     }
+<<<<<<< HEAD
     let settings = settings(f);
     let mut exported = Vec::new();
     for (doc, path) in docs.iter().zip(batch_paths(path, &docs)) {
@@ -1070,6 +1545,110 @@ fn export_layers(app: &mut PhotocraftApp, f: &Map<String, Value>, ids: &[LayerId
     app.ui.status = crate::i18n::fmt(tl!(template), &[("n", &exported.len().to_string())]);
     app.ui.status_error = false;
     Ok(json!({"files": exported}))
+=======
+    let docs = exportable_layers(&st.doc, ids)?;
+    let ext = s_fmt(f);
+    let (f, settings) = (f.clone(), settings(f));
+    // Several files on the desktop: a folder, then `<layer name>.<ext>` per layer there (#14808).
+    if docs.len() > 1 && !cfg!(target_arch = "wasm32") {
+        let names = layer_file_names(&docs, &ext);
+        return app.ask_folder(move |app, dir| {
+            let mut exported = Vec::new();
+            for (doc, name) in docs.iter().zip(names) {
+                let path = std::path::Path::new(&dir).join(name);
+                replace_link(&path)?;
+                exported.push(write_layer_file(app, doc, &f, &settings, &source_profile, &path.to_string_lossy())?);
+            }
+            let template = "Exported {n} files";
+            app.ui.status = crate::i18n::fmt(tl!(template), &[("n", &exported.len().to_string())]);
+            app.ui.status_error = false;
+            Ok(json!({"files": exported}))
+        });
+    }
+    // One file: the save dialog, named after the layer. The web downloads each file as before.
+    let suggested = match docs.as_slice() {
+        [one] => format!("{}.{ext}", layer_file_stem(&one.name)),
+        _ => format!("{}.{ext}", export_name(st.doc.name.rsplit_once('.').map_or(st.doc.name.as_str(), |(a, _)| a))),
+    };
+    app.pick_export(&suggested, move |app, path| {
+        let mut exported = Vec::new();
+        for (doc, path) in docs.iter().zip(batch_paths(&path, &docs)) {
+            exported.push(write_layer_file(app, doc, &f, &settings, &source_profile, &path)?);
+        }
+        let template = "Exported {n} files";
+        app.ui.status = crate::i18n::fmt(tl!(template), &[("n", &exported.len().to_string())]);
+        app.ui.status_error = false;
+        Ok(json!({"files": exported}))
+    })
+>>>>>>> upstream/main
+}
+
+/// One layer's file of a Layer › Export As: rendered with the dialog's settings and written.
+fn write_layer_file(
+    app: &mut PhotocraftApp,
+    doc: &Document,
+    f: &Map<String, Value>,
+    settings: &ExportSettings,
+    source_profile: &Profile,
+    path: &str,
+) -> Result<Value, String> {
+    let out = export_document(doc, f, None, source_profile)?;
+    crate::app::ensure_memory_to_save(&out, path)?;
+    let export = app.services.export.as_ref().ok_or("no exporter configured")?;
+    let (bytes, warnings) = export(&out, path, settings)?;
+    let write = app.services.write.as_mut().ok_or("no writer configured")?;
+    write(path, &bytes)?;
+    let template = "Exported {path}";
+    let what = crate::i18n::fmt(tl!(template), &[("path", &crate::file_open::display_name(path))]);
+    crate::notices::io_warnings(app, &what, &warnings);
+    Ok(json!({"path": path, "bytes": bytes.len(), "warnings": warnings}))
+}
+
+/// A layer's file name, as measured in the reference application: each character a file name
+/// can't hold becomes `_` (`a/b:c*?` → `a_b_c__`), spaces are kept.
+fn layer_file_stem(name: &str) -> String {
+    let stem: String = name.chars().map(|c| if c.is_control() || "<>:\"/\\|?*".contains(c) { '_' } else { c }).collect();
+    if stem.trim().is_empty() { "layer".into() } else { stem }
+}
+
+/// The names several layers' files get, for `docs` in document order (bottom to top). Equal
+/// names are numbered in Layers panel order: the upper layer keeps the name, the next ones down
+/// get `-1`, `-2`, … (skipping a name another layer already has). Names are compared upper-cased and lower-cased
+/// (so a final sigma `ς` and `σ`, and `K` and the Kelvin sign, are one name),
+/// as a case-insensitive destination (a default Windows or macOS volume) treats `Logo` and `logo`
+/// as one file, which a second write would silently replace.
+fn layer_file_names(docs: &[Document], ext: &str) -> Vec<String> {
+    // A name is taken when its upper-cased or its lower-cased form is: upper-casing joins `σ` and `ς`
+    // (Windows folds that way), lower-casing joins `K` and the Kelvin sign `K` (which APFS treats as
+    // one name). Neither folding alone catches both.
+    let taken = |used: &std::collections::HashSet<String>, name: &str| used.contains(&name.to_uppercase()) || used.contains(&name.to_lowercase());
+    let mut used = std::collections::HashSet::new();
+    let mut names = vec![String::new(); docs.len()];
+    for (i, doc) in docs.iter().enumerate().rev() {
+        let stem = layer_file_stem(&doc.name);
+        let mut name = format!("{stem}.{ext}");
+        let mut n = 1u64;
+        while taken(&used, &name) {
+            name = format!("{stem}-{n}.{ext}");
+            n = n.saturating_add(1);
+        }
+        used.insert(name.to_uppercase());
+        used.insert(name.to_lowercase());
+        names[i] = name;
+    }
+    names
+}
+
+/// Existing files are replaced without a prompt, but a link where a file goes is removed first,
+/// so the write lands there and is never redirected (the writer follows links).
+fn replace_link(path: &std::path::Path) -> Result<(), String> {
+    #[cfg(not(target_arch = "wasm32"))]
+    if path.symlink_metadata().is_ok_and(|m| m.file_type().is_symlink()) {
+        std::fs::remove_file(path).map_err(|e| format!("{}: {e}", path.display()))?;
+    }
+    #[cfg(target_arch = "wasm32")]
+    let _ = path;
+    Ok(())
 }
 
 /// File › Export › Quick Export as PNG: the format, quality, metadata, colour space and location
@@ -1111,7 +1690,17 @@ fn quick_export(app: &mut PhotocraftApp, p: Value) -> Result<Value, String> {
 }
 
 #[cfg(test)]
+mod srgb_default_tests;
+#[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod enter_key_tests;
+
+#[cfg(test)]
+mod jpg_progressive_tests;
+#[cfg(test)]
+mod layer_name_sanitise_tests;
 
 #[cfg(all(test, unix))]
 mod batch_name_tests {
@@ -1132,3 +1721,6 @@ mod batch_name_tests {
         std::fs::remove_file(&planted).unwrap();
     }
 }
+
+#[cfg(test)]
+mod scale_all_tests;

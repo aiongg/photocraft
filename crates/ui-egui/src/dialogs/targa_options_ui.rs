@@ -18,7 +18,7 @@ use crate::{ExportSettings, PhotocraftApp};
 
 /// `true` when `path` names a Targa (`.tga`, and the rarer `.icb`, `.vda`, `.vst`).
 pub fn is_tga_path(path: &str) -> bool {
-    photocraft_engine::file_cmds::extension(path).and_then(|e| photocraft_codecs::from_extension(&e)) == Some(photocraft_codecs::Format::Tga)
+    photocraft_engine::file_cmds::extension(path).and_then(|e| photocraft_formats::from_extension(&e)) == Some(photocraft_formats::Format::Tga)
 }
 
 /// Whether saving the active document to `path` asks for Targa Options: an RGB Targa. Grayscale

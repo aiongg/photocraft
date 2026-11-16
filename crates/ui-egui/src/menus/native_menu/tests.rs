@@ -192,8 +192,218 @@ fn the_app_menu_switches_the_ui_language() {
     assert!(set(&mut a, "xx-nope").is_err(), "an unknown code is an error");
 }
 
+<<<<<<< HEAD
 /// #1354: a dialog is modal for the menu bar too. Its rows are greyed (view navigation aside), and
 /// a click that arrives anyway doesn't run under the dialog.
+=======
+/// The menus show the shortcut that runs each command (Undo ⌘Z, Copy ⌘C were blank).
+#[test]
+fn menu_rows_show_the_shortcut_that_runs_them() {
+    let l = layout(true);
+    let sc = |id: &str| l.bar.find(id).and_then(|it| it.shortcut.clone());
+    assert_eq!(sc("edit.undo").as_deref(), Some("Cmd+Z"));
+    assert_eq!(sc("edit.copy").as_deref(), Some("Cmd+C"));
+    assert_eq!(sc("edit.paste").as_deref(), Some("Cmd+V"));
+    assert_eq!(sc("layer.hideLayers").as_deref(), Some("Cmd+,"));
+    let app = app(true);
+    let bindings = crate::shortcut_dispatch::bindings(&app);
+    for it in crate::menus::menu_items(&app).iter().filter(|it| it.enabled) {
+        let Some(shown) = it.shortcut.as_deref().and_then(crate::shortcuts::parse) else { continue };
+        let runs = bindings.iter().find(|(_, b)| *b == shown).map(|(id, _)| id.as_str());
+        assert!(runs.is_some(), "{} shows {:?}, which runs nothing", it.id, it.shortcut);
+    }
+}
+
+/// A native menu can't turn a plain item into a check item in place: opening the first
+/// document must not change any item's kind, or the whole menu is rebuilt. Window's list of
+/// documents gains a row, which rebuilds only the Window menu.
+#[test]
+fn opening_a_document_changes_state_not_structure() {
+    let _registry = crate::menus::plugin_ui::registry_guard();
+    let (a, b) = (crate::menus::menu_items(&app(false)), crate::menus::menu_items(&app(true)));
+    let kind = |items: &[MenuItem]| items.iter().map(|i| (i.id.clone(), i.checked.is_some())).collect::<HashMap<_, _>>();
+    let (ka, kb) = (kind(&a), kind(&b));
+    let flips: Vec<&String> = ka.iter().filter(|(id, k)| kb.get(*id).is_some_and(|o| o != *k)).map(|(id, _)| id).collect();
+    assert!(flips.is_empty(), "items that change kind: {flips:?}");
+    let (no_doc, one_doc) = (layout(false).bar, layout(true).bar);
+    assert_eq!(structure_key(&no_doc), structure_key(&one_doc));
+    assert_ne!(window_key(&no_doc), window_key(&one_doc), "the Window menu is rebuilt for its new row");
+}
+
+/// #2991: the open documents follow Bring All to Front, where a Mac app lists its windows,
+/// the active one checked. Switching documents moves the check without a rebuild.
+#[test]
+fn the_documents_follow_bring_all_to_front() {
+    let _registry = crate::menus::plugin_ui::registry_guard();
+    let none = ids(&layout(false).bar.menu(MenuRole::Window).unwrap().children);
+    assert_eq!(none.last().map(String::as_str), Some("<BringAllToFront>"));
+
+    let mut a = app(true);
+    a.run("file.new", json!({"width": 32, "height": 32})).unwrap();
+    a.sync_views();
+    let bar = photocraft_layout(&crate::menus::menu_items(&a), Lang::EN, "auto").bar;
+    let window = ids(&bar.menu(MenuRole::Window).unwrap().children);
+    assert_eq!(window[window.len() - 4..], ["<BringAllToFront>", "---", "window.document.0", "window.document.1"]);
+    assert_eq!(bar.find("window.document.1").and_then(|i| i.checked), Some(true));
+    assert_eq!(bar.find("window.document.0").and_then(|i| i.checked), Some(false));
+
+    a.session.set_active(0);
+    let switched = photocraft_layout(&crate::menus::menu_items(&a), Lang::EN, "auto").bar;
+    assert_eq!(switched.find("window.document.0").and_then(|i| i.checked), Some(true));
+    assert_eq!((structure_key(&switched), window_key(&switched)), (structure_key(&bar), window_key(&bar)), "a check moves in place");
+}
+
+/// The guard those two tests hold keeps a plug-in install out from between their menu builds:
+/// an install on another thread doesn't finish until the guard is dropped, whatever is already
+/// installed (a reinstall of the same plug-in leaves the menus as they were).
+#[test]
+fn a_plugin_install_waits_for_a_test_comparing_menu_builds() {
+    use std::time::Duration;
+    let guard = crate::menus::plugin_ui::registry_guard();
+    assert!(matches!(crate::menus::plugin_ui::REGISTRY.try_lock(), Err(std::sync::TryLockError::WouldBlock)), "the guard holds the registry mutex");
+    let before = structure_key(&layout(false).bar);
+    let (installed, done) = std::sync::mpsc::channel();
+    let installer = std::thread::spawn(move || {
+        let _registry = crate::menus::plugin_ui::registry_guard();
+        photocraft_plugins::registry::install_bytes(include_bytes!(concat!(env!("CARGO_MANIFEST_DIR"), "/../plugins/tests/fixtures/invert.wasm"))).unwrap();
+        installed.send(()).unwrap();
+    });
+    assert!(done.recv_timeout(Duration::from_millis(200)).is_err(), "the install waits for the guard");
+    assert_eq!(structure_key(&layout(false).bar), before, "no plug-in row appeared between the builds");
+    drop(guard);
+    done.recv_timeout(Duration::from_secs(30)).expect("the install goes ahead once the guard is dropped");
+    installer.join().unwrap();
+}
+
+#[test]
+fn native_key_equivalents_are_command_and_function_keys_only() {
+    assert!(Chord::parse("Cmd+B").unwrap().native_ok());
+    assert!(Chord::parse("F5").unwrap().native_ok());
+    assert!(!Chord::parse("B").unwrap().native_ok());
+    assert!(!Chord::parse("Alt+F").unwrap().native_ok());
+    assert!(!Chord::parse("Shift+X").unwrap().native_ok());
+    assert_eq!(Chord::parse("Ctrl+Cmd+M").unwrap().portable(), "Ctrl+Cmd+M");
+    assert_eq!(Chord::parse("Cmd++").unwrap().key, "+");
+}
+
+/// Every menu shortcut is written so it parses and turns back into the key press egui gets.
+#[test]
+fn every_shortcut_becomes_a_key_press() {
+    for it in layout(true).bar.items() {
+        let Some(sc) = &it.shortcut else { continue };
+        let c = Chord::parse(sc).unwrap_or_else(|| panic!("{sc} on {} doesn't parse", it.id));
+        assert_eq!(&c.portable(), sc, "{} writes its modifiers in another order", it.id);
+        let Some(egui::Event::Key { key, modifiers, .. }) = c.key_event(true) else { panic!("{sc} on {} has no egui key", it.id) };
+        let parsed = crate::shortcuts::parse(sc).unwrap();
+        assert!(crate::shortcuts::key_matches(&parsed, key, modifiers), "{sc} on {} doesn't match its own key press", it.id);
+    }
+}
+
+fn frame(ctx: &egui::Context, raw: egui::RawInput, f: impl FnMut(&mut egui::Ui)) {
+    let mut out = ctx.run_ui(raw, f);
+    out.textures_delta.clear();
+}
+
+struct Fake {
+    synced: std::rc::Rc<std::cell::RefCell<Vec<MenuBar>>>,
+    events: Vec<Event>,
+}
+
+impl Backend for Fake {
+    fn sync(&mut self, bar: &MenuBar) {
+        self.synced.borrow_mut().push(bar.clone());
+    }
+    fn drain(&mut self) -> Vec<Event> {
+        std::mem::take(&mut self.events)
+    }
+}
+
+/// A key equivalent reaches PhotoCraft's own key handling as the key press it was, so the
+/// shortcut runs once, through the same rules as without a native menu.
+#[test]
+fn key_equivalents_run_through_the_normal_shortcut_path() {
+    let synced = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut app = app(true);
+    let ctx = egui::Context::default();
+    let rulers = Chord::parse("Cmd+R").unwrap();
+    app.services.native_menu = Some(NativeMenu::new(Box::new(Fake { synced: synced.clone(), events: vec![Event::Key(rulers)] })));
+    let before = app.ui.extras.rulers;
+    let mut raw = egui::RawInput::default();
+    if let Some(m) = app.services.native_menu.as_mut() {
+        m.raw_input(&mut raw);
+    }
+    assert_eq!(raw.events.len(), 1, "the press: winit delivers the release");
+    frame(&ctx, raw, |ui| {
+        run(&mut app, ui.ctx());
+        crate::shortcuts::handle(&mut app, ui.ctx());
+        sync(&mut app, ui.ctx());
+    });
+    assert_eq!(app.ui.extras.rulers, !before, "⌘R toggled View › Rulers once");
+    assert_eq!(synced.borrow().len(), 1, "the menu was built");
+    // Nothing changed: no rebuild of the rows on the next frame.
+    frame(&ctx, egui::RawInput::default(), |ui| sync(&mut app, ui.ctx()));
+    assert_eq!(synced.borrow().len(), 1);
+}
+
+/// #1638: ⌘V through the Mac menu pasted three layers. AppKit takes the key-down for Edit ›
+/// Paste's key equivalent, but winit still delivers the key-up (it forwards key-ups while ⌘ is
+/// held). The menu's press plus that real release must paste once, whether the release
+/// arrives in a later frame or already sits in the same input as the menu event.
+#[test]
+fn a_paste_key_equivalent_pastes_once() {
+    let release = || egui::Event::Key { key: Key::V, physical_key: Some(Key::V), pressed: false, repeat: false, modifiers: Modifiers::COMMAND };
+    for same_frame in [false, true] {
+        let mut app = app(true);
+        let ctx = egui::Context::default();
+        app.run("select.rect", json!({"x": 0, "y": 0, "width": 8, "height": 4})).unwrap();
+        app.run("edit.copy", json!({})).unwrap();
+        let layers = |app: &PhotocraftApp| app.session.active().unwrap().doc.layer_count();
+        let before = layers(&app);
+        let paste = Chord::parse("Cmd+V").unwrap();
+        app.services.native_menu = Some(NativeMenu::new(Box::new(Fake { synced: Default::default(), events: vec![Event::Key(paste)] })));
+        let step = |app: &mut PhotocraftApp, events: Vec<egui::Event>| {
+            let mut raw = egui::RawInput { events, ..Default::default() };
+            eframe::App::raw_input_hook(app, &ctx, &mut raw);
+            frame(&ctx, raw, |ui| {
+                run(app, ui.ctx());
+                crate::shortcuts::handle(app, ui.ctx());
+            });
+        };
+        if same_frame {
+            // A quick tap: the real key-up is already queued when the menu event is drained.
+            step(&mut app, vec![egui::Event::ModifiersChanged(Modifiers::COMMAND), release()]);
+        } else {
+            step(&mut app, vec![egui::Event::ModifiersChanged(Modifiers::COMMAND)]);
+            step(&mut app, vec![release()]);
+        }
+        step(&mut app, vec![egui::Event::ModifiersChanged(Modifiers::NONE)]);
+        assert_eq!(layers(&app), before + 1, "one ⌘V pastes one layer (key-up in the same frame: {same_frame})");
+    }
+}
+
+#[test]
+fn clicks_run_the_command_and_resync() {
+    let synced = std::rc::Rc::new(std::cell::RefCell::new(Vec::new()));
+    let mut app = app(true);
+    let ctx = egui::Context::default();
+    app.services.native_menu = Some(NativeMenu::new(Box::new(Fake { synced: synced.clone(), events: vec![Event::Click("window.panel.layers".into())] })));
+    let before = app.ui.panels.layers;
+    let mut raw = egui::RawInput::default();
+    if let Some(m) = app.services.native_menu.as_mut() {
+        m.raw_input(&mut raw);
+    }
+    frame(&ctx, raw, |ui| {
+        run(&mut app, ui.ctx());
+        sync(&mut app, ui.ctx());
+    });
+    assert_eq!(app.ui.panels.layers, !before);
+    let bar = synced.borrow().last().cloned().unwrap();
+    assert_eq!(bar.find("window.panel.layers").unwrap().checked, Some(!before));
+}
+
+/// #1354: a dialog is modal for the menu bar too. Its rows are disabled (view navigation
+/// aside), and a click that arrives anyway doesn't run under the dialog.
+>>>>>>> upstream/main
 #[test]
 fn an_open_dialog_blocks_menu_clicks_except_view_navigation() {
     let (mut h, synced, events) = harness(true);

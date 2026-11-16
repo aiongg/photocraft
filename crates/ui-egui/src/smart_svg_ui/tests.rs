@@ -566,6 +566,37 @@ fn bounded_sessions_require_reuse_or_closing_a_document() {
     assert_eq!(app.smart_svg.editing.len(), MAX_SESSIONS);
 }
 
+<<<<<<< HEAD
+=======
+#[test]
+fn capture_smart_svg_visual_fixtures() {
+    let _gpu = photocraft_testkit::gpu_lock();
+    let Some(directory) = std::env::var_os("CRAFT_SMART_SVG_FIXTURES").map(std::path::PathBuf::from) else { return };
+    std::fs::create_dir_all(&directory).unwrap();
+    for theme in [crate::theme::ThemeKind::Pro, crate::theme::ThemeKind::StudioLight] {
+        let (mut app, _, _) = fixture();
+        open(&mut app);
+        let mut ready = false;
+        let lang = crate::i18n::lang_from_tag("en").unwrap();
+        let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 620.0)).wgpu().build_ui_state(
+            move |ui, app: &mut PhotocraftApp| {
+                let _language = crate::i18n::language_scope(lang);
+                if !ready {
+                    PhotocraftApp::setup_context(ui.ctx(), theme);
+                    ready = true;
+                    return;
+                }
+                show(app, ui.ctx());
+            },
+            app,
+        );
+        harness.ctx.set_os(egui::os::OperatingSystem::Windows);
+        harness.run_steps(5);
+        harness.render().unwrap().save(directory.join(format!("photocraft-smart-svg-editor-{}-en.png", theme.id()))).unwrap();
+    }
+}
+
+>>>>>>> upstream/main
 /// An AI payload in the PSD link table must reach explicit editor selection without becoming
 /// a filesystem path. A saved SVG replaces it through the normal optimistic transaction.
 #[test]
@@ -606,6 +637,64 @@ fn embedded_ai_link_table_handoff_preserves_source_until_saved_and_undo_restores
     assert_eq!(app.session.active().unwrap().doc, before);
 }
 
+<<<<<<< HEAD
+=======
+/// Optional screenshot uses authored bytes and mock services, never private artwork or an editor.
+#[test]
+fn capture_embedded_vector_conversion_prompt() {
+    let _gpu = photocraft_testkit::gpu_lock();
+    let Some(directory) = std::env::var_os("CRAFT_SMART_SVG_FIXTURES").map(std::path::PathBuf::from) else { return };
+    std::fs::create_dir_all(&directory).unwrap();
+    let (mut app, _, _) = fixture();
+    let state = app.session.active_mut().unwrap();
+    let id = state.active_layer.unwrap();
+    let LayerContent::Smart(sm) = &mut Arc::make_mut(&mut state.doc).layer_mut(id).unwrap().content else { panic!("smart") };
+    sm.source = SmartSource::Embedded { file_name: "Authored.ai".into(), bytes: Arc::new(b"%PDF-1.6\nsynthetic vector prompt".to_vec()) };
+    open(&mut app);
+    let mut ready = false;
+    let lang = crate::i18n::lang_from_tag("en").unwrap();
+    let mut harness = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 620.0)).wgpu().build_ui_state(
+        move |ui, app: &mut PhotocraftApp| {
+            let _language = crate::i18n::language_scope(lang);
+            if !ready {
+                PhotocraftApp::setup_context(ui.ctx(), crate::theme::ThemeKind::Pro);
+                ready = true;
+                return;
+            }
+            show(app, ui.ctx());
+        },
+        app,
+    );
+    harness.run_steps(5);
+    harness.render().unwrap().save(directory.join("photocraft-embedded-vector-editor-en.png")).unwrap();
+}
+
+/// Filter Gallery owns a document preview even though `distort.active()` excludes it.
+#[test]
+fn saved_changes_wait_for_filter_gallery_and_resume_after_cancel() {
+    let (mut app, saves, _) = fixture();
+    open(&mut app);
+    confirm(&mut app).unwrap();
+    crate::gallery_ui::open(&mut app).unwrap();
+    assert!(app.distort.gallery.is_some());
+    assert!(!app.distort.active());
+    let before = app.session.active().unwrap().doc.clone();
+    let changed = SVG.replace("red", "blue");
+    saves.borrow_mut().push_back(Ok(changed.as_bytes().to_vec()));
+    let ctx = egui::Context::default();
+    poll(&mut app, &ctx);
+    assert_eq!(app.session.active().unwrap().doc, before);
+    assert!(app.smart_svg.editing.first().unwrap().saved.is_some());
+    crate::gallery_ui::control(&mut app, &json!({"cancel":true})).unwrap();
+    poll(&mut app, &ctx);
+    assert!(app.smart_svg.editing.first().unwrap().saved.is_none());
+    let state = app.session.active().unwrap();
+    let LayerContent::Smart(smart) = &state.doc.layer(state.active_layer.unwrap()).unwrap().content else { panic!("smart object") };
+    let photocraft_doc::SmartSource::Embedded { bytes, .. } = &smart.source else { panic!("embedded") };
+    assert_eq!(bytes.as_slice(), changed.as_bytes());
+}
+
+>>>>>>> upstream/main
 #[test]
 fn saved_changes_wait_through_quick_mask_and_resume_without_another_save() {
     let (mut app, saves, _) = fixture();

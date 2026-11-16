@@ -208,8 +208,26 @@ fn open_session(
     };
     let source = photocraft_engine::color_cmds::composite_profile(&st.doc);
     let display = app.session.color.canvas_display(&st.doc).map_err(|e| e.to_string())?;
+<<<<<<< HEAD
     let lab_transform = photocraft_cms::cached(&source, photocraft_cms::Builtin::LabD50.profile(), Default::default()).map_err(|e| e.to_string())?;
     let scope_transform = photocraft_cms::cached(&source, photocraft_cms::Builtin::Srgb.profile(), Default::default()).map_err(|e| e.to_string())?;
+=======
+    let lab_transform = craft_cms::cached(&source, craft_cms::Builtin::LabD50.profile(), Default::default()).map_err(|e| e.to_string())?;
+    let scope_transform = craft_cms::cached(&source, craft_cms::Builtin::Srgb.profile(), Default::default()).map_err(|e| e.to_string())?;
+    if let Some(saved) = app.session.prefs().dialogs.get("filter.cameraRaw.scope")
+        && saved.get("samplers").and_then(Value::as_array).is_none_or(|a| a.len() <= MAX_SAMPLERS)
+        && let Ok(view) = serde_json::from_value(saved.clone())
+    {
+        app.ui.camera_raw_scope = view;
+    }
+    app.ui.camera_raw_preview = Default::default();
+    app.ui.camera_raw_scope.samplers.clear();
+    // Keep Camera Raw compact on open; vectorscope is an opt-in context-menu view.
+    app.ui.camera_raw_scope.vectorscope = false;
+    if selection.is_none() {
+        app.ui.camera_raw_scope.selected_region = false;
+    }
+>>>>>>> upstream/main
     let float = surf.format().sample == photocraft_color::SampleType::F32;
     // Builds the GPU pass the first time any Camera Raw dialog opens.
     let gpu = crate::camera_raw_gpu::for_app(app);

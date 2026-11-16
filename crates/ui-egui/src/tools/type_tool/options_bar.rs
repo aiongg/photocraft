@@ -35,6 +35,183 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             app.ui.status_error = true;
         }
     }
+<<<<<<< HEAD
+=======
+    // Font family and style menus (one placeholder in their place while the fonts load), in one
+    // scope so the controls after them keep their ids when the fonts finish loading: a click
+    // pressed before and released after still lands. The salt keeps the menus' ids apart from the
+    // Character panel's font menus.
+    ui.push_id("type-options-fonts", |ui| {
+        if fonts_ready(ui, 170.0 + ui.spacing().item_spacing.x + 110.0) {
+            if let Some(picked) = font_picker(app, ui, &mut fam, 170.0) {
+                app.ui.tool_options.type_font = fam.clone();
+                let st = styles(&fam);
+                let picked = picked.filter(|s| st.contains(s));
+                style = match &picked {
+                    Some(s) => s.clone(),
+                    None if st.contains(&style) => style.clone(),
+                    None => st.first().cloned().unwrap_or_else(|| "Regular".into()),
+                };
+                app.ui.tool_options.type_style = style.clone();
+                // Only a style picked under the family's ">" is set: otherwise each selected layer
+                // keeps its own face in the new family (#3556).
+                match picked {
+                    Some(s) => apply(app, ui.ctx(), json!({"font": fam, "fontStyle": s})),
+                    None => apply(app, ui.ctx(), json!({"font": fam})),
+                }
+            }
+            font_picker_tip(ui, tl!("Search and select fonts"));
+            let style_family = if fam.is_empty() { styles_at(app).map(|(c, _)| c.font_family).unwrap_or_default() } else { fam.clone() };
+            let opts: Vec<(String, String)> = styles(&style_family).into_iter().map(|s| (s.clone(), style_label(&s))).collect();
+            let opts_ref: Vec<(String, &str)> = opts.iter().map(|(a, b)| (a.clone(), b.as_str())).collect();
+            if crate::widgets::dropdown(ui, "type-style", tl!("Style"), &mut style, &opts_ref, 110.0) {
+                app.ui.tool_options.type_style = style.clone();
+                apply(app, ui.ctx(), json!({"fontStyle": style}));
+            }
+            // The menu's button, by the id its combo box takes from "type-style"; "Style" stays its name.
+            if let Some(menu) = ui.ctx().read_response(ui.make_persistent_id(egui::IdSalt::new("type-style"))) {
+                menu.on_hover_text(tl!("Set font style"));
+            }
+        }
+    });
+    let (r, icon) = ui.allocate_exact_size(egui::vec2(18.0, 22.0), egui::Sense::hover());
+    crate::icons::paint(ui, r, "type", 13.0, t.icon);
+    icon.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Label, true, tl!("Font size")));
+    // Photoshop's "T" scrubs the size field beside it, like the Character panel's icons (#6437).
+    crate::widgets::scrub_option_icon(ui, &icon, tl!("Set font size"));
+    let (unit, label) = type_unit(app);
+    let mut display = size * unit;
+    let edited = size_field(ui, &mut display, unit, label);
+    // A preset is already in points: converting it through the display unit would not round-trip.
+    if let Some(size) = match edited {
+        Some(MetricChoice::Typed(v)) => Some(v / unit),
+        Some(MetricChoice::Preset(pt)) => Some(pt),
+        _ => None,
+    } {
+        app.ui.tool_options.type_size = size;
+        apply(app, ui.ctx(), json!({"size": size, "metricsAsShown": true}));
+    }
+    let mut aa = target(app)
+        .and_then(|(id, _)| app.session.active().and_then(|st| text_layer(&st.doc, LayerId(id))))
+        .map(|t| photocraft_engine::type_extra_cmds::aa_name(t.antialias).to_string())
+        .unwrap_or_else(|| o.type_aa.clone());
+    let aa_opts = [
+        ("none".to_string(), tl!("None")),
+        ("sharp".to_string(), tl!("Sharp")),
+        ("crisp".to_string(), tl!("Crisp")),
+        ("strong".to_string(), tl!("Strong")),
+        ("smooth".to_string(), tl!("Smooth")),
+    ];
+    if crate::widgets::dropdown(ui, "type-aa", tl!("Anti-aliasing method"), &mut aa, &aa_opts, 80.0) {
+        app.ui.tool_options.type_aa = aa.clone();
+        if let Some(params) = formatting_params(app) {
+            let _ = app.run(&format!("type.antiAlias.{aa}"), params);
+        }
+    }
+    crate::widgets::vline(ui, 22.0);
+    ui.spacing_mut().item_spacing.x = 2.0;
+    // Alignment and direction show the target paragraph's, as Photoshop's bar follows the text
+    // being edited or the selected type layer; the tool defaults otherwise. A justified paragraph
+    // lights none of the three.
+    let para = styles_at(app).map(|(_, p)| p);
+    let shown_align = match &para {
+        Some(p) => match p.align {
+            photocraft_doc::text::TextAlign::Left => "left",
+            photocraft_doc::text::TextAlign::Center => "center",
+            photocraft_doc::text::TextAlign::Right => "right",
+            _ => "",
+        },
+        None => o.type_align.as_str(),
+    };
+    // Vertical text shows Top / Center / Bottom for the same left / center / right values, after the
+    // targeted layer's orientation, or with no text targeted the vertical tools' (#12059, #12088).
+    // The Horizontal Type Mask tool keeps the horizontal buttons (not measured).
+    let vertical = app.ui.tool != crate::state::Tool::HorizontalTypeMask
+        && match super::defaults::target_text(app) {
+            Some(t) => t.orientation == photocraft_doc::text::Orientation::Vertical,
+            None => app.ui.tool.is_vertical_type(),
+        };
+    let buttons = if vertical {
+        [
+            ("left", "vertical-align-top", tl!("Top align text")),
+            ("center", "vertical-align-middle", tl!("Center text")),
+            ("right", "vertical-align-bottom", tl!("Bottom align text")),
+        ]
+    } else {
+        [("left", "align-left", tl!("Left align text")), ("center", "align-center", tl!("Center text")), ("right", "align-right", tl!("Right align text"))]
+    };
+    for (align, icon, tip) in buttons {
+        if crate::icons::button(ui, icon, 24.0, shown_align == align, tip).clicked() {
+            app.ui.tool_options.type_align = align.into();
+            apply(app, ui.ctx(), json!({"align": align}));
+        }
+    }
+    ui.spacing_mut().item_spacing.x = 8.0;
+    crate::widgets::vline(ui, 22.0);
+    ui.spacing_mut().item_spacing.x = 2.0;
+    for (key, tip, d) in direction_items() {
+        let on = para.as_ref().map_or(o.type_direction == key, |p| p.direction == d);
+        if direction_button(ui, d, on, tip).clicked() {
+            app.ui.tool_options.type_direction = key.into();
+            apply(app, ui.ctx(), json!({"direction": key}));
+        }
+    }
+    ui.spacing_mut().item_spacing.x = 8.0;
+    crate::widgets::vline(ui, 22.0);
+    // Text colour swatch with a picker popup.
+    let c = shown
+        .as_ref()
+        .map(|s| s.3)
+        .map(|c| {
+            let v = c.to_rgb();
+            [v[0], v[1], v[2], 1.0]
+        })
+        .unwrap_or(app.session.tools.foreground);
+    let (rect, resp) = ui.allocate_exact_size(egui::vec2(28.0, 18.0), egui::Sense::click());
+    let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0).round() as u8;
+    ui.painter().rect_filled(rect, 2.0, Color32::from_rgb(q(c[0]), q(c[1]), q(c[2])));
+    ui.painter().rect_stroke(rect, 2.0, Stroke::new(1.0, t.field_border), egui::StrokeKind::Outside);
+    let resp = resp.on_hover_text(tl!("Set text color"));
+    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tl!("Set the text color")));
+    if resp.clicked() {
+        open_color_picker(app, [c[0], c[1], c[2]]);
+    }
+    // Create warped text, after the swatch as in Photoshop (#5911): the Type › Warp Text… dialog.
+    let can_warp = crate::menus::is_enabled(app, "type.warpText");
+    if ui.add_enabled_ui(can_warp, |ui| crate::icons::button(ui, "text-warp", 24.0, false, tl!("Create warped text"))).inner.clicked()
+        && let Err(e) = crate::menus::invoke(app, &ui.ctx().clone(), "type.warpText", json!({}))
+    {
+        app.ui.status = e;
+        app.ui.status_error = true;
+    }
+    // The bar's last button, as in Photoshop (#12054): Window › Character, which shows the
+    // Character | Paragraph group with Character in front, and hides it when clicked again.
+    if crate::icons::button(ui, "panels-top-left", 24.0, false, tl!("Toggle Character and Paragraph panels")).clicked()
+        && let Err(e) = crate::menus::invoke(app, &ui.ctx().clone(), "window.panel.character", json!({}))
+    {
+        app.ui.status = e;
+        app.ui.status_error = true;
+    }
+    if app.ui.text_edit.is_some() {
+        ui.with_layout(egui::Layout::right_to_left(egui::Align::Center), |ui| {
+            ui.add_space(8.0);
+            if crate::icons::button(
+                ui,
+                "check",
+                24.0,
+                false,
+                &crate::i18n::fmt(tl!("Commit any current edits ({key})"), &[("key", &crate::shortcuts::pretty("Cmd+Enter"))]),
+            )
+            .clicked()
+            {
+                commit_with(app, ui.input(|i| i.modifiers));
+            }
+            if crate::icons::button(ui, "ban", 24.0, false, tl!("Cancel any current edits (Esc)")).clicked() {
+                cancel(app);
+            }
+        });
+    }
+>>>>>>> upstream/main
 }
 
 /// A blank family represents mixed fonts, rather than falsely reporting the first one after
@@ -98,6 +275,10 @@ pub(super) fn kerning_at(app: &PhotocraftApp) -> Option<(photocraft_doc::text::K
         })
         .map(|r| (r.style.kerning, r.style.kern))
 }
+
+#[cfg(test)]
+#[path = "fonts_loading_tests.rs"]
+mod fonts_loading_tests;
 
 #[cfg(test)]
 #[path = "size_presets_tests.rs"]

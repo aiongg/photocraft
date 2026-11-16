@@ -130,12 +130,90 @@ fn indexed_color_resamples_with_nearest_neighbor_only() {
 fn traditional_point_size_drives_points_and_picas() {
     let mut app = app_with(100, 50, 72);
     app.session.execute("prefs.set", json!({"path": "unitsAndRulers.pointSize", "value": "traditional"})).unwrap();
+<<<<<<< HEAD
     let id = open_hosted(&mut app, "image.imageSize");
     set(&mut app, id, "resample", Value::Null);
     set(&mut app, id, "unit", unit(UnitKind::Points));
     set(&mut app, id, "width", json!(72.27));
     confirm_by_id(&mut app, id);
     let doc = &app.session.active().unwrap().doc;
+=======
+    for command in ["image.imageSize", "image.canvasSize"] {
+        let id = open(&mut app, command).unwrap();
+        assert_eq!(app.ui.dialog_mut(id).unwrap().fields.get("__ptPerIn"), Some(&json!(72.27)), "{command}");
+        app.ui.close_dialog(id);
+    }
+    let mut h = egui_kittest::Harness::builder()
+        .with_size(egui::vec2(1400.0, 900.0))
+        .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::show(app, ui.ctx()), app);
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::ThemeKind::ALL[0]);
+    let id = open(h.state_mut(), "image.imageSize").unwrap();
+    let d = h.state_mut().ui.dialog_mut(id).unwrap();
+    d.fields.insert("resample".into(), json!("none"));
+    d.fields.insert("__unit".into(), json!("pt"));
+    h.run_steps(3);
+    type_width(&mut h, "72.27");
+    let f = fields(&h);
+    assert_eq!((num(&f, "width"), num(&f, "height")), (100.0, 50.0), "{f:?}");
+    assert!((num(&f, "resolution") - 100.0).abs() < 1e-2, "{f:?}");
+}
+
+/// Types `text` into the Width field and leaves it with Tab.
+fn type_width(h: &mut egui_kittest::Harness<'static, PhotocraftApp>, text: &str) {
+    type_into(h, 0, text);
+}
+
+/// Types `text` into the `n`th number field (Width, Height, Resolution) and leaves it with Tab.
+fn type_into(h: &mut egui_kittest::Harness<'static, PhotocraftApp>, n: usize, text: &str) {
+    use egui::accesskit::Role;
+    use egui_kittest::kittest::Queryable;
+    let width = h.query_all_by_role(Role::SpinButton).nth(n).map(|n| n.rect()).expect("the number field");
+    h.hover_at(width.center());
+    h.run_steps(1);
+    h.drag_at(width.center());
+    h.run_steps(1);
+    h.drop_at(width.center());
+    h.run_steps(2);
+    h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
+    h.event(egui::Event::Text(text.into()));
+    h.run_steps(1);
+    h.key_press(egui::Key::Tab);
+    h.run_steps(3);
+}
+
+fn fields(h: &egui_kittest::Harness<'static, PhotocraftApp>) -> Map<String, Value> {
+    h.state().ui.dialogs.first().map(|d| d.fields.clone()).expect("the dialog is open")
+}
+
+/// #2393: with Resample off, a pixel Width can't be edited and the readouts keep showing the
+/// pixels OK keeps (they showed "200 px × 50 px" and "39K (was 20K)").
+#[test]
+fn resample_off_keeps_pixel_dimensions_in_the_dialog() {
+    use egui_kittest::kittest::Queryable;
+    let (mut h, id) = resample_off_dialog("px");
+    type_width(&mut h, "200");
+    let f = fields(&h);
+    assert_eq!((num(&f, "width"), num(&f, "height"), num(&f, "resolution")), (100.0, 50.0, 72.0), "{f:?}");
+    assert!(h.query_by_label("100 px × 50 px").is_some(), "the Dimensions line shows the kept pixels");
+    // 100 x 50 x 3 bytes, unchanged, so no "(was …)" (#14768).
+    assert!(h.query_by_label("14.6K").is_some(), "the Image Size estimate is unchanged");
+    crate::dialogs::confirm(h.state_mut(), id).unwrap();
+    let doc = &h.state().session.active().unwrap().doc;
+    assert_eq!((doc.size, doc.resolution_dpi), (photocraft_doc::Size::new(100, 50), 72.0));
+}
+
+/// With Resample off, a physical Width changes the resolution and keeps the pixels (Photoshop):
+/// 100 px at 72 ppi is 1.39 in; 2 in wide is 50 ppi.
+#[test]
+fn resample_off_physical_width_changes_the_resolution() {
+    let (mut h, id) = resample_off_dialog("in");
+    type_width(&mut h, "2");
+    let f = fields(&h);
+    assert_eq!((num(&f, "width"), num(&f, "height")), (100.0, 50.0), "{f:?}");
+    assert!((num(&f, "resolution") - 50.0).abs() < 1e-3, "{f:?}");
+    crate::dialogs::confirm(h.state_mut(), id).unwrap();
+    let doc = &h.state().session.active().unwrap().doc;
+>>>>>>> upstream/main
     assert_eq!(doc.size, photocraft_doc::Size::new(100, 50));
     assert!((doc.resolution_dpi - 100.0).abs() < 1e-2, "{}", doc.resolution_dpi);
 }
