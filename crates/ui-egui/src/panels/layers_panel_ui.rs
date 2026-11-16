@@ -4,11 +4,9 @@ use craft::keymap::CommandRef;
 use craft::layers::ui::options::{LayersOptionsDialog, LayersSettings};
 use craft::layers::ui::panel::{LayersMenuAction, LayersPanelCommands, LayersPanelWords};
 use craft::layers::ui::thumbs::ThumbContents;
-use craft::ui::contract::Bind;
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::list::ThumbSize;
 use craft::ui::menu::PanelRow;
-use craft::ui::patterns::form_dialogs::{DialogFields, HostedParamDialog, Param, ParamDialog, ParamKind, ParamResult};
 use craft::ui::runtime::commands::{CommandSet, CommandState};
 use craft::ui::runtime::env::Env;
 use photocraft_doc::Document;
@@ -198,38 +196,6 @@ pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
     persist_options(app);
     let result = set_contents(app, contents);
     report(app, result);
-}
-
-/// The Lock Layers dialog's check boxes: parameter key, label, opening value.
-fn lock_params() -> Vec<Param> {
-    vec![
-        Param::new("transparency", tl!("Transparency"), ParamKind::bool(false)),
-        Param::new("pixels", tl!("Image"), ParamKind::bool(false)),
-        Param::new("position", tl!("Position"), ParamKind::bool(false)),
-        Param::new("artboard", tl!("Prevent Auto-Nesting"), ParamKind::bool(false)),
-        Param::new("all", tl!("All"), ParamKind::bool(true)),
-    ]
-}
-
-/// Opens the Lock Layers dialog (Layer › Lock Layers…, ⌘/ and the panel menu all open it).
-pub(crate) fn open_lock_layers(app: &mut PhotocraftApp) -> DialogId {
-    let dialog = HostedParamDialog::new(app.ctx(), LOCK_LAYERS, DialogFields::new(), |fields| {
-        ParamDialog::new(LOCK_LAYERS, tl!("Lock Layers"), lock_params()).values(Bind::bound(fields))
-    });
-    app.framework.dialogs.open(dialog)
-}
-
-/// Whether the parameter dialog `key` is the Lock Layers dialog (its `ParamFamily` row).
-pub(crate) fn owns(key: &str) -> bool {
-    key == LOCK_LAYERS
-}
-
-/// Runs the Lock Layers dialog's OK.
-pub(crate) fn run(app: &mut PhotocraftApp, _ctx: &egui::Context, result: ParamResult) {
-    let on = |key: &str| result.fields.bool(key).unwrap_or(false);
-    let params = json!({"transparency": on("transparency"), "pixels": on("pixels"), "position": on("position"), "artboard": on("artboard"), "all": on("all")});
-    let outcome = app.run(LOCK_LAYERS, params).map(|_| ());
-    report(app, outcome);
 }
 
 /// Preview cache recomputes only when hovering a new target, not each pointer frame.
