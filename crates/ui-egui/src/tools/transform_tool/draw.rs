@@ -127,7 +127,7 @@ pub struct SessionShown {
 }
 
 /// The moving pixels as the session maps them (warped, skewed or styled), then the layers above
-/// them. Nothing is shown for the Frame tool's transform.
+/// them, both in the canvas's picture, under the grid, guides and controls. Nothing is shown for the Frame tool's transform.
 fn show_preview(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &mut egui::Ui, rect: egui::Rect) {
     if crate::frame_tool::frame_transform(t) {
         return;
@@ -149,7 +149,8 @@ fn show_preview(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
         .opacity(pv.opacity)
         .nearest(t.session.interpolation() == Interpolation::NearestNeighbor)
         .clip(canvas)
-        .dragging(t.session.dragging());
+        .dragging(t.session.dragging())
+        .picture();
     if let Some(display) = display.as_ref() {
         preview = preview.display(display);
     }
@@ -160,7 +161,7 @@ fn show_preview(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
     if let Some(above) = &pv.above
         && let Some(frame) = above.frame()
     {
-        RasterDisplay::new("", above).mapped(frame, 1).show_at(ui, rect);
+        RasterDisplay::new("", above).mapped(frame, 1).picture().show_at(ui, rect);
     }
 }
 
