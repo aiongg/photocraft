@@ -12,7 +12,7 @@ fn action(name: &str, steps: Vec<(String, Value)>) -> Action {
 
 /// A list holding only the action `name` with `steps`.
 fn only(name: &str, steps: Vec<(String, Value)>) -> ActionList {
-    ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: vec![action(name, steps)], sets: Vec::new() })
+    ActionList::from_file(ActionsFile::new(vec![action(name, steps)], Vec::new()))
 }
 
 fn session() -> Session {

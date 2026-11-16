@@ -18,7 +18,7 @@ fn ordinal(name: &str) -> ReferenceItem {
 fn load(s: &mut Session, reference: ReferenceItem) {
     let descriptor = Descriptor::new("null").with("null", D::Reference(vec![reference]));
     s.actions.list =
-        ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: vec![imported(AtnEvent::Code(*b"slct"), descriptor)], sets: Vec::new() });
+        ActionList::from_file(ActionsFile::new(vec![imported(AtnEvent::Code(*b"slct"), descriptor)], Vec::new()));
 }
 
 fn bytes(event: AtnEvent, descriptor: Descriptor) -> Vec<u8> {
@@ -54,7 +54,7 @@ fn roundtrip(action: &Action, reference: &ReferenceItem, target: Option<&Referen
 }
 
 fn replay(s: &mut Session, action: &Action) {
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: vec![action.clone()], sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(vec![action.clone()], Vec::new()));
     let result = s.execute("actions.play", json!({"action":"Select"})).unwrap();
     assert_eq!(result["ran"], 1, "{result}");
     assert!(result.get("failed").is_none(), "{result}");
@@ -489,7 +489,7 @@ fn group_end_index_never_targets_the_selection() {
     let offset = Descriptor::new("Ofst").with("Hrzn", D::UnitFloat { unit: *b"#Pxl", value: 1.0 }).with("Vrtc", D::UnitFloat { unit: *b"#Pxl", value: 0.0 });
     let action =
         imported(AtnEvent::Code(*b"move"), Descriptor::new("null").with("null", D::Reference(vec![index("Lyr ", 3)])).with("T   ", D::Descriptor(offset)));
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: vec![action], sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(vec![action], Vec::new()));
     let result = s.execute("actions.play", json!({"action":"Select"})).unwrap();
     assert!(result.get("failed").is_some(), "{result}");
     assert_eq!(s.active().unwrap().history.past_len(), past);

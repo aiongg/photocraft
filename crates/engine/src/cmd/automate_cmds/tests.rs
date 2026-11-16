@@ -3,7 +3,7 @@ use crate::actions_cmds::{Action, ActionList, ActionStep, ActionsFile};
 
 /// An `ActionList` holding `actions` in order.
 fn list_of(actions: Vec<Action>) -> ActionList {
-    ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions, sets: Vec::new() })
+    ActionList::from_file(ActionsFile::new(actions, Vec::new()))
 }
 
 pub(super) fn tmp(name: &str) -> String {

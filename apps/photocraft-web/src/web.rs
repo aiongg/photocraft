@@ -100,21 +100,13 @@ pub fn start() {
                     let served: Served = Arc::default();
                     load_font_manifest(served.clone(), cc.egui_ctx.clone());
                     let (session, warnings) = crate::preset_bridge::session(presets.clone());
-                    let actions_revision = session.actions.rev;
+                    let actions_revision = session.actions.list.revision();
                     preset_warnings.extend(warnings);
                     let drag = listen_drag(&pen_target);
-<<<<<<< HEAD
-                    let mut app = PhotocraftApp::with_context(
-                        cc.egui_ctx.clone(),
-                        session,
-                        services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag)),
-                    );
-=======
                     let mut services = services(inbox.clone(), place_inbox.clone(), drag_pos_service(pen_target.clone(), drag));
-                    let mut initial = Some(load_initial_preferences(&presets, database.is_some() && !session.actions.list.is_empty()));
+                    let mut initial = Some(load_initial_preferences(&presets, database.is_some() && !session.actions.list.actions().is_empty()));
                     services.load_prefs = Some(Box::new(move || initial.take().unwrap_or_else(stored_preferences)));
-                    let mut app = PhotocraftApp::new(session, services);
->>>>>>> upstream/main
+                    let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), session, services);
                     if !preset_warnings.is_empty() {
                         photocraft_ui_egui::notices::post(&mut app, i18n::t("Some brush presets could not be loaded"), preset_warnings, true, None);
                     }
@@ -383,11 +375,11 @@ struct WebShell {
 impl WebShell {
     fn save_presets(&mut self, ctx: &egui::Context) {
         let session = &self.app.session;
-        if self.actions_revision != session.actions.rev {
+        if self.actions_revision != session.actions.list.revision() {
             // The engine can reject an oversized definition before calling the backend.
             // Never stage that edit's keys with the last successfully queued definitions.
             self.presets.verify_action_definitions(&session.actions);
-            self.actions_revision = session.actions.rev;
+            self.actions_revision = session.actions.list.revision();
         }
         let prefs_revision = session.prefs.rev();
         if self.prefs_revision != Some(prefs_revision) {

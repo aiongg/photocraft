@@ -76,7 +76,7 @@ fn custom_and_fibers_recordings_round_trip_replay_native_settings_and_undo() {
             native.execute(id, p.clone()).unwrap();
             let mut s = fixture(depth);
             let before = photocraft_format::save_to_bytes(&s.active().unwrap().doc, &Default::default()).unwrap();
-            s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions.clone(), sets: Vec::new() });
+            s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions.clone(), Vec::new()));
             assert_eq!(s.execute("actions.play", json!({"action":"Dialog"})).unwrap()["ran"], 1);
             assert_eq!(
                 photocraft_compose::flatten(&s.active().unwrap().doc).px,
@@ -104,7 +104,7 @@ fn fibers_missing_seed_is_stable_across_playback_and_save() {
     assert_eq!(saved.actions[0].steps[0].params, *p);
     let render = |actions| {
         let mut s = fixture(8);
-        s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: actions, sets: Vec::new() });
+        s.actions.list = ActionList::from_file(ActionsFile::new(actions, Vec::new()));
         s.execute("actions.play", json!({"action":"Dialog"})).unwrap();
         photocraft_compose::flatten(&s.active().unwrap().doc).px.clone()
     };

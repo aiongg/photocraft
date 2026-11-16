@@ -214,7 +214,7 @@ fn custom_shape_uses_installed_id_despite_name_collision_and_undoes() {
         let mut s = fixture(depth);
         install_square(&mut s);
         let before = saved(&s);
-        s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions.clone(), sets: Vec::new() });
+        s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions.clone(), Vec::new()));
         assert_eq!(s.execute("actions.play", json!({"action":"Shape"})).unwrap()["ran"], 1);
         assert_eq!(pixels(&s), expected, "{depth}-bit square custom kernel");
         s.execute("edit.undo", json!({})).unwrap();
@@ -277,7 +277,7 @@ fn imported_csh_id_resolves_in_an_action_after_reimport_and_preference_reload() 
         .with("keyOriginType", D::Integer(9));
     let imported = atn_cmds::import(&encoded(d)).unwrap();
     assert!(imported.unsupported.is_empty());
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
     let before = saved(&s);
     assert_eq!(s.execute("actions.play", json!({"action":"Shape"})).unwrap()["ran"], 1);
     assert_eq!(pixels(&s), pixels(&expected));
@@ -315,7 +315,7 @@ fn missing_or_invalid_custom_shapes_refuse_before_document_or_history_changes() 
         assert_eq!(s.active().unwrap().history.past_len(), history);
     }
     let imported = atn_cmds::import(&encoded(descriptor())).unwrap();
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
     // Playback reports a failed step in its successful response; native command errors are not outer errors.
     let result = s.execute("actions.play", json!({"action":"Shape"})).unwrap();
     assert_eq!(result["ran"], 0);

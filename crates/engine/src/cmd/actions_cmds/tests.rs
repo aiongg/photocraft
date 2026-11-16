@@ -3,7 +3,7 @@ use serde_json::json;
 
 /// An `ActionList` holding `actions` in order.
 fn list_of(actions: Vec<Action>) -> ActionList {
-    ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions, sets: Vec::new() })
+    ActionList::from_file(ActionsFile::new(actions, Vec::new()))
 }
 
 /// A journal-style step: the journal, `called_actions`' steps and Batch steps stay `(id, params)` pairs.
@@ -1041,50 +1041,6 @@ fn play_refuses_recursion() {
 }
 
 #[test]
-fn legacy_occurrences_distinguish_a_sibling_from_a_cycle() {
-    let mut s = Session::new();
-    s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    for _ in 0..2 {
-        s.execute("actions.reset", json!({"confirm": true, "mode": "append"})).unwrap();
-    }
-    s.actions.list[0].steps = vec![("actions.play".into(), json!({"action": 2}))];
-    assert_eq!(s.actions.list[0].name, s.actions.list[2].name);
-    assert!(s.actions.list[0].action_id.is_none() && s.actions.list[2].action_id.is_none());
-    let sibling = s.execute("actions.play", json!({"action": 0})).unwrap();
-    assert_eq!(sibling["ran"], 1, "{sibling}");
-    assert!(sibling.get("failed").is_none());
-    s.actions.list[2].steps = vec![("actions.play".into(), json!({"action": 0}))];
-    let cycle = s.execute("actions.play", json!({"action": 0})).unwrap();
-    assert!(cycle["failed"]["error"].as_str().unwrap().contains("recursive action"), "{cycle}");
-    assert_eq!(s.actions.playing, 0);
-    assert!(s.actions.playback_stack.is_empty());
-}
-
-#[test]
-fn recording_a_later_legacy_occurrence_persists_its_id_and_step() {
-    let mut s = Session::new();
-    s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    for _ in 0..2 {
-        s.execute("actions.reset", json!({"confirm": true, "mode": "append"})).unwrap();
-    }
-    s.actions.list[2].steps.push(("layer.new.layer".into(), json!({"name": "later occurrence"})));
-    s.execute("actions.record", json!({"name": "Recorder"})).unwrap();
-    let live = s.execute("actions.play", json!({"action": 2, "from": 1})).unwrap();
-    assert_eq!(live["ran"], 1, "{live}");
-    s.execute("actions.stop", json!({})).unwrap();
-    let id = s.actions.list[2].action_id.clone().unwrap();
-    assert_eq!(s.actions.list[4].steps, [("actions.play".to_string(), json!({"action": "Invert Colors", "actionId": id, "from": 1}))]);
-    s.execute("actions.move", json!({"action": 2, "to": 3})).unwrap();
-    let saved = serde_json::to_string(&s.actions.list).unwrap();
-    let mut replay = Session::new();
-    replay.actions.list = serde_json::from_str(&saved).unwrap();
-    replay.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    let result = replay.execute("actions.play", json!({"action": "Recorder"})).unwrap();
-    assert_eq!(result["ran"], 1, "{result}");
-    assert!(replay.active().unwrap().doc.layers.iter().any(|layer| layer.name == "later occurrence"));
-}
-
-#[test]
 fn play_checks_each_step_with_the_authorize_hook() {
     /// The automation policy these tests stand in for: every `file.` command is refused.
     fn deny_file(id: &str, _: &Value) -> Result<()> {
@@ -1686,7 +1642,7 @@ fn record_keeps_an_existing_sets_exact_name() {
 #[test]
 fn record_keeps_an_empty_loaded_sets_exact_name() {
     let mut src = Session::new();
-    src.actions.list.replace(ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: Vec::new(), sets: vec![" Web ".into()] }));
+    src.actions.list.replace(ActionList::from_file(ActionsFile::new(Vec::new(), vec![" Web ".into()])));
     let saved = src.execute("actions.save", json!({"set": " Web "})).unwrap();
     let mut s = Session::new();
     assert_eq!(s.execute("actions.load", json!({"data": saved["data"]})).unwrap()["set"], " Web ");
@@ -1725,7 +1681,7 @@ fn captured_calls_keep_their_target_among_actions_a_load_renamed() {
         file.push(Action { set: Some(set.into()), ..Action::new("Retouch", vec![ActionStep::new(step, json!({}))]) });
     }
     file.push(Action::new("Other", vec![ActionStep::new("image.imageRotation.90cw", json!({}))]));
-    let list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: file, sets: Vec::new() });
+    let list = ActionList::from_file(ActionsFile::new(file, Vec::new()));
     let names: Vec<&str> = list.actions().iter().map(|a| a.name.as_str()).collect();
     assert_eq!(names, ["Retouch", "Retouch 2", "Other"], "a load renames the repeat");
     let mut steps = vec![
@@ -1768,7 +1724,7 @@ fn rename_leaves_calls_that_reach_another_sets_action_alone() {
             .into_iter()
             .chain([Action::new("Caller", calls())])
             .collect();
-        s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: file, sets: Vec::new() });
+        s.actions.list = ActionList::from_file(ActionsFile::new(file, Vec::new()));
         assert_eq!(s.actions.list.actions()[1].name, "Target 2", "the load renamed the repeat");
         s
     };
@@ -1840,108 +1796,4 @@ fn playback_stops_when_a_nested_batch_cannot_write_its_error_log() {
     assert!(failed["result"]["errorLogError"].is_string(), "{played}");
     assert_eq!(s.active().unwrap().doc.layers.len(), layers, "the step after the Batch must not run");
     let _ = std::fs::remove_dir_all(&dir);
-}
-
-#[test]
-fn recording_a_first_legacy_occurrence_survives_reorder_and_reload() {
-    let mut s = Session::new();
-    s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    s.actions.list = vec![
-        Action::new("Same", vec![("layer.new.layer".into(), json!({"name": "selected first"}))]),
-        Action::new("Same", vec![("layer.new.layer".into(), json!({"name": "wrong namesake"}))]),
-    ];
-    s.execute("actions.record", json!({"name": "Recorder"})).unwrap();
-    s.execute("actions.play", json!({"action": 0})).unwrap();
-    s.execute("actions.stop", json!({})).unwrap();
-    let id = s.actions.list[0].action_id.clone().unwrap();
-    assert_eq!(s.actions.list[2].steps, [("actions.play".to_string(), json!({"action": "Same", "actionId": id}))]);
-    s.execute("actions.move", json!({"action": 0, "to": 1})).unwrap();
-    let saved = serde_json::to_string(&s.actions.list).unwrap();
-    let mut replay = Session::new();
-    replay.actions.list = serde_json::from_str(&saved).unwrap();
-    replay.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    let result = replay.execute("actions.play", json!({"action": "Recorder"})).unwrap();
-    assert_eq!(result["ran"], 1, "{result}");
-    assert!(replay.active().unwrap().doc.layers.iter().any(|layer| layer.name == "selected first"));
-    assert!(!replay.active().unwrap().doc.layers.iter().any(|layer| layer.name == "wrong namesake"));
-}
-
-#[test]
-fn recording_a_unique_identified_action_keeps_its_id_after_namesake_reload() {
-    let mut s = Session::new();
-    s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    let id = "0123456789abcdef0123456789abcdef";
-    let mut target = Action::new("Same", vec![("layer.new.layer".into(), json!({"name": "identified target"}))]);
-    target.action_id = Some(id.into());
-    s.actions.list = vec![target];
-    s.execute("actions.record", json!({"name": "Recorder"})).unwrap();
-    s.execute("actions.play", json!({"action": 0})).unwrap();
-    s.execute("actions.stop", json!({})).unwrap();
-    assert_eq!(s.actions.list[1].steps, [("actions.play".to_string(), json!({"action": "Same", "actionId": id}))]);
-    s.actions.list.insert(0, Action::new("Same", vec![("layer.new.layer".into(), json!({"name": "new first namesake"}))]));
-    let saved = serde_json::to_string(&s.actions.list).unwrap();
-    let mut replay = Session::new();
-    replay.actions.list = serde_json::from_str(&saved).unwrap();
-    replay.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    let result = replay.execute("actions.play", json!({"action": "Recorder"})).unwrap();
-    assert_eq!(result["ran"], 1, "{result}");
-    assert!(replay.active().unwrap().doc.layers.iter().any(|layer| layer.name == "identified target"));
-    assert!(!replay.active().unwrap().doc.layers.iter().any(|layer| layer.name == "new first namesake"));
-}
-
-#[test]
-fn recording_a_unique_idless_action_keeps_plain_name_calls() {
-    let mut s = Session::new();
-    s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
-    s.actions.list = vec![Action::new("Plain", vec![("layer.new.layer".into(), json!({"name": "plain target"}))])];
-    s.execute("actions.record", json!({"name": "Recorder"})).unwrap();
-    s.execute("actions.play", json!({"action": 0})).unwrap();
-    s.execute("actions.stop", json!({})).unwrap();
-    assert_eq!(s.actions.list[0].action_id, None);
-    assert_eq!(s.actions.list[1].steps, [("actions.play".to_string(), json!({"action": "Plain"}))]);
-    s.actions.list.insert(0, Action::new("Plain", vec![("layer.new.layer".into(), json!({"name": "plain first"}))]));
-    let result = s.execute("actions.play", json!({"action": "Plain"})).unwrap();
-    assert_eq!(result["ran"], 1, "{result}");
-    assert!(s.active().unwrap().doc.layers.iter().any(|layer| layer.name == "plain first"));
-}
-
-#[test]
-fn panel_shortcut_labels_preserve_identity_empty_and_legacy_owner_rules() {
-    let mut s = Session::new();
-    let unique = "0123456789abcdef0123456789abcdef";
-    let duplicate = "11111111111111111111111111111111";
-    s.actions.list = ["Named", "Named", "Repeated ID", "Repeated ID", "Pinned", "Pinned", "Ambiguous", "Ambiguous", "Invalid"]
-        .into_iter()
-        .map(|name| Action::new(name, vec![]))
-        .collect();
-    s.actions.list[0].action_id = Some(unique.into());
-    s.actions.list[2].action_id = Some(duplicate.into());
-    s.actions.list[3].action_id = Some(duplicate.into());
-    s.actions.list[5].legacy_shortcut_owner = true;
-    s.actions.list[6].legacy_shortcut_owner = true;
-    s.actions.list[7].legacy_shortcut_owner = true;
-    s.actions.list[8].action_id = Some("invalid".into());
-    s.edit_prefs(|prefs| {
-        for (key, value) in [
-            (occurrence_key(unique), ""),
-            (occurrence_key(duplicate), "must not bind duplicate IDs"),
-            (occurrence_key("invalid"), "must not bind invalid IDs"),
-            ("actions.play:Named".into(), "legacy named"),
-            ("actions.play:Repeated ID".into(), "legacy repeated"),
-            ("actions.play:Pinned".into(), "legacy pinned"),
-            ("actions.play:Ambiguous".into(), "must not bind ambiguous owners"),
-            ("actions.play:Invalid".into(), "legacy invalid"),
-        ] {
-            prefs.shortcuts.insert(key, value.into());
-        }
-    });
-    assert_eq!(action_shortcuts(&s), [Some(""), None, Some("legacy repeated"), None, None, Some("legacy pinned"), None, None, Some("legacy invalid")]);
-    s.edit_prefs(|prefs| {
-        prefs.shortcuts.insert(occurrence_key(unique), "explicit named".into());
-    });
-    assert_eq!(action_shortcuts(&s)[0], Some("explicit named"));
-    s.edit_prefs(|prefs| {
-        prefs.shortcuts.remove(&occurrence_key(unique));
-    });
-    assert_eq!(action_shortcuts(&s)[0], Some("legacy named"));
 }

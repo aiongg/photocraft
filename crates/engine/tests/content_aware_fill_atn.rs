@@ -118,7 +118,7 @@ fn typed_flags_survive_saved_descriptors_and_public_playback() {
             let imported = atn_cmds::import(&saved).unwrap();
             assert!(imported.unsupported.is_empty());
             assert_eq!(imported.actions[0].steps, replay.actions.list.actions()[0].steps);
-            replay.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+            replay.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
             let played = replay.execute("actions.play", json!({"action": "Fill"})).unwrap();
             assert_eq!(played["ran"], 1);
             assert!(played.get("failed").is_none(), "{played}");

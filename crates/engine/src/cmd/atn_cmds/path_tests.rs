@@ -127,7 +127,7 @@ fn whole_atn_and_native_insert_path_replay_keep_geometry() {
     assert!(skipped.is_empty());
     let imported = super::super::import(&bytes).unwrap();
     assert!(imported.unsupported.is_empty());
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
     s.execute("path.set", json!({"name":"Source","path":{"subpaths":[]}})).unwrap();
     let played = s.execute("actions.play", json!({"action":0})).unwrap();
     assert!(played.get("failed").is_none(), "{played}");

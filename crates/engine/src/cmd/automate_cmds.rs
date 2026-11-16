@@ -339,9 +339,8 @@ pub fn document_saved(s: &mut Session, doc: photocraft_doc::DocId) -> Option<Val
 /// Resolve the enabled steps of the saved action chosen for a droplet: by name, refused when a
 /// given `set` does not hold it, else by name or index.
 pub(crate) fn named_action_steps(s: &Session, p: &Value, cmd: &str) -> Result<Vec<(String, Value)>> {
-    let index = match (p.get("actionId"), p.get("set").filter(|v| !v.is_null())) {
-        (Some(_), _) => crate::actions_cmds::resolve_play_target(&s.actions.list, p, cmd)?,
-        (None, Some(set)) => {
+    let index = match p.get("set").filter(|v| !v.is_null()) {
+        Some(set) => {
             let set = set.as_str().ok_or_else(|| bad(cmd, "\"set\" must be a string"))?;
             let name = p.get("action").and_then(Value::as_str).ok_or_else(|| bad(cmd, "a set needs a named action"))?;
             s.actions
@@ -351,11 +350,7 @@ pub(crate) fn named_action_steps(s: &Session, p: &Value, cmd: &str) -> Result<Ve
                 .position(|a| a.name == name && a.set.as_deref() == Some(set))
                 .ok_or_else(|| bad(cmd, format!("no action named `{name}` in set `{set}`")))?
         }
-<<<<<<< HEAD
         None => crate::actions_cmds::resolve(s.actions.list.actions(), p, cmd)?,
-=======
-        (None, None) => crate::actions_cmds::resolve(&s.actions.list, p, cmd)?,
->>>>>>> upstream/main
     };
     let action = s.actions.list.action(index).ok_or_else(|| bad(cmd, "the selected action no longer exists"))?;
     Ok(action.enabled_steps().map(|(_, step)| (step.command.clone(), step.params.clone())).collect())
