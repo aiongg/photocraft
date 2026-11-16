@@ -573,7 +573,10 @@ fn free_transform_of_a_shape_keeps_whole_pixels() {
         app.run("file.new", json!({"width": 1080, "height": 1080, "resolution": 72})).unwrap();
         app.run("prefs.set", json!({"path": "tools.snapVectorToolsAndTransformsToPixelGrid", "value": grid})).unwrap();
         app.sync_views();
+        // The whole document shows at 60 %, so no press or drag below reaches past the canvas edge and autoscrolls.
+        crate::canvas::testing::window(&mut app, egui::vec2(1400.0, 900.0));
         app.ui.views[0].zoom = 0.6;
+        app.ui.views[0].center = [540.0, 540.0];
         app.ui.views[0].fit_pending = false;
         app.ui.extras.snap = true;
         app.ui.view.show.smart_guides = true;
