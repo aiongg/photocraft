@@ -287,11 +287,28 @@ fn press_refused(app: &mut PhotocraftApp, tool: Tool) -> bool {
         return true;
     }
     if let Some(why) = hidden {
-        app.ui.status = why.into();
-        app.ui.status_error = true;
+        if !quiet_hidden_refusal(app, tool) {
+            app.ui.status = why.into();
+            app.ui.status_error = true;
+        }
         return true;
     }
     false
+}
+
+/// A Remove press on a hidden active pixel layer does nothing and says nothing, as in Photoshop (#12554). Only that
+/// case was measured: a layer inside a hidden group, a targeted mask, Sample All Layers and the other layer kinds keep
+/// the status-bar error. Hidden is checked before the lock, so a hidden layer with Lock All is quiet too.
+fn quiet_hidden_refusal(app: &PhotocraftApp, tool: Tool) -> bool {
+    if tool != Tool::Remove || app.ui.tool_options.sample_all.remove || super::paint_target(app) != serde_json::json!("pixels") {
+        return false;
+    }
+    let Some(st) = app.session.active() else { return false };
+    let Some(id) = st.active_layer.filter(|&id| st.doc.layer(id).is_some_and(|l| matches!(l.content, photocraft_doc::LayerContent::Raster(_)))) else {
+        return false;
+    };
+    let Some(path) = st.doc.path_of(id) else { return false };
+    (1..path.len()).all(|n| path.get(..n).and_then(|p| st.doc.layer_at(p)).is_some_and(|l| l.visible))
 }
 
 /// A press with `tool` that would paint the pixels of a group (the active layer, with neither its mask, an alpha channel

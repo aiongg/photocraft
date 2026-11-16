@@ -173,7 +173,7 @@ fn snap_targets_follow_the_document() {
             let mut board = photocraft_doc::Layer::group("Artboard 1", vec![]);
             if let photocraft_doc::LayerContent::Group(g) = &mut board.content {
                 g.artboard = Some(photocraft_doc::Artboard {
-                    rect: photocraft_geom::Rect::new(20, 110, 120, 190),
+                    rect: photocraft_geom::Rect::new(20, 110, 120, 170),
                     background: Default::default(),
                     preset: String::new(),
                 });
@@ -183,7 +183,8 @@ fn snap_targets_follow_the_document() {
         })
         .unwrap();
     assert_eq!(near(&app, &[], Axis::Y, 120.0), Some((SnapKind::LayerEdge, 120.0)));
-    assert_eq!(near(&app, &[], Axis::X, 150.0), Some((SnapKind::LayerCenter, 150.0)));
+    // Its centre line is off the document's (y 150), which would win a tie.
+    assert_eq!(near(&app, &[], Axis::X, 140.0), Some((SnapKind::LayerCenter, 140.0)));
     // A layer whose pixels reach past the canvas offers its whole rect (#1919).
     app.run("layer.new.layer", json!({"name": "off"})).unwrap();
     let off = app.session.active().unwrap().active_layer.unwrap();

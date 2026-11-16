@@ -3,7 +3,6 @@
 use serde_json::json;
 
 use crate::canvas_tool_menu::SAMPLER_DELETE;
-use crate::control::{ControlRequest, handle};
 use crate::{PhotocraftApp, Tool};
 
 /// A 200 x 100 document with the Color Sampler and samplers at (20, 20) and (120, 60).
@@ -17,23 +16,9 @@ fn app() -> (PhotocraftApp, egui::Context) {
     (app, ctx)
 }
 
-/// An agent's right-click at document point (x, y), as `ui.pointer` sends it. The tool host takes
-/// the queued input on a later pass, so frames run until the reply arrives.
-fn right_click(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64) {
-    let (req, reply) =
-        ControlRequest::new("ui.pointer", json!({"button": "secondary", "events": [{"kind": "down", "x": x, "y": y}, {"kind": "up", "x": x, "y": y}]}));
-    let _ = handle(app, ctx, &req);
-
-    let mut answer = None;
-    for _ in 0..30 {
-        crate::canvas::testing::frame(app);
-        if let Ok(v) = reply.try_recv() {
-            answer = Some(v);
-            break;
-        }
-    }
-    let answer = answer.expect("ui.pointer answers after the queued input ran");
-    assert_eq!(answer["ok"], json!(true), "{answer}");
+/// A right-click at document point (x, y) through the window host, as a mouse sends it.
+fn right_click(app: &mut PhotocraftApp, x: f64, y: f64) {
+    crate::canvas::testing::secondary_click(app, [x, y], egui::Modifiers::NONE);
 }
 
 fn samplers(app: &PhotocraftApp) -> Vec<[f64; 2]> {
@@ -46,7 +31,7 @@ fn samplers(app: &PhotocraftApp) -> Vec<[f64; 2]> {
 fn delete_never_removes_another_sampler_after_the_list_changes_under_the_menu() {
     let (mut app, ctx) = app();
     app.run("view.colorSamplers.add", json!({"x": 180, "y": 90})).unwrap();
-    right_click(&mut app, &ctx, 120.0, 60.0);
+    right_click(&mut app, 120.0, 60.0);
     assert_eq!(app.ui.canvas_tool_menu.as_ref().and_then(|m| m.sampler), Some(1));
     // An agent deletes #1 while the menu is open: index 1 now names the old #3.
     app.run("view.colorSamplers.delete", json!({"index": 0})).unwrap();
@@ -56,7 +41,7 @@ fn delete_never_removes_another_sampler_after_the_list_changes_under_the_menu() 
     assert_eq!(samplers(&app), [[120.5, 60.5], [180.5, 90.5]], "no other sampler is deleted");
 
     // Another document with a sampler at the same index and spot: still not this menu's sampler.
-    right_click(&mut app, &ctx, 180.0, 90.0);
+    right_click(&mut app, 180.0, 90.0);
     assert_eq!(app.ui.canvas_tool_menu.as_ref().and_then(|m| m.sampler), Some(1));
     app.run("file.new", json!({"width": 200, "height": 100})).unwrap();
     for (x, y) in [(20, 20), (180, 90)] {

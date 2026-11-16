@@ -56,11 +56,12 @@ fn a_click_with_the_mode_on_puts_a_bar_sized_board_at_the_click() {
     assert_eq!(last_step(&app).as_deref(), Some("New Artboard"));
     // The mode stays on; the next click rounds to whole pixels and takes the new selected board's size.
     assert!(app.ui.artboard_tool.adding);
-    // The second point is far right of the window's fit: zoom out so the canvas shows it.
+    // The second point is far right of the window's fit: centre the view on it, so the canvas shows it at any window
+    // size.
     {
         let view = &mut app.ui.views[0];
         view.zoom = 0.2;
-        view.center = [1800.0, 700.0];
+        view.center = [3000.0, 100.0];
         view.fit_pending = false;
     }
     crate::canvas::testing::frame(&mut app);
