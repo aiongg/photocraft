@@ -176,7 +176,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let move_label = if other_side == ToolbarSide::Right { tl!("Move Toolbar to the Right") } else { tl!("Move Toolbar to the Left") };
 
     let mut rail = ToolRail::new(Label::Empty, &slots, &current, &remembered)
-        .columns(NonZeroU8::new(columns).unwrap_or(NonZeroU8::MIN))
+        .columns(u8::try_from(columns).ok().and_then(NonZeroU8::new).unwrap_or(NonZeroU8::MIN))
         .edge(edge)
         .column_toggle(tl!("Toolbar").to_string())
         .side_toggle(move_label.to_string())
