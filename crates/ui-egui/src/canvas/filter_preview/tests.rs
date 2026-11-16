@@ -621,7 +621,8 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
     assert!(app.framework.dialogs.cancel_by_id(&ctx, first_dialog), "the first dialog closes");
     open_filter(&mut app, "filter.blur.gaussianBlur");
     let second_dialog = top_dialog(&app);
-    let (first_open, second_open) = (first_open.expect("the first dialog was open"), app.framework.dialogs.open_serial(second_dialog).expect("the second dialog is open"));
+    let (first_open, second_open) =
+        (first_open.expect("the first dialog was open"), app.framework.dialogs.open_serial(second_dialog).expect("the second dialog is open"));
     assert_ne!(second_open, first_open, "a reopened dialog is a new open, though its id repeats");
     release.send(()).expect("released");
 

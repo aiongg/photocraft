@@ -107,9 +107,7 @@ fn show_session(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
         Some(w) => show_warp(t, pv, w, ui, rect, &mut out),
         None => {
             let settings = super::settings(app);
-            let shown = TransformOverlay::new("Free Transform", &t.session, &settings)
-                .id_salt(super::BOX_ID_SALT)
-                .show_at(ui, rect);
+            let shown = TransformOverlay::new("Free Transform", &t.session, &settings).id_salt(super::BOX_ID_SALT).show_at(ui, rect);
             out.edits = shown.edits;
             out.snapped = shown.snapped;
             out.apply = shown.apply;

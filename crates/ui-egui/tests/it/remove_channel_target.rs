@@ -32,17 +32,16 @@ fn probe(input: Input) {
     let text = a.active().unwrap().active_layer.unwrap();
     run(&mut a, "layer.new.layer", r#"{"name":"Target"}"#);
     let target = a.active().unwrap().active_layer.unwrap();
-    a
-        .edit("fixture", |d, l| {
-            let q = d.layer_mut(l.unwrap()).unwrap().surface_mut().unwrap();
-            for y in 0..24 {
-                for x in 0..32 {
-                    q.write_pixel(x, y, &[((x * 7 + y * 13) % 31) as f32 / 30., (x % 5) as f32 / 4., (y % 7) as f32 / 6., 1.]);
-                }
+    a.edit("fixture", |d, l| {
+        let q = d.layer_mut(l.unwrap()).unwrap().surface_mut().unwrap();
+        for y in 0..24 {
+            for x in 0..32 {
+                q.write_pixel(x, y, &[((x * 7 + y * 13) % 31) as f32 / 30., (x % 5) as f32 / 4., (y % 7) as f32 / 6., 1.]);
             }
-            Ok(())
-        })
-        .unwrap();
+        }
+        Ok(())
+    })
+    .unwrap();
     run(&mut a, "file.new", r##"{"name":"B","width":32,"height":24,"background":"#6a219c"}"##);
     a.set_active(0);
     run(&mut a, "channel.target", r#"{"channel":"red"}"#);

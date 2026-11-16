@@ -22,8 +22,8 @@ use craft::behavior::{CancelReason, Cursor, GesturePhase, PointerButton};
 use craft::draw::ui::{CropShown, CropToolPass};
 use craft::keymap::Mods;
 use craft::ui::canvas::{
-    Autoscroll, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims,
-    ToolContext, ToolHost, ToolHostResponse, ToolKey, ToolPass, ToolPath, ToolPointer, ToolRegion, ZoomTool,
+    Autoscroll, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims, ToolContext,
+    ToolHost, ToolHostResponse, ToolKey, ToolPass, ToolPath, ToolPointer, ToolRegion, ZoomTool,
 };
 use craft::ui::primitives::Draw;
 

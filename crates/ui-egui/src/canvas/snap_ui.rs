@@ -170,9 +170,7 @@ fn pixel_grid(app: &PhotocraftApp) -> bool {
         return false;
     }
     let shapes = |st: &photocraft_engine::DocState| {
-        crate::transform_tool::moving_layers(t)
-            .iter()
-            .all(|id| st.doc.layer(*id).is_some_and(|l| matches!(l.content, photocraft_doc::LayerContent::Shape(_))))
+        crate::transform_tool::moving_layers(t).iter().all(|id| st.doc.layer(*id).is_some_and(|l| matches!(l.content, photocraft_doc::LayerContent::Shape(_))))
     };
     t.path.is_some() || app.session.active().is_some_and(shapes)
 }
