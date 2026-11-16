@@ -154,7 +154,6 @@ impl PhotocraftApp {
             paused_playbacks: Default::default(),
 <<<<<<< HEAD
 =======
-            held_actions_library: None,
             channel_thumbs: None,
             channel_views: HashMap::new(),
 >>>>>>> upstream/main
