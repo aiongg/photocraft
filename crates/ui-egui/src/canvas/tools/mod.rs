@@ -38,6 +38,19 @@ pub(crate) type FamilyTool<'a> = Box<dyn CanvasTool + 'a>;
 /// A tool borrowed for the host's run.
 type DynTool<'x> = &'x mut (dyn CanvasTool + 'x);
 
+/// The tool of the selection a canvas gesture began with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GesturePick {
+    /// The armed pick of the top dialog.
+    Dialog,
+    /// The open Free Transform session's tool.
+    Transform,
+    /// The open symmetry session's tool.
+    Symmetry,
+    /// The selected family's tool.
+    Selected,
+}
+
 /// Every canvas family's state between passes. `run` takes it out of the app for a pass (`std::mem::take`), so a family
 /// reads its own state through the tool it is given, and readers outside a pass read the fields through the app.
 // PLAN: each family module's `tool(scope, state, host)` / `drain(app, state, response)` path and state type follow cw.P1's
@@ -59,10 +72,10 @@ pub(crate) struct CanvasTools {
     pub(crate) mover: move_tool::MoveTool,
     /// The armed pick of the top dialog.
     pub(crate) dialog: dialog::DialogTools,
-    /// Whether the canvas's gesture in progress is the dialog pick's: set at each pass with no gesture, so a dialog
-    /// that opens during another tool's drag leaves that drag its tool until it ends (the host keeps a gesture's
-    /// tool only for stand-ins and momentary tools).
-    dialog_gesture: bool,
+    /// Which tool of the selection the canvas's gesture in progress began with: set at each pass with no gesture, so
+    /// a dialog pick, a Free Transform or a symmetry session that opens during another tool's drag leaves that drag
+    /// its tool until it ends (the host keeps a gesture's tool only for stand-ins and momentary tools).
+    gesture_pick: GesturePick,
     /// Brush, pencil, eraser, bucket and the other painting tools.
     pub(crate) paint: super::paint_tool::PaintState,
     /// The Eyedropper, also the Alt stand-in of the painting tools that sample.
@@ -109,7 +122,7 @@ impl Default for CanvasTools {
             selection: Default::default(),
             mover: Default::default(),
             dialog: Default::default(),
-            dialog_gesture: false,
+            gesture_pick: GesturePick::Selected,
             paint: Default::default(),
             eyedropper: Default::default(),
             vector: Default::default(),
@@ -493,7 +506,7 @@ fn with_rig<R>(
         selection,
         mover,
         dialog,
-        dialog_gesture,
+        gesture_pick,
         paint,
         eyedropper,
         vector,
@@ -517,22 +530,33 @@ fn with_rig<R>(
         let mut mover = Some(mover);
         let mut eyedropper = Some(eyedropper);
         let mut retouch = Some(retouch);
-        let dialog_picked = (!in_gesture || *dialog_gesture)
+        // A gesture keeps the pick it began with; with none running the dialog's pick, then a Free Transform, then a
+        // symmetry session, then the family's tool.
+        let began = in_gesture.then_some(*gesture_pick);
+        let may = |pick: GesturePick| began.is_none_or(|began| began == pick);
+        let dialog_picked = may(GesturePick::Dialog)
             && dialog::dialog_tool(&scope, dialog, host).is_some_and(|picked| {
                 boxed = Some(picked);
                 true
             });
+        let transform_picked = !dialog_picked && transform.is_some() && may(GesturePick::Transform);
+        let symmetry_picked = !dialog_picked && !transform_picked && symmetry.is_some() && may(GesturePick::Symmetry);
         if !in_gesture {
-            *dialog_gesture = dialog_picked;
+            *gesture_pick = match (dialog_picked, transform_picked, symmetry_picked) {
+                (true, _, _) => GesturePick::Dialog,
+                (_, true, _) => GesturePick::Transform,
+                (_, _, true) => GesturePick::Symmetry,
+                _ => GesturePick::Selected,
+            };
         }
         let selected: DynTool<'_> = 'select: {
             if dialog_picked {
                 break 'select dynamic(boxed.as_mut().expect("the dialog's tool was just stored"));
             }
-            if let Some(t) = transform.as_mut() {
+            if transform_picked && let Some(t) = transform.as_mut() {
                 break 'select t as &mut dyn CanvasTool;
             }
-            if let Some(t) = symmetry.as_mut() {
+            if symmetry_picked && let Some(t) = symmetry.as_mut() {
                 break 'select t as &mut dyn CanvasTool;
             }
             match fam {
