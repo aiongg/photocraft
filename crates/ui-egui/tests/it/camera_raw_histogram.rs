@@ -8,13 +8,15 @@ fn frame(app: &mut PhotocraftApp, ctx: &egui::Context) {
 }
 
 /// Runs frames until the develop of the settings in force has landed, and returns the dialog's
-/// description as the agent entry point reports it. The first pass after a change starts its develop.
+/// description as the agent entry point reports it. The first pass after a change starts its develop, and the
+/// queue runs it when a request finishes it, as the agent entry point's `waitPreview` does.
 fn settled(app: &mut PhotocraftApp, ctx: &egui::Context) -> Value {
     frame(app, ctx);
     for _ in 0..2000 {
+        craft::ui::runtime::pending::finish_jobs(ctx, std::time::Duration::from_secs(30));
         frame(app, ctx);
         let described = control::inspect(app, ctx)["cameraRaw"].clone();
-        if described["previewPending"] == false {
+        if described["previewPending"] == false && !described["histogram"].is_null() {
             return described;
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
