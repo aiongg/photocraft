@@ -273,8 +273,14 @@ pub(crate) fn finish(app: &mut PhotocraftApp) {
     let pivot = t.session.pivot();
     app.ui.type_transform_pivot = Some([pivot.x, pivot.y]);
     let Some(transform) = affine(&t) else { return };
-    // Pivot-only and out-and-back gestures leave no history entry, even in an untouched session.
-    if transform.m.iter().zip(t.original.m).all(|(a, b)| (a - b).abs() < 1e-9) {
+    // Pivot-only and out-and-back gestures leave no history entry, even in an untouched session. The pointer reaches
+    // the box in single-precision screen points, so a box dragged back to where it started is compared by where its
+    // corners are, to a thousandth of a document unit, not by exact matrix entries.
+    let unchanged = match (quad_of(t.session.rect(), &transform), quad_of(t.session.rect(), &t.original)) {
+        (Some(now), Some(then)) => now.iter().zip(then).all(|(a, b)| a.distance(b) < 1e-3),
+        _ => false,
+    };
+    if unchanged {
         return;
     }
     let Some(ed) = app.ui.text_edit.as_ref() else { return };

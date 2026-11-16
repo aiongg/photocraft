@@ -284,6 +284,21 @@ impl CanvasTool for MoveRun<'_> {
         let Some(space) = cx.space() else { return ToolAction::Ignored };
         let at = space.view.to_doc(pointer.pos);
         let style = ConstrainStyle::new(f64::from(cx.slop), f64::from(cx.slop));
+        // A double-click on type edits it, as in Photoshop (#1132): only the selected Move tool, not a ⌘ stand-in for
+        // another tool, and not while a transform box is open (its double-click commits).
+        if pointer.clicks >= 2 {
+            let edited = self.scope.with_app(|app| {
+                if app.ui.tool != Tool::Move || app.ui.transform.is_some() {
+                    return false;
+                }
+                let ctx = app.ctx().clone();
+                crate::type_tool::edit_at(app, &ctx, at.x, at.y)
+            });
+            if edited {
+                self.state.run = None;
+                return ToolAction::Done;
+            }
+        }
         let (action, run) = self.scope.with_app(|app| press_at(app, [at.x, at.y], pointer.mods, style));
         self.state.run = run;
         action
