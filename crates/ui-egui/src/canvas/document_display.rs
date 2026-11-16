@@ -428,7 +428,7 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
 
 /// The controls the tools show over the document, in the order that decides who takes a press: a control shown later
 /// is above the earlier ones. Returns the gradient's live proposal, which the picture of the same pass shows, and puts
-/// what the Crop tool's frame and the Free Transform box reported in `shown`, for the host's pass.
+/// what the Crop tool's frame and the Free Transform box reported in `reported`, for the host's pass.
 fn canvas_controls(
     app: &mut PhotocraftApp,
     ui: &mut egui::Ui,
@@ -436,7 +436,7 @@ fn canvas_controls(
     host: CanvasHost,
     space: &CanvasSpace,
     turned: &mut Option<CanvasView>,
-    shown: &mut tools::BodyShown,
+    reported: &mut tools::BodyShown,
 ) -> Option<(photocraft_doc::LayerId, photocraft_doc::Fill)> {
     let pointer = ui.input(|i| i.pointer.hover_pos());
     let now = ui.input(|i| i.time);
@@ -465,7 +465,7 @@ fn canvas_controls(
     crate::type_path_placement::show(app, ui, rect);
     let session = crate::transform_tool::show_in_canvas(app, ui, rect, now);
     let session_box_shown = session.shown;
-    shown.transform_snapped = session.snapped;
+    reported.transform_snapped = session.snapped;
     crate::cam_transform::show(app, ui, rect);
     super::transform_controls::show(app, ui, rect, session_box_shown);
     crate::move_box::show(app, ui, rect);
@@ -480,7 +480,7 @@ fn canvas_controls(
     crate::perspective_crop_ui::body(app, ui, rect);
     crate::analysis::canvas::body(app, ui, rect);
     if host.window.is_none() && host.viewport == egui::ViewportId::ROOT {
-        shown.crop = super::tools::crop::show_frame(app, ui, rect);
+        reported.crop = super::tools::crop::show_frame(app, ui, rect);
     }
     crate::crop_task_bar::show(app, ui, rect);
     crate::frame_tool::task_bar::show(ui, app, rect);
