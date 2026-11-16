@@ -32,7 +32,7 @@ enum Body {
 /// Icon for a layer kind (the same glyphs as the Layers panel's kind filter).
 fn kind_icon(content: &LayerContent) -> &'static str {
     match content {
-        LayerContent::Adjustment(_) => "sliders-horizontal",
+        LayerContent::Adjustment(_) => "adjustments",
         LayerContent::Group(_) => "folder",
         LayerContent::Fill(_) => "paint-bucket",
         LayerContent::Text(_) => "type",

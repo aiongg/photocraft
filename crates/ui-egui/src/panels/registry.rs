@@ -120,7 +120,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
     PanelEntry { scrolls_itself: true, ..panel("patterns", || tl!("Patterns").to_string(), "grid-3x3", LEAST, super::preset_panels::patterns_panel) },
     PanelEntry {
         heights: Some(PROPERTIES_HEIGHTS),
-        ..panel("properties", || tl!("Properties").to_string(), "sliders-horizontal", LEAST, super::properties::panel)
+        ..panel("properties", || tl!("Properties").to_string(), "adjustments", LEAST, super::properties::panel)
     },
     panel("adjustments", || tl!("Adjustments").to_string(), "contrast", LEAST, super::properties::adjustments::panel),
     PanelEntry {
@@ -178,7 +178,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         scrolls_itself: true,
         ..panel("channels", || tl!("Channels").to_string(), "squares-intersect", 110.0, super::channels_panel::show)
     },
-    PanelEntry { scrolls_itself: true, ..panel("paths", || tl!("Paths").to_string(), "pen-tool", 110.0, crate::vector_ui::paths_panel) },
+    PanelEntry { scrolls_itself: true, ..panel("paths", || tl!("Paths").to_string(), "pen_tool", 110.0, crate::vector_ui::paths_panel) },
     PanelEntry { heights: Some(BRUSHES_HEIGHTS), ..panel("brushes", || tl!("Brushes").to_string(), "brush", 70.0, super::brush_panel::brushes::panel) },
     PanelEntry {
         rows: super::preset_browser::styles_rows,

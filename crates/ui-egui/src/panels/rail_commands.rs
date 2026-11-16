@@ -14,7 +14,7 @@ use super::PhotocraftApp;
 #[command(prefix = "panelRail")]
 pub(crate) enum RailCommand {
     /// Properties and Adjustments.
-    #[command(label = "Properties", icon = "sliders-horizontal", kind = "toggle", alias = "window.rail.properties")]
+    #[command(label = "Properties", icon = "adjustments", kind = "toggle", alias = "window.rail.properties")]
     Properties,
     /// Navigator, Histogram and Info.
     #[command(label = "Navigator", icon = "navigation", kind = "toggle", alias = "window.rail.navigator")]
