@@ -2,7 +2,7 @@ use egui::Modifiers;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::canvas::testing::{frame, in_gesture, move_to, press, release};
+use crate::canvas::testing::{frame, move_to, press, release};
 use crate::state::Tool;
 use photocraft_engine::gradient_fill_cmds as cmds;
 
@@ -35,7 +35,7 @@ fn a_live_handle_or_stop_drag_is_one_fill_step_and_shows_before_release() {
     press(&mut app, [180.0, 60.0], m);
     move_to(&mut app, [165.0, 80.0], m);
     move_to(&mut app, [150.0, 100.0], m);
-    assert!(in_gesture(&app));
+    assert!(app.gradient.preview.is_some(), "the picture shows the proposed fill before release");
     assert_eq!(past(&app), before, "Update passes run no command");
     assert!((get(&mut app)["to"][0].as_f64().unwrap() - 180.0).abs() < 1e-3, "the document is unchanged during the drag");
     release(&mut app, [150.0, 100.0], m);
