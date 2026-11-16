@@ -7,6 +7,7 @@ use serde_json::json;
 
 use super::brush_refusal_alert_tests::{active, alerts, app, refused, steps, stroke};
 use super::*;
+use crate::canvas::testing::in_gesture;
 use crate::canvas::{ToolEvent, tool_event};
 
 const ERROR: &str = photocraft_engine::hidden_target::HIDDEN;
@@ -34,7 +35,7 @@ fn a_hidden_active_layer_is_quiet() {
         let (journal, before, status) = (app.session.journal.len(), steps(&app), app.ui.status.clone());
         tool_event(&mut app, ToolEvent::Down { x: 20.0, y: 32.0, pressure: 1.0 }, Modifiers::NONE);
         tool_event(&mut app, ToolEvent::Move { x: 44.0, y: 32.0, pressure: 1.0 }, Modifiers::NONE);
-        assert!(app.drag.is_none() && app.trail.is_none() && app.live_stroke.is_none(), "{after_each}: no stroke overlay");
+        assert!(!in_gesture(&app) && app.trail.is_none() && app.live_stroke.is_none(), "{after_each}: no stroke overlay");
         tool_event(&mut app, ToolEvent::Up { x: 44.0, y: 32.0 }, Modifiers::NONE);
         assert!(app.remove_pending.is_empty(), "{after_each}: no stroke collected");
         assert!(alerts(&app).is_empty(), "{after_each}: no dialog");
