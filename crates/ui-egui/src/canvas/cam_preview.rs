@@ -236,6 +236,12 @@ mod tests {
     /// The settle time in ms, the clock of `step`.
     const SETTLE_MS: f64 = SETTLE_S * 1000.0;
 
+    /// The app's clock, in ms. The canvas pass of a tool event shows the move it made, so that pass keys the move on
+    /// this clock first; a later `step` reads times on the same clock.
+    fn clock() -> f64 {
+        crate::gpu_canvas::now_ms()
+    }
+
     fn blue(d: &Document, x: i32, y: i32) -> bool {
         d.layers[0].surface().unwrap().rgba(x, y)[0] < 0.5
     }
@@ -255,11 +261,11 @@ mod tests {
         tool_event(&mut app, ToolEvent::Down { x: 22.0, y: 30.0, pressure: 1.0 }, m);
         assert!(step(&mut app, 0.0).is_none() && app.cam_preview.is_none());
         tool_event(&mut app, ToolEvent::Move { x: 72.0, y: 30.0, pressure: 1.0 }, m);
+        let moved = clock();
         // Still moving: the wait starts and nothing is computed or shown yet.
-        assert!(step(&mut app, 1000.0).is_none());
-        assert!(step(&mut app, 1000.0 + SETTLE_MS / 2.0).is_none() && app.cam_preview.as_ref().unwrap().running.is_none());
+        assert!(step(&mut app, moved).is_none() && app.cam_preview.as_ref().unwrap().running.is_none());
         // At rest: the job runs, off this thread, and its result shows once it arrives.
-        let mut now = 1000.0 + SETTLE_MS + 1.0;
+        let mut now = moved + SETTLE_MS + 1.0;
         assert!(step(&mut app, now).is_none() && app.cam_preview.as_ref().is_some_and(|p| p.running.is_some()), "the preview job starts off this thread");
         let (preview, key) = wait_for(&mut app, &mut now, 0).expect("a preview once the pointer rested");
         assert!(key != 0 && app.cam_preview.as_ref().unwrap().live.owns(PreviewKey::from_raw(key)) && showing(&app));
@@ -367,8 +373,9 @@ mod tests {
         let m = egui::Modifiers::NONE;
         tool_event(&mut app, ToolEvent::Down { x: 22.0, y: 30.0, pressure: 1.0 }, m);
         tool_event(&mut app, ToolEvent::Move { x: 72.0, y: 30.0, pressure: 1.0 }, m);
-        assert!(step(&mut app, 0.0).is_none());
-        let mut now = SETTLE_MS + 1.0;
+        let moved = clock();
+        assert!(step(&mut app, moved).is_none());
+        let mut now = moved + SETTLE_MS + 1.0;
         for _ in 0..3000 {
             assert!(step(&mut app, now).is_none(), "nothing to show");
             if app.cam_preview.as_ref().unwrap().failed.is_some() {
