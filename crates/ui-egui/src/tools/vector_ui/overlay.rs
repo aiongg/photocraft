@@ -140,10 +140,12 @@ pub(crate) fn show_paths(app: &mut PhotocraftApp, ui: &mut egui::Ui, at: egui::R
     let anchors = shown.first().map_or(AnchorsShown::Hidden, |(_, _, a)| *a);
     let (refs, mut paths): (Vec<PathRef>, Vec<EditPath>) = shown.into_iter().map(|(r, p, _)| (r, p)).unzip();
     let selection = crate::direct_select::selection(app, tool);
+    let cancelled = std::mem::take(&mut app.ui.direct_selection.cancel_press);
     let output = BezierOverlay::new("Paths", Bind::bound(&mut paths), &selection)
         .tool(tool)
         .anchors(anchors)
         .path_options(&app.ui.tool_options.path_options)
+        .cancelled(cancelled)
         .show_at(ui, at);
     Some(BezierShown { output, refs })
 }

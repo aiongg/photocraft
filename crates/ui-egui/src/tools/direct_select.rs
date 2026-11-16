@@ -117,6 +117,9 @@ pub struct DirectSelection {
     /// name of its History step, is the one its press chose, not the one the release's modifiers pick.
     #[serde(skip)]
     pub(crate) editing_mods: Mods,
+    /// `cancel_stale` ended a running gesture: the overlay cancels its open press in the next pass it shows.
+    #[serde(skip)]
+    pub(crate) cancel_press: bool,
     #[serde(skip)]
     pub(crate) owner: Option<Owner>,
     /// The saved path whose anchors the first Escape hid (#13072): the next Escape deactivates it,
@@ -272,7 +275,7 @@ pub(crate) fn cancel_stale(app: &mut PhotocraftApp) -> bool {
         return false;
     }
     let was_editing = ds.editing.is_some();
-    app.ui.direct_selection = DirectSelection::default();
+    app.ui.direct_selection = DirectSelection { cancel_press: was_editing, ..Default::default() };
     was_editing
 }
 
@@ -540,8 +543,9 @@ mod freeform_command_tests {
 
             press(&mut app, [20.0, 20.0], command);
             assert_eq!(app.ui.direct_selection.target, Some(PathRef::Saved(0)));
-            assert!(editing(&app), "{tool:?}: the press starts the gesture");
+            assert!(!editing(&app), "{tool:?}: the gesture begins with the drag");
             move_to(&mut app, [30.0, 40.0], Modifiers::NONE);
+            assert!(editing(&app), "{tool:?}: the press's drag goes on under its own tool after the modifier is released");
             release(&mut app, [30.0, 40.0], Modifiers::NONE);
             let st = app.session.active().unwrap();
             assert_eq!(st.doc.work_path, original.work_path, "{tool:?}: the Work Path stays");
