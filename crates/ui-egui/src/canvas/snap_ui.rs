@@ -144,10 +144,37 @@ pub(crate) fn targets(app: &PhotocraftApp, idx: usize, exclude: &[LayerId]) -> A
     targets
 }
 
-/// The canvas `Snap` of document `idx`: View › Snap To over its targets, without the layers a drag moves.
+/// The canvas `Snap` of document `idx`: View › Snap To over its targets, without the layers a drag moves, on the
+/// pixel grid where `pixel_grid` says.
 pub(crate) fn snap(app: &PhotocraftApp, idx: usize) -> Snap {
-    let exclude = if app.session.active_index() == Some(idx) { moving_set(app) } else { Vec::new() };
-    Snap::new(targets(app, idx, &exclude), options(app))
+    let active = app.session.active_index() == Some(idx);
+    let exclude = if active { moving_set(app) } else { Vec::new() };
+    Snap::new(targets(app, idx, &exclude), options(app)).whole_pixels(active && pixel_grid(app))
+}
+
+/// Whether the active document's points round to whole pixels: Preferences › Tools › Snap Vector Tools and
+/// Transforms to Pixel Grid, for the vector tools' points (production `pixel_round`) and for an open Free Transform
+/// of shape layers or a path, moved or scaled (#5751). The transform box rounds only an upright box at least a unit
+/// wide.
+fn pixel_grid(app: &PhotocraftApp) -> bool {
+    if !app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid {
+        return false;
+    }
+    let Some(t) = app.ui.transform.as_ref() else {
+        return matches!(
+            app.ui.tool,
+            Tool::Pen | Tool::CurvaturePen | Tool::Rectangle | Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Star | Tool::Line
+        );
+    };
+    if t.selection || t.session.warp().is_some() || t.content_aware.is_some() || t.target.is_some() {
+        return false;
+    }
+    let shapes = |st: &photocraft_engine::DocState| {
+        crate::transform_tool::moving_layers(t)
+            .iter()
+            .all(|id| st.doc.layer(*id).is_some_and(|l| matches!(l.content, photocraft_doc::LayerContent::Shape(_))))
+    };
+    t.path.is_some() || app.session.active().is_some_and(shapes)
 }
 
 /// The bounds of layer `id` as the Move tool moves and snaps it. `snap::layer_rect` skips groups,
