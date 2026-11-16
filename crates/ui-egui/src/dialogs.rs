@@ -427,6 +427,7 @@ pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
     adjust_dialog::take,
     layer_style::take,
     color_picker_ui::take,
+    crate::type_panels_ui::color_picker::take,
     color_range_ui::take,
     select_mask_ui::take,
     caf_ui::take,
@@ -472,6 +473,7 @@ pub fn run(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if crate::guide_edit::sync(app) {
         ui.ctx().request_repaint();
     }
+    crate::type_panels_ui::color_picker::check(app, ui.ctx());
     palette::show(app, ui);
     crate::filter_dialog::reconcile_match_color(app);
     filter_preview_ui::feed(app, ui.ctx());

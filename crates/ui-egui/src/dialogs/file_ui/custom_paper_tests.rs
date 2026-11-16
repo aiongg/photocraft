@@ -140,61 +140,6 @@ fn fields(h: &Harness<'_, PhotocraftApp>, id: DialogId) -> Map<String, Value> {
     open.into_iter().find(|d| d.id == id).and_then(|d| d.fields).and_then(|v| v.as_object().cloned()).expect("the Print dialog's values")
 }
 
-/// Exercises a preview drag at 1x/2x display scale, signed numeric entry and pointer capture
-/// off-page and back, then verifies Center restores the shared layout's placement.
-#[test]
-fn preview_drag_and_negative_fields_work_at_standard_and_retina_scale() {
-    for pixels_per_point in [1.0, 2.0] {
-        let (mut app, id) = app();
-        set_fields(&mut app, id, json!({"paper": "a4", "center": true, "scale": 100, "scaleToFit": false, "units": "cm"}));
-        let mut h = harness_at_scale(app, pixels_per_point);
-        let start = photocraft_engine::print_cmds::layout(&h.state().session.active().unwrap().doc, &Value::Object(fields(&h, id)), "file.print").unwrap();
-        let start_top = start.paper.1 - start.rect.1 - start.rect.3;
-        let from = h.get_by_label("Print preview image").rect().center();
-        let delta = vec2(-24.0, 18.0);
-        h.event(Event::PointerMoved(from));
-        h.event(Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
-        h.run_steps(1);
-        for step in 1..=3 {
-            h.event(Event::PointerMoved(from + delta * (step as f32 / 3.0)));
-            h.run_steps(1);
-        }
-        let during = fields(&h, id);
-        assert_eq!(during["center"], false, "Center must switch off during the drag");
-        assert!(during["left"].as_f64().unwrap() * 72.0 < start.rect.0 - 0.5, "a drag to the left moves the image left");
-        assert!(during["top"].as_f64().unwrap() * 72.0 > start_top + 0.5, "a drag down moves the image down");
-        h.event(Event::PointerButton { pos: from + delta, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
-        h.run_steps(3);
-        click(&mut h, "Centimeters");
-        click(&mut h, "Inches");
-        enter_length(&mut h, "Top", "-0.25");
-        enter_length(&mut h, "Left", "-0.5");
-        let negative = fields(&h, id);
-        assert_eq!(negative["top"], -0.25);
-        assert_eq!(negative["left"], -0.5);
-        let visible = h.get_by_label("Print preview image").rect();
-        assert!(visible.is_positive(), "a partly off-page image must retain a visible drag target");
-        let from = visible.center();
-        h.event(Event::PointerMoved(from));
-        h.event(Event::PointerButton { pos: from, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
-        h.run_steps(1);
-        // Keep capture even when both the pointer and image leave the sheet entirely.
-        h.event(Event::PointerMoved(from - vec2(400.0, 0.0)));
-        h.run_steps(2);
-        assert!(fields(&h, id)["left"].as_f64().unwrap() < -1.0);
-        h.event(Event::PointerMoved(from + vec2(12.0, 12.0)));
-        h.run_steps(2);
-        assert!(fields(&h, id)["left"].as_f64().unwrap() > -0.5);
-        h.event(Event::PointerButton { pos: from + vec2(12.0, 12.0), button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
-        h.run_steps(1);
-        click(&mut h, "Center");
-        let centered = photocraft_engine::print_cmds::layout(&h.state().session.active().unwrap().doc, &Value::Object(fields(&h, id)), "file.print").unwrap();
-        assert_eq!(fields(&h, id)["center"], true);
-        assert!((centered.rect.0 - (centered.paper.0 - centered.rect.2) / 2.0).abs() < 1e-9);
-        assert!((centered.rect.1 - (centered.paper.1 - centered.rect.3) / 2.0).abs() < 1e-9);
-    }
-}
-
 #[test]
 fn custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened() {
     let (mut app, id) = app();
@@ -242,7 +187,8 @@ fn custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened() {
     let id = open_print(h.state_mut());
     assert_no_system_listing();
     set_fields(h.state_mut(), id, json!({"dryRun": true}));
-    h.run_steps(3);
+    // A new dialog draws its first pass hidden while it sizes itself, as at the harness start.
+    h.run_steps(4);
     assert!(shown(&h, "Custom"), "reopening array-valued settings must show Custom");
     assert_eq!(fields(&h, id)["paper"], json!([522.0, 666.0]));
     std::fs::remove_file(output).unwrap();

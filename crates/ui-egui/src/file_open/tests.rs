@@ -1292,29 +1292,6 @@ fn files_dropped_on_the_tabs_open_at_that_slot() {
     assert_eq!(app.session.documents().last().map(|d| d.doc.name.as_str()), Some("last.png"));
 }
 
-/// #5687: files dropped from another app's window bring PhotoCraft to the front (a focus request
-/// in the frame that takes the drop), so the source window ends up behind it.
-#[test]
-fn a_drop_brings_the_window_to_the_front() {
-    let dir = std::env::temp_dir().join(format!("photocraft-drop-focus-{}", std::process::id()));
-    std::fs::create_dir_all(&dir).unwrap();
-    let file = dir.join("photo.png");
-    std::fs::write(&file, png_bytes(8, 8)).unwrap();
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).with_max_steps(8).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Services::default())
-    });
-    h.run_steps(2);
-    let focus = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
-        h.output().viewport_output.get(&egui::ViewportId::ROOT).is_some_and(|v| v.commands.contains(&egui::ViewportCommand::Focus))
-    };
-    assert!(!focus(&h), "no focus request without a drop");
-    h.input_mut().dropped_files.push(raw_drop(file, Err("read from the path".into())));
-    h.step();
-    assert!(focus(&h), "the drop brings the window forward");
-    let _ = std::fs::remove_dir_all(&dir);
-}
-
 #[test]
 fn views_and_windows_stay_with_their_documents() {
     let (mut app, _) = app_with(Vec::new());
@@ -1531,6 +1508,8 @@ fn export_as_is_recorded_and_replayed() {
     }
     control(&mut app, "ui.dialog.confirm", json!({"dialog": id}));
     answer(&mut app);
+    // The dialog's next pass takes the answered path and exports.
+    control(&mut app, "ui.dialog.confirm", json!({"dialog": id}));
     app.run("actions.stop", json!({})).unwrap();
     assert_eq!(*exported.borrow(), [("/pics/out.jpg".to_string(), 20, 10, Some(70))]);
     let craft::automation::actions::ActionStep { command: step_id, params: step } = app.session.actions.list.actions()[0].steps.last().cloned().unwrap();

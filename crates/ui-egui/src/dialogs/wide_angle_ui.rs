@@ -269,10 +269,18 @@ pub fn open(app: &mut PhotocraftApp, _ctx: &egui::Context) -> Result<(), String>
     Ok(())
 }
 
-/// Opens the workspace for the menu command. A `{ui}` request is `workspace_ui`'s, so it gets `None` here.
+/// Opens the workspace for the menu command; a `{ui}` request addresses the open workspace (`workspace_ui`), and is an
+/// error while it is closed rather than a run with the defaults.
 pub fn menu(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &Value) -> Option<Result<Value, String>> {
     if id != KEY {
         return None;
+    }
+    if let Some(ui) = params.get("ui") {
+        return Some(if app.wide_angle.is_some() {
+            crate::control::dialogs::workspace_ui(app, ctx, KEY, ui)
+        } else {
+            Err("Adaptive Wide Angle is not open".into())
+        });
     }
     if params.as_object().is_none_or(|o| o.is_empty()) {
         return Some(open(app, ctx).map(|_| describe(app).unwrap_or(Value::Null)));

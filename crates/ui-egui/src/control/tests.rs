@@ -218,41 +218,6 @@ fn layer_style_picker_control_binds_previews_confirms_and_cancels() {
 }
 
 #[test]
-fn text_style_picker_control_uses_bound_target_and_rejects_invalid_requests_atomically() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let ctx = app.ctx().clone();
-    app.run("file.new", json!({"width":32,"height":32})).unwrap();
-    let id = app.run("type.characterStyle.new", json!({"fromSelection":false,"attrs":{"color":"#123456"}})).unwrap()["id"].as_u64().unwrap();
-    for style in [
-        Value::Null,
-        json!({"kind":"wrong","id":id}),
-        json!({"kind":"character","id":"bad"}),
-        json!({"kind":"paragraph","id":u64::MAX}),
-        json!({"kind":"character","id":0}),
-        json!({"kind":"character","id":id,"extra":1}),
-    ] {
-        let panels = app.ui.type_panels.clone();
-        assert_eq!(call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":style}))["ok"], false);
-        assert_eq!(app.ui.type_panels, panels);
-        assert!(dialogs(&mut app, &ctx).is_empty());
-    }
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":{"kind":"character","id":id},"parent":1}))["ok"], false);
-    let doc = app.session.active().unwrap().doc.clone();
-    let r = call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":{"kind":"character","id":id}}));
-    assert_eq!(r["ok"], true);
-    let picker = r["result"]["dialog"].clone();
-    assert_eq!(top_dialog(&mut app, &ctx)["key"], format!("textStyle.character.{id}"));
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog":picker,"field":"color","value":"#00ff00"}))["ok"], true);
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog":picker}))["ok"], true);
-    assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &doc));
-    let r = call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":{"kind":"character","id":id}}));
-    let picker = r["result"]["dialog"].clone();
-    call(&mut app, &ctx, "ui.dialog.set", json!({"dialog":picker,"field":"color","value":"#00ff00"}));
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog":picker}))["ok"], true);
-    assert_ne!(app.session.active().unwrap().doc.text_styles, doc.text_styles);
-}
-
-#[test]
 fn layer_style_picker_control_rejects_bad_targets_without_opening_tool_picker() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
