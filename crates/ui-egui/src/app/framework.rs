@@ -205,7 +205,7 @@ fn defaults() -> AppDefaults {
     }
 }
 
-/// PhotoCraft's size overrides: Photoshop's panel dock width and, in the compact sizes, its rail width.
+/// PhotoCraft's size overrides: Photoshop's panel dock width.
 const SIZES: &[u8] = include_bytes!("sizes.json");
 
 /// The root values PhotoCraft gives the runtime before the theme, mode, scale and direction: the
