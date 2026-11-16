@@ -98,9 +98,10 @@ fn held(mods: Modifiers) -> Mods {
     Mods { cmd: mods.mac_cmd || mods.command, ctrl: mods.ctrl && (mods.mac_cmd || !mods.command), alt: mods.alt, shift: mods.shift }
 }
 
-/// One frame of the app on its own context, as its eframe hooks run it: the runtime's input hook gives the frame the
-/// app's command catalog, states and gate; the pass draws the document area and the hosted dialogs; then the input
-/// hook takes what the pass fired and the key route runs it, so a key a step delivers runs in the frame that took it.
+/// One frame of the app on its own context, as eframe runs its hooks: `raw_input_hook` gives the frame the app's
+/// command catalog, states and gate and takes what the last pass fired; each pass runs `logic`'s key route first (the
+/// commands the last pass fired, and the window's Escape before the canvas or a dialog can take it), then draws the
+/// document area and the hosted dialogs.
 fn run_frame(app: &mut PhotocraftApp) {
     // The app's frame reconciles the views with the open documents before anything draws.
     app.sync_views();
@@ -109,12 +110,12 @@ fn run_frame(app: &mut PhotocraftApp) {
     app.canvas_tools.last_response = None;
     app.framework_before_input(&ctx);
     frames.frame_without_input(Vec::new(), |ui| {
+        crate::shortcut_dispatch::record_view_commands(app);
+        crate::shortcuts::handle(app, &ui.ctx().clone());
         egui::CentralPanel::default().show(ui, |ui| super::document_area(app, ui));
         crate::dialogs::run(app, ui);
     });
     app.canvas_tools.frames = Some(frames);
-    app.framework_before_input(&ctx);
-    crate::shortcuts::handle(app, &ctx);
 }
 
 /// Runs frames until the window host has delivered everything queued.
@@ -226,7 +227,7 @@ pub(crate) fn key(app: &mut PhotocraftApp, key: egui::Key, mods: Modifiers) {
     let Some(key) = Key::from_egui(key) else { panic!("{key:?} has no key of the window host") };
     WindowHost::of(&ctx(app)).inject_key(egui::ViewportId::ROOT, key, held(mods), false);
     settle(app);
-    // The command the key fired in the last pass runs at its end; the pass after it shows what it opened.
+    // The command the key fired in the last pass runs in the next frame's key route, which shows what it opened.
     run_frame(app);
 }
 
