@@ -99,4 +99,3 @@ fn opacity_flow_and_aligned_stay_enabled_in_an_indexed_document() {
         assert!(!control(&h, role, name).accesskit_node().is_disabled(), "{name}");
     }
 }
-

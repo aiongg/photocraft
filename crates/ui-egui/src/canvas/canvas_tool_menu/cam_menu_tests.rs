@@ -1,5 +1,5 @@
-use super::*;
 use super::tests::open_here;
+use super::*;
 
 fn app() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
