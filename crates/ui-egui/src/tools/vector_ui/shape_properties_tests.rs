@@ -45,7 +45,6 @@ fn steps(h: &Harness<'_, PhotocraftApp>) -> usize {
 }
 
 /// Types `text` into the field named `name` and commits it with Enter.
-// PLAN: the control names ("Stroke width", "W") are the framework cells' captions as assumed by tools-w8; adjust them to its words.
 fn type_into(h: &mut Harness<'_, PhotocraftApp>, name: &str, text: &str) {
     h.get_by_label(name).click();
     h.run_steps(2);
@@ -57,7 +56,7 @@ fn type_into(h: &mut Harness<'_, PhotocraftApp>, name: &str, text: &str) {
 
 /// Drags the caption `name` by `dx` points: a scrub gesture from press to release.
 fn scrub(h: &mut Harness<'_, PhotocraftApp>, name: &str, dx: f32) {
-    let start: Pos2 = h.get_by_label(name).rect().center();
+    let start: Pos2 = h.get_by_role_and_label(egui::accesskit::Role::Label, name).rect().center();
     h.event(egui::Event::PointerMoved(start));
     h.event(egui::Event::PointerButton { pos: start, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
     h.run_steps(2);
@@ -103,11 +102,11 @@ fn selected_shape_numeric_drags_are_live_and_undo_as_separate_gestures() {
         other => panic!("expected a rectangle, got {other:?}"),
     };
     let start = width(&h);
-    scrub(&mut h, "W", 24.0);
+    scrub(&mut h, "Width", 24.0);
     let first = width(&h);
     assert_ne!(first, start, "the scrub changes the width");
     assert_eq!(steps(&h), before + 1, "the whole scrub is one step");
-    scrub(&mut h, "W", 24.0);
+    scrub(&mut h, "Width", 24.0);
     let second = width(&h);
     assert_ne!(second, first, "the second scrub changes it again");
     assert_eq!(steps(&h), before + 2, "a second scrub is a second step");

@@ -114,9 +114,25 @@ fn pick_kind(h: &mut Harness<'_, PhotocraftApp>, label: &str, kind: &str) {
     h.run_steps(2);
 }
 
-/// Clicks the popover's swatch `name`: a list item labelled "<name>, <hex>" in the Swatches list.
+/// Clicks the popover's swatch `name`: a list item labelled "<name>, <hex>" in the Swatches list. The list is the Solid
+/// paint's, and a group's rows show once its header is open (the group named by the swatch's first word).
 fn click_swatch(h: &mut Harness<'_, PhotocraftApp>, name: &str) {
     let prefix = format!("{name}, #");
+    let found = |h: &Harness<'_, PhotocraftApp>| {
+        h.query_all_by_role(egui::accesskit::Role::ListItem).any(|n| n.accesskit_node().label().as_deref().is_some_and(|l| l.starts_with(&prefix)))
+    };
+    if !found(h) {
+        // The swatches are the Solid paint's: a chip with no paint offers none until its kind is Solid.
+        let group = name.split(' ').next().unwrap_or(name);
+        if h.query_by_role_and_label(egui::accesskit::Role::Button, group).is_none() {
+            h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Solid").click();
+            h.run_steps(2);
+        }
+        if !found(h) {
+            h.get_by_role_and_label(egui::accesskit::Role::Button, group).click();
+            h.run_steps(2);
+        }
+    }
     h.query_all_by_role(egui::accesskit::Role::ListItem)
         .find(|n| n.accesskit_node().label().as_deref().is_some_and(|l| l.starts_with(&prefix)))
         .unwrap_or_else(|| panic!("the swatch {name}"))
@@ -210,7 +226,7 @@ fn zero_width_style_can_be_inspected_removed_or_reenabled_explicitly() {
 
         stroke_style_button(&mut h).click();
         h.run_steps(3);
-        h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Dotted").click();
+    h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
         h.run_steps(3);
         let stroke = shape(h.state()).stroke.as_ref().unwrap();
         assert_eq!(stroke.width, 3.0, "a deliberate style choice enables the dormant stroke");
@@ -372,7 +388,7 @@ fn selected_shape_style_is_available_when_absent_and_dismissal_does_not_enable_i
     assert_eq!(h.state().session.active().unwrap().doc, doc);
     stroke_style_button(&mut h).click();
     h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Dotted").click();
+    h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
     h.run_steps(3);
     assert_eq!(shape(h.state()).stroke.as_ref().unwrap().width, 3.0);
     assert_eq!(shape(h.state()).stroke.as_ref().unwrap().dashes, [0.0, 2.0]);
@@ -645,7 +661,7 @@ fn width_and_stroke_type_give_a_strokeless_shape_the_tool_stroke_gradient() {
         } else {
             stroke_style_button(&mut h).click();
             h.run_steps(3);
-            h.get_by_role_and_label(egui::accesskit::Role::RadioButton, "Dotted").click();
+    h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
             h.run_steps(3);
         }
         let stroke = shape(h.state()).stroke.clone().expect("a stroke");

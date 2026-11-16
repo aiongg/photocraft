@@ -133,7 +133,7 @@ fn escape_while_renaming_path_1_cancels_the_rename() {
         app
     });
     h.run_steps(8);
-    let name = h.get_by_label("Path 1").rect().left_center() + vec2(60.0, 0.0);
+    let name = h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Path 1").rect().left_center() + vec2(60.0, 0.0);
     h.event(egui::Event::PointerMoved(name));
     h.run_steps(30);
     for pressed in [true, false, true, false] {

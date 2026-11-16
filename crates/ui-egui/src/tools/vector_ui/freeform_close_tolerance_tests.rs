@@ -15,7 +15,11 @@ fn app(zoom: f32) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.session.execute("file.new", json!({"width": 800, "height": 600})).unwrap();
     app.sync_views();
+    // A window the 800 × 600 document fits in at every zoom the cases use.
+    crate::canvas::testing::window(&mut app, egui::vec2(2600.0, 2000.0));
     app.ui.views[0].zoom = zoom;
+    // The view keeps this zoom: a pending fit would show the document at the window's fit.
+    app.ui.views[0].fit_pending = false;
     app.ui.tool = Tool::FreeformPen;
     app.ui.tool_options.vector_mode = VectorMode::Path;
     app
