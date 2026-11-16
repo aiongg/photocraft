@@ -270,6 +270,8 @@ fn ctrl_release_inside_does_not_snap_the_line_to_a_guide() {
     let mut app = app();
     app.run("view.newGuide", json!({"orientation": "horizontal", "position": 252})).unwrap();
     two_rows(&mut app);
+    // Control suspends snapping on a Mac; off macOS the host reads Ctrl as the command key.
+    crate::canvas::testing::on_a_mac(&app);
     app.ui.extras.snap = true;
     app.ui.tool = Tool::SingleRowMarquee;
     tool_event(&mut app, ToolEvent::Down { x: 600.0, y: 250.5, pressure: 1.0 }, Modifiers::NONE);
@@ -339,5 +341,6 @@ fn a_snapped_back_move_tool_drag_keeps_the_piece_floating() {
     tool_event(&mut app, ToolEvent::Move { x: p[0], y: p[1] + 2.0, pressure: 1.0 }, Modifiers::NONE);
     tool_event(&mut app, ToolEvent::Up { x: p[0], y: p[1] }, Modifiers::NONE);
     assert!(floats(&app), "the piece still floats");
-    assert!(app.move_preview.is_none(), "no preview left from the drag");
+    // The canvas's next pass makes an empty preview shell for the floating piece; the drag's own shown picture is gone.
+    assert!(!crate::move_ui::showing(&app), "no preview left from the drag");
 }
