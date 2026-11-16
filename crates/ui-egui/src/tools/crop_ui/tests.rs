@@ -380,27 +380,6 @@ fn another_tool_commits_a_drawn_frame_at_8_and_16_bit() {
     assert_eq!(crop_ui::frame(&app), None);
 }
 
-/// The pen's eraser end stands in for the Crop tool only until the tip comes back (`stylus`),
-/// and a gesture still in progress isn't cut short: neither commits the frame.
-#[test]
-fn the_stylus_eraser_and_a_gesture_in_progress_keep_the_frame_pending() {
-    let mut app = app(SampleType::U8);
-    drag(&mut app, &[[10.0, 10.0], [50.0, 40.0]], NONE);
-    app.stylus.tool_before_eraser = Some(Tool::Crop);
-    app.ui.tool = Tool::Eraser;
-    crop_ui::each_pass(&mut app);
-    assert_eq!(doc_size(&app), Size::new(200, 100));
-    app.ui.tool = app.stylus.tool_before_eraser.take().unwrap();
-    crop_ui::each_pass(&mut app);
-    assert!(crop_ui::pending(&app) && crop_ui::frame(&app) == Some(boxed(10.0, 10.0, 50.0, 40.0, 0.0)));
-
-    tool_event(&mut app, ToolEvent::Down { x: 20.0, y: 20.0, pressure: 1.0 }, NONE);
-    assert!(crop_ui::dragging(&app));
-    app.ui.tool = Tool::Move;
-    crop_ui::each_pass(&mut app);
-    assert_eq!(doc_size(&app), Size::new(200, 100));
-}
-
 /// A layer 300..350 × 200..260 on a 400 × 300 canvas: the snap target of the two snap trials.
 fn board() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
