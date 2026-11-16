@@ -442,12 +442,14 @@ pub(crate) struct PathSelectionDrag {
     pub start: [f64; 2],
     /// The pointer's last document point.
     pub last: [f64; 2],
+    /// The modifiers held at the press; the cursor keeps them for the drag.
+    pub mods: craft::keymap::Mods,
     /// What the press targeted; a drag whose owner is no longer valid shows and commits nothing.
     pub owner: Option<super::VectorOwner>,
 }
 
-/// The Path Selection tool (A): a press selects, a drag moves the selected path or components,
-/// a release commits through [`path_selection_finish`]. It keeps its drag as its own state.
+/// The state of the Path Selection tool (A), kept across passes: the drag in progress and the
+/// events the pass reports. [`PathSelectionPass`] runs it.
 #[derive(Default)]
 pub(crate) struct PathSelectionTool {
     drag: Option<PathSelectionDrag>,
@@ -473,35 +475,43 @@ impl PathSelectionTool {
     pub(crate) fn take_events(&mut self) -> Vec<PathSelectionEvent> {
         std::mem::take(&mut self.events)
     }
-
-    fn doc_point(pointer: &craft::ui::canvas::ToolPointer, cx: &craft::ui::canvas::ToolContext<'_>) -> Option<[f64; 2]> {
-        let p = cx.space()?.view.to_doc(pointer.pos);
-        Some([p.x, p.y])
-    }
 }
 
-impl craft::ui::canvas::CanvasTool for PathSelectionTool {
+/// The Path Selection tool for one pass: a press selects, a drag moves the selected path or
+/// components, a release commits through [`path_selection_finish`]. Its cursor reads the app
+/// through the pass's scope.
+pub(crate) struct PathSelectionPass<'a> {
+    pub(crate) scope: &'a crate::canvas::tools::ToolScope<'a>,
+    pub(crate) tool: &'a mut PathSelectionTool,
+}
+
+fn doc_point(pointer: &craft::ui::canvas::ToolPointer, cx: &craft::ui::canvas::ToolContext<'_>) -> Option<[f64; 2]> {
+    let p = cx.space()?.view.to_doc(pointer.pos);
+    Some([p.x, p.y])
+}
+
+impl craft::ui::canvas::CanvasTool for PathSelectionPass<'_> {
     fn press(&mut self, pointer: &craft::ui::canvas::ToolPointer, cx: &mut craft::ui::canvas::ToolContext<'_>) -> craft::ui::canvas::ToolAction {
-        let Some(at) = Self::doc_point(pointer, cx) else { return craft::ui::canvas::ToolAction::Ignored };
-        self.drag = Some(PathSelectionDrag { start: at, last: at, owner: None });
-        self.events.push(PathSelectionEvent::Press { at, shift: pointer.mods.shift });
+        let Some(at) = doc_point(pointer, cx) else { return craft::ui::canvas::ToolAction::Ignored };
+        self.tool.drag = Some(PathSelectionDrag { start: at, last: at, mods: pointer.mods, owner: None });
+        self.tool.events.push(PathSelectionEvent::Press { at, shift: pointer.mods.shift });
         craft::ui::canvas::ToolAction::Claimed
     }
 
     fn drag(&mut self, pointer: &craft::ui::canvas::ToolPointer, cx: &mut craft::ui::canvas::ToolContext<'_>) {
-        if let (Some(d), Some(at)) = (&mut self.drag, Self::doc_point(pointer, cx)) {
+        if let (Some(d), Some(at)) = (&mut self.tool.drag, doc_point(pointer, cx)) {
             d.last = at;
         }
     }
 
     fn release(&mut self, pointer: &craft::ui::canvas::ToolPointer, cx: &mut craft::ui::canvas::ToolContext<'_>) {
-        let Some(d) = self.drag.take() else { return };
-        let end = Self::doc_point(pointer, cx).unwrap_or(d.last);
-        self.events.push(PathSelectionEvent::Release { start: d.start, end, owner: d.owner });
+        let Some(d) = self.tool.drag.take() else { return };
+        let end = doc_point(pointer, cx).unwrap_or(d.last);
+        self.tool.events.push(PathSelectionEvent::Release { start: d.start, end, owner: d.owner });
     }
 
     fn cancel(&mut self, _reason: craft::behavior::CancelReason, _cx: &mut craft::ui::canvas::ToolContext<'_>) {
-        self.drag = None;
+        self.tool.drag = None;
     }
 
     fn command_form(&self) -> craft::ui::canvas::ToolPath {
@@ -510,6 +520,15 @@ impl craft::ui::canvas::CanvasTool for PathSelectionTool {
 
     // The moved path shows through the overlay (`show_paths`), so the tool paints nothing.
     fn paint(&self, _draw: &craft::ui::primitives::Draw<'_>, _cx: &craft::ui::canvas::ToolContext<'_>) {}
+
+    /// `cursor_policy::path_selection_cursor`, with the press's modifiers and point while a drag runs.
+    fn cursor(&self, cx: &craft::ui::canvas::ToolContext<'_>) -> craft::behavior::Cursor {
+        let (mods, at) = match &self.tool.drag {
+            Some(d) => (d.mods, Some(d.start)),
+            None => (cx.mods, cx.pointer.as_ref().and_then(|p| doc_point(p, cx))),
+        };
+        self.scope.with_app(|app| crate::canvas::cursor_policy::path_selection_cursor(app, mods, at, cx.precise()))
+    }
 }
 
 /// The path a Path Selection drag in progress shows moved.

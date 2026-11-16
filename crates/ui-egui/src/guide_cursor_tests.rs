@@ -29,23 +29,8 @@ pub(crate) fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
     h
 }
 
-<<<<<<< HEAD
-fn screen(h: &Harness<'static, PhotocraftApp>, x: f32, y: f32) -> Pos2 {
-    crate::canvas::testing::to_screen(h.state(), [f64::from(x), f64::from(y)])
-=======
 pub(crate) fn screen(h: &Harness<'static, PhotocraftApp>, x: f32, y: f32) -> Pos2 {
-    let app = h.state();
-    let v = &app.ui.views[0];
-    ViewXform {
-        rect: crate::rulers::content_rect(app, app.last_canvas_rect),
-        zoom: v.zoom,
-        center: v.center,
-        flip: app.ui.view.flip_horizontal,
-        rotation: v.rotation,
-        aspect: app.ui.view.display_aspect(),
-    }
-    .to_screen(x, y)
->>>>>>> upstream/main
+    crate::canvas::testing::to_screen(h.state(), [f64::from(x), f64::from(y)])
 }
 
 pub(crate) fn hover(h: &mut Harness<'static, PhotocraftApp>, x: f32, y: f32, m: Modifiers) -> egui::CursorIcon {

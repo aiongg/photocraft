@@ -240,8 +240,10 @@ impl CanvasTool for SourceTool<'_> {
 
     fn paint(&self, _draw: &Draw<'_>, _cx: &ToolContext<'_>) {}
 
-    fn cursor(&self, _cx: &ToolContext<'_>) -> Cursor {
-        Cursor::Painted(PaintedCursor::Crosshair)
+    /// The painting tool's brush cursor with ⌥ held: the tip with its centre mark, or the Healing
+    /// Brush's sample target (`cursor_policy::source_target`).
+    fn cursor(&self, cx: &ToolContext<'_>) -> Cursor {
+        self.scope.with_app(|app| crate::brush_cursor::cursor(app, cx))
     }
 
     fn command_form(&self) -> ToolPath {

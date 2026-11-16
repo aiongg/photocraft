@@ -12,7 +12,7 @@ use craft::ui::canvas::ToolHostResponse;
 use serde_json::json;
 
 use super::freeform::{Admit, FreeformPenTool, freeform_locked_shape};
-use super::path_ops::{PathSelectionEvent, PathSelectionTool};
+use super::path_ops::{PathSelectionEvent, PathSelectionPass, PathSelectionTool};
 use super::pen::{self, pen_path};
 use super::pen_resume::{current_doc, draft_before_finish, remember_finish};
 use super::{PenPath, PhotocraftApp, VectorOwner, cancel_stale_pen, capture_pen_owner};
@@ -111,7 +111,7 @@ pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut VectorTools, _ho
         Which::Pen => Box::new(&mut state.pen),
         Which::Shapes => Box::new(&mut state.shapes),
         Which::Freeform => Box::new(&mut state.freeform),
-        Which::PathSelection => Box::new(&mut state.path_selection),
+        Which::PathSelection => Box::new(PathSelectionPass { scope, tool: &mut state.path_selection }),
     }
 }
 

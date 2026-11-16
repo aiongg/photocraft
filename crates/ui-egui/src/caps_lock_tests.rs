@@ -84,68 +84,9 @@ fn other(h: &mut Harness<'_, PhotocraftApp>, value: &str) {
     h.run_steps(2);
 }
 
-<<<<<<< HEAD
 /// #9836: an armed Levels or Curves eyedropper shows its own cursor alone, not with the tool's
 /// drawn over it, and takes caps lock's precise crosshair as well, as in Photoshop, instead of only
 /// following the preference.
-=======
-/// #4639: the pen tools show their own icon under Standard Other Cursors and the crosshair
-/// under Precise, and caps lock swaps one for the other either way, as in Photoshop. The
-/// Eyedropper, Color Sampler and Paint Bucket, which already followed the preference, swap too.
-#[test]
-fn caps_lock_swaps_the_other_cursors_between_their_icon_and_the_crosshair() {
-    for tool in [
-        Tool::Pen,
-        Tool::FreeformPen,
-        Tool::CurvaturePen,
-        // Add Anchor Point shows the pen only over a segment (#12729): `add_anchor_cursor_tests`.
-        Tool::DeleteAnchorPoint,
-        Tool::ConvertPoint,
-        Tool::Eyedropper,
-        Tool::ColorSampler,
-        Tool::PaintBucket,
-    ] {
-        let mut h = capslock_harness();
-        h.state_mut().ui.tool = tool;
-        h.run_steps(2);
-        other(&mut h, "standard");
-        let standard = fp(&h);
-        if let Some(variant) = crate::canvas::tool_cursor::PenVariant::from_tool(tool) {
-            // #9122: Pen tools upload an OS cursor bitmap, while CursorLifecycle leaves a
-            // Crosshair fallback in platform output in case the OS compositor cannot upload the bitmap.
-            assert_eq!(standard.icon, CursorIcon::Crosshair, "{tool:?}: fallback crosshair is left behind native cursor bitmap");
-            let img = standard.image.as_ref().expect("native cursor bitmap set for Pen");
-            let expected = crate::canvas::tool_cursor::rasterize_pen(variant, 1.0).expect("variant rasterizes at scale 1.0");
-            assert_eq!(img.size, expected.size, "{tool:?}: bitmap dimensions match rasterized variant");
-            assert_eq!(img.hotspot, expected.hotspot, "{tool:?}: hotspot matches variant");
-            assert_eq!(img.rgba, expected.rgba, "{tool:?}: RGBA bitmap matches variant rasterization");
-        } else if matches!(tool, Tool::PaintBucket | Tool::Eyedropper | Tool::ColorSampler) && cfg!(not(target_arch = "wasm32")) {
-            assert_eq!(standard.icon, CursorIcon::Crosshair, "{tool:?}: the OS bitmap has a visible fallback");
-            assert!(standard.image.is_some(), "{tool:?}: the standard cursor is the OS bitmap");
-        } else {
-            assert_eq!(standard.icon, CursorIcon::None, "{tool:?}: the standard cursor is the tool's own icon, drawn");
-            assert!(standard.image.is_none(), "{tool:?}: painted fallback has no native cursor bitmap");
-        }
-        other(&mut h, "precise");
-        let precise = fp(&h);
-        assert_ne!(standard, precise, "{tool:?}: Standard and Precise differ");
-        assert_eq!(precise.icon, CursorIcon::Crosshair, "{tool:?}: Precise cursor is crosshair");
-        assert!(precise.image.is_some(), "{tool:?}: Precise cursor uses the native crosshair bitmap");
-        assert_ne!(precise.image, standard.image, "{tool:?}: Precise bitmap differs from the standard tool icon");
-
-        caps(&mut h, true);
-        assert_eq!(fp(&h), standard, "{tool:?}: caps lock turns the precise crosshair back into the icon");
-        other(&mut h, "standard");
-        assert_eq!(fp(&h), precise, "{tool:?}: caps lock turns the icon into the precise crosshair");
-        caps(&mut h, false);
-        assert_eq!(fp(&h), standard, "{tool:?}: releasing caps lock restores the icon");
-    }
-}
-
-/// #9836: an armed Levels or Curves eyedropper (and the dialogs' other pickers) shows its own
-/// cursor alone, not with the tool's drawn over it, and takes caps lock's precise crosshair as
-/// well, as in Photoshop, instead of only following the preference.
->>>>>>> upstream/main
 #[test]
 fn caps_lock_gives_the_curves_eyedroppers_the_precise_crosshair() {
     let mut h = capslock_harness();

@@ -137,7 +137,11 @@ pub(crate) fn cursor(app: &PhotocraftApp, cx: &ToolContext<'_>) -> Cursor {
     let options = BrushCursorOptions::new(painting_cursor(prefs.painting))
         .show_only_crosshair_while_painting(prefs.show_only_crosshair_while_painting)
         .caps_lock_precise(true);
-    let centre = crate::canvas::cursor_policy::brush_tip_centre(tool, cx.mods.alt || app.ui.shell.latched.alt, prefs.show_crosshair_in_brush_tip);
+    let option = cx.mods.alt || app.ui.shell.latched.alt;
+    if crate::canvas::cursor_policy::source_target(tool, option, prefs.painting, cx.caps_lock) {
+        return crate::canvas::cursor_policy::sample_target();
+    }
+    let centre = crate::canvas::cursor_policy::brush_tip_centre(tool, option, prefs.show_crosshair_in_brush_tip);
     let painting = crate::canvas::paint_tool::stroking(app).is_some();
     // The framework's Standard cursor is the tool's icon.
     let icon = crate::icons::tool_icon(tool);

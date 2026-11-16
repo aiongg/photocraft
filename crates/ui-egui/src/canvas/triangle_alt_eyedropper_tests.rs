@@ -3,12 +3,14 @@
 //! Create Triangle; ⇧⌥ does the same. ⌥ pressed only after the drag started still draws from the
 //! centre, and with a shape layer active ⌥ at the press does not sample.
 
+use craft::keymap::Mods;
 use egui::Modifiers;
 use photocraft_doc::{Color, Fill, LayerContent};
 use serde_json::json;
 
 use super::shape_alt_samples;
 use crate::PhotocraftApp;
+use crate::canvas::testing::in_gesture;
 use crate::canvas::{ToolEvent, tool_event};
 use crate::state::Tool;
 
@@ -18,6 +20,7 @@ const WHITE: [u8; 3] = [255, 255, 255];
 /// A point on the red layer, and one on the white Background only.
 const ON_RED: [f64; 2] = [200.0, 175.0];
 const ON_WHITE: [f64; 2] = [500.0, 350.0];
+const ALT: Mods = Mods { alt: true, ..Mods::NONE };
 
 /// The issue's test document: 800 × 600, white Background, a red (220,30,30) pixel layer at
 /// 100,100 to 300,250 (active), black foreground, the Triangle tool in Shape mode.
@@ -79,7 +82,7 @@ fn alt_click_on_the_red_layer_picks_it_as_foreground_and_fill() {
         assert_eq!(foreground(&app), RED, "{press:?}: foreground #DC1E1E");
         assert_eq!(tool_fill(&app), RED, "{press:?}: Fill 220,30,30");
         assert_eq!(document_state(&app), before, "{press:?}: no History state, layer, dialog or colour sampler");
-        assert!(!app.alt_sampling, "{press:?}: the release ends the sampling");
+        assert!(!in_gesture(&app), "{press:?}: the release ends the sampling");
         // The next triangle is drawn in that Fill.
         drag(&mut app, [400.0, 300.0], [600.0, 400.0], Modifiers::NONE, Modifiers::NONE);
         assert_eq!(active_shape_fill(&app), RED, "{press:?}: the next triangle's Fill");
@@ -144,9 +147,8 @@ fn a_shape_layer_active_does_not_sample() {
     let mut app = app();
     drag(&mut app, [400.0, 300.0], [600.0, 400.0], Modifiers::NONE, Modifiers::NONE);
     app.run("tools.setColors", json!({"foreground": "#000000"})).unwrap();
-    assert!(!shape_alt_samples(&mut app, Modifiers::ALT, ON_RED[0], ON_RED[1]), "⌥ is left to the subtract");
+    assert!(!shape_alt_samples(&mut app, ALT, ON_RED[0], ON_RED[1]), "⌥ is left to the subtract");
     tool_event(&mut app, ToolEvent::Down { x: ON_RED[0], y: ON_RED[1], pressure: 1.0 }, Modifiers::ALT);
-    assert!(!app.alt_sampling);
     tool_event(&mut app, ToolEvent::Up { x: ON_RED[0], y: ON_RED[1] }, Modifiers::ALT);
     assert_eq!(foreground(&app), BLACK);
 }
@@ -154,18 +156,18 @@ fn a_shape_layer_active_does_not_sample() {
 #[test]
 fn unmeasured_cases_keep_drawing() {
     let mut app = app();
-    assert!(shape_alt_samples(&mut app, Modifiers::ALT, ON_RED[0], ON_RED[1]));
-    assert!(shape_alt_samples(&mut app, Modifiers::SHIFT | Modifiers::ALT, ON_RED[0], ON_RED[1]));
-    assert!(!shape_alt_samples(&mut app, Modifiers::NONE, ON_RED[0], ON_RED[1]));
-    assert!(!shape_alt_samples(&mut app, Modifiers::ALT | Modifiers::CTRL, ON_RED[0], ON_RED[1]), "Control+⌥ is the brush resize");
-    assert!(!shape_alt_samples(&mut app, Modifiers::ALT, -40.0, -40.0), "nothing to sample off the image");
+    assert!(shape_alt_samples(&mut app, ALT, ON_RED[0], ON_RED[1]));
+    assert!(shape_alt_samples(&mut app, Mods { shift: true, ..ALT }, ON_RED[0], ON_RED[1]));
+    assert!(!shape_alt_samples(&mut app, Mods::NONE, ON_RED[0], ON_RED[1]));
+    assert!(!shape_alt_samples(&mut app, Mods { ctrl: true, ..ALT }, ON_RED[0], ON_RED[1]), "Control+⌥ is the brush resize");
+    assert!(!shape_alt_samples(&mut app, ALT, -40.0, -40.0), "nothing to sample off the image");
     for mode in [craft::draw::ui::VectorMode::Path, craft::draw::ui::VectorMode::Pixels] {
         app.ui.tool_options.shape_mode = mode;
-        assert!(!shape_alt_samples(&mut app, Modifiers::ALT, ON_RED[0], ON_RED[1]), "{mode:?} mode wasn't measured");
+        assert!(!shape_alt_samples(&mut app, ALT, ON_RED[0], ON_RED[1]), "{mode:?} mode wasn't measured");
     }
     app.ui.tool_options.shape_mode = craft::draw::ui::VectorMode::Shape;
     app.ui.tool = Tool::Rectangle;
-    assert!(!shape_alt_samples(&mut app, Modifiers::ALT, ON_RED[0], ON_RED[1]), "the other shape tools are their own items");
+    assert!(!shape_alt_samples(&mut app, ALT, ON_RED[0], ON_RED[1]), "the other shape tools are their own items");
     // Off the image the press draws from the centre, as before.
     app.ui.tool = Tool::Triangle;
     let layers = document_state(&app).1;

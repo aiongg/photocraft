@@ -315,6 +315,8 @@ struct Preflight<'a, 'x> {
     /// The selection tools' outline is open (a Polygonal or Magnetic Lasso being drawn): an arrow nudges it, not the
     /// layer. Read before the pass takes the families' state out of the app.
     outline_open: bool,
+    /// The pass has an Alt stand-in, so a press the preflight hands on (`Ignored`) reaches it.
+    alt_stand_in: bool,
 }
 
 impl CanvasTool for Preflight<'_, '_> {
@@ -331,6 +333,10 @@ impl CanvasTool for Preflight<'_, '_> {
                     return ToolAction::Done;
                 }
                 let at = [doc.x, doc.y];
+                // The Triangle's ⌥ press that samples is the Eyedropper stand-in's, not a shape (#13364).
+                if self.alt_stand_in && self.scope.with_app(|app| super::cursor_policy::shape_alt_samples(app, pointer.mods, at[0], at[1])) {
+                    return ToolAction::Ignored;
+                }
                 if self.refused(pointer, at) {
                     return ToolAction::Done;
                 }
@@ -471,7 +477,7 @@ fn with_rig<R>(
         _ => None,
     };
     let command_wanted = stand_ins && transform.is_none() && takes_command_stand_in(tool);
-    let alt_wanted = stand_ins && transform.is_none() && super::alt_samples(tool, Mods::ALT);
+    let alt_wanted = stand_ins && transform.is_none() && super::cursor_policy::alt_eyedropper(tool);
     let source_wanted = stand_ins && matches!(tool, Tool::CloneStamp | Tool::Healing);
 
     let CanvasTools {
@@ -560,7 +566,8 @@ fn with_rig<R>(
         {
             alt_t = Some(retouch::source_tool(&scope, state, host));
         }
-        let mut pre = Preflight { scope: &scope, inner: selected, tool, dialog: dialog_picked, outline_open };
+        let alt_stand_in = alt_t.is_some();
+        let mut pre = Preflight { scope: &scope, inner: selected, tool, dialog: dialog_picked, outline_open, alt_stand_in };
         let mut tool_host = ToolHost::new().momentary(momentary);
         if let Some(mover) = command_t.as_mut() {
             tool_host = tool_host.stand_in(StandInKey::Command, dynamic(mover));
