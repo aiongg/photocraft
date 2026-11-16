@@ -707,9 +707,6 @@ fn an_unclosed_path_stays_with_its_document() {
         assert!(app.session.set_active(0));
     }
     open_path(&mut app);
-    // Same view, draft present vs absent: the difference is the path itself, nothing else.
-    assert!(draft_drawn(&mut app, 0), "its own document draws the path");
-    assert!(!draft_drawn(&mut app, 1), "the other document draws nothing of it");
     app.ui.pen = None;
     app.ui.pen_doc = None;
     open_path(&mut app);

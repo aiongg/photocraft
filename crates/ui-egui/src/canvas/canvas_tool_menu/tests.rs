@@ -67,6 +67,11 @@ pub(super) fn hosted(app: &mut PhotocraftApp) -> &mut HostedParamDialog {
 /// Presses OK on the open hosted parameter dialog through the app's dialog path: a family that judges a held OK
 /// answers it, then its run takes the result.
 pub(super) fn confirm_hosted(app: &mut PhotocraftApp, ctx: &Context) {
+    try_confirm_hosted(app, ctx).expect("OK was accepted");
+}
+
+/// [`confirm_hosted`] for a run that may be refused: the result of the dialog's OK.
+pub(super) fn try_confirm_hosted(app: &mut PhotocraftApp, ctx: &Context) -> Result<(), String> {
     let id = app
         .framework
         .dialogs
@@ -74,7 +79,7 @@ pub(super) fn confirm_hosted(app: &mut PhotocraftApp, ctx: &Context) {
         .ids()
         .find(|id| app.framework.dialogs.get_by_id::<HostedParamDialog>(*id).is_some())
         .expect("a hosted parameter dialog is open");
-    crate::dialogs::confirm(app, ctx, id).expect("OK was accepted");
+    crate::dialogs::confirm(app, ctx, id)
 }
 
 /// Pen clicks at document points `at`, as on the canvas.
@@ -724,7 +729,7 @@ fn stroke_path_reopens_with_the_simulate_pressure_that_was_applied() {
     open_stroke(&mut app);
     set_pressure(&mut app, false);
     app.run("path.delete", json!({"name": "work"})).unwrap();
-    confirm_hosted(&mut app, &ctx);
+    assert!(try_confirm_hosted(&mut app, &ctx).is_err(), "the run has no path to stroke");
     close_dialogs(&mut app);
     assert_eq!(strokes(&app), 1, "the failed run stroked nothing");
     work_path(&mut app);

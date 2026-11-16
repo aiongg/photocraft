@@ -39,7 +39,8 @@ fn pen_command_z_and_backspace_retract_points_before_document_undo() {
     let mut app = pen_app(&[]);
     app.run("shape.create", json!({"kind": "rect", "rect": [10, 10, 40, 40], "fill": "#ff0000"})).unwrap();
     let history = app.session.active().unwrap().history.past_len();
-    for at in [[10.0, 10.0], [50.0, 10.0], [50.0, 50.0]] {
+    // Away from the rectangle's anchors, which the Pen would edit.
+    for at in [[100.0, 100.0], [150.0, 100.0], [150.0, 150.0]] {
         testing::click(&mut app, at, Modifiers::NONE);
     }
     assert_eq!(pen_knots(&app), 3);

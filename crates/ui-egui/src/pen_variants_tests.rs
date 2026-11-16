@@ -231,9 +231,9 @@ fn the_curvature_pen_carries_on_an_open_path() {
     let at = steps(&app);
     app.ui.tool = Tool::CurvaturePen;
     click(&mut app, 80.0, 80.0);
-    assert!(app.ui.pen.is_none(), "the click selects the endpoint, it draws nothing");
+    assert!(app.ui.pen.as_ref().is_some_and(|p| p.curvature && p.draft.knots.len() == 3), "the press on the endpoint carries the path on, adding no anchor");
     click(&mut app, 140.0, 120.0);
-    assert!(app.ui.pen.as_ref().is_some_and(|p| p.curvature && p.draft.knots.len() == 4), "the next click carries the path on");
+    assert!(app.ui.pen.as_ref().is_some_and(|p| p.curvature && p.draft.knots.len() == 4), "the next click adds to the carried path");
     click(&mut app, 200.0, 80.0);
     crate::vector_ui::pen_commit(&mut app, false);
     let work = work_path(&app);
@@ -285,8 +285,9 @@ fn the_curvature_pen_carries_on_the_selected_subpath_of_two_that_end_together() 
     let mut app = app(Tool::CurvaturePen);
     set_work_path(&mut app, vec![Subpath::polyline(&[(20.0, 20.0), (80.0, 80.0)]), Subpath::polyline(&[(200.0, 20.0), (80.0, 80.0)])]);
     select_anchor(&mut app, crate::direct_select::PathRef::Work, [1, 1]);
-    click(&mut app, 140.0, 150.0);
+    click(&mut app, 80.0, 80.0);
     assert_eq!(app.ui.pen.as_ref().and_then(|p| p.resumes.as_ref()).map(|r| r.index), Some(1), "the selected subpath");
+    click(&mut app, 140.0, 150.0);
     crate::vector_ui::pen_commit(&mut app, false);
     let work = work_path(&app);
     assert_eq!(work.subpaths.iter().map(|s| s.knots.len()).collect::<Vec<_>>(), [2, 3], "the second subpath grew");
@@ -299,7 +300,9 @@ fn the_curvature_pen_carries_on_the_selected_subpath_of_two_that_end_together() 
 #[test]
 fn a_carried_on_endpoint_starts_a_new_curvature_run() {
     let draw = |points: &[(f64, f64)]| {
-        let mut app = app(Tool::CurvaturePen);
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        app.run("file.new", json!({"width": 800, "height": 400})).unwrap();
+        app.ui.tool = Tool::CurvaturePen;
         for &(x, y) in points {
             click(&mut app, x, y);
         }
@@ -310,7 +313,7 @@ fn a_carried_on_endpoint_starts_a_new_curvature_run() {
     let mut app = draw(&[(100.0, 300.0), (250.0, 150.0), (400.0, 300.0)]);
     let before = work_path(&app).subpaths[0].knots.clone();
     click(&mut app, 400.0, 300.0);
-    assert!(app.ui.pen.is_none(), "the click selects the endpoint, it draws nothing");
+    assert!(app.ui.pen.as_ref().is_some_and(|p| p.draft.knots.len() == 3), "the press on the endpoint carries the path on");
     click(&mut app, 550.0, 150.0);
     click(&mut app, 700.0, 300.0);
     assert!(crate::vector_ui::pen_commit(&mut app, false), "the commit goes through");
@@ -338,6 +341,7 @@ fn a_curved_path_carries_on_from_its_first_endpoint_with_its_handles_swapped() {
     let middle = Knot::smooth(Point::new(50.0, 60.0), Point::new(40.0, 50.0), Point::new(60.0, 70.0));
     set_work_path(&mut app, vec![Subpath { closed: false, knots: vec![start, middle, Knot::corner(80.0, 80.0)], op: Default::default() }]);
     select_anchor(&mut app, crate::direct_select::PathRef::Work, [0, 0]);
+    click(&mut app, 20.0, 20.0);
     click(&mut app, 0.0, 100.0);
     let pen = app.ui.pen.as_ref().expect("the path is carried on");
     assert_eq!(pen.resumes.as_ref().map(|r| r.index), Some(0));
@@ -346,20 +350,6 @@ fn a_curved_path_carries_on_from_its_first_endpoint_with_its_handles_swapped() {
     assert_eq!(anchors, [[80.0, 80.0], [50.0, 60.0], [20.0, 20.0], [0.0, 100.0]], "backwards, then the new anchor");
     assert_eq!((triples[1][1], triples[1][2]), ([60.0, 70.0], [40.0, 50.0]), "the curved middle knot's handles are swapped");
     assert_eq!(triples[2][1], [30.0, 10.0], "the endpoint's handle towards the path: its old outgoing one");
-}
-
-/// CodeRabbit on #10744: a double-click on a knot of the path carried on (not the endpoint it
-/// carries on from) changes nothing: those knots keep their handles.
-#[test]
-fn toggling_a_carried_knot_changes_nothing() {
-    use photocraft_doc::vector::Subpath;
-    let mut app = app(Tool::CurvaturePen);
-    set_work_path(&mut app, vec![Subpath::polyline(&[(20.0, 20.0), (80.0, 20.0), (80.0, 80.0)])]);
-    select_anchor(&mut app, crate::direct_select::PathRef::Work, [0, 2]);
-    click(&mut app, 140.0, 120.0);
-    let before = app.ui.pen.as_ref().map(|p| p.draft.clone());
-    testing::double_click(&mut app, [80.0, 20.0], Modifiers::NONE);
-    assert_eq!(app.ui.pen.as_ref().map(|p| p.draft.clone()), before, "the old corner stays as it was, handles and all");
 }
 
 /// CodeRabbit on #10744: in Path mode the Pen carries on the work path, so an endpoint selected

@@ -269,6 +269,13 @@ pub(super) fn ends(app: &PhotocraftApp) -> Vec<(u64, KnotRef, Point)> {
             ends.extend(at(0));
         }
     }
+    // Of ends on one point the pen carries on the first: the one Direct Selection has selected (#10726), else the last
+    // knot of the earlier subpath.
+    if let Some((target, subpath, knot)) = crate::direct_select::selected_open_end(app)
+        && target_ref(app, &name, layer) == Some(target)
+    {
+        ends.sort_by_key(|(_, at, _)| (at.subpath, at.knot) != (subpath, knot));
+    }
     ends
 }
 
@@ -295,18 +302,6 @@ pub(super) fn resume_key(app: &PhotocraftApp, key: u64, knot: KnotRef) -> Option
         return None;
     }
     resume_end(app, knot.subpath, knot.knot)
-}
-
-/// The endpoint Direct Selection has selected ([`crate::direct_select::selected_open_end`]), as
-/// a Pen path carrying its very subpath on from it (#10726). `None` unless that endpoint is in
-/// the path a Pen path carries on ([`resume_target`]): one in another path starts a new one.
-pub(super) fn resume_selected(app: &PhotocraftApp) -> Option<PenPath> {
-    let (target, index, knot) = crate::direct_select::selected_open_end(app)?;
-    let (name, layer, _) = resume_target(app)?;
-    if target_ref(app, &name, layer)? != target {
-        return None;
-    }
-    resume_end(app, index, knot)
 }
 
 /// The resumed path with its subpath carried on: the one subpath of `drawn` takes the old one's

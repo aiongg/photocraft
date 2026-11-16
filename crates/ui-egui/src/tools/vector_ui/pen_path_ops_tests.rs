@@ -202,7 +202,8 @@ fn path_mode_adds_subpaths_with_the_operation() {
     app.run("path.set", json!({"name": "Saved", "path": {"subpaths": [{"closed": true, "knots": [[2, 2], [60, 2], [60, 60]]}]}})).unwrap();
     app.ui.selected_path = Some("Saved".into());
     app.ui.tool_options.pen_path_op = "exclude".into();
-    square(&mut app, 10.0, 10.0, 20.0);
+    // Clear of the saved path's segments, which the Pen's Auto Add/Delete would edit.
+    square(&mut app, 100.0, 100.0, 20.0);
     let saved = app.session.active().unwrap().doc.paths.iter().find(|p| p.name == "Saved").unwrap().path.clone();
     assert_eq!(saved.subpaths.last().map(|s| s.op), Some(PathOp::Exclude));
     // A targeted vector mask.
