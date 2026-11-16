@@ -488,27 +488,20 @@ fn tilde_erases_only_with_the_brush_and_pencil() {
         if erases {
             drag_with(&mut h, Modifiers::NONE, 110.0, 130.0, 150.0, 130.0);
             assert_eq!(last_stroke_erases(&h), Some(true), "{tool:?}");
-            assert_eq!(rgba(&h, 130, 130)[3], 0.0, "{tool:?}: erased to transparency");
+            // `drag_with` bends through `(118, 136)` on the way from `(110, 130)` to `(150, 130)`,
+            // so the Pencil's 1 px tip (#12200) no longer reaches `(130, 130)`; check `(110, 130)`
+            // at the stroke start instead.
+            assert_eq!(rgba(&h, 110, 130)[3], 0.0, "{tool:?}: erased to transparency");
+            // The whole drag erases, not only its first dab: a 1 px Pencil line along the 40 px drag
+            // clears far more pixels than one dab.
+            let cleared = (100..160).flat_map(|x| (120..146).map(move |y| (x, y))).filter(|&(x, y)| rgba(&h, x, y)[3] == 0.0).count();
+            assert!(cleared >= 20, "{tool:?}: erased along the drag, {cleared} pixels");
             assert_eq!(last_stroke(h.state())["mode"], json!("clear"), "{tool:?}");
             assert_eq!(h.state().session.active().unwrap().history.undo_label(), Some(label));
         }
         key(&mut h, Key::Backtick, false, Modifiers::NONE);
-<<<<<<< HEAD
         h.run_steps(1);
         assert!(!h.state().held_erase, "{tool:?}: released");
-=======
-        assert_eq!(last_stroke_erases(&h), Some(true), "{tool:?}");
-        // `drag_with` bends through `(118, 136)` on the way from `(110, 130)` to `(150, 130)`,
-        // so the Pencil's 1 px tip (#12200) no longer reaches `(130, 130)`; check `(110, 130)`
-        // at the stroke start instead.
-        assert_eq!(rgba(&h, 110, 130)[3], 0.0, "{tool:?}: erased to transparency");
-        // The whole drag erases, not only its first dab: a 1 px Pencil line along the 40 px drag
-        // clears far more pixels than one dab.
-        let cleared = (100..160).flat_map(|x| (120..146).map(move |y| (x, y))).filter(|&(x, y)| rgba(&h, x, y)[3] == 0.0).count();
-        assert!(cleared >= 20, "{tool:?}: erased along the drag, {cleared} pixels");
-        assert_eq!(last_stroke(h.state())["mode"], json!("clear"), "{tool:?}");
-        assert_eq!(h.state().session.active().unwrap().history.undo_label(), Some(label));
->>>>>>> upstream/main
         assert_eq!(h.state().ui.tool, tool, "the tool stays");
         if erases {
             drag_with(&mut h, Modifiers::NONE, 110.0, 140.0, 150.0, 140.0);
@@ -670,14 +663,11 @@ fn right_click_at(h: &mut Harness<'static, PhotocraftApp>, p: Pos2) {
     h.run_steps(2);
 }
 
-/// A pending crop frame on the Crop tool, as the held-key test above sets one up.
-fn with_pending_crop(h: &mut Harness<'static, PhotocraftApp>) -> [f64; 4] {
-    let frame = [100.0, 50.0, 300.0, 200.0];
-    h.state_mut().ui.crop_rect = Some(frame);
-    h.state_mut().crop.default_frame = false;
+/// A pending crop frame on the Crop tool, as the held-key test above sets one up: the bottom-right handle dragged in.
+fn with_pending_crop(h: &mut Harness<'static, PhotocraftApp>) {
+    drag_with(h, Modifiers::NONE, 400.0, 300.0, 300.0, 200.0);
     h.run_steps(2);
     assert!(crate::crop_ui::pending(h.state()));
-    frame
 }
 
 /// The Space-Hand view menu over a pending crop (#11271): Esc closes only the menu and Enter
@@ -685,28 +675,27 @@ fn with_pending_crop(h: &mut Harness<'static, PhotocraftApp>) -> [f64; 4] {
 #[test]
 fn space_hand_view_menu_keeps_escape_and_enter_from_the_pending_crop() {
     let mut h = harness(Tool::Crop);
-    let frame = with_pending_crop(&mut h);
+    with_pending_crop(&mut h);
     let size = h.state().session.active().map(|s| s.doc.size);
     let steps = h.state().session.active().map(|s| s.history.past_len());
     let p = screen(&h, 200.0, 125.0);
     key(&mut h, Key::Space, true, Modifiers::NONE);
     right_click_at(&mut h, p);
     assert!(
-        h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.crop.is_none() && crate::canvas_tool_menu::is_view_tool(m.tool)),
+        h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.kind == MenuKind::View),
         "Space's Hand opens the view menu"
     );
     tap(&mut h, Key::Escape, Modifiers::NONE);
     h.run_steps(2);
     assert!(h.state().ui.canvas_tool_menu.is_none(), "Esc closes the menu");
-    assert_eq!(h.state().ui.crop_rect, Some(frame), "and only the menu: the crop is not discarded");
-    assert!(crate::crop_ui::pending(h.state()));
+    assert!(crate::crop_ui::pending(h.state()), "and only the menu: the crop is not discarded");
     right_click_at(&mut h, p);
     assert!(h.state().ui.canvas_tool_menu.is_some(), "the view menu opens again");
     tap(&mut h, Key::Enter, Modifiers::NONE);
     h.run_steps(2);
     assert_eq!(h.state().session.active().map(|s| s.doc.size), size, "Enter under the menu doesn't crop");
     assert_eq!(h.state().session.active().map(|s| s.history.past_len()), steps, "no history step");
-    assert_eq!(h.state().ui.crop_rect, Some(frame));
+    assert!(crate::crop_ui::pending(h.state()));
     // Close the menu and let Space go: Esc discards the pending crop as ever.
     h.state_mut().ui.canvas_tool_menu = None;
     key(&mut h, Key::Space, false, Modifiers::NONE);
@@ -753,11 +742,11 @@ fn space_hand_pasteboard_menu_opens_outside_the_image_and_outlives_space() {
     let outside = screen(&h, -60.0, -60.0);
     key(&mut h, Key::Space, true, Modifiers::NONE);
     right_click_at(&mut h, outside);
-    assert!(h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.pasteboard), "Space's Hand opens the pasteboard menu outside");
+    assert!(h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.kind == MenuKind::Pasteboard), "Space's Hand opens the pasteboard menu outside");
     assert_eq!(h.state().ui.tool, Tool::Move, "the Move tool stays selected");
     key(&mut h, Key::Space, false, Modifiers::NONE);
     h.run_steps(3);
-    assert!(h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.pasteboard), "the pasteboard menu outlives the held Space");
+    assert!(h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.kind == MenuKind::Pasteboard), "the pasteboard menu outlives the held Space");
     h.state_mut().ui.tool = Tool::Brush;
     h.run_steps(2);
     assert!(h.state().ui.canvas_tool_menu.is_none(), "another tool selected closes it");

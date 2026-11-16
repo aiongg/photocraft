@@ -51,47 +51,11 @@ pub fn handles(id: &str) -> bool {
     if let Some(k) = id.strip_prefix("window.arrange.") {
         return arrange_command(k).is_some();
     }
-<<<<<<< HEAD
     PANEL_IDS.contains(&id)
         || matches!(
             id,
             "view.extras" | "view.flipHorizontal" | "view.pixelAspectRatioCorrection" | "view.patternPreview" | "view.pixelArtPreview" | "view.rotateView"
         )
-=======
-    matches!(
-        id,
-        "view.extras"
-            | "view.twoHundredPercent"
-            | "view.printSize"
-            | "view.fitLayersOnScreen"
-            | "view.fitArtboardOnScreen"
-            | "window.panel.layerComps"
-            | "view.flipHorizontal"
-            | "view.pixelAspectRatioCorrection"
-            | "view.patternPreview"
-            | "view.pixelArtPreview"
-            | "view.rotateView"
-            | "view.rotateLeft"
-            | "view.rotateRight"
-            | "view.resetView"
-            | "window.panel.layers"
-            | "window.panel.history"
-            | "window.panel.navigator"
-            | "window.panel.properties"
-            | "window.panel.color"
-            | "window.panel.actions"
-            | "window.panel.channels"
-            | "window.panel.paths"
-            | "window.panel.character"
-            | "window.panel.paragraph"
-            | "window.panel.info"
-            | "window.panel.histogram"
-            | "window.panel.swatches"
-            | "window.panel.adjustments"
-            | "type.panels.character"
-            | "type.panels.paragraph"
-    )
->>>>>>> upstream/main
 }
 
 pub fn is_enabled(app: &PhotocraftApp, id: &str) -> Option<bool> {
@@ -109,31 +73,11 @@ pub(super) fn is_enabled_with_engine(app: &PhotocraftApp, id: &str, engine_enabl
         // (#9349); with none open, Cycle can only bring a full screen mode back to Standard.
         "view.screenMode.cycle" | "view.screenMode.cycleBack" => app.ui.text_edit.is_none() && (doc || app.ui.view.screen_mode != ScreenMode::Standard),
         "view.screenMode.fullScreen" | "view.screenMode.fullScreenWithMenuBar" => doc,
-<<<<<<< HEAD
         "view.rotateView" => doc,
         i if i.starts_with("window.arrange.") => arrange_command(&i["window.arrange.".len()..]).is_some_and(|command| {
             let windows = &app.ui.document_windows;
             command.arrangement().enabled(app.session.documents().len(), windows.docked.len(), windows.floating.len())
         }),
-=======
-        "view.twoHundredPercent"
-        | "view.printSize"
-        | "view.fitLayersOnScreen"
-        | "view.rotateView"
-        | "view.rotateLeft"
-        | "view.rotateRight"
-        | "view.resetView" => doc,
-        "view.fitArtboardOnScreen" => app.session.active().is_some_and(|d| d.doc.has_artboards()),
-        i if i.starts_with("window.arrange.") => match &i["window.arrange.".len()..] {
-            "consolidateAllToTabs" => true,
-            "floatInWindow" | "newWindowForDocument" => doc,
-            "matchZoom" | "matchLocation" | "matchRotation" | "matchAll" => app.session.documents().len() > 1 || !app.ui.windows.is_empty(),
-            _ => {
-                app.session.documents().len() > 1
-                    || (doc && matches!(&i["window.arrange.".len()..], "floatAllInWindows" | "cascade" | "tile" | "tileAllVertically" | "tileAllHorizontally"))
-            }
-        },
->>>>>>> upstream/main
         // Embedded placement reads the picker's bytes on every platform. Linked placement keeps
         // the engine's native filesystem guard because its source must remain reachable.
         "file.placeEmbedded" => doc && app.services.files.is_some(),
@@ -319,18 +263,10 @@ fn run(app: &mut PhotocraftApp, id: &str, p: &Value) -> Result<Value, String> {
     if id == "view.rotateView" {
         return rotate_command(app, p);
     }
-<<<<<<< HEAD
     // One store: the font picker reads the same preference.
     if let Some(k) = id.strip_prefix("type.fontPreviewSize.") {
         app.run("prefs.set", json!({"values": {"type.fontPreview": k}}))?;
         return Ok(json!(k));
-=======
-    if matches!(id, "view.rotateLeft" | "view.rotateRight") {
-        return crate::rotate_view::step(app, id == "view.rotateRight", p);
-    }
-    if id == "view.resetView" {
-        return crate::rotate_view::reset(app);
->>>>>>> upstream/main
     }
     let o = &mut app.ui.view;
     if let Some(k) = id.strip_prefix("view.show.") {
