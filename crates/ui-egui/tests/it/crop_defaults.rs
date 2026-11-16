@@ -17,6 +17,9 @@ fn harness() -> Harness {
         let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
         app.session.prefs.edit(|p| p.interface.language = "en".into());
         app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
+        // Snapping would pull the drawn frames' corners to the canvas edges and guides.
+        app.ui.extras.snap = false;
+        app.ui.view.show.smart_guides = false;
         app.ui.tool_options.crop.shield.classic_mode = true;
         app
     });

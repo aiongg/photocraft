@@ -24,6 +24,10 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     if crate::enable_rules::disabled(app, id) {
         return false;
     }
+    // A pending crop greys what Photoshop greys during one (#1918).
+    if crate::crop_ui::blocks(app, id) {
+        return false;
+    }
     // Filters stay live on a type layer: choosing one asks to rasterize it (#4303).
     if crate::rasterize_prompt::filter_needs(app, id).is_some() {
         return true;

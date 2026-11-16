@@ -28,6 +28,12 @@ const PANEL_IDS: [&str; 17] = [
     "type.panels.paragraph",
 ];
 
+/// The Window item and its shell command for the contextual task bar, which is a flag of the canvas tools, not a
+/// dock panel.
+fn is_context_task_bar(id: &str) -> bool {
+    matches!(id, "window.panel.contextualTaskBar" | "window.toggle.contextualTaskBar")
+}
+
 /// Ids handled here (live menu items).
 pub fn handles(id: &str) -> bool {
     if let Some(k) = id.strip_prefix("view.show.") {
@@ -52,6 +58,7 @@ pub fn handles(id: &str) -> bool {
         return arrange_command(k).is_some();
     }
     PANEL_IDS.contains(&id)
+        || is_context_task_bar(id)
         || matches!(
             id,
             "view.extras" | "view.flipHorizontal" | "view.pixelAspectRatioCorrection" | "view.patternPreview" | "view.pixelArtPreview" | "view.rotateView"
@@ -129,6 +136,9 @@ pub fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
         && let Some(on) = layout_checked(app, k)
     {
         return Some(on);
+    }
+    if is_context_task_bar(id) {
+        return Some(app.ui.panels.context_task_bar);
     }
     if PANEL_IDS.contains(&id) {
         return Some(crate::panel_docking::toggle_panel(id).is_some_and(|panel| crate::panel_docking::is_shown(app, panel)));
@@ -266,6 +276,11 @@ fn run(app: &mut PhotocraftApp, id: &str, p: &Value) -> Result<Value, String> {
     if let Some(k) = id.strip_prefix("type.fontPreviewSize.") {
         app.run("prefs.set", json!({"values": {"type.fontPreview": k}}))?;
         return Ok(json!(k));
+    }
+    if is_context_task_bar(id) {
+        let bar = &mut app.ui.panels.context_task_bar;
+        *bar = flag_param(p, *bar);
+        return Ok(json!(*bar));
     }
     let o = &mut app.ui.view;
     if let Some(k) = id.strip_prefix("view.show.") {

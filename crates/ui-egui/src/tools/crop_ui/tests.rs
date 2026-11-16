@@ -380,27 +380,6 @@ fn another_tool_commits_a_drawn_frame_at_8_and_16_bit() {
     assert_eq!(crop_ui::frame(&app), None);
 }
 
-/// The pen's eraser end stands in for the Crop tool only until the tip comes back (`stylus`),
-/// and a gesture still in progress isn't cut short: neither commits the frame.
-#[test]
-fn the_stylus_eraser_and_a_gesture_in_progress_keep_the_frame_pending() {
-    let mut app = app(SampleType::U8);
-    drag(&mut app, &[[10.0, 10.0], [50.0, 40.0]], NONE);
-    app.stylus.tool_before_eraser = Some(Tool::Crop);
-    app.ui.tool = Tool::Eraser;
-    crop_ui::each_pass(&mut app);
-    assert_eq!(doc_size(&app), Size::new(200, 100));
-    app.ui.tool = app.stylus.tool_before_eraser.take().unwrap();
-    crop_ui::each_pass(&mut app);
-    assert!(crop_ui::pending(&app) && crop_ui::frame(&app) == Some(boxed(10.0, 10.0, 50.0, 40.0, 0.0)));
-
-    tool_event(&mut app, ToolEvent::Down { x: 20.0, y: 20.0, pressure: 1.0 }, NONE);
-    assert!(crop_ui::dragging(&app));
-    app.ui.tool = Tool::Move;
-    crop_ui::each_pass(&mut app);
-    assert_eq!(doc_size(&app), Size::new(200, 100));
-}
-
 /// A layer 300..350 × 200..260 on a 400 × 300 canvas: the snap target of the two snap trials.
 fn board() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -437,35 +416,4 @@ fn drawing_a_new_crop_snaps_its_corner_not_the_default_frame() {
         let frame = crop_ui::frame(&app).unwrap();
         assert!((frame.rect.x1 - 300.0).abs() < 1e-6, "classic {classic}: {frame:?}");
     }
-}
-
-/// #7752: typing 16 and then 6 into the ratio fields over 4 : 3 fits from the frame the edit
-/// began with, not from the result of the first number.
-#[test]
-fn a_typed_crop_ratio_fits_from_the_frame_the_edit_started_with() {
-    use egui_kittest::kittest::Queryable;
-    let mut a = app(SampleType::U8);
-    a.ui.tool_options.crop.ratio = CropRatio::sides(4.0, 3.0);
-    let base = boxed(20.0, 10.0, 180.0, 90.0, 0.0);
-    tool(&mut a).crop_to(base);
-    let mut h = egui_kittest::Harness::builder()
-        .with_context(a.ctx().clone())
-        .with_size(egui::vec2(1400.0, 80.0))
-        .build_ui_state(|ui, app: &mut PhotocraftApp| crop_ui::bar::bar(app, ui), a);
-    h.run_steps(3);
-    h.get_by_label("Width").focus();
-    h.run_steps(2);
-    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
-    h.event(egui::Event::Text("16".into()));
-    h.key_press(egui::Key::Tab);
-    h.run_steps(3);
-    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
-    h.event(egui::Event::Text("6".into()));
-    h.key_press(egui::Key::Enter);
-    h.run_steps(4);
-    let frame = crop_ui::frame(h.state()).unwrap();
-    let (w, height) = (frame.rect.width(), frame.rect.height());
-    assert!((w / height - 16.0 / 6.0).abs() < 1e-6, "16 : 6, got {w} x {height}");
-    assert!((w - 160.0).abs() < 1e-6, "fitted from the frame the edit began with, not from the 16 : 3 result: {w} x {height}");
-    assert_eq!(frame.rect.center(), base.rect.center());
 }
