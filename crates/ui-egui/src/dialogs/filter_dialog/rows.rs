@@ -6,7 +6,7 @@
 //! blur row.
 //!
 //! These rows keep values under keys no command parameter has (`matteColor`, `sampleTool`, `resultPicked`,
-//! `resultFrom`, `lutSize`, `lutError`, `sourceSeen`) and Lens Blur's `channel:N` sources and Match Color's textual
+//! `lutSize`, `lutError`) and Lens Blur's `channel:N` sources and Match Color's textual
 //! `source`; the family's `command_params` (dialogs-w24) maps them back and leaves the private ones out.
 
 use std::path::PathBuf;
@@ -46,9 +46,8 @@ const RADIAL_BLUR: &str = "filter.blur.radialBlur";
 pub(crate) const MATTE_COLOR: &str = "matteColor";
 /// The Replace Color dropper armed: `sample`, `add`, `subtract`, or empty when none is.
 pub(crate) const SAMPLE_TOOL: &str = "sampleTool";
-/// The colour the Result swatch's Color Picker answers into, and the Result it opened on.
+/// The colour the Result swatch's Color Picker answers into; it is there only from the answer to the next pass.
 const RESULT_PICKED: &str = "resultPicked";
-const RESULT_SHOWN: &str = "resultShown";
 /// The size and name of the LUT Load 3D LUT… embedded, and why one could not be read.
 const LUT_SIZE: &str = "lutSize";
 const LUT_ERROR: &str = "lutError";
@@ -471,14 +470,10 @@ fn result_color(fields: &DialogFields) -> [f32; 3] {
 }
 
 /// Picking a Result in the Color Picker sets Hue, Saturation and Lightness so the sampled colour becomes it (#6278).
-/// `resultShown` is the result the row last drew and `resultPicked` is what the picker answers into, so a
-/// `resultPicked` that differs from `resultShown` is a pick; a slider edit made between passes changes neither.
+/// The picker's answer is the only write of `resultPicked`, and the pass that reads it removes it.
 fn apply_picked_result(fields: &mut DialogFields) {
     use photocraft_algo::tone;
     let Some(to) = fields.color(RESULT_PICKED) else { return };
-    if fields.color(RESULT_SHOWN).is_none_or(|shown| shown == to) {
-        return;
-    }
     let from = fields.color("color").unwrap_or([0.0; 3]);
     let (hue, saturation, lightness) = tone::replace_color_shift(from, to);
     for (key, v) in [("hue", hue), ("saturation", saturation), ("lightness", lightness)] {
@@ -500,12 +495,9 @@ fn result_row() -> Param {
                 swatch
             })
             .inner;
-        // The picker opens on the colour the form held at the start of the pass: `resultPicked` holds the shown
-        // Result and is what the picker answers into.
-        fields.set(RESULT_PICKED, FieldValue::Color(rgb));
-        fields.set(RESULT_SHOWN, FieldValue::Color(rgb));
+        // The row writes nothing itself: the picker opens on the shown Result and answers into `resultPicked`.
         if out.pick_color.is_some() {
-            cx.pick_color(RESULT_PICKED);
+            cx.pick_color(RESULT_PICKED, color);
         }
         out.response().clone()
     })
