@@ -350,7 +350,7 @@ fn kind_name(kind: &MenuKind) -> &'static str {
         MenuKind::TypeEdit { .. } => "TypeEdit",
         MenuKind::TypeLayer { .. } => "TypeLayer",
         MenuKind::Layers { .. } => "Layers",
-        MenuKind::BrushMode => "BrushMode",
+        MenuKind::BrushMode { .. } => "BrushMode",
     }
 }
 

@@ -97,7 +97,7 @@ fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Re
     use crate::canvas_tool_menu::MenuKind;
     let Some(id) = str_param(p, "id") else { return err("missing `id`") };
     let Some(menu) = app.ui.canvas_tool_menu.as_ref() else { return err("no canvas context menu is open") };
-    if matches!(menu.kind, MenuKind::BrushMode) {
+    if matches!(menu.kind, MenuKind::BrushMode { .. }) {
         return mode_menu_choose(app, ctx, id);
     }
     if !crate::canvas_tool_menu::available(app, menu, id) {

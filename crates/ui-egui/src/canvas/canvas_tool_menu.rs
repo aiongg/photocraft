@@ -60,7 +60,7 @@ pub enum MenuKind {
         layers: Vec<(u64, String)>,
     },
     /// A painting tool's Shift+right-click mode list (`brush_mode_menu`).
-    BrushMode,
+    BrushMode { plain: bool },
 }
 
 fn no_canvas() -> egui::Id {
@@ -996,7 +996,7 @@ pub fn selection_rows(has_selection: bool) -> &'static [Row] {
 /// The rows of an open menu. The crop, layer and brush-mode menus build theirs per menu: empty here.
 pub fn rows(menu: &CanvasToolMenu) -> &'static [Row] {
     match &menu.kind {
-        MenuKind::Crop { .. } | MenuKind::Layers { .. } | MenuKind::BrushMode => &[],
+        MenuKind::Crop { .. } | MenuKind::Layers { .. } | MenuKind::BrushMode { .. } => &[],
         MenuKind::Guide => GUIDE_MENU,
         MenuKind::Pasteboard => PASTEBOARD_MENU,
         MenuKind::View => {
@@ -1266,7 +1266,7 @@ pub fn entry_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) 
                 c => type_layer_rows(menu).iter().flatten().any(|(_, id)| *id == c) && crate::menus::is_enabled(app, c),
             };
         }
-        MenuKind::Layers { .. } | MenuKind::BrushMode => return true,
+        MenuKind::Layers { .. } | MenuKind::BrushMode { .. } => return true,
         MenuKind::Tool => {}
     }
     if is_eyedropper(menu) {
@@ -1371,7 +1371,7 @@ pub fn open(app: &mut PhotocraftApp, tool: Tool, kind: MenuKind, at: Pos2, doc: 
         point: None,
     };
     match kind {
-        MenuKind::Pasteboard | MenuKind::Guide | MenuKind::BrushMode if kind == MenuKind::BrushMode && crate::brush_mode_menu::items(tool).is_empty() => {
+        MenuKind::BrushMode { .. } if crate::brush_mode_menu::items(tool).is_empty() => {
             return false;
         }
         MenuKind::Pasteboard | MenuKind::Guide => {
@@ -1382,7 +1382,7 @@ pub fn open(app: &mut PhotocraftApp, tool: Tool, kind: MenuKind, at: Pos2, doc: 
             }
             menu.kind = kind;
         }
-        MenuKind::BrushMode => {
+        MenuKind::BrushMode { .. } => {
             // The checked row reads the tool's own brush.
             crate::paint_mouse::sync_tool_brush(app);
             menu.kind = kind;
@@ -1484,7 +1484,7 @@ fn choose_view(app: &mut PhotocraftApp, ctx: &Context, command: &str) -> Result<
 pub fn choose(app: &mut PhotocraftApp, ctx: &Context, command: &str) {
     // The layer and brush-mode menus pick by id; the brush-mode menu reads itself while open.
     match app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind) {
-        Some(MenuKind::BrushMode) => {
+        Some(MenuKind::BrushMode { .. }) => {
             match crate::brush_mode_menu::find(app, command) {
                 Ok(item) => crate::brush_mode_menu::choose(app, item),
                 Err(e) => app.ui.status = e,
@@ -1513,7 +1513,7 @@ pub fn choose(app: &mut PhotocraftApp, ctx: &Context, command: &str) {
             MenuKind::View => choose_view(app, ctx, command),
             MenuKind::TypeEdit { .. } if is_spelling(&menu, command) => choose_spelling(app, &menu, command),
             MenuKind::TypeEdit { .. } | MenuKind::TypeLayer { .. } => choose_type(app, ctx, command),
-            MenuKind::Layers { .. } | MenuKind::BrushMode => Ok(()),
+            MenuKind::Layers { .. } | MenuKind::BrushMode { .. } => Ok(()),
             // The shape menu's path rows run as the Pen's; its layer rows as the menu bar's, below.
             MenuKind::Tool if path_menu(menu.tool) || (shape_tool_menu(menu.tool) && !shape_layer_row(command)) => choose_pen(app, ctx, &menu, command),
             MenuKind::Tool if sampler_menu(&menu) => {
@@ -1652,7 +1652,7 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
         MenuKind::Layers { layers } => {
             return crate::layer_pick_ui::entries(layers, app.session.active().and_then(|s| s.active_layer).map(|l| l.0));
         }
-        MenuKind::BrushMode => return crate::brush_mode_menu::entries(app, menu.tool),
+        MenuKind::BrushMode { plain } => return crate::brush_mode_menu::entries(app, menu.tool, plain),
         _ => {}
     }
     let mut out = Vec::new();

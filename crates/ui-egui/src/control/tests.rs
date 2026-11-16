@@ -183,7 +183,7 @@ fn brush_mode_control_routes_modifiers_and_reports_choices_without_history() {
             "events": [{"kind": "down", "x": 20, "y": 20}]}),
         );
         let menu_kind = |app: &PhotocraftApp| app.ui.canvas_tool_menu.as_ref().map(|m| m.kind.clone());
-        assert_eq!(menu_kind(&app) == Some(MenuKind::BrushMode), expected == "mode", "{tool}: {modifiers}");
+        assert_eq!(matches!(menu_kind(&app), Some(MenuKind::BrushMode { .. })), expected == "mode", "{tool}: {modifiers}");
         let painted = |app: &PhotocraftApp, since: usize| app.session.journal.iter().skip(since).any(|(id, _)| id == "paint.stroke");
         match expected {
             "mode" => {
@@ -2533,7 +2533,7 @@ fn shift_right(app: &mut PhotocraftApp, tool: &str) {
 
 /// Whether the canvas tool menu open now is the brush mode menu.
 fn brush_mode_menu_open(app: &PhotocraftApp) -> bool {
-    app.ui.canvas_tool_menu.as_ref().is_some_and(|m| m.kind == MenuKind::BrushMode)
+    app.ui.canvas_tool_menu.as_ref().is_some_and(|m| matches!(m.kind, MenuKind::BrushMode { .. }))
 }
 
 /// `ui.context.choose` picks a Shift+right-click row by label; a bad or greyed one is an error

@@ -23,13 +23,14 @@ fn context_entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Value> {
 fn brush_mode_menu(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Value {
     use crate::brush_mode_menu as m;
     let tool = app.ui.tool;
-    let current = m::current(app, tool);
+    let plain = matches!(menu.kind, MenuKind::BrushMode { plain: true });
+    let current = m::checked(app, tool, plain);
     json!({
         "pos": menu.pos,
         "tool": tool,
         "mode": current.and_then(m::Item::label),
         "choices": m::labels(tool),
-        "items": m::entries(app, tool).iter().map(entry_json).collect::<Vec<_>>(),
+        "items": m::entries(app, tool, plain).iter().map(entry_json).collect::<Vec<_>>(),
     })
 }
 
@@ -128,7 +129,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
 >>>>>>> upstream/main
         }),
         "layerPicker": app.ui.layer_picker,
-        "brushModeMenu": menu.filter(|menu| matches!(menu.kind, MenuKind::BrushMode)).map(|menu| brush_mode_menu(app, menu)),
+        "brushModeMenu": menu.filter(|menu| matches!(menu.kind, MenuKind::BrushMode { .. })).map(|menu| brush_mode_menu(app, menu)),
         "brushPicker": app.ui.brush_picker.map(|pos| json!({
             "pos": pos,
             "list": {
@@ -142,7 +143,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
                 "scale": picker.browser.zoom,
             },
         })),
-        "canvasToolMenu": menu.filter(|menu| !matches!(menu.kind, MenuKind::Layers { .. } | MenuKind::BrushMode)).map(|menu| {
+        "canvasToolMenu": menu.filter(|menu| !matches!(menu.kind, MenuKind::Layers { .. } | MenuKind::BrushMode { .. })).map(|menu| {
             json!({
                 "pos": menu.pos,
                 "tool": menu.tool,
