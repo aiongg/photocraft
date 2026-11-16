@@ -23,7 +23,7 @@ use serde_json::{Map, Value, json};
 use crate::PhotocraftApp;
 
 mod rows;
-pub(crate) use rows::{REPLACE_COLOR, replace_color_sample};
+pub(crate) use rows::{REPLACE_COLOR, replace_color_replaces, replace_color_sample};
 
 const MATCH_COLOR: &str = "image.adjustments.matchColor";
 pub(crate) const MATCH_COLOR_DESTINATION: &str = "__matchColorDestination";

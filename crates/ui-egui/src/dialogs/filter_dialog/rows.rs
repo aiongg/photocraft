@@ -531,6 +531,16 @@ fn samples_of(fields: &DialogFields) -> ColorSamples {
     samples
 }
 
+/// Whether a press on Replace Color `id`'s dropper replaces the samples (its eyedropper tool, as `mods` change it)
+/// instead of adding or subtracting one.
+pub(crate) fn replace_color_replaces(app: &PhotocraftApp, id: DialogId, mods: Mods) -> bool {
+    app.framework
+        .dialogs
+        .get_by_id::<HostedParamDialog>(id)
+        .and_then(|d| armed_tool(d.fields()))
+        .is_none_or(|tool| tool.with_mods(mods) == SampleTool::Sample)
+}
+
 /// Sample the merged image at document point `at` into Replace Color's "From" colour.
 /// Returns true when the press was consumed, even off-image or over transparency, where nothing
 /// changes and the dropper stays armed (like the Curves picker). `false` when `id` is no Replace Color with a dropper armed.

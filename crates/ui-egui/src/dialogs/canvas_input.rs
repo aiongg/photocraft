@@ -13,7 +13,7 @@ use craft::behavior::{Cursor, CursorIcon, IconId, PaintedCursor};
 use craft::color::ui::ColorPickerDialog;
 use craft::imaging::layer_style::EffectSpec;
 use craft::imaging::ui::adjust::TonePicker;
-use craft::imaging::ui::color_range::HostedColorRange;
+use craft::imaging::ui::color_range::{HostedColorRange, SampleTool};
 use craft::imaging::ui::layer_style::HostedLayerStyle;
 use craft::keymap::Mods;
 use craft::theme::Srgba;
@@ -99,6 +99,43 @@ pub(crate) fn arm_dropper(app: &mut PhotocraftApp, dialog: DialogId, key: String
 /// Forgets the armed dropper (the dialog closed or its toggle went off).
 pub(crate) fn disarm_dropper(app: &mut PhotocraftApp) {
     app.dialog_dropper = None;
+}
+
+/// Whether `pick` keeps sampling while the primary button stays held and the pointer moves: the one rule of the
+/// dialogs' eyedroppers (the Levels and Curves picker, the Color Picker's, a parameter dialog's, Color Range's). A pick
+/// that adds or subtracts a sample (the sample tool, as `mods` change it) takes one per press instead. The Properties
+/// panel's armed picker, a Curves point and the preview locator act on the press alone.
+pub(crate) fn follows_drag(app: &PhotocraftApp, pick: DialogPick, mods: Mods) -> bool {
+    match pick {
+        DialogPick::TonePicker(_) => app.framework.dialogs.stack().top().is_some(),
+        DialogPick::Color => true,
+        DialogPick::ParamDropper => {
+            let Some((id, _)) = app.dialog_dropper.as_ref() else { return false };
+            let replace_color = app.framework.dialogs.get_by_id::<HostedParamDialog>(*id).and_then(|dialog| dialog.key()) == Some(crate::filter_dialog::REPLACE_COLOR);
+            !replace_color || crate::filter_dialog::replace_color_replaces(app, *id, mods)
+        }
+        DialogPick::ColorRange => app.framework.dialogs.get::<HostedColorRange>().is_some_and(|dialog| dialog.tool().with_mods(mods) == SampleTool::Sample),
+        _ => false,
+    }
+}
+
+/// A drag step at `at` of a pick that [`follows_drag`]: the pick runs again on the press's modifiers.
+pub(crate) fn resample(app: &mut PhotocraftApp, pick: DialogPick, at: [f64; 2], mods: Mods) {
+    match pick {
+        DialogPick::TonePicker(_) => {
+            pick_tone(app, at);
+        }
+        DialogPick::Color => {
+            pick_color(app, at);
+        }
+        DialogPick::ParamDropper => {
+            pick_dropper(app, at, mods);
+        }
+        DialogPick::ColorRange => {
+            pick_color_range(app, at, mods);
+        }
+        _ => {}
+    }
 }
 
 /// A press at `at` with the armed Levels or Curves point picker (the dialog's, or the Properties panel's when no dialog
