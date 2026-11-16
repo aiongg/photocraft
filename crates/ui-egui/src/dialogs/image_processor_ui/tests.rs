@@ -22,10 +22,7 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, key: &str, va
 fn values_nest_per_format() {
     let mut map = json!({"output": "o", "jpeg/enabled": true, "jpeg/quality": 5.0, "psd/enabled": false, "tiff/lzw": true}).as_object().unwrap().clone();
     super::nest(&mut map);
-    assert_eq!(
-        Value::Object(map),
-        json!({"output": "o", "jpeg": {"enabled": true, "quality": 5.0}, "psd": {"enabled": false}, "tiff": {"lzw": true}})
-    );
+    assert_eq!(Value::Object(map), json!({"output": "o", "jpeg": {"enabled": true, "quality": 5.0}, "psd": {"enabled": false}, "tiff": {"lzw": true}}));
 }
 
 #[test]

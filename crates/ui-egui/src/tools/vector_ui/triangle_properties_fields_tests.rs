@@ -26,7 +26,8 @@ fn active_id(app: &PhotocraftApp) -> LayerId {
 }
 
 fn harness(app: PhotocraftApp, id: LayerId) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(400.0, 900.0)).build_ui_state(move |ui, app| shape_properties(app, ui, id), app);
+    let mut h =
+        Harness::builder().with_context(app.ctx().clone()).with_size(vec2(400.0, 900.0)).build_ui_state(move |ui, app| shape_properties(app, ui, id), app);
     h.run_steps(4);
     h
 }

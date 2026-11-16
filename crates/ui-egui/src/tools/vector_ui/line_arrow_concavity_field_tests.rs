@@ -26,10 +26,8 @@ fn app_with_arrow() -> (PhotocraftApp, LayerId) {
 
 fn properties() -> (Harness<'static, PhotocraftApp>, LayerId) {
     let (app, id) = app_with_arrow();
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(400.0, 900.0)).build_ui_state(
-        move |ui, app| shape_properties(app, ui, id),
-        app,
-    );
+    let mut h =
+        Harness::builder().with_context(app.ctx().clone()).with_size(vec2(400.0, 900.0)).build_ui_state(move |ui, app| shape_properties(app, ui, id), app);
     h.run_steps(4);
     (h, id)
 }
@@ -38,10 +36,8 @@ fn properties() -> (Harness<'static, PhotocraftApp>, LayerId) {
 fn gear() -> Harness<'static, PhotocraftApp> {
     let (mut app, _) = app_with_arrow();
     app.ui.tool = Tool::Line;
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1800.0, 400.0)).build_ui_state(
-        |ui, app| crate::panels::options_bar(app, ui),
-        app,
-    );
+    let mut h =
+        Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1800.0, 400.0)).build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
     h.run_steps(4);
     h.query_by_label("Arrowheads").expect("the arrowhead gear").click();
     h.run_steps(3);

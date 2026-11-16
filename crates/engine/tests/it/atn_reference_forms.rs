@@ -17,8 +17,7 @@ fn ordinal(name: &str) -> ReferenceItem {
 
 fn load(s: &mut Session, reference: ReferenceItem) {
     let descriptor = Descriptor::new("null").with("null", D::Reference(vec![reference]));
-    s.actions.list =
-        ActionList::from_file(ActionsFile::new(vec![imported(AtnEvent::Code(*b"slct"), descriptor)], Vec::new()));
+    s.actions.list = ActionList::from_file(ActionsFile::new(vec![imported(AtnEvent::Code(*b"slct"), descriptor)], Vec::new()));
 }
 
 fn bytes(event: AtnEvent, descriptor: Descriptor) -> Vec<u8> {

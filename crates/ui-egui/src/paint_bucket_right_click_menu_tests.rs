@@ -46,7 +46,11 @@ fn a_plain_right_click_lists_the_options_bar_modes_with_none_checked() {
     assert_eq!(rows, options_bar_modes());
     assert!(checked.is_empty(), "no entry is checked: {checked:?}");
     assert!(crate::brush_picker::opened_at(&app).is_none(), "not the preset picker");
-    assert_eq!(crate::brush_mode_menu::current(&app, Tool::PaintBucket), Some(crate::brush_mode_menu::Item::Blend(BlendMode::Normal)), "the tool's mode is unchanged");
+    assert_eq!(
+        crate::brush_mode_menu::current(&app, Tool::PaintBucket),
+        Some(crate::brush_mode_menu::Item::Blend(BlendMode::Normal)),
+        "the tool's mode is unchanged"
+    );
 }
 
 #[test]

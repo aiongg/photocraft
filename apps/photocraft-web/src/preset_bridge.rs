@@ -208,7 +208,9 @@ impl Bridge {
     pub fn verify_action_definitions(&self, actions: &ActionState) {
         let mut s = self.state();
         s.actions_unsynced = match s.files.get(ACTIONS_FILE) {
-            Some(bytes) => !std::str::from_utf8(bytes).ok().and_then(|text| ActionsFile::from_json(text).ok()).is_some_and(|file| file == actions.list.to_file()),
+            Some(bytes) => {
+                !std::str::from_utf8(bytes).ok().and_then(|text| ActionsFile::from_json(text).ok()).is_some_and(|file| file == actions.list.to_file())
+            }
             None => !(actions.list.actions().is_empty() && actions.list.sets().is_empty()),
         };
     }

@@ -113,7 +113,8 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
     let next = photocraft_doc::CountGroup::default();
     let g = group.map_or(&next, |gi| &m.count_groups[gi]);
     if let Some(gi) = group {
-        let mut entries: Vec<Entry<GroupPick>> = m.count_groups.iter().enumerate().map(|(i, g)| Entry::new(GroupPick::Group(i), Label::from(g.name.clone()))).collect();
+        let mut entries: Vec<Entry<GroupPick>> =
+            m.count_groups.iter().enumerate().map(|(i, g)| Entry::new(GroupPick::Group(i), Label::from(g.name.clone()))).collect();
         entries.push(Entry::separator());
         entries.push(Entry::new(GroupPick::Rename, Label::from(tl!("Rename…"))));
         match Select::new(Label::from(tl!("Group")), Bind::given(GroupPick::Group(gi)), &entries).show(ui).value() {

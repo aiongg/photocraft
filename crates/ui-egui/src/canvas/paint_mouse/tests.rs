@@ -70,7 +70,12 @@ fn strokes(h: &Harness<'static, PhotocraftApp>) -> Vec<serde_json::Value> {
 
 /// Where the Shift+right-click mode menu is open, if it is.
 fn mode_menu_at(h: &Harness<'static, PhotocraftApp>) -> Option<Pos2> {
-    h.state().ui.canvas_tool_menu.as_ref().filter(|m| matches!(m.kind, crate::canvas_tool_menu::MenuKind::BrushMode { .. })).map(|m| egui::pos2(m.pos[0], m.pos[1]))
+    h.state()
+        .ui
+        .canvas_tool_menu
+        .as_ref()
+        .filter(|m| matches!(m.kind, crate::canvas_tool_menu::MenuKind::BrushMode { .. }))
+        .map(|m| egui::pos2(m.pos[0], m.pos[1]))
 }
 
 /// Where the Brush Preset picker is open, if it is.

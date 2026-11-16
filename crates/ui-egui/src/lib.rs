@@ -229,19 +229,19 @@ use panels::variables_ui;
 pub use prefs::kys_import;
 pub use prefs::prefs_ui;
 use prefs::pressure_curve_ui;
+#[cfg(not(target_arch = "wasm32"))]
+pub use services::AgentAutomationFn;
 pub use services::AutomationReadResult;
 pub(crate) use services::SAVE_OPTIONS_OPEN;
 #[cfg(test)]
 pub(crate) use services::saved_revision_after_write;
 pub use services::{
     AdoptAutosaveFn, AppendTextFn, AutomationAuthorizeFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationServices, AutomationWriteFn,
-    AutosaveFn, AutosaveResultsFn, CapsLockFn, ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, ExportFn,
-    ExportSettings, ExternalSvgEditor, ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox,
-    LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn, SameFileFn,
-    SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
+    AutosaveFn, AutosaveResultsFn, CapsLockFn, ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn,
+    ExportFn, ExportSettings, ExternalSvgEditor, ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn,
+    Inbox, LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn,
+    SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
 };
-#[cfg(not(target_arch = "wasm32"))]
-pub use services::AgentAutomationFn;
 pub(crate) use services::{opaque_layer, saves_flat_in_place};
 pub use text::cjk_fonts;
 pub use text::direction;
@@ -972,7 +972,6 @@ mod view_sync_tests;
 #[cfg(test)]
 mod stamp_tests;
 
-
 #[cfg(test)]
 mod alt_click_tests;
 #[cfg(test)]
@@ -989,7 +988,6 @@ mod polygon_lasso_tests;
 
 #[cfg(test)]
 mod window_frame_tests;
-
 
 #[cfg(test)]
 mod browse_field_tests;
@@ -1019,13 +1017,13 @@ mod selection_move_step_tests;
 mod view_guides_submenu_tests;
 
 #[cfg(test)]
-mod reset_tip_tests;
-#[cfg(test)]
-mod zoom_mode_tests;
-#[cfg(test)]
 mod lasso_click_tests;
 #[cfg(test)]
+mod reset_tip_tests;
+#[cfg(test)]
 mod rotate_steps_tests;
+#[cfg(test)]
+mod zoom_mode_tests;
 
 #[cfg(test)]
 mod red_eye_context_menu_tests;

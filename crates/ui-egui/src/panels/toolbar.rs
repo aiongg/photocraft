@@ -249,8 +249,11 @@ fn show_drawer(
         for edit in &out.edits {
             arranged = apply_toolbar_edit(&arranged, edit, &defaults);
         }
-        let params =
-            if matches!(out.edits.last(), Some(ToolbarEdit::Reset)) { json!({"reset": true}) } else { json!({"toolbar": tool_commands::saved_groups(&arranged)}) };
+        let params = if matches!(out.edits.last(), Some(ToolbarEdit::Reset)) {
+            json!({"reset": true})
+        } else {
+            json!({"toolbar": tool_commands::saved_groups(&arranged)})
+        };
         if let Err(e) = crate::menus::invoke(app, ctx, "edit.toolbar", params) {
             app.ui.status = e;
             app.ui.status_error = true;

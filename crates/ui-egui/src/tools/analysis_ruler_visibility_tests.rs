@@ -3,8 +3,8 @@
 
 use serde_json::json;
 
-use crate::state::Tool;
 use crate::PhotocraftApp;
+use crate::state::Tool;
 use photocraft_doc::Ruler;
 
 /// A 200 x 100 document with a ruler from 20,20 to 180,80 and its protractor arm to 20,90.

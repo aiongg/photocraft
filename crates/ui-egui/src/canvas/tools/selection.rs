@@ -79,9 +79,7 @@ impl SelectionTools {
 
     /// The whole-pixel offset of the selection drag in progress, from the tool that runs it.
     pub(crate) fn drag_offset(&self) -> Option<(i32, i32)> {
-        [self.marquee.phase(), self.lasso.phase(), self.polygon.phase(), self.magnetic.phase(), self.wand.drag.phase()]
-            .into_iter()
-            .find_map(drag_delta)
+        [self.marquee.phase(), self.lasso.phase(), self.polygon.phase(), self.magnetic.phase(), self.wand.drag.phase()].into_iter().find_map(drag_delta)
     }
 }
 

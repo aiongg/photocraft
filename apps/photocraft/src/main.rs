@@ -500,8 +500,7 @@ fn main() -> eframe::Result {
     write_start_marker(&sentinel, &plan);
     let gpu_note: std::sync::Arc<std::sync::Mutex<Option<String>>> = Default::default();
     // The adapter's real texture limits (egui asks for 8192 px), so big documents stay on the GPU.
-    let wanted_adapter =
-        gpu_startup::wanted_adapter(std::env::var("PHOTOCRAFT_GPU_ADAPTER").ok().as_deref(), &gpu_startup::gpu_adapter(&prefs.performance));
+    let wanted_adapter = gpu_startup::wanted_adapter(std::env::var("PHOTOCRAFT_GPU_ADAPTER").ok().as_deref(), &gpu_startup::gpu_adapter(&prefs.performance));
     gpu_startup::configure(&mut options.wgpu_options.wgpu_setup, &plan, os, wanted_adapter, sentinel.clone(), gpu_note.clone());
     // Preferences › Performance › Low-Latency Drawing (#1343): without vsync a stroke shows about
     // 50 ms sooner; wgpu picks Immediate, else Mailbox, else Fifo by what the driver offers.

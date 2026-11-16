@@ -227,8 +227,7 @@ pub fn base_rows(app: &PhotocraftApp) -> Vec<Row> {
         item.label = reveal_label().into();
     }
     // File › Open Recent: a dynamic submenu of recently opened files, after Open as Smart Object… (#14053).
-    if let Some(after) =
-        rows.iter().position(|i| i.command.id == "file.openAsSmartObject").or_else(|| rows.iter().position(|i| i.command.id == "file.openAs"))
+    if let Some(after) = rows.iter().position(|i| i.command.id == "file.openAsSmartObject").or_else(|| rows.iter().position(|i| i.command.id == "file.openAs"))
     {
         let rp = ["File", "Open Recent"];
         let mut recent: Vec<Row> = app

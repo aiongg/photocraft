@@ -277,7 +277,9 @@ impl CanvasTool for RetouchTool<'_> {
                 let mods = press.map_or(cx.mods, |(_, mods)| mods);
                 tool_feedback::selection_op(Tool::ObjectSelection, app.ui.selection_mode, mods, tool_feedback::has_selection(app)).badge()
             }
-            Tool::Patch | Tool::ContentAwareMove => state.lasso.outline_operation().map_or_else(|| at.and_then(|at| tool_feedback::patch_badge(app, at, press, cx.mods)), |op| op.badge()),
+            Tool::Patch | Tool::ContentAwareMove => {
+                state.lasso.outline_operation().map_or_else(|| at.and_then(|at| tool_feedback::patch_badge(app, at, press, cx.mods)), |op| op.badge())
+            }
             _ => None,
         });
         badge.map_or(Cursor::Painted(PaintedCursor::Crosshair), |badge| PaintedCursor::badged(CursorIcon::Crosshair, badge).into())

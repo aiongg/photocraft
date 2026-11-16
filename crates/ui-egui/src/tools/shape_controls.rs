@@ -94,7 +94,9 @@ fn selection(app: &PhotocraftApp, flat_ok: bool) -> Option<(Vec<u64>, [f64; 4])>
         rect = Some(rect.map_or([x0, y0, x1, y1], |r| [r[0].min(x0), r[1].min(y0), r[2].max(x1), r[3].max(y1)]));
         layers.push(l.id.0);
     }
-    let r = rect.filter(|r| r.iter().all(|v| v.is_finite()) && if flat_ok { r[2] >= r[0] && r[3] >= r[1] && (r[2] > r[0] || r[3] > r[1]) } else { r[2] > r[0] && r[3] > r[1] })?;
+    let r = rect.filter(|r| {
+        r.iter().all(|v| v.is_finite()) && if flat_ok { r[2] >= r[0] && r[3] >= r[1] && (r[2] > r[0] || r[3] > r[1]) } else { r[2] > r[0] && r[3] > r[1] }
+    })?;
     Some((layers, r))
 }
 

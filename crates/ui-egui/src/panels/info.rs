@@ -120,7 +120,8 @@ pub(crate) fn readings<'a>(app: &mut PhotocraftApp, samplers: &'a [(SamplerReado
         .position(position)
         .extent(extent_labels)
         .measure(ruler.as_ref().map(|r| r.measure.clone()))
-        .document(Some([size.width, size.height])).samplers(samplers)
+        .document(Some([size.width, size.height]))
+        .samplers(samplers)
 }
 
 /// The first `N` entries of the JSON array `v` as bytes; `None` when one is missing or not a byte.

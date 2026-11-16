@@ -70,7 +70,9 @@ fn alt_after_the_start_draws_from_the_centre() {
 #[test]
 fn the_dialog_and_the_drag_send_the_same_triangle() {
     let mut dialog = app(800, 600);
-    let id = crate::dialogs::shape_dialog::open(&mut dialog, craft::draw::ui::shape_drag::ShapeKind::Triangle, craft::behavior::kurbo::Point::new(400.0, 300.0)).unwrap();
+    let id =
+        crate::dialogs::shape_dialog::open(&mut dialog, craft::draw::ui::shape_drag::ShapeKind::Triangle, craft::behavior::kurbo::Point::new(400.0, 300.0))
+            .unwrap();
     crate::dialogs::testing::confirm(&mut dialog, id).unwrap();
     let mut dragged = app(800, 600);
     drag(&mut dragged, [400.0, 300.0], [500.0, 400.0], Modifiers::NONE);

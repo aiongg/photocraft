@@ -1,8 +1,8 @@
 //! The Layers panel menu's Duplicate Layer… (#14615): right after New Group…, opening the same
 //! dialog as Layer › Duplicate Layer…, plural with several layers selected, greyed without a document.
 use craft::keymap::CommandRef;
-use craft::ui::menu::PanelRow;
 use craft::ui::dialog::StackDialog;
+use craft::ui::menu::PanelRow;
 use craft::ui::patterns::form_dialogs::HostedParamDialog;
 use craft::ui::runtime::commands::CommandState;
 use serde_json::json;

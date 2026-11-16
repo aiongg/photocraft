@@ -4527,4 +4527,3 @@ fn save_and_close_refuses_a_read_only_source() {
         assert_eq!(std::fs::read(&source).unwrap(), bytes, "overrideOpen {override_open}: the source is unchanged");
     }
 }
-

@@ -115,7 +115,10 @@ fn recorded_steps_load_and_save_back_unchanged() {
     for (d, params) in cases {
         let (mut s, r) = load(vec![d.clone()]);
         assert_eq!(r["unsupported"], json!([]), "{r}");
-        let (id, p) = { let step = &s.actions.list.actions()[0].steps[0]; (&step.command, &step.params) };
+        let (id, p) = {
+            let step = &s.actions.list.actions()[0].steps[0];
+            (&step.command, &step.params)
+        };
         let mut p = p.clone();
         p.as_object_mut().unwrap().remove(SOURCE);
         assert_eq!((id.as_str(), &p), (FRAME, &params));

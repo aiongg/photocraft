@@ -598,7 +598,12 @@ pub fn finish_object_selection(app: &mut PhotocraftApp, start: [f64; 2], end: [f
     let (w, h) = ((end[0] - start[0]).abs(), (end[1] - start[1]).abs());
     let sample_all = app.ui.tool_options.sample_all.object_selection;
     let hard_edge = app.ui.tool_options.object_hard_edge;
-    let mode = crate::tool_feedback::mode_name(crate::tool_feedback::selection_op(Tool::ObjectSelection, app.ui.selection_mode, mods, crate::tool_feedback::has_selection(app)));
+    let mode = crate::tool_feedback::mode_name(crate::tool_feedback::selection_op(
+        Tool::ObjectSelection,
+        app.ui.selection_mode,
+        mods,
+        crate::tool_feedback::has_selection(app),
+    ));
     if (w < 2.0 || h < 2.0) && app.ui.tool_options.object_finder {
         // Object Finder (#4087): the object under the click, as hovering highlighted it.
         let r = app.run("select.object", json!({"point": [end[0], end[1]], "mode": mode, "sampleAllLayers": sample_all, "hardEdge": hard_edge}));

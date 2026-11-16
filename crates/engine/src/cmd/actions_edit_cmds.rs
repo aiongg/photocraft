@@ -17,10 +17,10 @@ mod insert_path;
 mod library_commands;
 mod record_again;
 
-pub(crate) use library_commands::enabled as library_change_enabled;
-pub(crate) use library_commands::{confirmed_idle, publish_library};
-pub use library_commands::{BASICS_SET, LibraryUndo, undo_library_label};
 pub use insert_path::selected_path as selected_recording_path;
+pub(crate) use library_commands::enabled as library_change_enabled;
+pub use library_commands::{BASICS_SET, LibraryUndo, undo_library_label};
+pub(crate) use library_commands::{confirmed_idle, publish_library};
 pub use record_again::{RecordAgainTarget, target as record_again_target};
 
 fn bad(cmd: &str, msg: impl Into<String>) -> EngineError {

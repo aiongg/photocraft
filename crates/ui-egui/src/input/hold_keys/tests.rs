@@ -681,10 +681,7 @@ fn space_hand_view_menu_keeps_escape_and_enter_from_the_pending_crop() {
     let p = screen(&h, 200.0, 125.0);
     key(&mut h, Key::Space, true, Modifiers::NONE);
     right_click_at(&mut h, p);
-    assert!(
-        h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.kind == MenuKind::View),
-        "Space's Hand opens the view menu"
-    );
+    assert!(h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.kind == MenuKind::View), "Space's Hand opens the view menu");
     tap(&mut h, Key::Escape, Modifiers::NONE);
     h.run_steps(2);
     assert!(h.state().ui.canvas_tool_menu.is_none(), "Esc closes the menu");

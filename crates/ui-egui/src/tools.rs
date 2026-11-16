@@ -56,7 +56,6 @@ mod art_history_default_style_tests;
 #[cfg(test)]
 mod gradient_mode_greyed_tests;
 
-
 #[cfg(test)]
 mod count_show_extras_tests;
 #[cfg(test)]

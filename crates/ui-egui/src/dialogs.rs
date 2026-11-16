@@ -250,8 +250,14 @@ pub(crate) mod params {
         for id in hosted(app) {
             let key = key_of(app, id);
             let Some(dialog) = dialog_mut(app, id) else { continue };
-            let (colour, path, dropper, listing, footer, range) =
-                (dialog.pick_color(), dialog.pick_path(), dialog.take_eyedropper(), dialog.take_listing(), dialog.take_footer_action(), dialog.take_range_alert());
+            let (colour, path, dropper, listing, footer, range) = (
+                dialog.pick_color(),
+                dialog.pick_path(),
+                dialog.take_eyedropper(),
+                dialog.take_listing(),
+                dialog.take_footer_action(),
+                dialog.take_range_alert(),
+            );
             if let Some(alert) = range {
                 let _ = alerts::show(app, alert);
             }
@@ -683,10 +689,10 @@ pub mod distort_ui;
 pub mod duplicate_layer_ui;
 pub mod equalize_ui;
 pub mod export_dialog;
+pub(crate) mod fade_modes;
 pub mod file_forms;
 pub mod file_ui;
 pub mod fill_ui;
-pub(crate) mod fade_modes;
 pub mod filter_dialog;
 pub(super) mod filter_preview_ui;
 #[cfg(not(target_arch = "wasm32"))]

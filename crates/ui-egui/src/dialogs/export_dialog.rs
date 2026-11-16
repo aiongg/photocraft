@@ -8,6 +8,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 
 use craft::behavior::PixelSize;
+use craft::cms::Profile;
 use craft::ui::contract::SaveKey;
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::patterns::form_dialogs::{
@@ -16,7 +17,6 @@ use craft::ui::patterns::form_dialogs::{
 };
 use craft::ui::patterns::presets::{GroupPath, NamedPresetEvent, PresetLibrary};
 use craft::ui::runtime::requests::PathKind;
-use craft::cms::Profile;
 use photocraft_doc::{ColorMode, Document, LayerId};
 use serde_json::{Map, Value, json};
 

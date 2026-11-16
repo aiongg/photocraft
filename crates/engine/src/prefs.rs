@@ -24,9 +24,9 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::commands::CommandSpec;
-pub use craft::automation::agents::WhenAppClosed;
-use craft::automation::agents::AgentSettings;
 use crate::{EngineError, Result, Session};
+use craft::automation::agents::AgentSettings;
+pub use craft::automation::agents::WhenAppClosed;
 
 /// A string-valued choice enum with its JSON names (used to validate `prefs.set` and to fill
 /// dropdowns in the Preferences dialog).

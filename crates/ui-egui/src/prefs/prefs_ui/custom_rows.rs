@@ -12,10 +12,10 @@ use craft::ui::choice::Checkbox;
 use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};
 use craft::ui::display::Text;
 use craft::ui::form::Field;
+use craft::ui::patterns::preferences::PathSetting;
 use craft::ui::pickers::Select;
 use craft::ui::runtime::env::system_appearance;
 use craft::ui::style::TypeRole;
-use craft::ui::patterns::preferences::PathSetting;
 use craft::ui::text::{NumberField, TextField};
 use serde_json::{Value, json};
 

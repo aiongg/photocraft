@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use craft::behavior::{CursorBadge, EditEvent, IconId, Mixed};
 use craft::cms::lutfile::write_cube;
+use craft::cms::{ColorSpace, TransformOptions};
 use craft::color::ui::{LutChoice, LutPicker, LutPickerOutput};
 use craft::imaging::ui::color_range::{ColorSamples, SampleSign, SampleTool};
 use craft::keymap::Mods;
@@ -27,7 +28,6 @@ use craft::ui::pickers::Select;
 use craft::ui::primitives::IconSpec;
 use craft::ui::runtime::env::Label;
 use craft::ui::runtime::requests::EyedropperRequest;
-use craft::cms::{ColorSpace, TransformOptions};
 use photocraft_color::ColorMode;
 use photocraft_doc::Document;
 use photocraft_engine::installed_profiles::InstalledProfile;

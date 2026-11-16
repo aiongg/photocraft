@@ -64,7 +64,10 @@ fn every_measured_source_loads_and_saves_back() {
     for (codes, names) in forms {
         let d = recorded("Recorded message", &codes, target("Grys"));
         let mut s = load_items(vec![item(d.clone())]);
-        let (id, p) = { let step = &s.actions.list.actions()[0].steps[0]; (&step.command, &step.params) };
+        let (id, p) = {
+            let step = &s.actions.list.actions()[0].steps[0];
+            (&step.command, &step.params)
+        };
         assert_eq!(id, ID, "{codes:?}");
         assert_eq!((&p["from"], &p["to"]), (&json!(names), &json!("grayscale")), "{p}");
         let back = saved_items(&mut s);
@@ -80,7 +83,10 @@ fn every_native_target_loads_and_the_canonical_form_carries_only_the_settings() 
     for (class, to) in [("Grys", "grayscale"), ("RGBM", "rgb"), ("CMYM", "cmyk"), ("LbCM", "lab")] {
         let d = recorded("", &["URGB", "ULab"], target(class));
         let s = load_items(vec![item(d.clone())]);
-        let (id, p) = { let step = &s.actions.list.actions()[0].steps[0]; (&step.command, &step.params) };
+        let (id, p) = {
+            let step = &s.actions.list.actions()[0].steps[0];
+            (&step.command, &step.params)
+        };
         assert_eq!((id.as_str(), p), (ID, &json!({"from": ["rgb", "lab"], "to": to})));
         assert_eq!(exported(p), Some(d), "{to}");
     }

@@ -50,8 +50,7 @@ pub(super) fn load(s: &mut Session, p: &Value) -> Result<Value> {
     // keeps it as an empty folder, like one New Set made, and `replace` drops the set's actions.
     if replace {
         // The function keys of the actions it replaces go with them.
-        let replaced: Vec<String> =
-            s.actions.list.actions().iter().filter(|a| a.set.as_deref() == Some(imp.set.as_str())).map(|a| a.name.clone()).collect();
+        let replaced: Vec<String> = s.actions.list.actions().iter().filter(|a| a.set.as_deref() == Some(imp.set.as_str())).map(|a| a.name.clone()).collect();
         crate::actions_cmds::remove_shortcuts(s, replaced.iter().map(String::as_str));
     }
     let file = ActionsFile::new(imp.actions, vec![imp.set.clone()]);

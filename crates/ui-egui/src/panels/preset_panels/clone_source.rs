@@ -26,11 +26,20 @@ fn edit(app: &mut PhotocraftApp, command: &str, mut params: Value, gesture: Opti
 /// A number field of `value`: the value an edit landed on with its gesture, `None` when nothing changed. With
 /// `name`, the field sits in a `Field` labelled `label` and keeps `name` as its own accessible name, so the label
 /// describes it.
-fn number(ui: &mut egui::Ui, label: &str, name: Option<&str>, value: f64, range: std::ops::RangeInclusive<f64>, unit: UnitKind) -> Option<(f64, Option<GestureId>)> {
+fn number(
+    ui: &mut egui::Ui,
+    label: &str,
+    name: Option<&str>,
+    value: f64,
+    range: std::ops::RangeInclusive<f64>,
+    unit: UnitKind,
+) -> Option<(f64, Option<GestureId>)> {
     let mut shown = Some(value);
     let out = match name {
         Some(name) => {
-            Field::new(label.to_owned()).show(ui, |ui, _| NumberField::new(name.to_owned(), Bind::bound(&mut shown)).keeps_name(true).range(range.clone()).unit_kind(unit).show(ui)).inner?
+            Field::new(label.to_owned())
+                .show(ui, |ui, _| NumberField::new(name.to_owned(), Bind::bound(&mut shown)).keeps_name(true).range(range.clone()).unit_kind(unit).show(ui))
+                .inner?
         }
         None => NumberField::new(label.to_owned(), Bind::bound(&mut shown)).range(range).unit_kind(unit).show(ui),
     };

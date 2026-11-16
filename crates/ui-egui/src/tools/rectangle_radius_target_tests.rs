@@ -20,7 +20,8 @@ fn bar_with(tool: Tool) -> Harness<'static, PhotocraftApp> {
     app.run("shape.create", json!({"kind": "roundedRect", "rect": [10, 10, 80, 60], "radii": [20, 20, 20, 20], "fill": "#ff0000"})).unwrap();
     app.sync_views();
     app.ui.tool = tool;
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1800.0, 300.0)).build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
+    let mut h =
+        Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1800.0, 300.0)).build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
     h.run_steps(4);
     h
 }

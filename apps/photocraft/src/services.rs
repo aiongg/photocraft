@@ -452,9 +452,7 @@ pub fn agent_automation(settings: &craft::automation::agents::AgentSettings) -> 
     let no_flags = photocraft_automation::args::AutomationArgs { automation_read_root: Vec::new(), automation_write_root: None };
     match crate::automation_workspace(&no_flags, settings) {
         Ok((workspace, warning)) => (automation(Some(workspace)), warning.map(|w| format!("Agents can connect, but without file access there: {w}"))),
-        Err(e) => {
-            (automation(Some(photocraft_automation::AuthorizedWorkspace::default())), Some(format!("Agents can connect, but without file access: {e}")))
-        }
+        Err(e) => (automation(Some(photocraft_automation::AuthorizedWorkspace::default())), Some(format!("Agents can connect, but without file access: {e}"))),
     }
 }
 

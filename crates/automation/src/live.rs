@@ -123,11 +123,7 @@ impl Live {
         match self.cfg.when_closed.unwrap_or(integrations.agents.when_app_closed) {
             WhenAppClosed::Error => Err("PhotoCraft isn't running: open it, then try again.".into()),
             WhenAppClosed::Headless => {
-                let reads = if self.cfg.read_roots.is_empty() {
-                    integrations.agents.read_folder().into_iter().collect()
-                } else {
-                    self.cfg.read_roots.clone()
-                };
+                let reads = if self.cfg.read_roots.is_empty() { integrations.agents.read_folder().into_iter().collect() } else { self.cfg.read_roots.clone() };
                 let write = self.cfg.write_root.clone().or_else(|| integrations.agents.write_folder());
                 self.headless(&reads, write, "PhotoCraft isn't running and its agent folders can't be used")
             }

@@ -25,11 +25,7 @@ fn linked_app(switch: AgentSwitch) -> (PhotocraftApp, tempfile::TempDir, Arc<Mut
     let seen = asked.clone();
     app.services.agent_automation = Some(Box::new(move |settings: &AgentSettings| {
         seen.lock().unwrap().push(settings.clone());
-        let services = crate::AutomationServices {
-            command: Some(Box::new(|_, _| Err("policy".into()))),
-            authorize: Some(|_, _| Ok(())),
-            ..Default::default()
-        };
+        let services = crate::AutomationServices { command: Some(Box::new(|_, _| Err("policy".into()))), authorize: Some(|_, _| Ok(())), ..Default::default() };
         (services, (settings.read_root == "/missing").then(|| "Automation Read Folder is not used".to_string()))
     }));
     (app, dir, asked)

@@ -3,13 +3,13 @@
 //! scope strip, the floating scope and the clipping overlay; nothing here draws.
 //!
 //! One [`ScopeData`] is built per develop and kept with its result, so a pass only reads it.
+use craft::cms::Transform;
 use craft::imaging::scopes::{ChannelMask, ClippingMask};
 use craft::imaging::ui::histogram::ChannelColor;
 use craft::imaging::ui::scopes::{ClippingFrame, HistogramSet, ScopeChannel, ScopeFrame, ScopeReadout, VectorscopeFrame};
 use craft::ui::primitives::Revision;
 use photocraft_algo::histogram::RgbHistogram;
 use photocraft_algo::vectorscope::{HUES, SATURATIONS, Vectorscope, hue_saturation};
-use craft::cms::Transform;
 use std::sync::Arc;
 
 /// Most colour samplers (probes) on the preview.

@@ -123,8 +123,7 @@ pub(crate) fn deselect_loaded_path(app: &mut PhotocraftApp, name: &str) {
 /// Path Selection has components of the saved path targeted in the Paths panel selected: what its bare Enter and
 /// Esc deselect (#13287).
 pub(crate) fn saved_path_components_selected(app: &PhotocraftApp) -> bool {
-    selected_saved_path_index(app)
-        .is_some_and(|(index, _)| matches!(crate::path_components::selected(app), Some((PathRef::Saved(i), ..)) if i == index))
+    selected_saved_path_index(app).is_some_and(|(index, _)| matches!(crate::path_components::selected(app), Some((PathRef::Saved(i), ..)) if i == index))
 }
 
 /// Is the active document's Work Path drawn and edited on the canvas? Not after
@@ -228,7 +227,10 @@ pub(crate) fn delete_key_edits_path(app: &PhotocraftApp) -> Option<(&'static str
         && app.ui.view.shows(app.ui.view.show.target_path);
     usable.then_some(())?;
     let holds = crate::direct_select::still_valid(app, ds);
-    if holds && ds.anchors.is_empty() && let (Some([s, k]), Some(target)) = (ds.segment, ds.target) {
+    if holds
+        && ds.anchors.is_empty()
+        && let (Some([s, k]), Some(target)) = (ds.segment, ds.target)
+    {
         let (_, path) = crate::direct_select::candidates(app).into_iter().find(|(r, _)| *r == target)?;
         path.subpaths.get(s)?.knots.get(k)?;
         crate::direct_select::writable(app, &target).then_some(())?;

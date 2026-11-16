@@ -7,8 +7,7 @@ use craft::theme::Srgba;
 use craft::ui::contract::{Bind, SaveKey};
 use craft::ui::dialog::{DialogId, DialogResult, StackDialog};
 use craft::ui::patterns::form_dialogs::{
-    BackgroundContents, BitDepth, ColorMode as DialogMode, ColorProfiles, DocumentOptions, HostedNewDocument, NewDocumentDialog, PIXEL_ASPECTS,
-    SQUARE_PIXELS,
+    BackgroundContents, BitDepth, ColorMode as DialogMode, ColorProfiles, DocumentOptions, HostedNewDocument, NewDocumentDialog, PIXEL_ASPECTS, SQUARE_PIXELS,
 };
 use craft::ui::patterns::presets::{GroupPath, NamedPresetEvent, PresetLibrary};
 use craft::ui::runtime::env::UnitKind;
@@ -173,8 +172,7 @@ pub(crate) fn profiles(app: &PhotocraftApp) -> Vec<ColorProfiles> {
         .iter()
         .map(|(mode, dialog_mode)| {
             let space = photocraft_engine::color_cmds::mode_space(*mode);
-            let mut others: Vec<String> =
-                craft::cms::Builtin::ALL.iter().filter(|b| b.profile().color_space == space).map(|b| b.id().to_string()).collect();
+            let mut others: Vec<String> = craft::cms::Builtin::ALL.iter().filter(|b| b.profile().color_space == space).map(|b| b.id().to_string()).collect();
             others.extend(installed.iter().filter(|i| i.is_destination() && i.color_space == space).map(|i| i.path.clone()));
             ColorProfiles::new(*dialog_mode, app.session.color.working(*mode).description.clone(), others)
         })
