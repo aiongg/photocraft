@@ -526,7 +526,10 @@ fn the_mode_shows_clear_while_tilde_is_held() {
 #[test]
 fn a_held_key_keeps_a_pending_crop_and_another_tools_key_commits_it() {
     let mut h = harness(Tool::Crop);
-    // PLAN: the frame is set by dragging the bottom-right handle in, since tools-w45's crop session setter is not in the tree.
+    // Classic Mode resizes the frame from the dragged handle; the default image mode resizes about the centre.
+    h.state_mut().ui.tool_options.crop.shield.classic_mode = true;
+    h.state_mut().ui.extras.snap = false;
+    h.run_steps(1);
     drag_with(&mut h, Modifiers::NONE, 400.0, 300.0, 300.0, 200.0);
     h.run_steps(2);
     assert!(crate::crop_ui::pending(h.state()));
