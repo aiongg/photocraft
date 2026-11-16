@@ -148,6 +148,10 @@ impl DockPanels<String> for Panels<'_> {
         body(self.app, ui, panel);
     }
 
+    fn content(&self, panel: &String) -> Option<u64> {
+        Some(super::region_versions::panel(self.app, panel))
+    }
+
     /// The canvas group is the document area: it draws its own tabs, rail and documents in the group's rect.
     fn group_view(&mut self, panels: &[String], _: usize, ui: &mut egui::Ui, at: GroupAt, _: &mut BodyCx<'_>) -> Option<f32> {
         if !panels.iter().any(|panel| panel == CANVAS) {

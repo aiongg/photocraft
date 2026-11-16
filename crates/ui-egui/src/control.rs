@@ -83,7 +83,29 @@ fn run_waiting(app: &mut PhotocraftApp, wait: bool, run: impl FnOnce(&mut Photoc
     }
 }
 
+/// The methods that only hand the window input (it reaches a region as a hand's does) or only read: every other method
+/// may change what a settling region shows, so it counts as a command run (`PhotocraftApp::commands_run`).
+const INPUT_OR_READ: &[&str] = &[
+    "engine.commands",
+    "jobs.list",
+    "ui.capsLock",
+    "ui.click",
+    "ui.inspect",
+    "ui.key",
+    "ui.menu.list",
+    "ui.move",
+    "ui.pointer",
+    "ui.release",
+    "ui.screenshot",
+    "ui.type",
+    "ui.wheel",
+];
+
 pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context, req: &ControlRequest) -> Reply {
+    if !INPUT_OR_READ.contains(&req.method.as_str()) {
+        app.commands_run += 1;
+        ctx.request_repaint();
+    }
     let saved = app.session.authorize;
     if let Some(gate) = app.services.automation_authorize {
         app.session.authorize = Some(gate);

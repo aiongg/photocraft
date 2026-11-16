@@ -5,7 +5,7 @@ use super::{
 use craft::ui::contract::{Bind, BodyCx, PaneEdge};
 use craft::ui::runtime::env::WindowKey;
 use craft::ui::runtime::windows::WindowHost;
-use craft::ui::shell::AppShell;
+use craft::ui::shell::{AppShell, slots};
 
 /// The tool rail's slot: the toolbar on the side `panels.toolbar_side` gives.
 fn tool_rail(ui: &mut egui::Ui, _cx: &mut BodyCx<'_>, app: &mut PhotocraftApp) {
@@ -233,6 +233,7 @@ impl PhotocraftApp {
         let reading_start = if crate::direction::is_rtl() { crate::state::ToolbarSide::Right } else { crate::state::ToolbarSide::Left };
         let toolbar_edge = if self.ui.panels.toolbar_side.resolve() == reading_start { PaneEdge::Start } else { PaneEdge::End };
         let window_title = panels::title_bar::window_title(self);
+        let versions = (panels::region_versions::options_bar(self), panels::region_versions::tool_rail(self), panels::region_versions::status_bar(self));
         // The shell binds a copy of the mode, since `show` takes the app too; the copy goes back
         // to the view after the pass.
         let mut mode = self.ui.view.screen_mode;
@@ -242,8 +243,11 @@ impl PhotocraftApp {
             .screen_mode(Bind::bound(&mut mode))
             .title_bar_if(menu_bar, |ui, _cx, app| panels::title_bar(app, ui))
             .options_bar(options_bar && !home, |ui, _cx, app| panels::options_bar(app, ui))
+            .content(slots::OPTIONS, versions.0)
             .tools(toolbar_edge, panels::toolbar::columns(self), toolbar && !home, tool_rail)
+            .content(slots::TOOLS, versions.1)
             .status(status_bar && !home, |ui, _cx, app| panels::status_bar(app, ui))
+            .content(slots::STATUS, versions.2)
             .body(|ui, _cx, app| {
                 if home {
                     canvas::document_area(app, ui);
