@@ -481,19 +481,25 @@ fn title_of(label: &str) -> Label {
     Label::from(crate::i18n::t(label).trim_end_matches('…').to_string())
 }
 
-/// The build closure of a command dialog over its values.
+/// The build closure of a command dialog over its values, over the active document's canvas: its droppers, the Blur
+/// Gallery's pins and the preview pane's locator take presses there.
 fn builder(
+    app: &PhotocraftApp,
     command: &str,
     title: Label,
     params: Vec<Param>,
     reset: DialogFields,
 ) -> impl for<'b> Fn(&'b mut DialogFields) -> ParamDialog<'b> + Send + 'static {
     let key = command.to_owned();
+    let canvas = app.session.active_index().map(|idx| crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
     move |fields: &mut DialogFields| {
         let mut dialog = ParamDialog::command(key.clone(), title.clone(), params.clone())
             .values(Bind::bound(fields))
             .reset_to(reset.clone())
             .previews(previews(&key));
+        if let Some(canvas) = canvas {
+            dialog = dialog.canvas(canvas);
+        }
         if key == "image.mode.colorTable" {
             dialog = dialog.extra_buttons(vec![("load".to_owned(), Label::from(tl!("Load…").to_string())), ("save".to_owned(), Label::from(tl!("Save…").to_string()))]);
         }
@@ -509,7 +515,7 @@ pub fn open(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, String> 
     let fields = fields(app, command, &params);
     let captured = if command == MATCH_COLOR { json!(app.session.active().map(|st| (st.doc.id, st.active_layer))) } else { Value::Null };
     let reset = reset_values(&params, &fields);
-    let build = builder(command, title_of(spec.label), params, reset);
+    let build = builder(app, command, title_of(spec.label), params, reset);
     Ok(crate::dialogs::params::open_param(app, command, fields, captured, build))
 }
 
@@ -525,7 +531,7 @@ pub fn open_with_spec(app: &mut PhotocraftApp, command: &str, label: &str, spec:
         fields.set("target", FieldValue::Json(target));
     }
     let reset = reset_values(&params, &fields);
-    let build = builder(command, title_of(label), params, reset);
+    let build = builder(app, command, title_of(label), params, reset);
     // PLAN: assumed `open_param_unsaved(app, key, fields, captured, build) -> DialogId` (dialogs-w19): `open_param` without the remember key.
     crate::dialogs::params::open_param_unsaved(app, command, fields, Value::Null, build)
 }
@@ -540,7 +546,7 @@ pub fn open_smart_edit(app: &mut PhotocraftApp, command: &str, recorded: &Map<St
     let reset = reset_values(&params, &base);
     let mut opening = base;
     overlay(&params, recorded, &mut opening);
-    let build = builder(command, title_of(spec.label), params, reset);
+    let build = builder(app, command, title_of(spec.label), params, reset);
     // PLAN: assumed `open_param_unsaved`, as in `open_with_spec`.
     Ok(crate::dialogs::params::open_param_unsaved(app, command, opening, target, build))
 }
