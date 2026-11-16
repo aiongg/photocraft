@@ -122,7 +122,8 @@ fn frame_content_and_both_selection_follow_clicks_and_double_clicks() {
     let source_before = app.session.active().unwrap().doc.layer(source).unwrap().clone();
     double_click(&mut app, [70., 75.]);
     let f = selected(&app).unwrap().frame.clone();
-    drag(&mut app, [70., 75.], [85., 85.]);
+    // A new press sequence, beyond the double-click distance of the clicks above.
+    drag(&mut app, [100., 100.], [115., 110.]);
     assert!(!app.ui.frame_tool.auto_transform);
     assert!(app.ui.transform.is_none());
     assert_eq!(selected(&app).unwrap().frame, f, "image-only transform leaves the mask");
