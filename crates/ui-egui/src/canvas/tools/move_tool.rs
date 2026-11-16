@@ -14,8 +14,8 @@ use crate::state::Tool;
 use craft::behavior::geometry::{ConstrainStyle, Directions, MoveGesture};
 use craft::behavior::kurbo::{self, Point};
 use craft::behavior::{CancelReason, Cursor, CursorIcon};
-use craft::keymap::Mods;
-use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolPath, ToolPointer};
+use craft::keymap::{Chord, Key, Mods};
+use craft::ui::canvas::{CanvasTool, ToolAction, ToolClaims, ToolContext, ToolKey, ToolPath, ToolPointer};
 use craft::ui::primitives::{Draw, PaintShape, StrokeColor, StrokeWidth};
 use craft::ui::runtime::env::Label;
 use photocraft_engine::float_cmds::Floating;
@@ -107,6 +107,13 @@ pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut MoveTool, _host:
 }
 
 /// The Move tool as the host runs it: the pass's scope over the app, and the tool's own state.
+/// ↩ drops pixels left floating by a move.
+const DROP_KEYS: &[Chord] = &[Chord::plain(Key::Enter)];
+
+fn floating(app: &PhotocraftApp) -> bool {
+    app.session.active().is_some_and(|st| photocraft_engine::float_cmds::floating(st).is_some())
+}
+
 pub(crate) struct MoveRun<'a> {
     scope: &'a ToolScope<'a>,
     state: &'a mut MoveTool,
@@ -349,6 +356,11 @@ impl CanvasTool for MoveRun<'_> {
                     app.ui.status = e;
                     app.ui.status_error = true;
                 }
+                if run.kind == Kind::Pixels {
+                    // The floating piece shows from the document now, also when the drag snapped back to where it
+                    // began: the drag's preview is spent.
+                    app.move_preview = None;
+                }
                 crate::move_mods::finish(app);
             }
         });
@@ -361,6 +373,30 @@ impl CanvasTool for MoveRun<'_> {
             crate::move_mods::abandon(app);
             app.move_preview = None;
         });
+    }
+
+    fn claims(&self) -> ToolClaims {
+        if self.state.run.is_none() && self.scope.with_app(|app| floating(app)) { ToolClaims::NONE.keys(DROP_KEYS) } else { ToolClaims::NONE }
+    }
+
+    fn key(&mut self, key: &ToolKey, _cx: &mut ToolContext<'_>) -> bool {
+        let enter = match key {
+            ToolKey::Submit => true,
+            ToolKey::Kept(chord) => *chord == DROP_KEYS[0],
+            _ => false,
+        };
+        enter
+            && self.state.run.is_none()
+            && self.scope.with_app(|app| {
+                if !floating(app) {
+                    return false;
+                }
+                if let Err(e) = app.run("select.drop", json!({})) {
+                    app.ui.status = e;
+                    app.ui.status_error = true;
+                }
+                true
+            })
     }
 
     fn paint(&self, draw: &Draw<'_>, cx: &ToolContext<'_>) {

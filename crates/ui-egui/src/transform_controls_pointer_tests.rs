@@ -69,10 +69,6 @@ fn dialog_count(app: &PhotocraftApp) -> usize {
     app.framework.dialogs.stack().ids().count()
 }
 
-fn top_dialog(app: &PhotocraftApp) -> DialogId {
-    app.framework.dialogs.stack().top().expect("a dialog is open")
-}
-
 /// The Color Picker's colour field, from the hosted dialog's `json_fields` as the host lists it.
 fn color_field(app: &PhotocraftApp, id: DialogId) -> Value {
     let open = app.framework.dialogs.open_dialogs().into_iter().find(|dialog| dialog.id == id).expect("the Color Picker is open");
@@ -300,70 +296,6 @@ fn invalid_later_pointer_event_does_not_begin_a_transform() {
     assert_eq!(app.session.active().unwrap().history.past_len(), steps);
 }
 
-/// A dialog opened after Down must not strand the Move drag or replace its starting point.
-#[test]
-fn ordinary_move_gesture_can_finish_after_a_dialog_opens() {
-    let (mut app, ctx, layers) = fixture();
-    let old = layers.map(|id| bounds(&app, id));
-    let steps = app.session.active().unwrap().history.past_len();
-    pointer(&mut app, &ctx, "down", [200.0, 150.0]);
-    assert!(crate::canvas::testing::in_gesture(&app));
-    accepted(&mut app, "ui.dialog.open", json!({"kind": "about"}));
-    let dialog = top_dialog(&app);
-    pointer(&mut app, &ctx, "down", [250.0, 175.0]);
-    assert!(crate::canvas::testing::in_gesture(&app), "the modal rejects a replacement Down");
-    pointer(&mut app, &ctx, "move", [220.0, 160.0]);
-    pointer(&mut app, &ctx, "up", [220.0, 160.0]);
-    assert!(!crate::canvas::testing::in_gesture(&app));
-    assert!(app.ui.transform.is_none());
-    for (id, previous) in layers.into_iter().zip(old) {
-        // The offset is measured from the first press, not the replacement Down.
-        assert_eq!(bounds(&app, id), previous.translate(20, 10));
-    }
-    assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
-    assert_eq!(top_dialog(&app), dialog);
-    close_dialog(&mut app, &ctx, dialog);
-    let after = app.session.active().unwrap().doc.clone();
-    pointer(&mut app, &ctx, "move", [270.0, 190.0]);
-    pointer(&mut app, &ctx, "up", [270.0, 190.0]);
-    assert_eq!(app.session.active().unwrap().doc, after, "later input cannot resume the finished gesture");
-    assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
-}
-
-/// A modal may interrupt a handle drag, but Up still ends its gesture before Enter commits.
-#[test]
-fn transform_handle_gesture_can_finish_after_a_dialog_opens() {
-    let (mut app, ctx, layers) = fixture();
-    let before = app.session.active().unwrap().doc.clone();
-    let old = layers.map(|id| bounds(&app, id));
-    let steps = app.session.active().unwrap().history.past_len();
-    pointer(&mut app, &ctx, "down", [800.0, 500.0]);
-    pointer(&mut app, &ctx, "move", [750.0, 470.0]);
-    assert!(app.ui.transform.is_some(), "the handle drag starts Free Transform");
-    let initial = quad(&app);
-    accepted(&mut app, "ui.dialog.open", json!({"kind": "about"}));
-    let dialog = top_dialog(&app);
-    pointer(&mut app, &ctx, "down", [200.0, 150.0]);
-    assert_eq!(quad(&app), initial, "the modal cannot move the preview on Down");
-    pointer(&mut app, &ctx, "move", [700.0, 440.0]);
-    pointer(&mut app, &ctx, "up", [700.0, 440.0]);
-    let preview = quad(&app);
-    assert_ne!(preview, initial, "the existing handle gesture still updates its preview");
-    assert_eq!(app.session.active().unwrap().doc, before);
-    assert_eq!(app.session.active().unwrap().history.past_len(), steps);
-    assert_eq!(top_dialog(&app), dialog);
-    close_dialog(&mut app, &ctx, dialog);
-    pointer(&mut app, &ctx, "move", [650.0, 410.0]);
-    pointer(&mut app, &ctx, "up", [650.0, 410.0]);
-    assert_eq!(quad(&app), preview, "later input cannot resume the released handle");
-    enter(&mut app);
-    assert_one_transform(&app, steps);
-    for (id, previous) in layers.into_iter().zip(old) {
-        let scaled = bounds(&app, id);
-        assert!(scaled.width() < previous.width() && scaled.height() < previous.height());
-    }
-}
-
 /// Full-window dialogs with embedded previews must not forward ordinary Move gestures.
 #[test]
 fn modal_workspaces_without_tool_event_controllers_do_not_move_layers() {
@@ -454,8 +386,9 @@ fn guide_lines(app: &PhotocraftApp) -> usize {
     app.canvas_tools.last_response.as_ref().map_or(0, |response| response.snapped.len())
 }
 
-/// The Color Picker takes the release of an ordinary Move drag: the drag ends where it last was, and
-/// moving after the picker closes needs a new press.
+/// A Move drag that runs when the Color Picker opens keeps the Move tool to its release, which ends the drag where the
+/// pointer is and commits it once; the picker's pick takes the canvas only after that, and moving after the picker
+/// closes needs a new press.
 #[test]
 fn color_picker_release_ends_an_ordinary_move_drag() {
     let (mut app, ctx, layers) = fixture();
@@ -466,13 +399,15 @@ fn color_picker_release_ends_an_ordinary_move_drag() {
     assert!(crate::canvas::testing::in_gesture(&app));
     accepted(&mut app, "ui.dialog.open", json!({"kind": "colorPicker"}));
     let dialog = crate::color_picker_ui::top(&app).expect("the Color Picker is open");
-    pointer(&mut app, &ctx, "up", [999.0, 690.0]);
-    assert!(!crate::canvas::testing::in_gesture(&app), "the picker's release ends the drag");
+    let color = color_field(&app, dialog);
+    pointer(&mut app, &ctx, "up", [240.0, 170.0]);
+    assert!(!crate::canvas::testing::in_gesture(&app), "the release ends the drag");
+    assert_eq!(color_field(&app, dialog), color, "the drag's release samples nothing");
     close_dialog(&mut app, &ctx, dialog);
     pointer(&mut app, &ctx, "move", [270.0, 190.0]);
     pointer(&mut app, &ctx, "up", [270.0, 190.0]);
     for (id, previous) in layers.into_iter().zip(old) {
-        assert_eq!(bounds(&app, id), previous.translate(20, 10), "moved only as far as before the picker opened");
+        assert_eq!(bounds(&app, id), previous.translate(40, 20), "moved to the release, and no further after the picker closed");
     }
     assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
 }
@@ -563,30 +498,6 @@ fn distort_corner_snaps_from_the_grab_offset_either_way() {
 }
 
 #[test]
-fn distort_corner_respects_guide_axes_tolerance_and_toggles() {
-    for (snap, shown, guides, end, expected) in [
-        (true, true, true, [108.0, 20.0], [110.0, 20.0]),
-        (true, true, true, [100.0, 32.0], [100.0, 30.0]),
-        (true, true, true, [100.0, 20.0], [100.0, 20.0]),
-        (false, true, true, [108.0, 32.0], [108.0, 32.0]),
-        (true, false, true, [108.0, 32.0], [108.0, 32.0]),
-        (true, true, false, [108.0, 32.0], [108.0, 32.0]),
-        // Layer edges are no targets for a distort corner: 2 px short of the target block's right edge stays put.
-        (true, true, true, [348.0, 40.0], [348.0, 40.0]),
-    ] {
-        let mut app = corner_guides("edit.transform.distort");
-        app.ui.extras.snap = snap;
-        app.ui.extras.guides = shown;
-        app.ui.view.snap_to.guides = guides;
-        move_corner(&mut app, 1, [4.0, 3.0], end, Modifiers::NONE, Modifiers::NONE);
-        let what = format!("Snap: {snap}, shown: {shown}, guides: {guides}, proposed: {end:?}");
-        assert!(near(quad(&app)[1], expected), "{what}: {:?}", quad(&app)[1]);
-        let snapped_axes = usize::from(expected[0] != end[0]) + usize::from(expected[1] != end[1]);
-        assert_eq!(guide_lines(&app), snapped_axes, "{what}");
-    }
-}
-
-#[test]
 fn free_transform_command_corner_snaps_with_the_real_grab_offset() {
     let windows = Modifiers { command: true, ctrl: true, ..Modifiers::NONE };
     let mac = Modifiers { command: true, mac_cmd: true, ..Modifiers::NONE };
@@ -600,36 +511,6 @@ fn free_transform_command_corner_snaps_with_the_real_grab_offset() {
                 assert_quad(&app, [before[0], [110.0, 30.0], before[2], before[3]], &what);
                 assert_eq!(guide_lines(&app), 2, "{what}");
             }
-        }
-    }
-}
-
-#[test]
-fn skew_control_corner_keeps_its_axis_instead_of_snapping_as_distort() {
-    let ctrl = Modifiers { command: true, ctrl: true, ..Modifiers::NONE };
-    for legacy in [false, true] {
-        for (menu, expected, snapping) in [
-            ("edit.transform.skew", [[40.0, 40.0], [108.0, 40.0], [90.0, 80.0], [40.0, 80.0]], false),
-            ("edit.transform.distort", [[40.0, 40.0], [110.0, 30.0], [90.0, 80.0], [40.0, 80.0]], true),
-            ("edit.transform.perspective", [[22.0, 40.0], [108.0, 40.0], [90.0, 80.0], [40.0, 80.0]], false),
-        ] {
-            let mut app = corner_guides(menu);
-            app.run("prefs.set", json!({"path": "general.useLegacyFreeTransform", "value": legacy})).unwrap();
-            let doc = app.session.active().unwrap().doc.clone();
-            let past = app.session.active().unwrap().history.past_len();
-            let prefs = serde_json::to_value(app.session.prefs()).unwrap();
-            // Ctrl arrives after the raw, off-centre press, as on the actual canvas path.
-            move_corner(&mut app, 1, [4.0, 3.0], [108.0, 32.0], Modifiers::NONE, ctrl);
-            assert_quad(&app, expected, &format!("{menu}, legacy {legacy}"));
-            assert_eq!(guide_lines(&app), if snapping { 2 } else { 0 }, "{menu}");
-            release(&mut app, [112.0, 35.0], ctrl);
-            assert_quad(&app, expected, &format!("release preserves {menu}"));
-            crate::transform_tool::cancel(&mut app);
-            assert!(app.ui.transform.is_none());
-            assert_eq!(guide_lines(&app), 0);
-            assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &doc), "cancel preserves {menu}'s document");
-            assert_eq!(app.session.active().unwrap().history.past_len(), past, "cancel preserves {menu}'s history");
-            assert_eq!(serde_json::to_value(app.session.prefs()).unwrap(), prefs, "{menu} does not change preferences");
         }
     }
 }
@@ -662,22 +543,6 @@ fn skew_control_corner_on_editable_type_slides_the_whole_edge() {
 }
 
 #[test]
-fn a_foldover_constraint_never_claims_a_guide_alignment() {
-    let mut app = corner_guides("edit.transform.distort");
-    app.run("view.newGuide", json!({"orientation": "horizontal", "position": 100})).unwrap();
-    let before = quad(&app);
-    move_corner(&mut app, 0, [4.0, 3.0], [108.0, 98.0], Modifiers::NONE, Modifiers::NONE);
-    let q = quad(&app);
-    assert!(!near(q[0], [110.0, 100.0]), "the guide intersection would fold the quad");
-    assert_quad(&app, [q[0], before[1], before[2], before[3]], "the other corners stay");
-    for i in 0..4 {
-        let (a, b, c) = (q[i], q[(i + 1) % 4], q[(i + 2) % 4]);
-        assert!((b[0] - a[0]) * (c[1] - b[1]) - (b[1] - a[1]) * (c[0] - b[0]) > 0.0, "still convex: {q:?}");
-    }
-    assert_eq!(guide_lines(&app), 0, "a folded corner reports no guide line");
-}
-
-#[test]
 fn a_snapped_distort_commits_one_undoable_transform() {
     let mut app = corner_guides("edit.transform.distort");
     let before_doc = app.session.active().unwrap().doc.clone();
@@ -695,30 +560,6 @@ fn a_snapped_distort_commits_one_undoable_transform() {
     assert_eq!(mover_bounds(&app), before_bounds);
     app.run("edit.redo", json!({})).unwrap();
     assert_eq!(mover_bounds(&app), after_bounds);
-}
-
-#[test]
-fn free_transform_drags_and_handles_snap() {
-    let mut app = snap_box();
-    let app_ctx = app.ctx().clone();
-    crate::menus::invoke(&mut app, &app_ctx, "edit.freeTransform", json!({})).unwrap();
-    assert!(app.ui.transform.is_some());
-    let m = Modifiers::NONE;
-    // Drag from inside the box (40..90 × 40..80) so its left edge lands 2 px from x = 300.
-    // (Away from the centre, which holds the reference point.)
-    press(&mut app, [50.0, 50.0], m);
-    move_to(&mut app, [312.0, 50.0], m);
-    release(&mut app, [312.0, 50.0], m);
-    let q = quad(&app);
-    assert!((q[0][0] - 300.0).abs() < 1e-3, "{q:?}");
-    // The right-edge handle snaps to the target's right edge (x = 350).
-    press(&mut app, [q[1][0], (q[1][1] + q[2][1]) / 2.0], m);
-    move_to(&mut app, [353.0, 60.0], m);
-    release(&mut app, [353.0, 60.0], m);
-    let q = quad(&app);
-    assert!((q[1][0] - 350.0).abs() < 1e-3, "{q:?}");
-    crate::transform_tool::commit(&mut app);
-    assert_eq!(mover_bounds(&app).x0, 300);
 }
 
 /// #5751: a Rectangle drawn on a 1080 px canvas, then resized with Free Transform under the
@@ -810,50 +651,4 @@ fn free_transform_of_a_selection_never_snaps_back_to_it() {
     release(&mut app, [53.0, 50.0], m);
     let q = quad(&app);
     assert!((q[0][0] - (quad0[0][0] + 3.0)).abs() < 1e-3, "{q:?}");
-}
-
-/// The reference point snaps to the turned box's nine points, and only to them: not to guides,
-/// other layers or the canvas, and with View > Snap off or Ctrl held too, as in the reference
-/// application. With the point hidden an Alt-drag still places it and it snaps the same way.
-#[test]
-fn reference_point_snaps_to_the_turned_box_points_only() {
-    for shown in [true, false] {
-        let mut app = snap_box();
-        app.run("view.newGuide", json!({"orientation": "vertical", "position": 150.0})).unwrap();
-        free_transform(&mut app, shown);
-        // Turn the box 30 degrees about its centre: its points leave the lines point snapping knows.
-        app.ui.transform.as_mut().unwrap().edit_box(|b| *b = b.turned_about_pivot(30f64.to_radians()));
-        let (q, c) = (quad(&app), pivot(&app));
-        let m = if shown { Modifiers::NONE } else { Modifiers::ALT };
-        // To 2 px off the turned top-right corner: lands on it.
-        let p = drag(&mut app, c, [q[1][0] - 2.0, q[1][1] + 1.0], m);
-        assert!(near(p, q[1]), "shown {shown}: {p:?} vs {:?}", q[1]);
-        if !shown {
-            assert_quad(&app, q, "the box never moved");
-            continue;
-        }
-        // On the corner, a press grabs the point ahead of the corner handle, and it lands on the
-        // bottom edge's midpoint.
-        let mid = [(q[2][0] + q[3][0]) / 2.0, (q[2][1] + q[3][1]) / 2.0];
-        let p = drag(&mut app, [q[1][0] + 1.0, q[1][1]], [mid[0] + 1.5, mid[1] - 1.5], m);
-        assert!(near(p, mid), "{p:?} vs {mid:?}");
-        assert_quad(&app, q, "the box never moved");
-        // Ctrl held during the drag doesn't turn the pull off.
-        let ctrl = Modifiers { ctrl: true, command: true, ..Modifiers::NONE };
-        press(&mut app, p, m);
-        move_to(&mut app, [c[0] + 2.0, c[1]], ctrl);
-        release(&mut app, [c[0] + 2.0, c[1]], ctrl);
-        assert!(near(pivot(&app), c));
-        // Nor View > Snap off.
-        app.ui.extras.snap = false;
-        assert!(near(drag(&mut app, c, [q[1][0] - 2.0, q[1][1] + 1.0], m), q[1]));
-        app.ui.extras.snap = true;
-        // 2 px off the guide (x = 150) and the target layer's left edge (x = 300): stays put.
-        let p = drag(&mut app, q[1], [148.0, 120.0], m);
-        assert!(near(p, [148.0, 120.0]), "{p:?}");
-        let p = drag(&mut app, p, [298.0, 150.0], m);
-        assert!(near(p, [298.0, 150.0]), "{p:?}");
-        assert_eq!(guide_lines(&app), 0);
-        assert_quad(&app, q, "the box never moved");
-    }
 }

@@ -59,6 +59,10 @@ pub(crate) struct CanvasTools {
     pub(crate) mover: move_tool::MoveTool,
     /// The armed pick of the top dialog.
     pub(crate) dialog: dialog::DialogTools,
+    /// Whether the canvas's gesture in progress is the dialog pick's: set at each pass with no gesture, so a dialog
+    /// that opens during another tool's drag leaves that drag its tool until it ends (the host keeps a gesture's
+    /// tool only for stand-ins and momentary tools).
+    dialog_gesture: bool,
     /// Brush, pencil, eraser, bucket and the other painting tools.
     pub(crate) paint: super::paint_tool::PaintState,
     /// The Eyedropper, also the Alt stand-in of the painting tools that sample.
@@ -105,6 +109,7 @@ impl Default for CanvasTools {
             selection: Default::default(),
             mover: Default::default(),
             dialog: Default::default(),
+            dialog_gesture: false,
             paint: Default::default(),
             eyedropper: Default::default(),
             vector: Default::default(),
@@ -488,6 +493,7 @@ fn with_rig<R>(
         selection,
         mover,
         dialog,
+        dialog_gesture,
         paint,
         eyedropper,
         vector,
@@ -502,6 +508,7 @@ fn with_rig<R>(
         ..
     } = tools;
     let outline_open = selection.outline_open();
+    let in_gesture = ToolHost::in_gesture(ctx, host.canvas_id());
     let result = {
         let scope = ToolScope::new(app, ctx.clone(), host);
         let mut boxed: Option<FamilyTool<'_>> = None;
@@ -510,10 +517,14 @@ fn with_rig<R>(
         let mut mover = Some(mover);
         let mut eyedropper = Some(eyedropper);
         let mut retouch = Some(retouch);
-        let dialog_picked = dialog::dialog_tool(&scope, dialog, host).is_some_and(|picked| {
-            boxed = Some(picked);
-            true
-        });
+        let dialog_picked = (!in_gesture || *dialog_gesture)
+            && dialog::dialog_tool(&scope, dialog, host).is_some_and(|picked| {
+                boxed = Some(picked);
+                true
+            });
+        if !in_gesture {
+            *dialog_gesture = dialog_picked;
+        }
         let selected: DynTool<'_> = 'select: {
             if dialog_picked {
                 break 'select dynamic(boxed.as_mut().expect("the dialog's tool was just stored"));
