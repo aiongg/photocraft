@@ -68,15 +68,16 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
         let (cmd, params) = crate::smart_filter_dialog::params_command(app, &captured, &key, params).ok()?;
         (id, cmd, params)
     } else {
-        let (id, key, dialog_fields, mut fields) = {
+        let (id, key, dialog_fields, fields) = {
             let d = app.framework.dialogs.get::<HostedParamDialog>()?;
             if !d.is_previewing() {
                 return None;
             }
-            let serde_json::Value::Object(fields) = serde_json::to_value(d.fields()).ok()? else { return None };
-            (d.id(), d.key()?.to_owned(), d.fields().clone(), fields)
+            let key = d.key()?.to_owned();
+            // The values OK runs: a document choice is its index, a colour its hex.
+            let serde_json::Value::Object(fields) = crate::filter_dialog::command_params(&key, d.fields()) else { return None };
+            (d.id(), key, d.fields().clone(), fields)
         };
-        crate::filter_dialog::refresh_match_color_sources(&app.session, &mut fields);
         // Previews edit what the command will: a targeted layer mask included (#780).
         let target = crate::dialogs::params::captured(app, &key);
         crate::filter_dialog::validate_match_color_destination(app, &key, &target, &fields).ok()?;
@@ -99,6 +100,7 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
         revision: st.revision,
         sources: crate::filter_dialog::preview_source_revisions(&app.session, &cmd, &params),
         dialog: id,
+        open: app.framework.dialogs.open_serial(id).unwrap_or(0),
         active: st.active_layer,
         target: st.channel_view.target,
         command: cmd,
@@ -221,13 +223,13 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
 const FADE: &str = "edit.fade";
 
 /// The preview session of `key`: everything that makes two requests the same target at any scale (document,
-/// revision, active layer, dialog, and the target, sources, command, tool colours and Match Color's source layer),
+/// revision, active layer, dialog and its open, and the target, sources, command, tool colours and Match Color's source layer),
 /// not the other parameters and not `k`. A frame of another session is foreign to the dialog's preview.
 pub(crate) fn session_of(key: &crate::filter_dialog::FilterPreviewKey) -> PreviewSession {
     let layer = key.active.map_or(0, |l| u64::from(l.0) + 1);
     let source_layer = key.params.get("sourceLayer");
     let target = format!("{:?}|{:?}|{}|{:?}|{:?}", key.target, key.sources, key.command, key.tool_colors, source_layer);
-    PreviewSession::new(key.doc.0, key.revision, layer).and(key.dialog.value()).and(settings_hash(&[target.as_bytes()]))
+    PreviewSession::new(key.doc.0, key.revision, layer).and(key.dialog.value()).and(key.open).and(settings_hash(&[target.as_bytes()]))
 }
 
 /// Whether `key` is a preview of the open dialog's target, at any proxy factor (a frame is drawn at its own factor,

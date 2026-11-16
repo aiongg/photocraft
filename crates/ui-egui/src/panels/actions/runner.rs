@@ -224,6 +224,7 @@ fn pause_for_dialog(app: &mut PhotocraftApp, action: &Action, step: usize, id: &
     if let Some(paused) = app.paused_playbacks.paused.get_mut(&token) {
         paused.dialog = Some(dialog);
         paused.filter_receiver = receiver;
+        paused.explicit_layer = params.get("layer").filter(|layer| !layer.is_null()).cloned();
     }
     Ok(dialog)
 }
@@ -806,6 +807,9 @@ pub(crate) struct PausedPlayback {
     /// An implicit filter/adjustment step resolves this active layer at the pause. The outer Option marks
     /// that binding even when there was no active layer; explicit-layer and other dialogs omit it.
     pub(super) filter_receiver: Option<Option<photocraft_doc::LayerId>>,
+    /// The layer the recorded step names. The settings editor has no row for it, so the confirmed command takes it
+    /// from here: the step keeps its receiver, whatever layer is active at OK.
+    pub(super) explicit_layer: Option<Value>,
     /// Descriptor-free menu playback owns this settings dialog and the concrete command it opened.
     pub(super) menu_editor: Option<(DialogId, String)>,
     /// The actions that called this one through Play Action steps, nearest first, each with the
@@ -867,6 +871,7 @@ impl PausedPlaybacks {
                 doc: None,
                 dialog: None,
                 filter_receiver: None,
+                explicit_layer: None,
                 menu_editor: None,
                 callers: Vec::new(),
                 allow_continue: false,
@@ -925,6 +930,10 @@ pub(crate) fn run_step_dialog(app: &mut PhotocraftApp, dialog: DialogId, command
 /// [`run_step_dialog`] for the playback `token` names, which Check Spelling holds itself.
 fn run_paused_command(app: &mut PhotocraftApp, token: u64, command: &str, params: Value) -> Result<Value, String> {
     let paused = app.paused_playbacks.paused.get(&token).ok_or("this dialog doesn't belong to a paused action")?;
+    let mut params = params;
+    if let (Some(layer), Some(object)) = (&paused.explicit_layer, params.as_object_mut()) {
+        object.entry("layer").or_insert_with(|| layer.clone());
+    }
     check_menu_editor(app, paused, command, &params)?;
     if let Some(receiver) = paused.filter_receiver
         && !document_target(&params)

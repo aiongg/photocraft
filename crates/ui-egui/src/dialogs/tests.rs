@@ -22,6 +22,7 @@ fn filter_dialog_with_preview(background: bool) -> (PhotocraftApp, DialogId) {
         revision: st.revision,
         sources: Vec::new(),
         dialog: id,
+        open: app.framework.dialogs.open_serial(id).unwrap_or(0),
         active: st.active_layer,
         target: st.channel_view.target,
         command: "filter.blur.gaussianBlur".into(),

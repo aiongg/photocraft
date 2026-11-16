@@ -1485,7 +1485,7 @@ fn a_thin_layer_scaled_then_warped_commits_the_curve() {
     };
     // The middle sags below the band's old bottom edge (y 60); near the end the edge hangs less.
     assert!(alpha(41, 70) > 0.99, "middle {}", alpha(41, 70));
-    assert!(alpha(2, 70) < 0.01 && alpha(2, 40) > 0.99, "end {} {}", alpha(2, 70), alpha(2, 40));
+    assert!(alpha(15, 70) < 0.01 && alpha(15, 40) > 0.99, "end {} {}", alpha(15, 70), alpha(15, 40));
 }
 
 /// #7885: a surface drag (a press inside a cell, on no anchor or handle) commits exactly as

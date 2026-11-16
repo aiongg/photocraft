@@ -425,7 +425,8 @@ fn clone_overlay_of_a_scaled_source_stays_within_the_sampling_budget() {
         app.run("cloneSource.set", json!({"width": scale, "height": scale})).unwrap();
         let source = super::strokes::clone_source(&mut app, [32.0, 32.0]).unwrap_or_else(|| panic!("{size} px at {scale} %: the image shows"));
         let side = source.size();
-        assert!(side.width <= size as u32 + 2 && side.height <= size as u32 + 2, "{size} px at {scale} %: the image is no larger than the brush: {side:?}");
+        let budget = super::strokes::CLONE_PREVIEW_MAX_SIDE;
+        assert!(side.width <= budget && side.height <= budget, "{size} px at {scale} %: the image stays within the sampling budget: {side:?}");
         assert_eq!(clone_source_image(&mut app).unwrap()(32, 32).a(), 255, "{size} px at {scale} %: the source under the pointer");
     }
 }

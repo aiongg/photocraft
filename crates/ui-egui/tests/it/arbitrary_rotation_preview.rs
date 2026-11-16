@@ -69,20 +69,18 @@ fn preview_on(h: &Harness) -> bool {
     h.get_by_label("Preview").accesskit_node().toggled() == Some(Toggled::True)
 }
 
-/// Count blue canvas pixels and their vertical extent, excluding every open dialog's actual rectangle.
+/// Count blue canvas pixels and their vertical extent, excluding the open dialog's actual rectangle.
 fn blue(h: &mut Harness, name: &str) -> (usize, u32, u32) {
     h.run_steps(3);
     let rect = h.state().last_canvas_rect.shrink(3.0);
-    // Everything above the canvas layer (the dialog and its popups) is excluded.
-    let modals: Vec<_> = h.ctx.memory(|m| {
-        m.areas()
-            .visible_layer_ids()
-            .into_iter()
-            .filter(|l| l.order != egui::Order::Background)
-            .filter_map(|l| m.area_rect(l.id))
-            .map(|r| r.expand(4.0))
-            .collect()
-    });
+    // The window that draws the dialog's OK button; the canvas itself lives in a non-background layer.
+    let modals: Vec<_> = h
+        .query_by_label("OK")
+        .and_then(|ok| h.ctx.layer_id_at(ok.rect().center()))
+        .and_then(|layer| h.ctx.memory(|m| m.area_rect(layer.id)))
+        .map(|r| r.expand(4.0))
+        .into_iter()
+        .collect();
     let img = h.render().expect("render");
     if let Some(dir) = std::env::var_os("PHOTOCRAFT_ROTATION_EVIDENCE_DIR") {
         std::fs::create_dir_all(&dir).expect("evidence directory");
