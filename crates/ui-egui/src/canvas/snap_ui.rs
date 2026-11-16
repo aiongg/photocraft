@@ -53,8 +53,8 @@ fn selection_moves(app: &PhotocraftApp) -> bool {
 
 /// The layers a drag moves or resizes: they are not targets. What the Move tool would move whole
 /// (the selected layers, the layers linked to them and everything inside a group, so a group does not
-/// snap to its own layers' starting edges), and the type layer being edited (a paragraph-box handle
-/// drag does not snap to the text it resizes, #6819).
+/// snap to its own layers' starting edges), the type layer being edited (a paragraph-box handle
+/// drag does not snap to the text it resizes, #6819) and the layers of the open Free Transform.
 fn moving_set(app: &PhotocraftApp) -> Vec<LayerId> {
     let mut set = Vec::new();
     if moves_as_move_tool(app)
@@ -67,6 +67,9 @@ fn moving_set(app: &PhotocraftApp) -> Vec<LayerId> {
     }
     if let Some(edit) = app.ui.text_edit.as_ref() {
         set.push(LayerId(edit.layer));
+    }
+    if let Some(t) = app.ui.transform.as_ref() {
+        set.extend(crate::transform_tool::moving_layers(t));
     }
     set
 }
