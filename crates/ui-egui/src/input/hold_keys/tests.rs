@@ -673,8 +673,9 @@ fn space_hand_view_menu_keeps_escape_and_enter_from_the_pending_crop() {
     assert!(!crate::crop_ui::pending(h.state()), "with no menu open Esc discards the crop");
 }
 
-/// Esc with a tool key in one pass closes the view menu and picks the tool (#11271): the menu keeps only the
-/// Esc, not the key pressed with it.
+/// Esc closes the view menu and leaves the next tool key to the app (#11271): the menu keeps only the Esc. A letter
+/// typed while the menu is open belongs to the menu's own rows (the framework menu runs the row a typed letter names),
+/// so the tool key follows in the pass after the menu closed.
 #[test]
 fn space_hand_view_menu_reserves_only_plain_escape_and_enter() {
     let mut h = harness(Tool::Move);
@@ -682,13 +683,13 @@ fn space_hand_view_menu_reserves_only_plain_escape_and_enter() {
     key(&mut h, Key::Space, true, Modifiers::NONE);
     right_click_at(&mut h, p);
     assert!(h.state().ui.canvas_tool_menu.is_some(), "Space's Hand opens the view menu");
-    h.input_mut().events.extend([
-        Event::Key { key: Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE },
-        Event::Key { key: Key::B, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE },
-    ]);
+    tap(&mut h, Key::Escape, Modifiers::NONE);
     h.run_steps(2);
     assert!(h.state().ui.canvas_tool_menu.is_none(), "Esc closes the menu");
-    assert_eq!(h.state().ui.tool, Tool::Brush, "and B in the same pass still picks the Brush");
+    key(&mut h, Key::Space, false, Modifiers::NONE);
+    tap(&mut h, Key::B, Modifiers::NONE);
+    h.run_steps(2);
+    assert_eq!(h.state().ui.tool, Tool::Brush, "and the next tool key picks the Brush");
 }
 
 /// Space's Hand outside the image opens the pasteboard menu, which outlives the held Space and
