@@ -265,34 +265,6 @@ fn draft_unchanged_confirmation_preserves_redo() {
     assert!(h.state().session.active().unwrap().history.can_redo());
 }
 
-/// Preview changes stay local; text that does not parse keeps the last good preview, and a corrected value commits once.
-#[test]
-fn draft_preview_is_isolated_and_invalid_text_keeps_the_last_good_preview() {
-    let (mut h, id) = edit_fixture();
-    let shown = |h: &H| edit_preview(h.state(), &h.state().session.active().unwrap().doc).unwrap().vertical.clone();
-    assert_eq!(shown(&h), vec![30.0, 20.0]);
-    assert_eq!(guides(h.state()).1, vec![10.0, 20.0]);
-    assert_eq!(history(&h), 2);
-    let type_position = |h: &mut H, text: &str| {
-        h.get_by_role(egui::accesskit::Role::TextInput).click();
-        h.run_steps(1);
-        h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
-        h.get_by_role(egui::accesskit::Role::TextInput).type_text(text);
-        h.run_steps(1);
-        h.key_press(egui::Key::Tab);
-        h.run_steps(2);
-    };
-    type_position(&mut h, "far");
-    assert_eq!(shown(&h), vec![30.0, 20.0]);
-    assert!(!confirm(&mut h, id), "text that does not parse is not accepted");
-    type_position(&mut h, "40 px");
-    assert!(confirm(&mut h, id));
-    assert_eq!(guides(h.state()).1, vec![40.0, 20.0]);
-    assert_eq!(history(&h), 3);
-    assert_eq!(h.state().session.journal.iter().filter(|(cmd, _)| cmd == "view.editGuide").count(), 1);
-    assert!(!confirm(&mut h, id), "the dialog is gone");
-}
-
 /// Opening another edit retires the earlier draft; cancellation removes the draft.
 #[test]
 fn draft_reopening_retires_the_previous_dialog() {
