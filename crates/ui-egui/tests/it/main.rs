@@ -30,7 +30,6 @@ mod interactive_bench_reporting;
 mod layout_perf;
 mod live_stroke_canvas;
 mod magnetic_lasso_right_click;
-mod marching_ants_pixels;
 mod paint_bucket_all_layers;
 mod pattern_preview_canvas;
 mod radial_blur_center;
