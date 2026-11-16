@@ -265,7 +265,15 @@ fn open_sized(app: &mut PhotocraftApp, stem: String, title: Option<String>, sour
     defaults.jpeg_quality = u8::try_from(prefs.jpeg_quality.clamp(1, 100)).unwrap_or(85);
     defaults.webp_quality = u8::try_from(prefs.webp_quality.clamp(1, 100)).unwrap_or(85);
     defaults.webp_lossless = prefs.webp_lossless;
+    // One file per exportable layer of a selection: a single one is named after its layer, several go into a folder
+    // (the dialog asks for it, #15028, #14808).
+    let docs = layer_documents(app, &layers);
+    let stem = match docs.as_slice() {
+        [one] => layer_file_stem(&one.name),
+        _ => stem,
+    };
     let mut dialog = HostedExportAs::new(stem, source, options)
+        .files(docs.len().max(1))
         .formats(dialog_formats())
         .defaults(defaults)
         .methods(RESAMPLE_CHOICES.to_vec())
@@ -869,19 +877,10 @@ fn drive(app: &mut PhotocraftApp, ctx: &egui::Context, open: &mut ExportOpen) ->
             }
             Ok(json!({}))
         };
-        // Several Scale All sizes, and several layers' files on the desktop, go into a folder (#15028, #14808); one
-        // layer's file of a selection keeps the save dialog, named after that layer.
-        let layer_docs = layer_documents(app, &open.layers);
-        let folder = matches!(request.kind, PathKind::Folder) || (layer_docs.len() > 1 && !cfg!(target_arch = "wasm32"));
-        let suggested = match layer_docs.as_slice() {
-            [one] => {
-                let ext = std::path::Path::new(&suggested).extension().and_then(|e| e.to_str()).unwrap_or("png");
-                format!("{}.{ext}", layer_file_stem(&one.name))
-            }
-            _ => suggested,
-        };
+        // The dialog's request says whether the answer is a folder (several Scale All sizes, several layers' files on
+        // the desktop) or a file named after the document or its one layer.
         // PLAN: `pick_export` remembers the chosen folder when the answer is taken, before the export it leads to has run, so a failed export still moves where the next one starts.
-        let asked = if folder { app.ask_folder(answer) } else { app.pick_export(&suggested, answer) };
+        let asked = if matches!(request.kind, PathKind::Folder) { app.ask_folder(answer) } else { app.pick_export(&suggested, answer) };
         match asked {
             Ok(_) => open.picking = true,
             Err(error) => {
@@ -1246,7 +1245,7 @@ fn write_layer_file(
 /// can't hold becomes `_` (`a/b:c*?` → `a_b_c__`), spaces are kept.
 fn layer_file_stem(name: &str) -> String {
     let stem: String = name.chars().map(|c| if c.is_control() || "<>:\"/\\|?*".contains(c) { '_' } else { c }).collect();
-    if stem.trim().is_empty() { "layer".into() } else { stem }
+    if stem.chars().all(|c| c.is_whitespace() || c == '.') { "layer".into() } else { stem }
 }
 
 /// The names several layers' files get, for `docs` in document order (bottom to top). Equal
