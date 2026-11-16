@@ -135,7 +135,8 @@ fn rect4(r: photocraft_geom::Rect) -> [f64; 4] {
 }
 
 /// The box of what a drag moves, where it is at the press: the selected pixels' outline (the float's
-/// piece once cut), else the union of the selected layers' frames.
+/// piece once cut), else the union of the frames of what moves: a group carries its layers and linked layers go
+/// along.
 fn moving_box(app: &PhotocraftApp, pixels: bool) -> Option<[f64; 4]> {
     let st = app.session.active()?;
     if pixels {
@@ -146,14 +147,10 @@ fn moving_box(app: &PhotocraftApp, pixels: bool) -> Option<[f64; 4]> {
         };
         return (!b.is_empty()).then(|| rect4(b));
     }
-    let b = st
-        .selected_layers()
+    photocraft_engine::layer_multi_cmds::move_targets(&st.doc, &st.selected_layers())
         .into_iter()
-        .filter_map(|id| st.doc.layer(id))
-        .map(|l| photocraft_engine::transform_cmds::transform_frame(&st.doc, l))
-        .filter(|b| !b.is_empty())
-        .reduce(|a, b| a.union(&b))?;
-    Some(rect4(b))
+        .filter_map(|id| crate::snap_ui::tree_rect(&st.doc, id))
+        .reduce(|a, b| [a[0].min(b[0]), a[1].min(b[1]), a[2].max(b[2]), a[3].max(b[3])])
 }
 
 /// The press: Auto-Select's pick, the refusals, then the kind of drag it starts.

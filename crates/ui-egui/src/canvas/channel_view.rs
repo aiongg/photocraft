@@ -75,7 +75,7 @@ impl Look {
 #[derive(Clone, Default)]
 pub struct Screen {
     pub encode_srgb: bool,
-    pub transform: Option<std::sync::Arc<craft_cms::Transform>>,
+    pub transform: Option<std::sync::Arc<craft::cms::Transform>>,
 }
 
 impl Screen {

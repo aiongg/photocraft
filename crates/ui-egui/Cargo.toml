@@ -15,7 +15,6 @@ craft = { workspace = true, features = ["ui", "layers", "color", "draw", "imagin
 craft-i18n = { workspace = true }
 photocraft-geom = { workspace = true }
 photocraft-color = { workspace = true }
-craft-cms = { workspace = true }
 photocraft-raster = { workspace = true }
 photocraft-doc = { workspace = true }
 photocraft-compose = { workspace = true }

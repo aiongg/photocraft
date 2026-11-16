@@ -961,20 +961,6 @@ mod hidden_layer_tests;
 mod warp_text_dialog_tests;
 
 #[cfg(test)]
-<<<<<<< HEAD
-=======
-mod new_doc_web_artboards_tests;
-
-#[cfg(test)]
-mod blend_dropdown_wheel_tests;
-#[cfg(test)]
-mod paths_scroll_tests;
-
-#[cfg(test)]
-mod blend_dropdown_groups_tests;
-
-#[cfg(test)]
->>>>>>> upstream/main
 mod options_bar_mode_wheel_tests;
 
 #[cfg(test)]
@@ -1007,8 +993,6 @@ mod view_sync_tests;
 #[cfg(test)]
 mod stamp_tests;
 
-#[cfg(test)]
-mod new_doc_save_preset_icon_tests;
 
 #[cfg(test)]
 mod alt_click_tests;
@@ -1027,8 +1011,6 @@ mod polygon_lasso_tests;
 #[cfg(test)]
 mod window_frame_tests;
 
-#[cfg(test)]
-mod new_doc_pixel_aspect_tests;
 
 #[cfg(test)]
 mod browse_field_tests;
@@ -1060,15 +1042,11 @@ mod view_guides_submenu_tests;
 #[cfg(test)]
 mod reset_tip_tests;
 #[cfg(test)]
-<<<<<<< HEAD
 mod zoom_mode_tests;
-=======
-mod clone_stamp_reset_tip_tests;
 #[cfg(test)]
-mod smudge_default_tip_tests;
+mod lasso_click_tests;
 #[cfg(test)]
-mod sponge_default_tip_tests;
->>>>>>> upstream/main
+mod rotate_steps_tests;
 
 #[cfg(test)]
 mod red_eye_context_menu_tests;

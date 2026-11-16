@@ -6,7 +6,7 @@
 
 use std::sync::Arc;
 
-use craft_cms::{Builtin, Profile, curve::Curve};
+use craft::cms::{Builtin, Profile, curve::Curve};
 use photocraft_color::{ColorMode, PixelFormat, SampleType};
 use photocraft_doc::{Document, Layer, LayerContent, Size};
 use photocraft_engine::display_color::Display;
@@ -203,7 +203,7 @@ fn gpu_display_shadows_match_independent_icc_reference_at_all_depths() {
 #[test]
 #[ignore = "manual 24 MP GPU timing; run with --release --ignored --nocapture"]
 fn compare_display_paths_24mp() {
-    use craft_cms::{Intent, Lut3d, Transform};
+    use craft::cms::{Intent, Lut3d, Transform};
     use photocraft_ui_egui::gpu_canvas::{GpuCanvas, ViewParams};
     use std::time::Instant;
 

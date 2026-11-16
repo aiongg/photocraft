@@ -245,9 +245,9 @@ fn engine_action(action: ProfileAction) -> &'static str {
 /// The Color Settings policy that answers this mode's files when Ask On Mismatch is off.
 fn policy_key(mode: ColorMode) -> Option<&'static str> {
     match photocraft_engine::color_cmds::mode_space(mode) {
-        craft_cms::ColorSpace::Rgb => Some("policyRgb"),
-        craft_cms::ColorSpace::Cmyk => Some("policyCmyk"),
-        craft_cms::ColorSpace::Gray => Some("policyGray"),
+        craft::cms::ColorSpace::Rgb => Some("policyRgb"),
+        craft::cms::ColorSpace::Cmyk => Some("policyCmyk"),
+        craft::cms::ColorSpace::Gray => Some("policyGray"),
         _ => None,
     }
 }
