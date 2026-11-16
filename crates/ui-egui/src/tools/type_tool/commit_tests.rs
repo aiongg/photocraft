@@ -207,8 +207,8 @@ fn tool_shortcuts_work_after_another_layer_is_selected() {
     app.run("layer.select", json!({"layer": other})).unwrap();
     h.run_steps(2);
     assert!(h.state().ui.text_edit.is_none(), "the frame commits the edit");
-    h.key_press(egui::Key::V);
-    h.event(egui::Event::Text("v".into()));
+    testing::key(h.state_mut(), egui::Key::V, egui::Modifiers::NONE);
+    type_keys(h.state_mut(), "v");
     h.run_steps(2);
     assert_eq!(h.state().ui.tool, crate::state::Tool::Move, "V picks the Move tool");
     assert_eq!(text_of(h.state(), 0, text).as_deref(), Some("Hello"), "and types nothing");

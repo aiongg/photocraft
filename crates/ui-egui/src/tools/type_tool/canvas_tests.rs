@@ -198,6 +198,21 @@ fn panel_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     h
 }
 
+/// The Properties panel without the app's frame logic, which ends a text edit whose layer is not the
+/// active one: for a session on a layer other than the primary.
+fn panel_harness_without_frame_logic(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
+    let _ = photocraft_text::shared();
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(760.0, 800.0)).with_max_steps(16).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            ui.set_width(340.0);
+            show_panels(app, ui);
+        },
+        app,
+    );
+    h.run_steps(4);
+    h
+}
+
 fn bar_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let _ = photocraft_text::shared();
     let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1100.0, 80.0)).with_max_steps(16).build_app(
@@ -480,10 +495,12 @@ fn click(h: &mut Harness<'static, PhotocraftApp>, p: Pos2) {
 fn double_click(h: &mut Harness<'static, PhotocraftApp>, p: Pos2) {
     h.hover_at(p);
     h.run_steps(1);
+    // One pass per press and release, as the window delivers them: the runtime takes one press per pass.
     for pressed in [true, false, true, false] {
         h.event(egui::Event::PointerButton { pos: p, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE });
+        h.run_steps(1);
     }
-    h.run_steps(2);
+    h.run_steps(1);
 }
 
 fn drag(h: &mut Harness<'static, PhotocraftApp>, a: Pos2, b: Pos2) {
@@ -910,6 +927,8 @@ fn transform_drag(h: &mut Harness<'static, PhotocraftApp>, a: Pos2, b: Pos2, mod
 
 fn transform_app(paragraph: bool, vertical: bool, transform: Affine) -> (PhotocraftApp, LayerId) {
     let mut app = new_app();
+    // The tests assert where a drag lands, which a snap to a guide or an edge would move.
+    app.ui.extras.snap = false;
     let mut p = json!({"text": "Hello é世界\nSecond line", "size": 32, "x": 300, "y": 420});
     if paragraph {
         p["box"] = json!([300, 300, 240, 180]);
@@ -1686,7 +1705,7 @@ mod multi_layer_formatting {
         }
         let raster = LayerId(app.run("layer.new.layer", json!({"name": "Selected raster"})).unwrap()["layer"].as_u64().unwrap());
         selected(&mut app, &[ids[0], ids[1], raster]);
-        let mut h = controls(app, true);
+        let mut h = panel_harness_without_frame_logic(app);
         number(&mut h, "Font size", "60");
         // Differ from the automatic 72 pt leading so this is an actual property change.
         number(&mut h, "Leading", "84");

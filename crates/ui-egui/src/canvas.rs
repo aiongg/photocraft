@@ -188,7 +188,9 @@ pub fn canvas_view(
     // The primary canvas keeps its view in `app.ui.views`: the pass starts from the stored view and stores the one it
     // ends with, unless something stored another view while the pass ran (a tool's commit asking for a fit), which then
     // stands.
-    let stored = primary.then(|| app.ui.views.get(idx).cloned()).flatten();
+    // A New Window for Document keeps a view of its own (`window_views`), which is not the document's.
+    let own_window = host.window.is_some_and(|window| app.ui.window_views.contains_key(&window));
+    let stored = (primary && !own_window).then(|| app.ui.views.get(idx).cloned()).flatten();
     // `View::zoom` is device pixels per document pixel; this canvas's geometry is in its own viewport's egui points. A
     // document window can sit on another display with a different scale, so only the primary canvas records `app.ppp`
     // for the frame's shared helpers (`point_zoom`, the navigator, control-channel coordinate mapping).

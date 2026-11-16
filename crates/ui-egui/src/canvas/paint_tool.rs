@@ -199,6 +199,34 @@ fn with_resize<R>(app: &mut PhotocraftApp, f: impl FnOnce(&mut crate::brush_resi
 
 /// A press the paint tool takes: the resize chord, the HUD Color Picker, a Mixer Brush load (a click
 /// that is done at once), or a stroke.
+/// A Paint Bucket or Magic Eraser press: the fill or the erase runs at the clicked pixel. Returns false for any other tool.
+fn click_tool(app: &mut PhotocraftApp, tool: Tool, at: [f64; 2]) -> bool {
+    match tool {
+        Tool::PaintBucket => {
+            let o = app.ui.tool_options.clone();
+            let contents = if o.bucket_fill_pattern { "pattern" } else { "foreground" };
+            let params = json!({
+                "x": at[0].floor(),
+                "y": at[1].floor(),
+                "tolerance": o.tolerance,
+                "contiguous": o.contiguous,
+                "antiAlias": o.anti_alias,
+                "sampleAllLayers": o.sample_all.paint_bucket,
+                "opacity": o.fill_opacity,
+                "contents": contents,
+                "target": paint_target(app),
+            });
+            if let Err(e) = app.run("paint.bucket", params) {
+                app.ui.status = e;
+                app.ui.status_error = true;
+            }
+            true
+        }
+        Tool::MagicEraser => crate::eraser_ui::click(app, tool, at[0], at[1]),
+        _ => false,
+    }
+}
+
 fn begin(app: &mut PhotocraftApp, state: &mut PaintState, pointer: &ToolPointer, at: [f64; 2], cx: &mut ToolContext<'_>) -> ToolAction {
     let tool = app.ui.tool;
     let (mods, button) = (pointer.mods, pointer.button);
@@ -231,6 +259,10 @@ fn begin(app: &mut PhotocraftApp, state: &mut PaintState, pointer: &ToolPointer,
             app.ui.status = e;
             app.ui.status_error = true;
         }
+        return ToolAction::Done;
+    }
+    // The Paint Bucket and the Magic Eraser act on the click: no stroke, no drag.
+    if button == PointerButton::Primary && click_tool(app, tool, at) {
         return ToolAction::Done;
     }
     sync_tool_brush(app);

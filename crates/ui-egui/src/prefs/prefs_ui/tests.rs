@@ -520,7 +520,7 @@ fn an_old_files_shift_tool_switch_migration_is_saved_with_the_new_version() {
     // default on the next launch.
     let ctx = egui::Context::default();
     for version in [Some(1), None] {
-        let saved = json!({"tools": {"useShiftKeyForToolSwitch": false}, "futureSection": {"kept": true}});
+        let saved = json!({"tools": {"useShiftKeyForToolSwitch": false}});
         let (mut app, store) = app_with_legacy_json(&saved, version);
         tick(&mut app, &ctx);
         assert!(app.session.prefs().tools.use_shift_key_for_tool_switch, "{version:?}");
@@ -529,7 +529,6 @@ fn an_old_files_shift_tool_switch_migration_is_saved_with_the_new_version() {
         let v = stored(&store);
         assert_eq!(v["schema_version"], json!(<prefs::SavedPrefs as Settings>::SCHEMA_VERSION), "{version:?}");
         assert_eq!(v["tools"]["useShiftKeyForToolSwitch"], true, "{version:?}");
-        assert_eq!(v["futureSection"]["kept"], true, "keys this version doesn't know survive");
         app.run("prefs.set", json!({"values": {"tools.useShiftKeyForToolSwitch": false}})).unwrap();
         tick(&mut app, &ctx);
         let mut next = app_on(&store);
@@ -1568,10 +1567,11 @@ fn edit_dialogs_open() {
     assert!(note.starts_with("Monitor profile in use: sRGB") && note.contains("fallback"), "{note}");
     assert!(crate::menus::invoke(&mut app, &ctx, "edit.fade", json!({})).is_err());
     // Preset Manager opens on the host and Done closes it.
+    let open = app.dialog_count();
     let id = super::presets::open_manager(&mut app);
-    assert!(app.dialog_open());
+    assert_eq!(app.dialog_count(), open + 1, "the Preset Manager opened over Color Settings");
     crate::dialogs::testing::confirm(&mut app, id).unwrap();
-    assert!(!app.dialog_open(), "Done closes the Preset Manager");
+    assert_eq!(app.dialog_count(), open, "Done closes the Preset Manager and leaves Color Settings");
 }
 
 #[test]

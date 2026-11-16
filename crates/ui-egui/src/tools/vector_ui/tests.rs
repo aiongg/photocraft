@@ -338,6 +338,9 @@ fn making_a_selection_from_the_pen_path_deselects_and_hides_it() {
     assert!(app.session.active().unwrap().doc.work_path.is_some());
     assert!(app.session.active().unwrap().doc.selection.is_none());
     assert!(overlay(&app).is_empty(), "still hidden");
+    // Auto Add/Delete makes the selected saved path the only target (#12762), so the plain Pen overlay is the one that shows
+    // both paths.
+    app.ui.tool_options.pen_auto_add_delete = false;
     // Selecting a saved path in the Paths panel doesn't show it; only the Work Path does.
     let saved = json!({"subpaths": [{"closed": true, "knots": [{"anchor": [60, 60]}, {"anchor": [90, 60]}, {"anchor": [90, 90]}]}]});
     app.run("path.set", json!({"name": "Saved", "path": saved})).unwrap();
@@ -575,12 +578,12 @@ fn align_edges_snaps_a_fractional_weight_to_the_nearest_pixel() {
 /// pixels, even a short one (rounding each end on its own turned 10.1,10.49 → 11.3,11.69 into a 1 × 2 step).
 #[test]
 fn a_short_shift_drag_line_keeps_its_45_degrees() {
-    let line = |app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]| {
+    let line = |app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2], shift: bool| {
         app.ui.tool = Tool::Line;
         let geometry = ShapeGeometry::Line { from: (from[0], from[1]).into(), to: (to[0], to[1]).into(), weight: 1.0 };
-        finish_drag(app, ShapeKind::Line, &geometry, Mods::default());
+        finish_drag(app, ShapeKind::Line, &geometry, Mods { shift, ..Mods::default() });
         let info = app.run("shape.info", json!({})).unwrap();
-        let p = |k: &str| [info[k][0].as_f64().unwrap(), info[k][1].as_f64().unwrap()];
+        let p = |k: &str| [info["live"][k][0].as_f64().unwrap(), info["live"][k][1].as_f64().unwrap()];
         (p("from"), p("to"))
     };
     let cases: [([f64; 2], [f64; 2]); 4] = [([10.1, 10.49], [11.3, 11.69]), ([20.4, 5.6], [17.1, 8.9]), ([3.3, 40.2], [9.8, 33.1]), ([50.5, 50.5], [44.2, 44.0])];
@@ -590,14 +593,14 @@ fn a_short_shift_drag_line_keeps_its_45_degrees() {
         let side = (dx.abs() + dy.abs()) / 2.0;
         let snapped = [start[0] + side * dx.signum(), start[1] + side * dy.signum()];
         let mut a = app();
-        let (from, to) = line(&mut a, start, snapped);
+        let (from, to) = line(&mut a, start, snapped, true);
         assert!(from.iter().chain(&to).all(|v| v.fract() == 0.0), "whole pixels: {from:?} {to:?}");
         let (dx, dy) = (to[0] - from[0], to[1] - from[1]);
         assert!(dx != 0.0 && dx.abs() == dy.abs(), "{start:?} → {end:?}: still 45°: {from:?} {to:?}");
     }
     // Without the snap each end still rounds on its own.
     let mut a = app();
-    let (from, to) = line(&mut a, [10.1, 10.49], [11.3, 11.89]);
+    let (from, to) = line(&mut a, [10.1, 10.49], [11.3, 11.89], false);
     assert_eq!((from, to), ([10.0, 10.0], [11.0, 12.0]));
 }
 
@@ -721,19 +724,23 @@ fn pen_overlay_uses_the_view_document_even_during_direct_selection() {
     app.ui.tool = Tool::Pen;
     clicks(&mut app, &[[20.0, 20.0], [80.0, 60.0]]);
     app.session.execute("file.new", json!({"width": 200, "height": 200})).unwrap();
-    // The draft's document is the first one, the new document the second.
-    for active in [0, 1] {
-        assert!(app.session.set_active(active));
-        for tool in [Tool::Pen, Tool::DirectSelection] {
-            app.ui.tool = tool;
-            for modifiers in [Modifiers::NONE, Modifiers::COMMAND] {
-                testing::modifiers(&mut app, modifiers);
+    // The draft's document is the first one, the new document the second. A frame with the second one active finishes the
+    // stale draft (`cancel_stale_pen`), so the modifiers are set in a frame while the first is active and the second
+    // is made active only for the reads.
+    for modifiers in [Modifiers::NONE, Modifiers::COMMAND] {
+        assert!(app.session.set_active(0));
+        testing::modifiers(&mut app, modifiers);
+        for active in [0, 1] {
+            assert!(app.session.set_active(active));
+            for tool in [Tool::Pen, Tool::DirectSelection] {
+                app.ui.tool = tool;
                 for (index, visible) in [(0, true), (1, false)] {
                     assert_eq!(draft_drawn(&mut app, index), visible, "active {active}, {tool:?}, {modifiers:?}, document {index}");
                 }
             }
         }
     }
+    assert!(app.session.set_active(0));
     testing::modifiers(&mut app, Modifiers::NONE);
 }
 

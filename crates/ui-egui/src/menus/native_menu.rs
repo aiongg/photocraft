@@ -95,6 +95,8 @@ pub(crate) fn state_hash(app: &PhotocraftApp, input: Option<u64>) -> u64 {
     }
     let ui = &app.ui;
     (&ui.recent_files, &app.workspaces.set.current, app.ui.palette.open, ui.transform.is_some(), ui.text_edit.is_some(), app.dialog_count()).hash(&mut h);
+    // Cut and Copy are enabled while the typed text has a selection.
+    ui.text_edit.as_ref().map(|e| e.anchor != e.caret).hash(&mut h);
     (app.discard.is_some(), crate::distort_ui::modal_workspace(app)).hash(&mut h);
     crate::prefs_ui::recording(app).hash(&mut h);
     // Edit / Clear Selected Guides are enabled only while a guide is selected.

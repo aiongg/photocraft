@@ -10,6 +10,13 @@ const FONTS: [&str; 2] = ["Inter", "JetBrains Mono"];
 
 type H = Harness<'static, PhotocraftApp>;
 
+use super::commit_tests::ime;
+
+/// A key press through the window host, as the platform's reaches the focused editor.
+fn key(app: &mut PhotocraftApp, key: Key) {
+    crate::canvas::testing::key(app, key, egui::Modifiers::NONE);
+}
+
 fn layer(doc: &Document, id: LayerId) -> &photocraft_doc::TextLayer {
     let LayerContent::Text(t) = &doc.layer(id).unwrap().content else { panic!("text layer") };
     t
@@ -44,12 +51,14 @@ fn select(h: &mut H, range: [usize; 2]) {
     e.caret = range[1];
 }
 
+/// Takes the keyboard off the family field and gives it to the session's editor, as the field's Enter does in the app.
 fn surrender_focus(h: &H) {
     h.ctx.memory_mut(|m| {
         if let Some(id) = m.focused() {
             m.surrender_focus(id);
         }
     });
+    super::editing::focus_editor(&h.ctx);
 }
 
 /// A text layer `content` in an edit session in `FONTS[pattern % 2]`; patterns 2 and 3 style characters 2..4 in the other font.
@@ -156,11 +165,11 @@ fn caret_font_choices_style_only_subsequent_typing_including_ime() {
                 assert!(crate::type_font_preview::display_doc(h.state_mut(), 0).is_none());
                 // Two preedit replacements and the final commit keep the pending font.
                 surrender_focus(&h);
-                h.event(egui::Event::Ime(egui::ImeEvent::Preedit { text: "é".into(), active_range_chars: None }));
+                ime(h.state_mut(), egui::ImeEvent::Preedit { text: "é".into(), active_range_chars: None });
                 h.run();
-                h.event(egui::Event::Ime(egui::ImeEvent::Preedit { text: "éX".into(), active_range_chars: None }));
+                ime(h.state_mut(), egui::ImeEvent::Preedit { text: "éX".into(), active_range_chars: None });
                 h.run();
-                h.event(egui::Event::Ime(egui::ImeEvent::Commit("éX".into())));
+                ime(h.state_mut(), egui::ImeEvent::Commit("éX".into()));
                 h.run();
                 super::host::type_text(h.state_mut(), "Z");
                 h.run();
@@ -200,9 +209,9 @@ fn caret_style_is_discarded_by_navigation_cancel_undo_and_document_switch() {
         match action {
             "navigation" => {
                 surrender_focus(&h);
-                h.key_press(Key::ArrowLeft);
+                key(h.state_mut(), Key::ArrowLeft);
                 h.run();
-                h.key_press(Key::ArrowRight);
+                key(h.state_mut(), Key::ArrowRight);
                 h.run();
                 super::host::type_text(h.state_mut(), "Z");
                 assert!(families(&saved(&h, id)).iter().all(|f| f == FONTS[0]));
@@ -253,7 +262,7 @@ fn backspace_and_delete_preserve_pending_caret_font() {
         h.run();
         choose(&mut h, FONTS[1], "enter");
         surrender_focus(&h);
-        h.key_press(key);
+        self::key(h.state_mut(), key);
         h.run();
         assert!(super::insertion_style::pending(h.state()).is_some());
         super::host::type_text(h.state_mut(), "Z");
@@ -271,9 +280,9 @@ fn backspace_and_delete_preserve_pending_caret_font() {
     h.run();
     choose(&mut h, FONTS[1], "enter");
     surrender_focus(&h);
-    h.key_press(Key::Backspace);
+    key(h.state_mut(), Key::Backspace);
     h.run();
-    h.key_press(Key::Backspace);
+    key(h.state_mut(), Key::Backspace);
     h.run();
     assert!(super::insertion_style::pending(h.state()).is_some());
     super::host::type_text(h.state_mut(), "Z");

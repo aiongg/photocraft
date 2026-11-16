@@ -106,7 +106,8 @@ pub(super) fn try_pen_commit(app: &mut PhotocraftApp, closed: bool) -> Result<()
 /// The Freeform history override applies to document paths and new shape layers only.
 fn commit_path_current(app: &mut PhotocraftApp, pen: &PenPath, closed: bool, freeform: bool) -> bool {
     let shape_mode = app.ui.tool_options.vector_mode == VectorMode::Shape;
-    if pen.draft.knots.is_empty() || (pen.draft.knots.len() < 2 && shape_mode) {
+    // One anchor is no path, in either mode.
+    if pen.draft.knots.len() < 2 {
         return true;
     }
     let path = path_json(&pen_path(pen));
