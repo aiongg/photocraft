@@ -6,7 +6,7 @@ use craft::ui::buttons::{Button, ToggleButton};
 use craft::ui::choice::Checkbox;
 use craft::ui::contract::{Bind, Entry, Outcome as _, Props as _, Show as _, ShowContainer as _};
 use craft::ui::display::Text;
-use craft::ui::form::{FieldGroup, SliderField};
+use craft::ui::form::{Field, FieldGroup, SliderField};
 use craft::ui::pickers::Select;
 use craft::ui::runtime::env::UnitKind;
 use craft::ui::text::{LinkedFields, NumberField};
@@ -23,10 +23,17 @@ fn edit(app: &mut PhotocraftApp, command: &str, mut params: Value, gesture: Opti
     run(app, command, params);
 }
 
-/// A number field of `value`: the value an edit landed on with its gesture, `None` when nothing changed.
-fn number(ui: &mut egui::Ui, label: &str, value: f64, range: std::ops::RangeInclusive<f64>, unit: UnitKind) -> Option<(f64, Option<GestureId>)> {
+/// A number field of `value`: the value an edit landed on with its gesture, `None` when nothing changed. With
+/// `name`, the field sits in a `Field` labelled `label` and keeps `name` as its own accessible name, so the label
+/// describes it.
+fn number(ui: &mut egui::Ui, label: &str, name: Option<&str>, value: f64, range: std::ops::RangeInclusive<f64>, unit: UnitKind) -> Option<(f64, Option<GestureId>)> {
     let mut shown = Some(value);
-    let out = NumberField::new(label.to_owned(), Bind::bound(&mut shown)).range(range).unit_kind(unit).show(ui);
+    let out = match name {
+        Some(name) => {
+            Field::new(label.to_owned()).show(ui, |ui, _| NumberField::new(name.to_owned(), Bind::bound(&mut shown)).keeps_name(true).range(range.clone()).unit_kind(unit).show(ui)).inner?
+        }
+        None => NumberField::new(label.to_owned(), Bind::bound(&mut shown)).range(range).unit_kind(unit).show(ui),
+    };
     let landed = (*out.events.landed()?)?;
     ((landed - value).abs() > 1e-9).then(|| (landed, out.events.last().and_then(EditEvent::id)))
 }
@@ -77,10 +84,10 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut offset_edit = None;
     FieldGroup::new(tl!("Transform")).show(ui, |ui, _| {
         if slot.source.is_some() {
-            if let Some((x, id)) = number(ui, "X", off[0], -30000.0..=30000.0, UnitKind::Pixels) {
+            if let Some((x, id)) = number(ui, "X", Some("Clone Source X Offset"), off[0], -30000.0..=30000.0, UnitKind::Pixels) {
                 offset_edit = Some(([x, off[1]], id));
             }
-            if let Some((y, id)) = number(ui, "Y", off[1], -30000.0..=30000.0, UnitKind::Pixels) {
+            if let Some((y, id)) = number(ui, "Y", Some("Clone Source Y Offset"), off[1], -30000.0..=30000.0, UnitKind::Pixels) {
                 offset_edit = Some(([off[0], y], id));
             }
         }
@@ -99,7 +106,7 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         if let Some(&now) = out.link.landed().filter(|&&now| now != slot.linked) {
             set = Some((json!({"linked": now}), None));
         }
-        if let Some((angle, id)) = number(ui, "A", slot.rotation, -180.0..=180.0, UnitKind::Degrees) {
+        if let Some((angle, id)) = number(ui, "A", None, slot.rotation, -180.0..=180.0, UnitKind::Degrees) {
             set = Some((json!({"rotation": angle}), id));
         }
         if let Some(now) = toggle(ui, tl!("Flip Horizontal"), slot.flip_h) {
