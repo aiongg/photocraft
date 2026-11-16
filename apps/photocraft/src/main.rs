@@ -737,7 +737,7 @@ fn main() -> eframe::Result {
             // A preference's automation folder that couldn't be opened, or a token file it couldn't
             // write: a Dock launch has no console.
             if let Some(ControlNotice { title, lines }) = control_warning {
-                photocraft_ui_egui::notices::post(&mut app, title, lines, false, None);
+                photocraft_ui_egui::notices::post(&mut app, title, lines, craft::theme::variant::Tone::Neutral, None);
             }
             Ok(Box::new(app))
         }),

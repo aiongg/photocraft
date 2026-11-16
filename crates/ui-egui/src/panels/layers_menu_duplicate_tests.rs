@@ -2,6 +2,7 @@
 //! dialog as Layer › Duplicate Layer…, plural with several layers selected, greyed without a document.
 use craft::keymap::CommandRef;
 use craft::ui::menu::PanelRow;
+use craft::ui::dialog::StackDialog;
 use craft::ui::patterns::form_dialogs::HostedParamDialog;
 use craft::ui::runtime::commands::CommandState;
 use serde_json::json;
@@ -39,7 +40,7 @@ fn open_dialog(app: &mut PhotocraftApp) -> Option<String> {
     crate::menus::invoke(app, &ctx, "layer.duplicate", json!({})).unwrap();
     crate::dialogs::testing::show(app);
     let id = top(app);
-    let ours = app.framework.dialogs.get_by_id::<HostedParamDialog>(id).is_some_and(|d| d.key().is_some_and(|k| crate::duplicate_layer_ui::owns(&k)));
+    let ours = app.framework.dialogs.get_by_id::<HostedParamDialog>(id).is_some_and(|d| StackDialog::key(d).is_some_and(crate::duplicate_layer_ui::owns));
     assert!(ours, "the Duplicate Layer dialog");
     fields(app, id).text("name").map(str::to_string)
 }
