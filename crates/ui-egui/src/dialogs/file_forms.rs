@@ -139,6 +139,12 @@ pub(crate) fn open_package(app: &mut PhotocraftApp) -> DialogId {
 
 /// File › Export › Paths to Illustrator.
 pub(crate) fn open_paths_to_file(app: &mut PhotocraftApp) -> DialogId {
+    let rows = paths_to_file_rows(app);
+    open_form(app, PATHS_TO_FILE, tl!("Export Paths to File"), rows)
+}
+
+/// The Paths to Illustrator form's rows: the file path and the Paths choice.
+pub(crate) fn paths_to_file_rows(app: &PhotocraftApp) -> Vec<Param> {
     let (dir, stem) = (default_dir(app), doc_stem(app));
     // Document Bounds comes first; a document without paths offers only it, selected (#13771).
     let mut options = ids(&["documentBounds"]);
@@ -157,11 +163,11 @@ pub(crate) fn open_paths_to_file(app: &mut PhotocraftApp) -> DialogId {
     // Opens on the Paths panel's selected row (#13777). A shape layer's path ("layer") is not an entry
     // yet, and a row the document no longer has falls back to All Paths (Document Bounds without paths).
     let selected = app.ui.selected_path.as_deref().filter(|s| *s != "layer" && selectable.iter().any(|n| n == s)).unwrap_or(fallback).to_string();
-    let rows = vec![
+    // The choice is not remembered between openings (#13777).
+    vec![
         Param::new("path", tl!("Path"), ParamKind::text(format!("{dir}/{stem}.ai"))),
-        Param::new("paths", tl!("Paths"), ParamKind::choice(options, Some(selected))),
-    ];
-    open_form(app, PATHS_TO_FILE, tl!("Export Paths to File"), rows)
+        Param::new("paths", tl!("Paths"), ParamKind::choice(options, Some(selected))).not_remembered(),
+    ]
 }
 
 #[cfg(test)]
