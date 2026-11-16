@@ -23,10 +23,40 @@
 //! `--click-at X,Y` opens a screen-space menu (for example the top Select menu) after the script.
 //! `--hover-at X,Y` leaves the pointer there without a click, for what a tool shows under it (the
 //! brush outline, the Clone Source overlay).
+//!
+//! `SNAPSHOT_RERUNS=1` prints, for every frame the script's calls run, its passes and the reasons a
+//! pass asked to run again, after the framework's `craft_ui::rerun` lines that name what changed.
 
 use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::{PhotocraftApp, Services};
 use serde_json::Value;
+
+/// Prints the framework's rerun diagnostics (`craft_ui::rerun`) to stderr.
+struct RerunLog;
+
+impl log::Log for RerunLog {
+    fn enabled(&self, metadata: &log::Metadata<'_>) -> bool {
+        metadata.target() == "craft_ui::rerun"
+    }
+
+    fn log(&self, record: &log::Record<'_>) {
+        if self.enabled(record.metadata()) {
+            eprintln!("  rerun: {}", record.args());
+        }
+    }
+
+    fn flush(&self) {}
+}
+
+/// Runs one frame; with `reruns`, prints its passes and why each pass after the first ran.
+fn step(harness: &mut egui_kittest::Harness<'_, PhotocraftApp>, reruns: Option<&str>) {
+    harness.step();
+    if let Some(label) = reruns {
+        let output = &harness.output().platform_output;
+        let reasons: Vec<&str> = output.request_discard_reasons.iter().map(|cause| cause.reason.as_ref()).collect();
+        eprintln!("frame  {label}: {} passes {reasons:?}", output.num_completed_passes);
+    }
+}
 
 fn arg(args: &[String], name: &str) -> Option<String> {
     args.iter().position(|a| a == name).and_then(|i| args.get(i + 1).cloned())
@@ -126,6 +156,10 @@ fn main() {
     harness.run_steps(4);
     let ctx = harness.ctx.clone();
     let timing = std::env::var_os("SNAPSHOT_TIMING").is_some();
+    let reruns = std::env::var_os("SNAPSHOT_RERUNS").is_some();
+    if reruns && log::set_logger(&RerunLog).is_ok() {
+        log::set_max_level(log::LevelFilter::Debug);
+    }
     for (method, params) in script {
         let t0 = std::time::Instant::now();
         let label = format!("{method} {}", params.get("command").and_then(Value::as_str).unwrap_or(""));
@@ -138,13 +172,16 @@ fn main() {
         }
         // The window host injects queued input one step per pass (the runtime's input hook).
         let host = craft::ui::runtime::windows::WindowHost::of(&ctx);
+        let shown = reruns.then_some(label.as_str());
         for _ in 0..4 * craft::automation::synthetic::MAX_CLICKS {
             if host.injected_idle() {
                 break;
             }
-            harness.step();
+            step(&mut harness, shown);
         }
-        harness.run_steps(4);
+        for _ in 0..4 {
+            step(&mut harness, shown);
+        }
         if timing {
             eprintln!("{:>8.1} ms  {label}", t0.elapsed().as_secs_f64() * 1000.0);
         }
