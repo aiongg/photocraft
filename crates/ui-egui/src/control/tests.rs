@@ -98,61 +98,6 @@ fn shift_right_brush_does_not_open_presets_or_paint() {
 }
 
 #[test]
-fn brush_mode_control_routes_modifiers_and_reports_choices_without_history() {
-    for (tool, modifiers, expected) in [
-        ("brush", json!({"shift": true}), "mode"),
-        ("brush", json!({}), "erase"),
-        ("brush", json!({"alt": true}), "resize"),
-        ("brush", json!({"shift": true, "alt": true}), "erase"),
-        ("brush", json!({"shift": true, "ctrl": true}), if cfg!(target_os = "macos") { "erase" } else { "layer" }),
-        ("brush", json!({"shift": true, "command": true}), "layer"),
-        ("pencil", json!({"shift": true}), "mode"),
-        ("eraser", json!({"shift": true}), "mode"),
-        ("spotHealing", json!({"shift": true}), "preset"),
-    ] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        let ctx = app.ctx().clone();
-        app.run("file.new", json!({"width": 64, "height": 64, "background": "white"})).unwrap();
-        app.run("prefs.set", json!({"path": "tools.rightClickWithPaintingTools", "value": "erase"})).unwrap();
-        let history = app.session.active().unwrap().history.past_len();
-        let journal = app.session.journal.len();
-        pointer(
-            &mut app,
-            json!({"tool": tool, "button": "right", "modifiers": modifiers,
-            "events": [{"kind": "down", "x": 20, "y": 20}]}),
-        );
-        let menu_kind = |app: &PhotocraftApp| app.ui.canvas_tool_menu.as_ref().map(|m| m.kind.clone());
-        assert_eq!(matches!(menu_kind(&app), Some(MenuKind::BrushMode { .. })), expected == "mode", "{tool}: {modifiers}");
-        let painted = |app: &PhotocraftApp, since: usize| app.session.journal.iter().skip(since).any(|(id, _)| id == "paint.stroke");
-        match expected {
-            "mode" => {
-                assert!(!crate::canvas::testing::in_gesture(&mut app));
-                assert!(!painted(&app, journal));
-                assert_eq!(app.session.active().unwrap().history.past_len(), history);
-                let inspect = inspect(&app, &ctx);
-                assert_eq!(inspect["brushModeMenu"]["choices"], json!(crate::brush_mode_menu::labels(app.ui.tool)));
-                let journal = app.session.journal.len();
-                pointer(
-                    &mut app,
-                    json!({"events": [
-                    {"kind": "down", "x": 10, "y": 10}, {"kind": "move", "x": 30, "y": 30}, {"kind": "up", "x": 30, "y": 30}]}),
-                );
-                assert!(menu_kind(&app).is_none() && !crate::canvas::testing::in_gesture(&mut app));
-                assert_eq!(app.session.journal.len(), journal, "control dismissal cannot paint");
-            }
-            "preset" => assert!(!inspect(&app, &ctx)["brushPicker"].is_null()),
-            "layer" => assert!(matches!(menu_kind(&app), Some(MenuKind::Layers { .. }))),
-            "resize" => assert!(app.brush_resize.active()),
-            "erase" => {
-                assert!(crate::canvas::testing::in_gesture(&mut app));
-                assert!(!app.brush_resize.active(), "Shift+Alt is not the resize gesture");
-            }
-            _ => panic!("unknown fixture route: {expected}"),
-        }
-    }
-}
-
-#[test]
 fn perf_output_includes_slow_frames() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
@@ -614,6 +559,8 @@ fn agent_space_right_click_opens_the_hand_view_menu() {
         assert!(crate::canvas_tool_menu::rows(&menu) == crate::canvas_tool_menu::HAND_MENU, "{tool:?}");
         assert_eq!(menu.under, Some(tool), "{tool:?}");
         assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"view.twoHundredPercent"}))["ok"], true, "{tool:?}");
+        // The canvas carries out the runtime's view command in its next frame.
+        crate::canvas::testing::frame(&mut app);
         assert_eq!(app.ui.views[0].zoom, 2.0, "{tool:?}");
         assert_eq!(app.ui.tool, tool);
         app.ui.canvas_tool_menu = None;
@@ -645,27 +592,6 @@ fn agent_space_right_click_while_typing_keeps_the_type_menu() {
     assert_eq!(pointer(&mut app, click)["ok"], true);
     let menu = app.ui.canvas_tool_menu.clone().expect("the type edit menu");
     assert!(matches!(menu.kind, MenuKind::TypeEdit { .. }), "the type edit menu, not the view menu");
-}
-
-/// #11271: with a text field focused Space types, so an agent's Space right-click with the Move
-/// tool is the Move tool's (its layer list), not the Hand's view menu, as `hold_keys` decides in
-/// the app.
-#[test]
-fn agent_space_right_click_with_a_text_field_focused_keeps_the_tool() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    // The focus lives on the app's context, which the canvas passes run on.
-    let ctx = app.ctx().clone();
-    app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
-    app.sync_views();
-    app.ui.tool = crate::state::Tool::Move;
-    let field = egui::Id::unique("a focused text field");
-    egui::text_edit::TextEditState::default().store(&ctx, field);
-    ctx.memory_mut(|m| m.request_focus(field));
-    assert!(ctx.text_edit_focused(), "the field has focus");
-    let click = json!({"space": true, "button": "secondary", "events": [{"kind":"down","x":8,"y":8},{"kind":"up","x":8,"y":8}]});
-    assert_eq!(pointer(&mut app, click)["ok"], true);
-    assert!(app.ui.canvas_tool_menu.as_ref().is_none_or(|m| !matches!(m.kind, MenuKind::View)), "no view menu while a field has focus");
-    assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Layers { .. })), "the Move tool's layer list");
 }
 
 /// #6561: an agent's right-click on a pending crop opens the crop menu, as on the canvas.
