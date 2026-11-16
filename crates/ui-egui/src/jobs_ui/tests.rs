@@ -434,11 +434,11 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
     let r = h.state_mut().save_as(Some("/tmp/photocraft-test/fg.psd".into())).unwrap();
     assert_eq!(r["pending"], true, "the same background job does the work");
     h.run_steps(1);
-    // The overlay's card is up from the first frame (no delay), titled with the save (the overlay's name and the
-    // card's title both carry it), then its stage. A new layer's accessibility tree can take a second pass to
-    // appear under kittest.
+    // The overlay's card is up from the first frame (no delay), titled with the save, then its stage. The overlay's
+    // own node (named for the save) is in the accessibility tree a pass before the card's body, so the wait is for the
+    // body's hint.
     let t = Instant::now();
-    while h.query_all_by_label("Saving fg.psd").count() == 0 && t.elapsed() < Duration::from_secs(30) {
+    while (h.query_all_by_label("Saving fg.psd").count() == 0 || h.query_by_label("Esc to cancel").is_none()) && t.elapsed() < Duration::from_secs(30) {
         h.step();
     }
     h.get_by_label("Esc to cancel");
