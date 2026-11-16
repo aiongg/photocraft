@@ -282,14 +282,9 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         pasteboards(app, ui, body.rect, idx, border, label.clone());
         guides = super::rulers::show(app, ui, host);
         selection_controls(app, ui, body.rect, idx, output, &label);
-        // Under the controls, through the canvas's reserved paint slot.
-        let mut under = Vec::new();
-        if primary {
-            under.extend(crate::levels_clipping::shapes(app, ctx, &space.view, idx));
-        }
-        if !under.is_empty() {
-            space.paint_picture(ctx, under);
-        }
+        // The Levels clipping display, over the picture and under the controls: it joins the canvas's picture slot
+        // after the picture.
+        let clipping = if primary { crate::levels_clipping::shapes(app, ctx, &space.view, idx) } else { Vec::new() };
         // Color Range's Selection Preview: the dialog's proxy mask, drawn by the selection overlay without ants.
         if let Some(preview) = crate::color_range_ui::selection_preview(app, ctx) {
             SelectionOverlay::new(format!("{label} Selection Preview"), &*preview.mask)
@@ -375,6 +370,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
             };
             display.show_at(ui, body.rect);
         }
+        space.paint_picture(ctx, clipping);
         // The grid is drawn over the picture.
         if app.ui.view.shows(app.ui.view.show.pixel_grid) {
             let own = grid_prep.map(|prep| prep.source(app));
