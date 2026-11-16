@@ -43,7 +43,7 @@ fn services() -> crate::Services {
 /// commands they fired in the next frame, so a key needs two frames ([`press`], [`tap`]).
 pub(crate) fn app_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let ctx = app.ctx().clone();
-    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_context(ctx).with_max_steps(64).build_eframe(move |_cc| app);
+    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_context(ctx).with_max_steps(64).with_step_dt(1.0 / 60.0).build_eframe(move |_cc| app);
     h.run_steps(8);
     h
 }

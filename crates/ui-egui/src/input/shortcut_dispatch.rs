@@ -289,13 +289,42 @@ pub(crate) fn overrides(app: &PhotocraftApp) -> Overrides {
             overrides.insert(id, Vec::new());
         }
     }
+    let taken: Vec<Chord> = prefs
+        .shortcuts
+        .iter()
+        .filter(|(id, key)| id.starts_with(crate::actions::SHORTCUT_PREFIX) && !key.is_empty())
+        .filter_map(|(_, key)| Chord::parse(key).ok())
+        .collect();
     for (id, bridged) in RUNTIME_COMMANDS {
         let main = crate::shortcuts::effective_shortcut(app, id, crate::shortcuts::default_shortcut(id).as_deref());
         let mut keys: Vec<String> = main.iter().cloned().collect();
         keys.extend(prefs.alternates(id, main.as_deref()));
+        keys.retain(|key| !held_by_action(&taken, key));
         overrides.insert(bridged.command().key(), keys);
     }
+    // A key an action holds is the action's alone (it is checked before every command's key, as in Photoshop): the
+    // command that has it by default keeps its other keys.
+    if !taken.is_empty() {
+        for row in command_rows(app) {
+            let id = row.command.id.as_str();
+            if id.starts_with(crate::actions::SHORTCUT_PREFIX) || is_bridged(id) {
+                continue;
+            }
+            let main = crate::shortcuts::effective_shortcut(app, id, crate::shortcuts::default_shortcut(id).as_deref());
+            let mut keys: Vec<String> = main.iter().cloned().collect();
+            keys.extend(prefs.alternates(id, main.as_deref()));
+            if keys.iter().any(|key| held_by_action(&taken, key)) {
+                keys.retain(|key| !held_by_action(&taken, key));
+                overrides.insert(id, keys);
+            }
+        }
+    }
     overrides
+}
+
+/// Whether `key` is one of the chords the actions hold.
+fn held_by_action(taken: &[Chord], key: &str) -> bool {
+    Chord::parse(key).is_ok_and(|chord| taken.contains(&chord))
 }
 
 /// Delete's key (Delete / Backspace) with nothing selected deletes the selected layers, of any
@@ -394,6 +423,7 @@ pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
     for fired in std::mem::take(&mut app.framework.delivered) {
         if let Some((id, Bridged::View(_))) = bridge_of(&fired.command) {
             crate::panels::actions::journal_view(app, id, json!({}));
+            record(&app.ctx(), id, Outcome::Ran);
         }
     }
 }
@@ -588,6 +618,11 @@ fn dispatch_as(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, last: boo
             }
         }
     };
+    record(ctx, id, outcome);
+}
+
+/// Notes in the run log that command `id` ended as `outcome`.
+fn record(ctx: &egui::Context, id: &str, outcome: Outcome) {
     ctx.data_mut(|d| {
         let log = d.get_temp_mut_or_default::<Vec<(String, Outcome)>>(log_id());
         if log.len() >= 64 {
