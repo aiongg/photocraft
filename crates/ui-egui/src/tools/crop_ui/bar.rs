@@ -1,7 +1,6 @@
 //! The Crop tool's options as the framework `CropBar`, and the preset list of the task bar. One handler turns the cells'
 //! outputs into app calls.
 
-use craft::behavior::geometry::CropBox;
 use craft::draw::ui::crop::{CropBar, CropPresetList, CropRatioChange};
 use craft::ui::dialog::{Alert, HostedAlert};
 use craft::ui::runtime::env::Env;
@@ -15,17 +14,12 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let Some(document) = document(app) else { return };
     let mut settings = app.ui.tool_options.crop.clone();
     let users = crate::crop_presets::user_presets(app);
-    let (armed, angle, modified, entry) = {
+    let (armed, modified, entry) = {
         let tool = &app.canvas_tools.crop.tool;
-        (tool.straighten_armed(), tool.frame().map(|f| f.angle), tool.modified(), tool.shows_selection_entry(&settings))
+        (tool.straighten_armed(), tool.modified(), tool.shows_selection_entry(&settings))
     };
     let words = words(app);
-    let mut crop_bar = CropBar::new(&mut settings, &document);
-    // Without a frame the Angle field stays disabled.
-    if let Some(angle) = angle {
-        crop_bar = crop_bar.angle(angle);
-    }
-    let out = crop_bar
+    let out = CropBar::new(&mut settings, &document)
         .user_presets(&users)
         .straighten(armed)
         .selection_entry(entry)
@@ -39,12 +33,6 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     preset_outputs(app, out.ratio, out.new_preset, out.delete_preset, out.selection);
     if out.straighten {
         toggle_straighten(app);
-    }
-    if let Some(angle) = out.angle
-        && let Some(frame) = app.canvas_tools.crop.tool.frame()
-    {
-        let event = app.canvas_tools.crop.tool.crop_to(CropBox::new(frame.rect, angle));
-        handle_event(app, event);
     }
     if out.pick_color.is_some() {
         let rgb = settings.shield.custom_color.map(|v| f32::from(v) / 255.0);
