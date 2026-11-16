@@ -45,7 +45,7 @@ pub(crate) enum ToolCommand {
     Ruler,
     #[command(label = "Note Tool", icon = "message-square", kind = "tool", group = "tools", alias = "tools.select.note")]
     Note,
-    #[command(label = "Count Tool", icon = "circle-dot", kind = "tool", group = "tools", alias = "tools.select.count")]
+    #[command(label = "Count Tool", icon = "target", kind = "tool", group = "tools", alias = "tools.select.count")]
     Count,
     #[command(label = "Brush Tool", icon = "brush", kind = "tool", group = "tools", alias = "tools.select.brush")]
     Brush,
@@ -93,7 +93,7 @@ pub(crate) enum ToolCommand {
     RedEye,
     #[command(label = "Clone Stamp Tool", icon = "stamp", kind = "tool", group = "tools", alias = "tools.select.cloneStamp")]
     CloneStamp,
-    #[command(label = "Pattern Stamp Tool", icon = "grid-3x3", kind = "tool", group = "tools", alias = "tools.select.patternStamp")]
+    #[command(label = "Pattern Stamp Tool", icon = "grid", kind = "tool", group = "tools", alias = "tools.select.patternStamp")]
     PatternStamp,
     #[command(label = "History Brush Tool", icon = "history-brush", kind = "tool", group = "tools", alias = "tools.select.historyBrush")]
     HistoryBrush,

@@ -117,7 +117,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
     },
     panel("gradients", || tl!("Gradients").to_string(), "blend", LEAST, super::preset_panels::gradients_panel),
     // Patterns lays out its own list and footer bar.
-    PanelEntry { scrolls_itself: true, ..panel("patterns", || tl!("Patterns").to_string(), "grid-3x3", LEAST, super::preset_panels::patterns_panel) },
+    PanelEntry { scrolls_itself: true, ..panel("patterns", || tl!("Patterns").to_string(), "grid", LEAST, super::preset_panels::patterns_panel) },
     PanelEntry {
         heights: Some(PROPERTIES_HEIGHTS),
         ..panel("properties", || tl!("Properties").to_string(), "adjustments", LEAST, super::properties::panel)
@@ -187,7 +187,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         ..floating("styles", || tl!("Styles").to_string(), "sparkles", [300.0, 420.0], super::preset_panels::styles_panel)
     },
     floating("shapes", || tl!("Shapes").to_string(), "square", [300.0, 420.0], super::preset_panels::shapes_panel),
-    floating("toolPresets", || tl!("Tool Presets").to_string(), "circle-dot", [300.0, 380.0], super::preset_panels::tool_presets_panel),
+    floating("toolPresets", || tl!("Tool Presets").to_string(), "target", [300.0, 380.0], super::preset_panels::tool_presets_panel),
     floating("cloneSource", || tl!("Clone Source").to_string(), "stamp", [300.0, 360.0], super::preset_panels::clone_source_panel),
     PanelEntry {
         rows: super::type_panels_ui::styles::panel_rows,
