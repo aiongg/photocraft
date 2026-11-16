@@ -848,13 +848,6 @@ fn answer_held(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) {
     }
 }
 
-/// Ends the Actions step the dialog `id` belonged to: the playing action stops there.
-fn abandon_step(app: &mut PhotocraftApp, id: DialogId) {
-    if let Some(token) = crate::actions::token_of(app, id) {
-        crate::actions::abandoned(app, token);
-    }
-}
-
 /// The result pump's entry for the adjustment dialog (`dialogs::run`, once per pass): answers the editor's asks,
 /// follows the target, runs the command of a held OK (one history step) and answers the dialog with it, and turns the
 /// host's Cancel into the Actions step abandoned. A Cancel that arrives while the dialog is still open is the one an
@@ -875,7 +868,9 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
         DialogResult::Ok(_) => {}
         _ if still_open => {}
         _ => {
-            abandon_step(app, id);
+            if let Some(token) = crate::actions::token_of(app, id) {
+                crate::actions::stopped(app, token);
+            }
             app.adjust_open = None;
         }
     }

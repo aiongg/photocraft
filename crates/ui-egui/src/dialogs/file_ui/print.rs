@@ -126,6 +126,7 @@ pub fn open_print(app: &mut PhotocraftApp) -> DialogId {
         ("printerProfile", FieldValue::Text("coated-cmyk".into())),
         ("intent", FieldValue::Text("relative".into())),
         ("bpc", FieldValue::Bool(true)),
+        ("units", FieldValue::Text("cm".into())),
         ("center", FieldValue::Bool(true)),
         ("top", FieldValue::Number(0.0)),
         ("left", FieldValue::Number(0.0)),
@@ -183,9 +184,10 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
         photocraft_engine::print_cmds::PAPERS.iter().map(|p| (p.0.to_string(), print_paper_label(p.0).into())).collect();
     papers.push(("custom".into(), tl!("Custom").into()));
 
-    let pt = |key: &str, label: &'static str| {
-        Param::new(key, label, ParamKind::number(Some(1.0), Some(14400.0), 612.0, 1.0, 2)).visible_when("paper", FieldValue::Text("custom".into()))
+    let paper_length = |key: &'static str, label: &'static str| {
+        length_row(key, label, 1.0, 0.0, 14400.0).visible_when("paper", FieldValue::Text("custom".into()))
     };
+    let position = |key: &'static str, label: &'static str| length_row(key, label, 72.0, -limit, limit).enabled_when("center", FieldValue::Bool(false));
     let on = |key: &str| (key.to_string(), FieldValue::Text("photocraftManages".into()));
     let (on_key, on_value) = on("colorHandling");
     let mark = |key: &str, label: &'static str| Param::new(key, label, ParamKind::bool(false));
@@ -228,15 +230,15 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
         PrintSection {
             title: tl!("Position and Size").into(),
             params: vec![
+                Param::new("units", tl!("Units"), choice(&[("cm", tl!("Centimeters")), ("mm", tl!("Millimeters")), ("in", tl!("Inches"))], "cm")),
                 Param::new("paper", tl!("Paper"), ParamKind::choice(papers, Some("letter".into()))),
-                pt("paperWidth", tl!("Paper Width (pt)")),
-                pt("paperHeight", tl!("Paper Height (pt)")),
+                paper_length("paperWidth", tl!("Paper Width")),
+                paper_length("paperHeight", tl!("Paper Height")),
                 Param::new("orientation", tl!("Orientation"), choice(&[("portrait", tl!("Portrait")), ("landscape", tl!("Landscape"))], "portrait")),
                 Param::new("center", tl!("Center"), ParamKind::bool(true)),
                 // Shown while Center owns them, so choosing manual placement cannot resize the dialog.
-                Param::new("top", tl!("Top (in)"), ParamKind::number(Some(-limit), Some(limit), 0.0, 0.1, 2)).enabled_when("center", FieldValue::Bool(false)),
-                Param::new("left", tl!("Left (in)"), ParamKind::number(Some(-limit), Some(limit), 0.0, 0.1, 2))
-                    .enabled_when("center", FieldValue::Bool(false)),
+                position("top", tl!("Top")),
+                position("left", tl!("Left")),
                 Param::new("scaleToFit", tl!("Scale to Fit Media"), ParamKind::bool(false)),
                 Param::new("scale", tl!("Scale (%)"), ParamKind::number(Some(1.0), Some(1000.0), 100.0, 1.0, 2))
                     .enabled_when("scaleToFit", FieldValue::Bool(false)),
@@ -258,6 +260,32 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
             params: vec![Param::new("output", tl!("Save as PDF"), ParamKind::text("")).hint(tl!("(print to the printer)")).browse(PathKind::SaveFile)],
         },
     ]
+}
+
+/// Points in one of the Units menu's units; centimetres for an unknown name.
+fn unit_points(units: Option<&str>) -> (f64, &'static str) {
+    match units {
+        Some("mm") => (72.0 / 25.4, "mm"),
+        Some("in") => (72.0, "in"),
+        _ => (72.0 / 2.54, "cm"),
+    }
+}
+
+/// A length row shown in the Units menu's unit. The value is kept in `points_per_stored` points per stored unit
+/// (the custom paper in points, the position in inches), so a change of unit never changes the stored length.
+fn length_row(key: &'static str, label: &'static str, points_per_stored: f64, min: f64, max: f64) -> Param {
+    Param::custom(key, label, move |ui, fields, _| {
+        let (unit, suffix) = unit_points(fields.text("units"));
+        let mut shown = fields.number(key).unwrap_or(0.0) * points_per_stored / unit;
+        let (lo, hi) = (min * points_per_stored / unit, max * points_per_stored / unit);
+        let response = ui.add(egui::DragValue::new(&mut shown).range(lo..=hi).max_decimals(2).suffix(format!(" {suffix}")));
+        if response.changed() && shown.is_finite() {
+            fields.set(key, FieldValue::Number(shown * unit / points_per_stored));
+        }
+        // The form names a custom row's control by the row's label only for the controls it draws itself.
+        response.widget_info(|| egui::WidgetInfo { label: Some(label.to_owned()), ..egui::WidgetInfo::drag_value(true, shown) });
+        response
+    })
 }
 
 /// The system's printers, as the engine lists them without waiting: the driver list where the

@@ -511,7 +511,23 @@ fn write_params(value: &AdjustValue, cx: &ValueCx) -> Value {
         }
     }
     let out = Value::Object(out);
-    if matches!(value, AdjustValue::Levels { .. } | AdjustValue::Curves { .. }) && cx.gray() { adjust_params::gray_tone_params(&out) } else { out }
+    if matches!(value, AdjustValue::Levels { .. } | AdjustValue::Curves { .. }) && cx.gray() { neutral_colour_records(kind_name(value), &out) } else { out }
+}
+
+/// A gray plane's parameters: the colour records are the neutral ones of its gray adjustment, whatever `params` carried
+/// (#5335: hidden colour curves stay neutral).
+fn neutral_colour_records(kind: &str, params: &Value) -> Value {
+    let mut out = adjust_params::gray_tone_params(params);
+    if let Ok(neutral) = adjust_params::default_for(kind, ColorMode::Grayscale)
+        && let (Value::Object(out), Value::Object(neutral)) = (&mut out, adjust_params::to_params(&neutral))
+    {
+        for key in ["red", "green", "blue", "cyan", "magenta", "yellow", "black", "lightness", "a", "b"] {
+            if let Some(record) = neutral.get(key) {
+                out.insert(key.into(), record.clone());
+            }
+        }
+    }
+    out
 }
 
 /// Whether the Lab entries are Lightness, a, b with no combined record: the top-level record then aliases Lightness.

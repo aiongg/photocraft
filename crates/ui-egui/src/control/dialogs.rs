@@ -223,12 +223,6 @@ fn blend_row(_: &Value, v: &Value) -> Vec<(String, Value)> {
     vec![pair("blend", blend_id(v))]
 }
 
-// PLAN: the radio field id `area` is assumed (dialogs-w22 by request).
-fn equalize_area(_: &Value, v: &Value) -> Vec<(String, Value)> {
-    let selected = v.as_bool().unwrap_or(false);
-    vec![pair("area", json!(if selected { "selected" } else { "entire" }))]
-}
-
 fn merge_documents(_: &Value, v: &Value) -> Vec<(String, Value)> {
     v.as_array().map(|ids| ids.iter().take(4).enumerate().map(|(i, id)| (format!("channel{}", i + 1), id.clone())).collect()).unwrap_or_default()
 }
@@ -279,7 +273,6 @@ pub(crate) const FIELD_KEYS: &[FieldKey] = &[
     FieldKey { which: Which::Key("edit.fill"), from: "mode", to: "mode", values: &[], with: Some(mode_row) },
     FieldKey { which: Which::Key("edit.stroke"), from: "mode", to: "mode", values: &[], with: Some(mode_row) },
     FieldKey { which: Which::Key("layer.smartFilter.blendingOptions"), from: "blend", to: "blend", values: &[], with: Some(blend_row) },
-    FieldKey { which: Which::Key("image.adjustments.equalize"), from: "selectedAreaOnly", to: "area", values: &[], with: Some(equalize_area) },
     FieldKey { which: Which::Key("channel.mergeChannels"), from: "documents", to: "", values: &[], with: Some(merge_documents) },
     FieldKey { which: Which::Key("filter.blur.radialBlur"), from: "centerX", to: "center", values: &[], with: Some(center_x) },
     FieldKey { which: Which::Key("filter.blur.radialBlur"), from: "centerY", to: "center", values: &[], with: Some(center_y) },
