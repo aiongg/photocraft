@@ -428,12 +428,9 @@ fn replace_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
 }
 
 /// The three droppers (#6280), as Photoshop's: Eyedropper, Add to Sample and Subtract from Sample. Clicking
-/// the armed one puts it away. The dialog opens with the first armed (#6279).
+/// the armed one puts it away. The dialog opens with the first armed (#6279), and Reset arms it again.
 fn droppers_row() -> Param {
     Param::custom(SAMPLE_TOOL, Label::from(tl!("Eyedroppers")), |ui, fields, cx| {
-        if !fields.contains(SAMPLE_TOOL) {
-            fields.set(SAMPLE_TOOL, "sample");
-        }
         let armed = fields.text(SAMPLE_TOOL).unwrap_or_default().to_owned();
         // The body can run more than once in a pass and each run starts clean, so the request is filed on every run
         // while a dropper is armed: the host's arming is idempotent.
@@ -462,6 +459,7 @@ fn droppers_row() -> Param {
         cx.sampling(!fields.text(SAMPLE_TOOL).unwrap_or_default().is_empty());
         response
     })
+    .opens_with("sample")
 }
 
 /// The sampled colour after the Hue, Saturation and Lightness shift.
