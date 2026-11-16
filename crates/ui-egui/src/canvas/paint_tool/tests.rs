@@ -491,7 +491,6 @@ fn painting_a_group_is_refused_at_the_press_with_a_message() {
     assert!(app.session.active().unwrap().doc.layer(group).unwrap().is_group());
     app.ui.tool_options.gradient_classic = true;
     for tool in [Tool::Brush, Tool::Pencil, Tool::Eraser, Tool::CloneStamp, Tool::PaintBucket, Tool::MagicEraser, Tool::RedEye, Tool::Gradient] {
-        // Alerts of the earlier tools stay open: this press's are the ones past `seen`.
         let seen = errors(&app).len();
         app.ui.tool = tool;
         tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 10.0, pressure: 1.0 }, M);
@@ -503,6 +502,12 @@ fn painting_a_group_is_refused_at_the_press_with_a_message() {
         };
         assert_eq!(errors(&app)[seen..], [want], "{tool:?}");
         assert!(!testing::in_gesture(&mut app) && app.live_stroke.is_none(), "{tool:?} starts no stroke");
+        // The alert is modal: the next tool's press reaches the canvas once it is answered.
+        let ctx = testing::ctx(&app);
+        for id in app.framework.dialogs.open_dialogs().into_iter().map(|d| d.id).collect::<Vec<_>>() {
+            let _ = crate::dialogs::cancel(&mut app, &ctx, id);
+        }
+        testing::frame(&mut app);
         tool_event(&mut app, ToolEvent::Move { x: 20.0, y: 10.0, pressure: 1.0 }, M);
         tool_event(&mut app, ToolEvent::Up { x: 20.0, y: 10.0 }, M);
         assert!(trail(&app).is_none(), "{tool:?} draws no trail");
