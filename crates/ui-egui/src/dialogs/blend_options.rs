@@ -21,9 +21,10 @@ pub(crate) fn blend_mode(fields: &DialogFields, key: &str) -> BlendMode {
     fields.text(key).and_then(photocraft_engine::commands::blend_from_str).unwrap_or(BlendMode::Normal)
 }
 
-/// Mode, Opacity (percent) and Preserve Transparency: the rows Fill and Stroke share.
+/// The Blending section, Mode, Opacity (percent) and Preserve Transparency: the rows Fill and Stroke share.
 pub(crate) fn blending_rows() -> Vec<Param> {
     vec![
+        Param::section(tl!("Blending")),
         blend_param("mode", tl!("Mode:"), false, BlendMode::Normal),
         Param::new("opacity", tl!("Opacity:"), ParamKind::range(0.0, 100.0, 100.0, SliderScale::Linear)),
         Param::new("preserveTransparency", tl!("Preserve Transparency"), ParamKind::bool(false)),
