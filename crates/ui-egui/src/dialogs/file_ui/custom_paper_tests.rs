@@ -242,7 +242,8 @@ fn custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened() {
     let id = open_print(h.state_mut());
     assert_no_system_listing();
     set_fields(h.state_mut(), id, json!({"dryRun": true}));
-    h.run_steps(3);
+    // A new dialog draws its first pass hidden while it sizes itself, as at the harness start.
+    h.run_steps(4);
     assert!(shown(&h, "Custom"), "reopening array-valued settings must show Custom");
     assert_eq!(fields(&h, id)["paper"], json!([522.0, 666.0]));
     std::fs::remove_file(output).unwrap();
