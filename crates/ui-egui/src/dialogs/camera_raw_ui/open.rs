@@ -99,6 +99,7 @@ pub(super) fn open_raw_with(app: &mut PhotocraftApp, ctx: &egui::Context, mut ra
     let index = document_index(app, raw.document).ok_or("the raw document was closed")?;
     app.session.set_active(index);
     let (layer, surf, _) = crate::distort_ui::active_pixels(app)?;
+    attach_decode(&mut raw);
     if let Some((params, original)) = kept {
         return open_raw_pixels(app, ctx, layer, surf, params, RawStart { raw, original: Some(original), auto_tone: false });
     }
@@ -121,47 +122,26 @@ pub(super) fn open_raw_with(app: &mut PhotocraftApp, ctx: &egui::Context, mut ra
         app.ui.status_error = false;
     }
     // Camera Raw Defaults › Apply auto tone: a file without its own settings opens with Auto.
-<<<<<<< HEAD
     let auto_tone = !from_sidecar && app.session.prefs().raw_defaults.apply_auto_tone;
     open_raw_pixels(app, ctx, layer, surf, params, RawStart { raw, original: None, auto_tone })
-=======
-    if !from_sidecar
-        && app.session.prefs().raw_defaults.apply_auto_tone
-        && let Some(d) = app.camera_raw.as_mut()
-    {
-        photocraft_algo::camera_raw::auto_tone(&d.proxy, &mut d.params);
-        d.dirty = true;
-    }
-    attach_raw(app, raw);
-    Ok(())
 }
 
-/// Gives the open dialog its raw: the file name, the camera tone curve it was developed with, and
-/// the decode (the open's kept one, else one made now) the preview and Open's re-develop share.
-fn attach_raw(app: &mut PhotocraftApp, mut raw: RawOpen) {
+/// Gives `raw` the decode (the open's kept one, else one made now) the dialog's preview curve and Open's re-develop
+/// share, so the file is decoded once. A raw that already holds its decode, or whose file is gone, is left as it is.
+fn attach_decode(raw: &mut RawOpen) {
+    if raw.decoded.is_some() {
+        return;
+    }
     let file = match (&raw.bytes, &raw.path) {
-        _ if raw.decoded.is_some() => None,
         (Some(b), _) => Some(std::borrow::Cow::Borrowed(b.as_slice())),
         #[cfg(not(target_arch = "wasm32"))]
         (None, Some(p)) => std::fs::read(p).ok().map(std::borrow::Cow::Owned),
         _ => None,
     };
-    let curve = match file {
-        Some(b) => {
-            raw.decoded = photocraft_io::raw::take_kept_decode(&b).or_else(|| photocraft_io::raw::RawDecode::new(&b).ok().map(std::sync::Arc::new));
-            Some(raw.decoded.as_ref().map(|d| d.tone_curve().to_vec()).unwrap_or_default())
-        }
-        None => raw.decoded.as_ref().map(|d| d.tone_curve().to_vec()),
-    };
-    if let Some(d) = app.camera_raw.as_mut() {
-        d.layer_name = raw.name.clone();
-        // The full-size preview retones the whole frame with it, as Open will.
-        let curve = curve.map(std::sync::Arc::new);
-        d.detail.raw_curve = curve.clone();
-        d.raw_curve = curve;
-        d.raw_open = Some(raw);
+    if let Some(b) = file {
+        raw.decoded = photocraft_io::raw::take_kept_decode(&b).or_else(|| photocraft_io::raw::RawDecode::new(&b).ok().map(std::sync::Arc::new));
     }
->>>>>>> upstream/main
+}
 }
 
 pub(super) fn document_index(app: &PhotocraftApp, id: photocraft_doc::DocId) -> Option<usize> {
