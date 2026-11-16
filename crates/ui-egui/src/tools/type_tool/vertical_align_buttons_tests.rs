@@ -43,6 +43,20 @@ pub(super) fn bar(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     h
 }
 
+/// The bar drawn without the app's frame logic: that logic ends a text edit whose document is not the
+/// active one, and the bar's own decision for such an edit is what the caller tests.
+fn bar_without_frame_logic(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
+    let ctx = app.ctx().clone();
+    let mut h = Harness::builder().with_context(ctx).with_size(egui::vec2(1200.0, 60.0)).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            ui.horizontal(|ui| super::options_bar(app, ui));
+        },
+        app,
+    );
+    h.run_steps(3);
+    h
+}
+
 /// Which of the two button sets the bar shows; panics on a mix or neither.
 pub(super) fn shown(h: &Harness<'static, PhotocraftApp>) -> [&'static str; 3] {
     let has = |label: &str| h.query_by_label(label).is_some();
@@ -122,5 +136,5 @@ fn a_background_text_edit_decides_by_its_own_document() {
     app.session.open_document(twin, None);
     app.run("type.orientation.horizontal", json!({"layer": id.0})).unwrap();
     assert_ne!(app.session.active().unwrap().doc.id.0, a, "the other document is active");
-    assert_eq!(shown(&bar(app)), VERTICAL, "the edited layer is vertical");
+    assert_eq!(shown(&bar_without_frame_logic(app)), VERTICAL, "the edited layer is vertical");
 }
