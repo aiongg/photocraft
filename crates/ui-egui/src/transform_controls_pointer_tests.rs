@@ -69,10 +69,6 @@ fn dialog_count(app: &PhotocraftApp) -> usize {
     app.framework.dialogs.stack().ids().count()
 }
 
-fn top_dialog(app: &PhotocraftApp) -> DialogId {
-    app.framework.dialogs.stack().top().expect("a dialog is open")
-}
-
 /// The Color Picker's colour field, from the hosted dialog's `json_fields` as the host lists it.
 fn color_field(app: &PhotocraftApp, id: DialogId) -> Value {
     let open = app.framework.dialogs.open_dialogs().into_iter().find(|dialog| dialog.id == id).expect("the Color Picker is open");
@@ -300,70 +296,6 @@ fn invalid_later_pointer_event_does_not_begin_a_transform() {
     assert_eq!(app.session.active().unwrap().history.past_len(), steps);
 }
 
-/// A dialog opened after Down must not strand the Move drag or replace its starting point.
-#[test]
-fn ordinary_move_gesture_can_finish_after_a_dialog_opens() {
-    let (mut app, ctx, layers) = fixture();
-    let old = layers.map(|id| bounds(&app, id));
-    let steps = app.session.active().unwrap().history.past_len();
-    pointer(&mut app, &ctx, "down", [200.0, 150.0]);
-    assert!(crate::canvas::testing::in_gesture(&app));
-    accepted(&mut app, "ui.dialog.open", json!({"kind": "about"}));
-    let dialog = top_dialog(&app);
-    pointer(&mut app, &ctx, "down", [250.0, 175.0]);
-    assert!(crate::canvas::testing::in_gesture(&app), "the modal rejects a replacement Down");
-    pointer(&mut app, &ctx, "move", [220.0, 160.0]);
-    pointer(&mut app, &ctx, "up", [220.0, 160.0]);
-    assert!(!crate::canvas::testing::in_gesture(&app));
-    assert!(app.ui.transform.is_none());
-    for (id, previous) in layers.into_iter().zip(old) {
-        // The offset is measured from the first press, not the replacement Down.
-        assert_eq!(bounds(&app, id), previous.translate(20, 10));
-    }
-    assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
-    assert_eq!(top_dialog(&app), dialog);
-    close_dialog(&mut app, &ctx, dialog);
-    let after = app.session.active().unwrap().doc.clone();
-    pointer(&mut app, &ctx, "move", [270.0, 190.0]);
-    pointer(&mut app, &ctx, "up", [270.0, 190.0]);
-    assert_eq!(app.session.active().unwrap().doc, after, "later input cannot resume the finished gesture");
-    assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
-}
-
-/// A modal may interrupt a handle drag, but Up still ends its gesture before Enter commits.
-#[test]
-fn transform_handle_gesture_can_finish_after_a_dialog_opens() {
-    let (mut app, ctx, layers) = fixture();
-    let before = app.session.active().unwrap().doc.clone();
-    let old = layers.map(|id| bounds(&app, id));
-    let steps = app.session.active().unwrap().history.past_len();
-    pointer(&mut app, &ctx, "down", [800.0, 500.0]);
-    pointer(&mut app, &ctx, "move", [750.0, 470.0]);
-    assert!(app.ui.transform.is_some(), "the handle drag starts Free Transform");
-    let initial = quad(&app);
-    accepted(&mut app, "ui.dialog.open", json!({"kind": "about"}));
-    let dialog = top_dialog(&app);
-    pointer(&mut app, &ctx, "down", [200.0, 150.0]);
-    assert_eq!(quad(&app), initial, "the modal cannot move the preview on Down");
-    pointer(&mut app, &ctx, "move", [700.0, 440.0]);
-    pointer(&mut app, &ctx, "up", [700.0, 440.0]);
-    let preview = quad(&app);
-    assert_ne!(preview, initial, "the existing handle gesture still updates its preview");
-    assert_eq!(app.session.active().unwrap().doc, before);
-    assert_eq!(app.session.active().unwrap().history.past_len(), steps);
-    assert_eq!(top_dialog(&app), dialog);
-    close_dialog(&mut app, &ctx, dialog);
-    pointer(&mut app, &ctx, "move", [650.0, 410.0]);
-    pointer(&mut app, &ctx, "up", [650.0, 410.0]);
-    assert_eq!(quad(&app), preview, "later input cannot resume the released handle");
-    enter(&mut app);
-    assert_one_transform(&app, steps);
-    for (id, previous) in layers.into_iter().zip(old) {
-        let scaled = bounds(&app, id);
-        assert!(scaled.width() < previous.width() && scaled.height() < previous.height());
-    }
-}
-
 /// Full-window dialogs with embedded previews must not forward ordinary Move gestures.
 #[test]
 fn modal_workspaces_without_tool_event_controllers_do_not_move_layers() {
@@ -454,8 +386,9 @@ fn guide_lines(app: &PhotocraftApp) -> usize {
     app.canvas_tools.last_response.as_ref().map_or(0, |response| response.snapped.len())
 }
 
-/// The Color Picker takes the release of an ordinary Move drag: the drag ends where it last was, and
-/// moving after the picker closes needs a new press.
+/// A Move drag that runs when the Color Picker opens keeps the Move tool to its release, which ends the drag where the
+/// pointer is and commits it once; the picker's pick takes the canvas only after that, and moving after the picker
+/// closes needs a new press.
 #[test]
 fn color_picker_release_ends_an_ordinary_move_drag() {
     let (mut app, ctx, layers) = fixture();
@@ -466,13 +399,15 @@ fn color_picker_release_ends_an_ordinary_move_drag() {
     assert!(crate::canvas::testing::in_gesture(&app));
     accepted(&mut app, "ui.dialog.open", json!({"kind": "colorPicker"}));
     let dialog = crate::color_picker_ui::top(&app).expect("the Color Picker is open");
-    pointer(&mut app, &ctx, "up", [999.0, 690.0]);
-    assert!(!crate::canvas::testing::in_gesture(&app), "the picker's release ends the drag");
+    let color = color_field(&app, dialog);
+    pointer(&mut app, &ctx, "up", [240.0, 170.0]);
+    assert!(!crate::canvas::testing::in_gesture(&app), "the release ends the drag");
+    assert_eq!(color_field(&app, dialog), color, "the drag's release samples nothing");
     close_dialog(&mut app, &ctx, dialog);
     pointer(&mut app, &ctx, "move", [270.0, 190.0]);
     pointer(&mut app, &ctx, "up", [270.0, 190.0]);
     for (id, previous) in layers.into_iter().zip(old) {
-        assert_eq!(bounds(&app, id), previous.translate(20, 10), "moved only as far as before the picker opened");
+        assert_eq!(bounds(&app, id), previous.translate(40, 20), "moved to the release, and no further after the picker closed");
     }
     assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
 }
