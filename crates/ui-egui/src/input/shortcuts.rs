@@ -292,7 +292,7 @@ pub fn clipboard_keys(ctx: &egui::Context, typing: bool, raw: &mut egui::RawInpu
 }
 
 /// The frame's key call, once per pass: runs the commands the runtime's keys fired in the pass before
-/// ([`crate::shortcut_dispatch::run_fired`]), then the held-key and Escape work of the app. The fired list is taken,
+/// ([`crate::shortcut_dispatch::run_fired`]), then the held-key work of the app; Escape is [`escape_keys`]'s. The fired list is taken,
 /// so a second pass in one frame runs only what its own input fired. The main window runs no shortcuts while the
 /// screen color picker is open.
 pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
@@ -306,9 +306,15 @@ pub fn handle(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // However the tool was picked (toolbar, flyout, shortcut, automation), its group's key and its
     // toolbar slot bring it back later (#2608). A temporary tool is no choice, so it isn't noted.
     app.ui.remember_group_tool(crate::tool_memory::selected(app));
-    // A foreground save (Save in Background off, #6207) blocks the app until the file is written;
-    // only Esc reaches it, to cancel while it still encodes (see `jobs_ui::tick`).
-    if crate::jobs_ui::foreground_save(app).is_some() {
+}
+
+/// Esc and the view keys. The UI pass runs it last (`ui_body`), so the canvas's
+/// sessions and tools, the dialogs and every other UI that takes Esc have had it first, and only what they left
+/// reaches the window's intents. The main window takes none while the screen color picker is open, and a foreground
+/// save (Save in Background off, #6207) blocks the app until the file is written: only Esc reaches it, to cancel
+/// while it still encodes (see `jobs_ui::tick`).
+pub fn escape_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    if crate::screen_picker::busy(app) || crate::jobs_ui::foreground_save(app).is_some() {
         return;
     }
     handle_escape_and_view_keys(app, ctx);

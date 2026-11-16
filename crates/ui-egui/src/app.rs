@@ -296,6 +296,7 @@ impl eframe::App for PhotocraftApp {
         #[cfg(test)]
         if let Some(mut body) = self.framework.test_body.take() {
             body(ui, self);
+            crate::shortcuts::escape_keys(self, &ui.ctx().clone());
             self.framework.test_body = Some(body);
             return;
         }
