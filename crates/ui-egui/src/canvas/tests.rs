@@ -662,12 +662,14 @@ fn a_secondary_canvas_hand_pans_while_a_transform_is_open() {
     view0.fit_pending = false;
     view0.fill_pending = false;
     let center0 = view0.center;
+    // The same document in a document window of its own, whose canvas is not the main window's.
+    let window = CanvasHost { idx: 0, viewport: egui::ViewportId::ROOT, window: Some(1) };
     let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0));
     let frame = |app: &mut PhotocraftApp, events: Vec<egui::Event>| -> View {
         let input = egui::RawInput { screen_rect: Some(rect), events, ..Default::default() };
         let mut seen = view0.clone();
         let mut out = ctx.run_ui(input, |ui| {
-            (seen, _) = canvas_view(app, ui, CanvasHost::main(0), rect, view0.clone(), false);
+            (seen, _) = canvas_view(app, ui, window, rect, view0.clone(), false);
         });
         out.textures_delta.clear();
         seen
