@@ -124,13 +124,7 @@ pub(super) struct RawStart {
 /// The camera tone curve a raw was developed with: Shadows / Highlights act on the raw data in linear light before it, and
 /// the full-size preview retones the whole frame with it, as Open will.
 fn tone_curve(raw: &RawOpen) -> Option<Arc<Vec<[f32; 2]>>> {
-    let curve = match (&raw.bytes, &raw.path) {
-        (Some(b), _) => Some(photocraft_io::raw::tone_curve(b)),
-        #[cfg(not(target_arch = "wasm32"))]
-        (None, Some(p)) => std::fs::read(p).ok().map(|b| photocraft_io::raw::tone_curve(&b)),
-        _ => None,
-    };
-    curve.map(Arc::new)
+    raw.decoded.as_ref().map(|d| Arc::new(d.tone_curve().to_vec()))
 }
 
 /// The filmstrip tiles of the open-time dialog (one per queued raw) and the one shown.
