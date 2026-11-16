@@ -72,30 +72,11 @@ use photocraft_ui_egui::os_window::APP_ID;
 /// The smallest the main window may be, in points.
 const MIN_WINDOW_SIZE: [f32; 2] = [760.0, 480.0];
 
-/// Which title bar Preferences › Interface › System Title Bar asks for (#1271, #1316). Read from the
-/// saved preferences before the window opens; a missing or unreadable file keeps the default. The frame
-/// decision (`window_policy::decide_for`) turns it into the frame the platform allows.
-fn title_bar_pref(prefs_file: Option<&std::path::Path>) -> TitleBarPref {
-    let prefs: photocraft_engine::prefs::Preferences =
-        prefs_file.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default();
+/// Which title bar Preferences › Interface › System Title Bar asks for (#1271, #1316), from the
+/// preferences read before the window opens (`services::saved_prefs`). The frame decision
+/// (`window_policy::decide_for`) turns it into the frame the platform allows.
+fn title_bar_pref(prefs: &photocraft_engine::prefs::Preferences) -> TitleBarPref {
     if prefs.interface.system_title_bar { TitleBarPref::System } else { TitleBarPref::Integrated }
-}
-
-/// Preferences › Integrations, read before the window opens the way [`title_bar_pref`] is:
-/// whether agents may drive this launch at all, and the automation folders used when no
-/// `--automation-read-root` / `--automation-write-root` was given. A missing or unreadable file
-/// keeps the defaults.
-///
-/// The section is read on its own, and when it doesn't read as a whole each value on its own,
-/// as the app's lenient load reads them (#6611): a wrong-typed value elsewhere in the file, or
-/// in the other field, must not turn Allow Agent Control back on while the dialog shows it off.
-fn integrations(prefs_file: Option<&std::path::Path>) -> photocraft_engine::prefs::Integrations {
-    let file: Option<serde_json::Value> = prefs_file.and_then(|p| std::fs::read_to_string(p).ok()).and_then(|t| serde_json::from_str(&t).ok());
-    file.as_ref()
-        .and_then(|v| v.get("integrations"))
-        .cloned()
-        .map(photocraft_engine::prefs::read_integrations_section)
-        .unwrap_or_else(|| photocraft_engine::prefs::Preferences::default().integrations)
 }
 
 /// The automation roots: `--automation-read-root` / `--automation-write-root` (or their
@@ -262,13 +243,13 @@ fn claim_single_instance(
 /// The display server to open the window on: Xwayland for a pen on Wayland, which gives this app
 /// no pen input (#639). Exits with the package to install when its libraries are missing.
 #[cfg(target_os = "linux")]
-fn linux_display_session() -> linux_libs::DisplaySession {
+fn linux_display_session(display_server: photocraft_engine::prefs::LinuxDisplayServer) -> linux_libs::DisplaySession {
     let session = tablet::display_session();
     // Preferences › Performance › Linux display server = X11: Xwayland on a Wayland session too,
     // where native file drops work (winit 0.30 has none on Wayland, #386). Only when Xwayland can
     // run the window ($DISPLAY set, X11 libraries installed); otherwise the session's own.
     let session = if session == linux_libs::DisplaySession::Wayland
-        && gpu_startup::read_display_server(services::prefs_file().as_deref()) == photocraft_engine::prefs::LinuxDisplayServer::X11
+        && display_server == photocraft_engine::prefs::LinuxDisplayServer::X11
         && std::env::var_os("DISPLAY").is_some_and(|d| !d.is_empty())
         && linux_libs::available(linux_libs::DisplaySession::X11)
     {
@@ -303,14 +284,16 @@ struct ControlNotice {
 }
 
 /// The `--control` server's port, token and workspace, when it is on (exits 2 on a bad
-/// configuration). Preferences › AI Integrations' folders stand in for automation roots no flag
+/// configuration). Preferences › AI Integrations (`prefs`, read before the window opens) decide
+/// whether agents may drive this launch, and its folders stand in for automation roots no flag
 /// names. The server the agents switch starts is the agent link's, not this.
 fn control_setup(
+    prefs: &photocraft_engine::prefs::Integrations,
     cli_port: Option<u16>,
     auth: photocraft_automation::args::ControlArgs,
     automation: &photocraft_automation::args::AutomationArgs,
 ) -> ControlSetup {
-    control_setup_in(services::config_dir(), &integrations(services::prefs_file().as_deref()), cli_port, auth, automation)
+    control_setup_in(services::config_dir(), prefs, cli_port, auth, automation)
 }
 
 /// [`control_setup`] with the settings folder and Preferences › AI Integrations given.
@@ -424,8 +407,12 @@ fn main() -> eframe::Result {
 
     attach_log_file(logger);
 
+    // The saved preferences the launch needs before the window opens, read once without opening
+    // the settings store (the app opens it later).
+    let saved = services::saved_prefs();
+    let prefs = &saved.prefs;
     // An adapter named in the environment is chosen at startup, which a forwarded launch never reaches.
-    let rendering_mode = gpu_startup::read_rendering_prefs(services::prefs_file().as_deref()).1;
+    let rendering_mode = gpu_startup::rendering_prefs(&prefs.performance).1;
     if gpu_startup::adapter_override_is_process_specific(std::env::var("PHOTOCRAFT_GPU_ADAPTER").ok().as_deref(), rendering_mode, gpu_startup::ADAPTER_CHOICE) {
         launch_options.push(launch_args::PerProcess::GpuAdapterEnv);
     }
@@ -443,12 +430,12 @@ fn main() -> eframe::Result {
     let _ = (new_instance, &launch_options);
 
     // Bind and authenticate the authorized control listener before display/GPU initialization.
-    let ControlSetup { control, warning: control_warning } = control_setup(control_port, auth, &automation);
+    let ControlSetup { control, warning: control_warning } = control_setup(&prefs.integrations, control_port, auth, &automation);
 
     #[cfg(target_os = "linux")]
     let native_session = linux_libs::session_from_env(|name| std::env::var(name).ok());
     #[cfg(target_os = "linux")]
-    let session = linux_display_session();
+    let session = linux_display_session(prefs.performance.linux_display_server);
 
     // Finder / Dock / Open With deliver files as Apple events, not arguments; catch the one that
     // launched us as well as later ones. Lives until the event loop returns.
@@ -479,7 +466,7 @@ fn main() -> eframe::Result {
     let presets = services::presets_dir().map(photocraft_engine::preset_store::open_dir_async);
     // Who draws the window frame, decided once: the viewport below and the runtime's root frame both follow it.
     // `PHOTOCRAFT_TITLEBAR`, `PHOTOCRAFT_CAPTION_STYLE` and `PHOTOCRAFT_CAPTION_LAYOUT` are read by the decision.
-    let decision = window_policy::decide_for(Prefix::new("PHOTOCRAFT"), Backend::from_env(), title_bar_pref(services::prefs_file().as_deref()));
+    let decision = window_policy::decide_for(Prefix::new("PHOTOCRAFT"), Backend::from_env(), title_bar_pref(prefs));
     let integrated_frame = matches!(decision.frame, Frame::Integrated(_));
     let mut options = native_options(&decision.frame);
     // winit picks Wayland whenever `WAYLAND_DISPLAY` is set; open on X11 when that was chosen.
@@ -499,7 +486,7 @@ fn main() -> eframe::Result {
     // driver moves to a safer one), and lock this start's marker until the first frames render.
     let t_sentinel = std::time::Instant::now();
     let os = gpu_startup::Os::current();
-    let (pref, mode) = gpu_startup::read_rendering_prefs(services::prefs_file().as_deref());
+    let (pref, mode) = gpu_startup::rendering_prefs(&prefs.performance);
     let (previous, sentinel) = match services::config_dir() {
         Some(dir) => gpu_startup::Sentinel::begin(&dir),
         None => (gpu_startup::Previous::Clean, None),
@@ -514,11 +501,11 @@ fn main() -> eframe::Result {
     let gpu_note: std::sync::Arc<std::sync::Mutex<Option<String>>> = Default::default();
     // The adapter's real texture limits (egui asks for 8192 px), so big documents stay on the GPU.
     let wanted_adapter =
-        gpu_startup::wanted_adapter(std::env::var("PHOTOCRAFT_GPU_ADAPTER").ok().as_deref(), &gpu_startup::read_gpu_adapter(services::prefs_file().as_deref()));
+        gpu_startup::wanted_adapter(std::env::var("PHOTOCRAFT_GPU_ADAPTER").ok().as_deref(), &gpu_startup::gpu_adapter(&prefs.performance));
     gpu_startup::configure(&mut options.wgpu_options.wgpu_setup, &plan, os, wanted_adapter, sentinel.clone(), gpu_note.clone());
     // Preferences › Performance › Low-Latency Drawing (#1343): without vsync a stroke shows about
     // 50 ms sooner; wgpu picks Immediate, else Mailbox, else Fifo by what the driver offers.
-    if gpu_startup::read_low_latency(services::prefs_file().as_deref()) {
+    if prefs.performance.low_latency_drawing {
         options.wgpu_options.surface.present_mode = eframe::wgpu::PresentMode::AutoNoVsync;
     }
     // Testers' present mode and frame latency overrides (#1343), after the preference.
@@ -906,23 +893,37 @@ mod tests {
         assert_eq!(opened.inner_size, Some(egui::vec2(2560.0, 1392.0)));
     }
 
+    /// The preferences the launch reads from the settings folder `dir` (`services::saved_prefs`).
+    fn launch_prefs(dir: Option<&std::path::Path>) -> photocraft_engine::prefs::Preferences {
+        photocraft_engine::prefs::read_saved(dir).prefs
+    }
+
     #[test]
     fn the_system_title_bar_preference_is_read_from_the_saved_preferences() {
         // #1271, #1316: Preferences › Interface › System Title Bar asks for the system's bar; the frame
         // decision (craft-window) turns the preference into the frame the platform allows.
         use super::TitleBarPref;
         let dir = std::env::temp_dir().join(format!("pc-titlebar-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("prefs.json");
-        assert_eq!(super::title_bar_pref(None), TitleBarPref::default(), "no preferences file: the default");
+        let file = dir.join(photocraft_engine::prefs::LEGACY_PREFS_FILE);
+        let read = || super::title_bar_pref(&launch_prefs(Some(&dir)));
+        assert_eq!(super::title_bar_pref(&launch_prefs(None)), TitleBarPref::default(), "no settings folder: the default");
+        assert_eq!(read(), TitleBarPref::default(), "nothing saved: the default");
         std::fs::write(&file, "not json").unwrap();
-        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::default(), "an unreadable file: the default");
+        assert_eq!(read(), TitleBarPref::default(), "an unreadable file: the default");
         std::fs::write(&file, r#"{"interface":{}}"#).unwrap();
-        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::default(), "an older preference file: the default");
+        assert_eq!(read(), TitleBarPref::default(), "an older preference file: the default");
         std::fs::write(&file, r#"{"interface":{"systemTitleBar":true}}"#).unwrap();
-        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::System);
+        assert_eq!(read(), TitleBarPref::System);
         std::fs::write(&file, r#"{"interface":{"systemTitleBar":false}}"#).unwrap();
-        assert_eq!(super::title_bar_pref(Some(&file)), TitleBarPref::Integrated);
+        assert_eq!(read(), TitleBarPref::Integrated);
+
+        // Once the app's settings store has saved config.toml, the launch reads that, not the older file.
+        let (mut store, _) = craft::settings::SettingsStore::open_with(photocraft_engine::prefs::store_options(Some(&dir)));
+        store.update(|saved| saved.prefs.interface.system_title_bar = true);
+        store.flush().unwrap();
+        assert_eq!(read(), TitleBarPref::System, "config.toml wins over preferences.json");
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -957,15 +958,17 @@ mod tests {
     #[test]
     fn integrations_fall_back_to_the_defaults_without_a_readable_file() {
         let dir = std::env::temp_dir().join(format!("pc-integrations-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("prefs.json");
+        let file = dir.join(photocraft_engine::prefs::LEGACY_PREFS_FILE);
         let default = photocraft_engine::prefs::Integrations::default();
 
-        assert_eq!(super::integrations(None), default, "no preferences file");
+        assert_eq!(launch_prefs(None).integrations, default, "no settings folder");
+        assert_eq!(launch_prefs(Some(&dir)).integrations, default, "nothing saved");
         std::fs::write(&file, "not json").unwrap();
-        assert_eq!(super::integrations(Some(&file)), default, "an unreadable file");
+        assert_eq!(launch_prefs(Some(&dir)).integrations, default, "an unreadable file");
         std::fs::write(&file, r#"{"integrations":{"allowAgentControl":false,"controlPort":7878}}"#).unwrap();
-        let read = super::integrations(Some(&file));
+        let read = launch_prefs(Some(&dir)).integrations;
         assert!(!read.agents.allow_agent_control);
         assert_eq!(read.agents.control_port, 7878);
         let _ = std::fs::remove_dir_all(&dir);
@@ -976,8 +979,9 @@ mod tests {
     #[test]
     fn a_bad_value_elsewhere_keeps_agent_control_off() {
         let dir = std::env::temp_dir().join(format!("pc-integrations-lenient-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).unwrap();
-        let file = dir.join("prefs.json");
+        let file = dir.join(photocraft_engine::prefs::LEGACY_PREFS_FILE);
         // What the Preferences dialog shows for the same file.
         let shown = |text: &str| {
             let mut session = photocraft_engine::Session::new();
@@ -986,7 +990,7 @@ mod tests {
         };
         let read = |text: &str| {
             std::fs::write(&file, text).unwrap();
-            let read = super::integrations(Some(&file));
+            let read = launch_prefs(Some(&dir)).integrations;
             assert_eq!(read, shown(text), "{text}");
             read
         };

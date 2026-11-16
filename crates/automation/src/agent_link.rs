@@ -10,48 +10,13 @@ use std::path::Path;
 
 use craft::automation::agents;
 use photocraft_engine::prefs::Integrations;
-use serde_json::Value;
 
-use crate::AutomationError;
-
-fn io_error(path: &Path, e: impl std::fmt::Display) -> AutomationError {
-    AutomationError::Io(format!("{}: {e}", path.display()))
-}
-
-/// Largest preferences file read; anything bigger is not ours.
-const MAX_CONFIG_BYTES: u64 = 16 << 20;
-
-/// Read a small text file, refusing anything larger than [`MAX_CONFIG_BYTES`] or anything but a
-/// regular file (a FIFO would block the read).
-fn read_small(path: &Path) -> Result<Option<String>, AutomationError> {
-    let meta = match std::fs::metadata(path) {
-        Ok(m) => m,
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => return Ok(None),
-        Err(e) => return Err(io_error(path, e)),
-    };
-    if !meta.is_file() {
-        return Err(io_error(path, "not a regular file"));
-    }
-    if meta.len() > MAX_CONFIG_BYTES {
-        return Err(io_error(path, format!("larger than {MAX_CONFIG_BYTES} bytes")));
-    }
-    match std::fs::read_to_string(path) {
-        Ok(s) => Ok(Some(s)),
-        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(None),
-        Err(e) => Err(io_error(path, e)),
-    }
-}
-
-/// The MCP preferences saved in `dir/preferences.json` (defaults when the file or
-/// the section is missing or unreadable: the CLI must not fail over the app's settings).
+/// The MCP preferences saved in `dir`, read as the app's settings store loads them
+/// (`photocraft_engine::prefs::read_saved`: `config.toml`, or before it the older
+/// `preferences.json`). Defaults when nothing is saved or the file is unreadable: the CLI must not
+/// fail over the app's settings.
 pub fn read_integrations(dir: &Path) -> Integrations {
-    read_small(&dir.join("preferences.json"))
-        .ok()
-        .flatten()
-        .and_then(|text| serde_json::from_str::<Value>(&text).ok())
-        .and_then(|v| v.get("integrations").cloned())
-        .map(photocraft_engine::prefs::read_integrations_section)
-        .unwrap_or_default()
+    photocraft_engine::prefs::read_saved(Some(dir)).prefs.integrations
 }
 
 // ---- The agents switch -------------------------------------------------------------------------
