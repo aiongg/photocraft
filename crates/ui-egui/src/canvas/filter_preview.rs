@@ -83,7 +83,7 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
         crate::filter_dialog::validate_match_color_destination(app, &key, &target, &fields).ok()?;
         let (cmd, params) = if crate::smart_filter_dialog::owns(&key) {
             crate::smart_filter_dialog::blend_command(app, &target, &dialog_fields).ok()?
-        } else if !target.is_null() {
+        } else if crate::smart_filter_dialog::is_target(&target) {
             crate::smart_filter_dialog::params_command(app, &target, &key, crate::filter_dialog::params_of(&fields)).ok()?
         } else {
             (key.clone(), app.with_mask_target(&key, crate::filter_dialog::params_of(&fields)))

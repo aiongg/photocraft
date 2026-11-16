@@ -659,15 +659,19 @@ pub(crate) fn check(app: &mut PhotocraftApp, result: &ParamResult) -> Result<(),
     validate_match_color_source_layer(app, &result.key, &fields).map_err(Label::from)
 }
 
-/// An explicit source layer must be in the chosen source document: a missing one refuses OK instead of falling back
-/// to Merged.
+/// The chosen source must be an open document, and an explicit source layer must be in it: a closed or invalid source
+/// or a missing layer refuses OK instead of falling back to another document or to Merged.
 fn validate_match_color_source_layer(app: &PhotocraftApp, command: &str, fields: &Map<String, Value>) -> Result<(), String> {
     if command != MATCH_COLOR {
         return Ok(());
     }
-    let Some(layer) = fields.get("sourceLayer").filter(|layer| !layer.is_null()) else { return Ok(()) };
     let source = fields.get("source").and_then(|source| source.as_u64().or_else(|| source.as_str()?.parse().ok())).and_then(|i| usize::try_from(i).ok());
-    let Some(source) = source.and_then(|i| app.session.documents().get(i)) else { return Ok(()) };
+    let source = match source {
+        Some(index) => Some(app.session.documents().get(index).ok_or("the Match Color source document is not open")?),
+        None => None,
+    };
+    let Some(layer) = fields.get("sourceLayer").filter(|layer| !layer.is_null()) else { return Ok(()) };
+    let Some(source) = source else { return Ok(()) };
     let listed =
         source.doc.walk().into_iter().any(|(_, _, l)| layer.as_u64() == Some(l.id.0) || layer.as_i64().is_some_and(|v| i64::try_from(l.id.0) == Ok(v)));
     if listed { Ok(()) } else { Err("the Match Color source layer is not in the source document".into()) }
