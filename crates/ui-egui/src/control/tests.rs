@@ -688,6 +688,8 @@ fn agent_right_click_with_the_zoom_tool_opens_and_runs_the_view_menu() {
     assert_eq!(ids, ["view.fitOnScreen", "view.fillScreen", "view.actualPixels", "view.twoHundredPercent", "view.printSize", "view.zoomIn", "view.zoomOut"]);
     assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"select.all"}))["ok"], false);
     assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"view.twoHundredPercent"}))["ok"], true);
+    // The canvas carries out the runtime's view command in its next frame.
+    crate::canvas::testing::frame(&mut app);
     assert_eq!(app.ui.views[0].zoom, 2.0);
     assert!(app.ui.canvas_tool_menu.is_none());
 }

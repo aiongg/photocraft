@@ -241,6 +241,22 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
     rows
 }
 
+/// The rows of the commands the runtime defines ([`RUNTIME_COMMANDS`]) under their PhotoCraft ids, as the engine's
+/// catalog gives them with their default keys. The Keyboard Shortcuts dialog and a `.kys` import edit them with the
+/// rows of [`command_rows`]; the runtime's own catalog holds them under the framework commands.
+pub(crate) fn bridged_rows() -> Vec<CommandDef> {
+    photocraft_engine::keymap_defs::command_defs()
+        .into_iter()
+        .map(|mut def| {
+            if def.paths.is_empty() {
+                def.paths.extend(menu_path(&def.command.id));
+            }
+            def
+        })
+        .filter(|def| is_bridged(&def.command.id))
+        .collect()
+}
+
 /// The keys the app binds outside its menus, for the menu layout: the runtime keymap's keys (the user's overrides included) of
 /// every catalog row that is not a menu item (the tool letters, the held keys, the canvas keys, commands without a
 /// row), as chords with their command. A system menu item gives way to one of these as to a menu shortcut.
