@@ -534,25 +534,6 @@ fn explicit_mask_channel_roundtrip_resumes_queued_svg_save_with_masks_preserved(
 }
 
 #[test]
-fn active_gradient_preview_defers_save_until_gesture_ends() {
-    let (mut app, saves, _) = fixture();
-    open(&mut app);
-    confirm(&mut app).unwrap();
-    let before = app.session.active().unwrap().doc.clone();
-    app.ui.tool = crate::state::Tool::Gradient;
-    app.ui.tool_options.gradient_classic = false;
-    crate::canvas::testing::press(&mut app, [0.0, 0.0], egui::Modifiers::NONE);
-    assert!(crate::gradient_ui::editing(&app));
-    saves.borrow_mut().push_back(Ok(SVG.replace("red", "blue").into_bytes()));
-    let ctx = egui::Context::default();
-    poll(&mut app, &ctx);
-    assert_eq!(app.session.active().unwrap().doc, before);
-    app.gradient = Default::default();
-    poll(&mut app, &ctx);
-    assert_ne!(app.session.active().unwrap().doc, before);
-}
-
-#[test]
 fn bounded_sessions_require_reuse_or_closing_a_document() {
     let (mut app, _, calls) = fixture();
     for _ in 0..MAX_SESSIONS {

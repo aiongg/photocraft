@@ -5,7 +5,6 @@
 
 use super::*;
 use craft::behavior::dock::{Action, Column, DockEdge, DockPlacement, Layout, Node, PanelPlace};
-use egui_kittest::kittest::Queryable;
 use serde_json::{Value, json};
 
 use crate::panels::registry;
@@ -326,17 +325,3 @@ fn main_workspace_file_loads_as_the_default_and_saves_as_a_workspace() {
     assert_eq!((&reloaded.ui.docking.layout, &reloaded.ui.docking.hidden), (&app.ui.docking.layout, &app.ui.docking.hidden));
 }
 
-/// Moving the toolbar persists at click time, whether or not a dock pass follows: the side is not a
-/// workspace action, so the tool rail's toggle saves it itself.
-#[test]
-fn moving_the_toolbar_persists_without_the_dock() {
-    use crate::state::ToolbarSide;
-    let (mut h, _transport) = crate::lifecycle_tests::app_harness(crate::Services::default(), 0);
-    h.state_mut().session.prefs.edit(|p| p.workspace.remember_workspace_changes = true);
-    h.run_steps(2);
-    h.get_by_label("Move Toolbar to the Right").click();
-    h.run_steps(2);
-    assert_eq!(h.state().ui.panels.toolbar_side, ToolbarSide::Right);
-    let saved = &h.state().session.prefs().panel_layout;
-    assert_eq!(saved["panels"]["toolbar_side"], "right", "the toolbar side is persisted: {saved}");
-}

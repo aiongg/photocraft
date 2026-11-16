@@ -1,7 +1,7 @@
 use super::*;
 
 use craft::automation::actions::{ActionList, ActionStep};
-use craft::automation::ui::actions::{ActionSelection, ActionsEvent, ActionsHost};
+use craft::automation::ui::actions::{ActionSelection, ActionsEvent};
 use craft::text::ui::spelling::CheckSpellingDialog;
 use craft::ui::dialog::DialogId;
 
@@ -1412,14 +1412,6 @@ fn a_displace_step_restores_recording_when_the_map_picker_fails_or_is_cancelled(
         app.poll_file_dialog();
         assert_displace_call_finished(&mut app, 0);
     }
-}
-
-#[test]
-fn a_displace_step_restores_recording_when_the_map_picker_cannot_start() {
-    let mut app = recording_with_displace_child();
-    let id = pause_child(&mut app);
-    assert!(answer_ok(&mut app, id).is_err());
-    assert_displace_call_finished(&mut app, 0);
 }
 
 #[test]

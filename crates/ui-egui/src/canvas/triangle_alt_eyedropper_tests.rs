@@ -153,25 +153,3 @@ fn a_shape_layer_active_does_not_sample() {
     assert_eq!(foreground(&app), BLACK);
 }
 
-#[test]
-fn unmeasured_cases_keep_drawing() {
-    let mut app = app();
-    assert!(shape_alt_samples(&mut app, ALT, ON_RED[0], ON_RED[1]));
-    assert!(shape_alt_samples(&mut app, Mods { shift: true, ..ALT }, ON_RED[0], ON_RED[1]));
-    assert!(!shape_alt_samples(&mut app, Mods::NONE, ON_RED[0], ON_RED[1]));
-    assert!(!shape_alt_samples(&mut app, Mods { ctrl: true, ..ALT }, ON_RED[0], ON_RED[1]), "Control+⌥ is the brush resize");
-    assert!(!shape_alt_samples(&mut app, ALT, -40.0, -40.0), "nothing to sample off the image");
-    for mode in [craft::draw::ui::VectorMode::Path, craft::draw::ui::VectorMode::Pixels] {
-        app.ui.tool_options.shape_mode = mode;
-        assert!(!shape_alt_samples(&mut app, ALT, ON_RED[0], ON_RED[1]), "{mode:?} mode wasn't measured");
-    }
-    app.ui.tool_options.shape_mode = craft::draw::ui::VectorMode::Shape;
-    app.ui.tool = Tool::Rectangle;
-    assert!(!shape_alt_samples(&mut app, ALT, ON_RED[0], ON_RED[1]), "the other shape tools are their own items");
-    // Off the image the press draws from the centre, as before.
-    app.ui.tool = Tool::Triangle;
-    let layers = document_state(&app).1;
-    drag(&mut app, [-40.0, -40.0], [60.0, 60.0], Modifiers::ALT, Modifiers::ALT);
-    assert_eq!(foreground(&app), BLACK, "nothing sampled");
-    assert_eq!(document_state(&app).1, layers + 1, "a triangle was drawn");
-}

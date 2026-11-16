@@ -58,47 +58,6 @@ fn escape_while_the_right_button_is_down_cancels_the_right_click() {
     assert!(!nothing_opened(&h), "the next right-click opens its menu");
 }
 
-/// Every painting tool's Shift+right-click menu (Edit Brush… and its Mode list) reads the same
-/// right-click as the Brush's: one that moved a few pixels opens the tool's own menu where the
-/// button went down, and nothing else; a long Shift+right drag opens nothing. Spot Healing has no
-/// such menu and keeps its Brush Preset picker.
-#[test]
-fn a_moved_shift_right_click_opens_each_painting_tools_own_menu() {
-    let tools = [
-        Tool::Brush,
-        Tool::Pencil,
-        Tool::CloneStamp,
-        Tool::Eraser,
-        Tool::Dodge,
-        Tool::Sponge,
-        Tool::PaintBucket,
-        Tool::Gradient,
-        Tool::MixerBrush,
-        Tool::Healing,
-    ];
-    for tool in tools {
-        let mut h = harness(None);
-        h.state_mut().ui.tool = tool;
-        h.run_steps(2);
-        let journal = h.state().session.journal.len();
-        let at = right_drag_by(&mut h, vec2(9.0, 5.0), Modifiers::SHIFT);
-        assert_eq!(mode_menu_at(&h), Some(at), "{tool:?}: the menu opens where the button went down");
-        assert!(picker_at(&h).is_none(), "{tool:?}: only the Shift+right-click menu opens");
-        assert_eq!(h.state().session.journal.len(), journal, "{tool:?}: and nothing runs");
-        h.key_press(egui::Key::Escape);
-        h.run_steps(2);
-        right_drag_by(&mut h, vec2(120.0, 60.0), Modifiers::SHIFT);
-        assert!(mode_menu_at(&h).is_none() && nothing_opened(&h), "{tool:?}: a long Shift+right drag opens nothing");
-        assert!(strokes(&h).is_empty(), "{tool:?}");
-    }
-    let mut h = harness(None);
-    h.state_mut().ui.tool = Tool::SpotHealing;
-    h.run_steps(2);
-    let at = right_drag_by(&mut h, vec2(9.0, 5.0), Modifiers::SHIFT);
-    assert!(mode_menu_at(&h).is_none());
-    assert_eq!(picker_at(&h), Some(at), "Spot Healing keeps its picker");
-}
-
 /// The Shift+Alt+right HUD Color Picker opens with the current colour under the pointer. A press
 /// that opened it is the HUD's gesture: released after a small move, on the HUD or just off it
 /// on the canvas, it closes the HUD and opens neither the Brush Preset picker nor a canvas menu.

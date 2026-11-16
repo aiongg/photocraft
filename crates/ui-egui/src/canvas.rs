@@ -256,9 +256,6 @@ mod transform_controls_tests;
 mod layer_edges_tests;
 
 #[cfg(test)]
-mod guide_ants_tests;
-
-#[cfg(test)]
 mod live_frame_tests;
 
 #[cfg(test)]

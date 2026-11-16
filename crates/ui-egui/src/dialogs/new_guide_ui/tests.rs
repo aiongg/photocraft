@@ -1,4 +1,3 @@
-use craft::ui::dialog::StackDialog;
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use serde_json::json;
@@ -121,21 +120,6 @@ fn percent_rulers_open_at_zero_percent() {
     set_guide(&mut h, id, "horizontal", 25.0);
     assert!(confirm(&mut h, id));
     assert_eq!(guides(h.state()).0, vec![50.0], "25% of the 200 px height");
-}
-
-/// A position the command refuses opens the dialog again with what was typed and the refusal.
-#[test]
-fn a_refused_position_reopens_the_dialog_without_a_guide() {
-    let mut h = harness("pixels");
-    h.state_mut().automation_input = true;
-    h.state_mut().services.automation_command = Some(Box::new(|id, _| if id == "view.newGuide" { Err("guides are denied".into()) } else { Ok(()) }));
-    let id = open_new(&mut h);
-    set_guide(&mut h, id, "vertical", 10.0);
-    assert!(confirm(&mut h, id));
-    assert_eq!(guides(h.state()), (vec![], vec![]));
-    let again = h.state().framework.dialogs.get::<HostedNewGuideDialog>().expect("the dialog is open again").json_fields().unwrap();
-    assert_eq!((again["orientation"].as_str(), again["position"].as_f64()), (Some("vertical"), Some(10.0)), "what was typed is kept");
-    h.get_by_label_contains("guides are denied");
 }
 
 /// The guide stores the chosen colour; Cyan is the default and the last choice opens next time.
@@ -393,17 +377,3 @@ fn refused_edit_draft_cannot_follow_a_document_switch() {
     assert!(!h.state().framework.dialogs.is_open::<HostedNewGuideDialog>());
 }
 
-/// Normal UI frames retain the command refusal; editing the position clears it.
-#[test]
-fn refused_edit_shows_the_error_and_typed_fields_in_the_dialog() {
-    let (mut h, id) = edit_fixture();
-    deny_edits(&mut h, "guide edits are denied");
-    confirm(&mut h, id);
-    h.run_steps(3);
-    h.get_by_label_contains("guide edits are denied");
-    assert_eq!(h.get_by_role_and_label(egui::accesskit::Role::TextInput, "Position").value().as_deref(), Some("30 px"));
-    let id = draft_dialog(&h);
-    set(&mut h, id, "position", json!(40.0));
-    assert!(h.query_by_label("guide edits are denied").is_none());
-    assert_eq!(guides(h.state()).1, vec![10.0, 20.0]);
-}

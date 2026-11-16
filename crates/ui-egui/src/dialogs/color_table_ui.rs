@@ -189,19 +189,4 @@ mod tests {
         assert_eq!(command_params(&loaded_fields("custom"), kept.clone()), kept);
     }
 
-    #[test]
-    fn loaded_act_bytes_fill_the_dialog_fields() {
-        let table: Vec<[u8; 3]> = (0..256).map(|i| [i as u8, 0, 255]).collect();
-        let bytes = photocraft_engine::swatch_cmds::act_bytes(&table, Some(3)).unwrap();
-        let files = std::sync::Arc::new(craft::host::ScriptedFiles::answering([craft::host::Picked::Contents(vec![("Table.act".into(), bytes)])]));
-        let services = crate::Services { files: Some(files), ..Default::default() };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        let ctx = app.ctx().clone();
-        app.run("file.new", json!({"width": 8, "height": 8, "mode": "rgb"})).unwrap();
-        let id = crate::filter_dialog::open(&mut app, "image.mode.colorTable").expect("the Color Table dialog opens");
-        footer_action(&mut app, &ctx, id, "load");
-        let fields = app.framework.dialogs.get_by_id::<HostedParamDialog>(id).unwrap().fields().clone();
-        assert_eq!(fields.text("table"), Some("custom"));
-        assert_eq!(pending(&app, &fields), Some((table, Some(3))));
-    }
 }

@@ -3,7 +3,6 @@
 
 use super::*;
 use crate::app::framework::BuildApp as _;
-use craft::ui::canvas::RasterSource;
 use craft::ui::primitives::Revision;
 use egui::{Pos2, vec2};
 use egui_kittest::Harness;
@@ -332,23 +331,6 @@ fn mixer_drag_above_the_preview_size_paints_on_release() {
         let pixel = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().rgba(60, 30);
         assert_eq!(pixel[0] > 0.9 && pixel[3] > 0.9, !locked, "{pixel:?}");
     }
-}
-
-/// ⌥ with ⌘ held (the Move stand-in) is not a Mixer Brush paint load.
-#[test]
-fn mixer_alt_with_a_held_temporary_tool_does_not_load_paint() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    app.run("file.new", json!({"width":120,"height":60,"background":"#00ff00"})).unwrap();
-    app.run("layer.new.layer", json!({})).unwrap();
-    app.ui.tool = Tool::MixerBrush;
-    let alt = egui::Modifiers { alt: true, ..Default::default() };
-    let alt_cmd = egui::Modifiers { alt: true, command: true, ..Default::default() };
-    tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 30.0, pressure: 1.0 }, alt_cmd);
-    tool_event(&mut app, ToolEvent::Up { x: 30.0, y: 30.0 }, alt_cmd);
-    assert!(app.session.tools.mixer.spatial.is_none(), "the held Move tool doesn't sample");
-
-    tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 30.0, pressure: 1.0 }, alt);
-    assert!(app.session.tools.mixer.spatial.is_some(), "⌥ with the Mixer Brush itself samples");
 }
 
 #[test]

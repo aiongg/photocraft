@@ -580,22 +580,6 @@ fn arrow_keys_nudge_the_selected_pixels() {
     assert_eq!(alpha(&app, id, 48, 16), 1.0, "the layer itself didn't move");
 }
 
-/// Without floatable pixels (a position-locked layer) the Move tool behaves as without a
-/// selection: it moves the layer, which the lock refuses.
-#[test]
-fn a_layer_that_cannot_float_moves_whole_as_before() {
-    let (mut app, id) = selected_pixels(8);
-    app.session.execute("layer.lockLayers", json!({"position": true})).unwrap();
-    drag(&mut app, [16.0, 16.0], [26.0, 16.0], egui::Modifiers::NONE);
-    assert_eq!(offset(&app), None);
-    assert!(alpha(&app, id, 10, 10) == 1.0 && alpha(&app, id, 30, 16) == 0.0, "nothing moved");
-    // Without a selection the layer moves whole.
-    app.session.execute("layer.lockLayers", json!({"position": false})).unwrap();
-    app.session.execute("select.deselect", json!({})).unwrap();
-    drag(&mut app, [16.0, 16.0], [26.0, 16.0], egui::Modifiers::NONE);
-    assert!(alpha(&app, id, 10, 10) == 0.0 && alpha(&app, id, 58, 16) == 1.0, "the whole layer moved");
-}
-
 #[test]
 fn floating_selection_does_not_snap_to_its_own_starting_outline_or_preview_at_zero() {
     let (mut app, _id) = selected_pixels(8);

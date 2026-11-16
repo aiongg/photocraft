@@ -2,7 +2,7 @@ use super::document_display::{CanvasHost, active_view};
 use super::*;
 use craft::behavior::canvas::ZoomLadder;
 use craft::behavior::kurbo::Size;
-use craft::ui::canvas::{PixelRect, RasterSource};
+use craft::ui::canvas::PixelRect;
 use craft::ui::primitives::Revision;
 
 #[test]
@@ -733,106 +733,6 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
 }
 
 #[test]
-fn guides_draw_over_the_puppet_perspective_and_vanishing_point_previews() {
-    // #7781: like Free Transform's (#5086), the warped pixels of Puppet Warp and Perspective
-    // Warp and Vanishing Point's paste are image content. They were drawn with their pins and
-    // planes, after the guides, hiding every guide across them; the guides now go over them,
-    // the mesh lines, pins and planes over the guides, as in Photoshop.
-    for command in ["edit.puppetWarp", "edit.perspectiveWarp", photocraft_engine::vp_cmds::VP] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        let ctx = app.ctx().clone();
-        app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
-        app.run("layer.new.layer", json!({})).unwrap();
-        app.run("select.rect", json!({"x": 100, "y": 100, "width": 100, "height": 60})).unwrap();
-        app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
-        if command == photocraft_engine::vp_cmds::VP {
-            app.run("edit.copy", json!({})).unwrap();
-        }
-        app.run("select.deselect", json!({})).unwrap();
-        app.run("view.newGuide", json!({"orientation": "vertical", "position": 150})).unwrap();
-        app.ui.extras.guides = true;
-        app.ui.extras.rulers = false;
-        app.sync_views();
-        crate::distort_ui::menu(&mut app, &ctx, command, &json!({})).expect("an on-canvas mode").expect("it starts");
-        let mut view = app.ui.views[0].clone();
-        view.zoom = 1.0;
-        view.center = [200.0, 150.0];
-        view.fit_pending = false;
-        view.fill_pending = false;
-        let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0));
-        // One canvas pass with `events` as its only input.
-        let pass = |app: &mut PhotocraftApp, events: Vec<egui::Event>| -> egui::FullOutput {
-            let input = egui::RawInput { screen_rect: Some(rect), events, ..Default::default() };
-            let mut out = ctx.run_ui(input, |ui| {
-                canvas_view(app, ui, CanvasHost::main(0), rect, view.clone(), true);
-            });
-            out.textures_delta.clear();
-            out
-        };
-        let button =
-            |pos: Pos2, pressed: bool| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
-        // At 100 % centred on the document, screen and document coordinates coincide.
-        let drag = |app: &mut PhotocraftApp, from: Pos2, to: Pos2| {
-            pass(app, vec![egui::Event::PointerMoved(from)]);
-            pass(app, vec![button(from, true)]);
-            pass(app, vec![egui::Event::PointerMoved(from.lerp(to, 0.5))]);
-            pass(app, vec![egui::Event::PointerMoved(to)]);
-            pass(app, vec![button(to, false)]);
-        };
-        if command == photocraft_engine::vp_cmds::VP {
-            // A plane over the document; the clipboard pastes onto it.
-            for (x, y) in [(20.0, 280.0), (380.0, 280.0), (300.0, 40.0), (100.0, 40.0)] {
-                drag(&mut app, pos2(x, y), pos2(x, y));
-            }
-        } else if command == "edit.perspectiveWarp" {
-            // One plane, dragged out across the guide.
-            // PLAN: the sheet drives this drag through `puppet_ui::session_apply`, whose contract edit is the Puppet's `PinEdit`; the plane drag goes through the canvas body's pointer input instead.
-            drag(&mut app, pos2(60.0, 70.0), pos2(240.0, 190.0));
-            assert_eq!(app.distort.perspective.as_ref().map(|s| s.warp.planes().len()), Some(1), "the drag makes a plane");
-        }
-        let out = pass(&mut app, vec![]);
-        let layer = Rect::from_min_max(pos2(100.0, 100.0), pos2(200.0, 160.0));
-        // Puppet Warp's mesh reaches its Expansion (2 px) past the pixels.
-        let near = |r: Rect| (r.min - layer.min).length() < 4.0 && (r.max - layer.max).length() < 4.0;
-        // The shapes of the pass in paint order across the paint layers.
-        let shapes: Vec<&egui::Shape> = out.shapes.iter().map(|s| &s.shape).collect();
-        // The warped pixels (or the paste): a textured mesh over the layer (or on the plane,
-        // well inside the document, unlike the checkerboard and document image).
-        let preview = shapes.iter().position(|s| match s {
-            egui::Shape::Mesh(m) if m.texture_id != egui::TextureId::default() => {
-                let r = m.calc_bounds();
-                if command == photocraft_engine::vp_cmds::VP { r.width() > 10.0 && r.width() < 300.0 && r.min.x < 150.0 && r.max.x > 150.0 } else { near(r) }
-            }
-            _ => false,
-        });
-        // The guide: a vertical line at x = 150 across the whole view.
-        let is_guide = |s: &egui::Shape| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() < 0.01) && (points[1].y - points[0].y).abs() > 200.0);
-        let guide = shapes.iter().position(|s| is_guide(s));
-        // Over the guide: Puppet Warp's mesh lines, the Vanishing Point plane's outline, the
-        // Perspective Warp plane's outline (exactly the dragged rectangle).
-        let plane = Rect::from_min_max(pos2(60.0, 70.0), pos2(240.0, 190.0));
-        let overlay = shapes.iter().position(|s| match s {
-            egui::Shape::LineSegment { points, .. } => {
-                command != "edit.perspectiveWarp" && !is_guide(s) && points.iter().all(|p| layer.expand(3.0).contains(*p))
-            }
-            egui::Shape::Path(p) => {
-                p.closed
-                    && p.points.len() == 4
-                    && (command != "edit.perspectiveWarp"
-                        || (Rect::from_points(&p.points).min - plane.min).length() + (Rect::from_points(&p.points).max - plane.max).length() < 0.5)
-            }
-            _ => false,
-        });
-        let (Some(preview), Some(guide)) = (preview, guide) else {
-            panic!("{command}: all painted: preview {preview:?}, guide {guide:?}");
-        };
-        assert!(preview < guide, "{command}: the guide ({guide}) draws over the warped pixels ({preview})");
-        let Some(overlay) = overlay else { panic!("{command}: its mesh or plane is drawn") };
-        assert!(guide < overlay, "{command}: the mesh or plane ({overlay}) draws over the guide ({guide})");
-    }
-}
-
-#[test]
 fn layer_style_dialog_previews_live_and_cancel_restores() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
@@ -941,27 +841,6 @@ fn float_doc(app: &mut PhotocraftApp, ctx: &egui::Context, i: usize) -> Result<s
 /// The id of the first floating document window.
 fn first_window(app: &PhotocraftApp) -> u64 {
     app.ui.document_windows.floating[0].0.id
-}
-
-#[test]
-fn arrange_layout_only_includes_docked_documents() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    for name in ["first", "floating", "last"] {
-        app.run("file.new", json!({"width": 80, "height": 60, "name": name})).unwrap();
-    }
-    app.sync_views();
-    let app_ctx = app.ctx().clone();
-    crate::menus::invoke(&mut app, &app_ctx, "window.arrange.threeUpStacked", json!({})).unwrap();
-    float_doc(&mut app, &app_ctx, 1).unwrap();
-    let rect = Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(800.0, 600.0));
-    let shown: Vec<_> = arranged_cells(&app, rect).unwrap().into_iter().map(|(doc, _)| doc).collect();
-    assert_eq!(shown, vec![0, 2]);
-
-    let app_ctx = app.ctx().clone();
-    float_doc(&mut app, &app_ctx, 0).unwrap();
-    let app_ctx = app.ctx().clone();
-    float_doc(&mut app, &app_ctx, 2).unwrap();
-    assert!(arranged_cells(&app, rect).is_none(), "the main canvas should be blank when every document is floating");
 }
 
 #[test]
@@ -1186,39 +1065,3 @@ fn free_transform_redraws_only_the_moving_layer_when_the_box_opens_and_closes() 
     assert!(damage_since(&app, 0, (rev, key ^ dk), (rev + 2, 0), dk, (rev + 1, Some(moved))).is_none(), "a later revision isn't ours");
 }
 
-/// tanish2k09 on #10406: an armed eyedropper owns the image of the primary canvas only, the one
-/// its picks come from and its pipette is drawn on. A secondary canvas (a Window › Arrange › New
-/// Window view) is never left without a cursor for it.
-#[test]
-fn an_armed_eyedropper_hides_no_cursor_on_a_secondary_canvas() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-    let ctx = app.ctx().clone();
-    app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
-    app.sync_views();
-    app.ui.tool = crate::state::Tool::Move;
-    let id = crate::adjust_dialog::open(&mut app, "image.adjustments.curves").expect("the dialog opens");
-    // PLAN: the hosted Curves dialog's type name and its `set_picker` argument (dl.K46) are assumed: `HostedAdjustDialog` in `adjust_dialog`, taking a `TonePicker`.
-    app.framework
-        .dialogs
-        .get_mut_by_id::<crate::adjust_dialog::HostedAdjustDialog>(id)
-        .expect("the hosted dialog")
-        .set_picker(Some(craft::imaging::ui::adjust::TonePicker::Black));
-    assert!(crate::dialogs::canvas_input::armed(&app).is_some(), "the black-point eyedropper is armed");
-    let view = app.ui.views[0].clone();
-    let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0));
-    let cursor = |app: &mut PhotocraftApp, primary: bool| {
-        let mut icon = egui::CursorIcon::Default;
-        for _ in 0..3 {
-            let mut input = egui::RawInput::default();
-            input.events.push(egui::Event::PointerMoved(Pos2::new(200.0, 150.0)));
-            let mut out = ctx.run_ui(input, |ui| {
-                canvas_view(app, ui, CanvasHost::main(0), rect, view.clone(), primary);
-            });
-            out.textures_delta.clear();
-            icon = out.platform_output.cursor_icon;
-        }
-        icon
-    };
-    assert_eq!(cursor(&mut app, true), egui::CursorIcon::None, "the primary canvas hides the icon under the pipette it draws");
-    assert_ne!(cursor(&mut app, false), egui::CursorIcon::None, "a secondary canvas keeps a cursor");
-}

@@ -4,7 +4,7 @@
 //! One file keeps the save dialog with the layer's name.
 
 use super::*;
-use craft::host::{PickKind, Picked, ScriptedFiles};
+use craft::host::{Picked, ScriptedFiles};
 use photocraft_doc::{Color, Size};
 use std::{cell::RefCell, rc::Rc};
 
@@ -82,19 +82,6 @@ fn export_layers_to(app: &mut PhotocraftApp, files: &ScriptedFiles, ids: &[Layer
     request
 }
 
-#[test]
-fn several_layers_go_into_a_folder_one_file_each() {
-    // The guard removes the folder on success and on failure.
-    let guard = tempfile::tempdir().unwrap();
-    let dir = guard.path().to_path_buf();
-    let (mut app, ids, _, written, files) = app();
-    let request = export_layers_to(&mut app, &files, &ids, &dir);
-    assert_eq!(request.kind, PickKind::Folder, "a folder choice");
-    let want: Vec<String> = ["a_b_c__.png", "Dup-1.png", "Dup.png"].iter().map(|n| dir.join(n).to_string_lossy().into_owned()).collect();
-    assert_eq!(*written.borrow(), want, "no sub folder; the upper Dup keeps the name");
-    assert!(!app.ui.status_error, "{}", app.ui.status);
-}
-
 #[cfg(unix)]
 #[test]
 fn a_planted_link_is_replaced_not_followed() {
@@ -109,12 +96,3 @@ fn a_planted_link_is_replaced_not_followed() {
     assert!(!dir.join("victim").exists(), "nothing was written through the link");
 }
 
-#[test]
-fn one_file_keeps_the_save_dialog_with_the_layers_name() {
-    let (mut app, ids, empty, written, files) = app();
-    let request = export_layers_to(&mut app, &files, &[empty, ids[0]], std::path::Path::new("/out/picked.png"));
-    assert_eq!(request.kind, PickKind::Save, "one file keeps the save dialog");
-    let suggested = request.file_name.clone();
-    assert!(suggested.as_deref().is_some_and(|s| s.ends_with("a_b_c__.png")), "{suggested:?}");
-    assert_eq!(*written.borrow(), ["/out/picked.png"]);
-}

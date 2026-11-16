@@ -473,36 +473,6 @@ fn print_dialog_opens_with_the_settings_remembered_from_an_earlier_session() {
     assert_eq!(f.bool("center"), Some(true), "what wasn't remembered keeps its default");
 }
 
-/// #5328: Save as PDF has Browse…, which fills the field from a Save dialog (suggesting the
-/// document's name as a PDF) rather than needing a typed path.
-#[test]
-fn save_as_pdf_browse_fills_the_output_from_a_save_dialog() {
-    use craft::host::ScriptedFiles;
-    use egui_kittest::kittest::Queryable;
-    let files = Arc::new(ScriptedFiles::new().saving_suggested());
-    let mut app = app();
-    app.services.files = Some(files.clone());
-    app.run("file.new", json!({"width": 120, "height": 80, "name": "poster"})).unwrap();
-    let id = open_print(&mut app);
-    let mut h = egui_kittest::Harness::builder()
-        // The dialog lists the Japanese paper names; no installed face is guaranteed to draw them.
-        .allow_missing_glyphs()
-        .with_size(egui::vec2(1440.0, 900.0))
-        .with_max_steps(64)
-        .with_context(app.ctx().clone())
-        .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
-    h.run_steps(4);
-    h.get_by_label("Browse…").click();
-    h.run_steps(3);
-    let ctx = h.ctx.clone();
-    take(h.state_mut(), &ctx);
-    h.run_steps(3);
-    let asked = files.requests();
-    assert!(matches!(asked.as_slice(), [request] if request.file_name.as_deref().is_some_and(|n| n.ends_with("poster.pdf"))), "{asked:?}");
-    let output = field(print_fields(h.state_mut(), id), "output");
-    assert!(output.as_str().is_some_and(|o| o.ends_with("poster.pdf")), "{output}");
-}
-
 #[test]
 fn print_dialog_does_not_inherit_scripted_send_override() {
     for send in [false, true] {

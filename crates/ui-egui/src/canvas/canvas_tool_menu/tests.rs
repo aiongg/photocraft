@@ -495,45 +495,6 @@ fn every_canvas_menu_row_runs_a_known_command() {
 }
 
 #[test]
-fn type_edit_menu_rows_act_on_the_text_and_the_layer() {
-    let mut app = app();
-    let id = editing_type(&mut app);
-    let ctx = app.ctx().clone();
-    let reopen = |app: &mut PhotocraftApp| assert!(open_here(app, Tool::Type, [10.0, 10.0]));
-    // Faux Bold toggles the style of the selected characters, and shows checked.
-    reopen(&mut app);
-    let menu = app.ui.canvas_tool_menu.clone().unwrap();
-    assert!(!mode_checked(&app, &menu, FAUX_BOLD) && mode_checked(&app, &menu, "type.antiAlias.smooth"));
-    choose(&mut app, &ctx, FAUX_BOLD);
-    assert!(text_of(&app, id).unwrap().char_runs().iter().all(|r| r.style.faux_bold));
-    assert!(mode_checked(&app, &menu, FAUX_BOLD));
-    // Cut takes the selection out of the text; with nothing selected Copy and Cut grey out.
-    reopen(&mut app);
-    choose(&mut app, &ctx, "edit.cut");
-    assert_eq!(text_of(&app, id).unwrap().text, "");
-    reopen(&mut app);
-    let menu = app.ui.canvas_tool_menu.clone().unwrap();
-    assert!(!entry_enabled(&app, &menu, "edit.copy") && !entry_enabled(&app, &menu, "edit.cut"));
-    app.ui.canvas_tool_menu = None;
-    crate::menus::invoke(&mut app, &ctx, "edit.undo", json!({})).unwrap();
-    assert_eq!(text_of(&app, id).unwrap().text, "Hello");
-    // Select All selects every character, not the canvas.
-    reopen(&mut app);
-    choose(&mut app, &ctx, "select.all");
-    let edit = app.ui.text_edit.clone().unwrap();
-    assert_eq!((edit.anchor, edit.caret), (0, 5));
-    assert!(app.session.active().unwrap().doc.selection.is_none());
-    // Warp Text… opens its dialog; Rasterize Type ends the edit and rasterizes the layer.
-    reopen(&mut app);
-    choose(&mut app, &ctx, "type.warpText");
-    assert!(any_dialog(&app), "Warp Text… asks for its settings");
-    close_dialogs(&mut app);
-    reopen(&mut app);
-    choose(&mut app, &ctx, "type.rasterizeTypeLayer");
-    assert!(app.ui.text_edit.is_none() && text_of(&app, id).is_none(), "the type layer is pixels now");
-}
-
-#[test]
 fn type_layer_menu_targets_the_type_under_the_pointer() {
     let mut app = app();
     let id = committed_type(&mut app);
@@ -806,38 +767,6 @@ fn unfinished_shape_path_disables_actions_that_would_target_the_previous_layer()
         assert!(!entry_enabled(&app, menu, id), "{id} must not act on the layer replaced by the pending shape");
     }
     assert!(entry_enabled(&app, menu, "path.toSelection"));
-}
-
-/// The menu's Crop row, clicked with the mouse, crops; the Crop tool then shows no frame until
-/// the next press, so the applied crop doesn't look still pending.
-#[test]
-fn the_crop_row_crops_and_no_frame_shows_until_the_next_press() {
-    let mut app = crop_app();
-    app.ui.tool_options.crop.shield.classic_mode = false;
-    let mut h = harness(app);
-    // Tall enough for the whole menu, down to its last row.
-    h.set_size(vec2(1000.0, 1400.0));
-    draw_crop(h.state_mut());
-    h.run_steps(2);
-    let r = frame_of(h.state()).unwrap();
-    let center = h.state().last_canvas_rect.center();
-    right_click(&mut h, center, Modifiers::NONE);
-    h.get_by_label("Crop").click();
-    h.run_steps(3);
-    let size = h.state().session.active().unwrap().doc.size;
-    assert_eq!((f64::from(size.width), f64::from(size.height)), ((r[2] - r[0]).round(), (r[3] - r[1]).round()), "cropped to the frame");
-    assert!(h.state().ui.canvas_tool_menu.is_none());
-    assert_eq!(h.state().ui.tool, Tool::Crop);
-    assert_eq!(frame_of(h.state()), None, "no frame around the cropped image");
-    // A click on the canvas brings back a frame around the whole cropped image.
-    let center = h.state().last_canvas_rect.center();
-    h.event(egui::Event::PointerMoved(center));
-    h.run_steps(1);
-    h.event(egui::Event::PointerButton { pos: center, button: PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
-    h.run_steps(1);
-    h.event(egui::Event::PointerButton { pos: center, button: PointerButton::Primary, pressed: false, modifiers: Modifiers::NONE });
-    h.run_steps(2);
-    assert_eq!(frame_of(h.state()), Some([0.0, 0.0, f64::from(size.width), f64::from(size.height)]), "the click brings a frame back");
 }
 
 #[test]

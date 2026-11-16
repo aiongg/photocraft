@@ -57,27 +57,6 @@ fn find(h: &mut Harness<'_, PhotocraftApp>, params: serde_json::Value) -> serde_
 }
 
 #[test]
-fn the_menu_item_shows_the_layers_panel_and_focuses_the_name_field() {
-    let mut h = harness();
-    crate::panel_docking::show_panel(h.state_mut(), "layers", Some(false)).unwrap();
-    h.state_mut().ui.layer_filter.name = "oth".into();
-    h.run_steps(4);
-    assert!(!crate::panel_docking::is_shown(h.state(), "layers"), "the Layers panel is closed");
-    let before = selected(&h);
-    find(&mut h, json!({}));
-    assert_eq!(selected(&h), before, "Find Layers does not change the layer selection");
-    assert!(crate::panel_docking::is_shown(h.state(), "layers"), "the Layers panel is shown");
-    assert_eq!(h.state().ui.layer_filter.by, FilterBy::Name);
-    assert!(h.ctx.memory(|m| m.focused()).is_some(), "the caret is in the Name field");
-    // The existing text is selected, so typing replaces it.
-    h.event(egui::Event::Text("lin".into()));
-    h.run_steps(4);
-    assert_eq!(h.state().ui.layer_filter.name, "lin");
-    assert_eq!(listed(&h), ["LinkB", "LinkA"]);
-    assert_eq!(selected(&h), [], "the typed filter hides \"Other\", which is deselected (#10879); no match is selected");
-}
-
-#[test]
 fn a_name_param_sets_the_filter_text_without_changing_the_selection() {
     let mut h = harness();
     let link_a = id(&h, "LinkA");

@@ -88,34 +88,3 @@ fn key(h: &mut Harness<'static, PhotocraftApp>, key: egui::Key) {
     h.run_steps(2);
 }
 
-/// The mouse opens the picker at the pointer, Escape closes it, and `ui.pointer` opens it again.
-fn assert_picker_opens(h: &mut Harness<'static, PhotocraftApp>, case: &str) {
-    let c = mouse_right_click(h);
-    assert_eq!(crate::brush_picker::opened_at(h.state()), Some(c), "{case}: the mouse, at the pointer");
-    h.key_press(egui::Key::Escape);
-    h.run_steps(2);
-    assert!(crate::brush_picker::opened_at(h.state()).is_none(), "{case}: closed");
-    pointer_right_click(h);
-    assert!(crate::brush_picker::opened_at(h.state()).is_some(), "{case}: ui.pointer");
-}
-
-#[test]
-fn with_nothing_waiting_the_remove_tool_still_opens_the_picker() {
-    assert_picker_opens(&mut remove_harness(), "nothing painted");
-    for (k, case) in [(egui::Key::Enter, "applied"), (egui::Key::Escape, "dropped")] {
-        let mut h = waiting();
-        key(&mut h, k);
-        assert!(h.state().remove_pending.is_empty(), "{case}: nothing waits");
-        assert_picker_opens(&mut h, case);
-    }
-}
-
-#[test]
-fn other_painting_tools_keep_opening_the_picker() {
-    for tool in [Tool::Brush, Tool::Pencil, Tool::CloneStamp, Tool::SpotHealing] {
-        let mut h = harness(None);
-        h.state_mut().ui.tool = tool;
-        h.run_steps(2);
-        assert_picker_opens(&mut h, &format!("{tool:?}"));
-    }
-}

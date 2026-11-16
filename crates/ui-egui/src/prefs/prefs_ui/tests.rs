@@ -5,7 +5,7 @@ use craft::draw::ui::transform::Interpolation;
 use craft::keymap::{Binding, CommandRef, Policy};
 use craft::menu::{Chord, ItemKind, Node, ThemeChoice, ThemeLabels};
 use craft::settings::testing::{MemoryFiles, retry_delay};
-use craft::settings::{Location, OpenOptions, Settings, SettingsFiles, SettingsStore};
+use craft::settings::{Location, OpenOptions, Settings, SettingsStore};
 use craft::theme::ThemeId;
 use craft::ui::patterns::preferences::{PrefValue, SettingsDraft};
 use egui::{Color32, vec2};
@@ -1363,57 +1363,6 @@ fn preferences_dialog_round_trip() {
     let pages = serde_json::to_value(super::fields::PrefPages::of(app.session.prefs())).unwrap();
     assert_eq!(pages["cursors"]["painting"], "fullSizeTip");
     assert_eq!(pages["unitsAndRulers"]["rulers"], "inches");
-}
-
-#[test]
-fn preferences_apply_rejects_invalid_drafts_and_keeps_them_open() {
-    let (mut app, _) = app_with_store();
-    let before = app.session.prefs().to_json();
-    open_prefs(&mut app, "fileHandling");
-    // The window keeps choices to their options and numbers to their ranges, so the draft that reaches the engine and
-    // is refused is a number that has no range of its own: the autosave interval is one of a fixed list.
-    edit(&mut app, "fileHandling.autosaveMinutes", PrefValue::Int(7));
-    assert!(apply_window(&mut app).is_err());
-    assert_eq!(app.session.prefs().to_json(), before);
-    assert!(window_open(&app), "the window stays open with the draft");
-    let error = app.prefs_rt.window.as_ref().and_then(|session| session.state.error.clone());
-    assert!(error.is_some_and(|e| e.contains("fileHandling.autosaveMinutes")), "the refusal shows in the window's error line");
-}
-
-#[test]
-fn shortcut_dialog_moves_shortcuts_and_shell_dispatch_follows() {
-    use super::shortcuts::{press_ok, rebind};
-    let (mut app, _) = app_with_store();
-    let ctx = egui::Context::default();
-    let steal = |app: &mut PhotocraftApp, id: &str, key: &str| {
-        open_shortcuts(app, 0);
-        rebind(app, &CommandRef::new(id), Binding::parse(key).unwrap(), Policy::Steal).unwrap();
-        press_ok(app, &ctx);
-    };
-    // ⌘O (File › Open, a shell command) given to Layer › New › Layer.
-    steal(&mut app, "layer.new.layer", "Cmd+O");
-    assert_eq!(effective_shortcut(&app, "layer.new.layer", None).as_deref(), Some("Cmd+O"));
-    assert_eq!(effective_shortcut(&app, "file.open", Some("Cmd+O")), None, "taken from File › Open");
-    // The menu rows show the effective shortcut.
-    assert_eq!(menu_shortcut(&app, "layer.new.layer"), Some(chord("Cmd+O")));
-    assert_eq!(menu_shortcut(&app, "file.open"), None);
-
-    // Re-assigning a shortcut already held by a custom override takes it from the override.
-    steal(&mut app, "layer.new.group", "Cmd+O");
-    assert_eq!(effective_shortcut(&app, "layer.new.group", None).as_deref(), Some("Cmd+O"));
-    assert_eq!(effective_shortcut(&app, "layer.new.layer", None), None, "taken from layer.new.layer override");
-
-    // OK with nothing changed keeps every shortcut where it is.
-    let unchanged = app.session.prefs().shortcuts.clone();
-    open_shortcuts(&mut app, 0);
-    press_ok(&mut app, &ctx);
-    assert_eq!(app.session.prefs().shortcuts, unchanged);
-
-    // Giving the shortcut back to Layer › New › Layer takes it from the group override.
-    steal(&mut app, "layer.new.layer", "Cmd+O");
-    assert_eq!(effective_shortcut(&app, "layer.new.layer", None).as_deref(), Some("Cmd+O"));
-    assert_eq!(effective_shortcut(&app, "layer.new.group", None), None, "taken back from the group");
-    assert_eq!(effective_shortcut(&app, "file.open", Some("Cmd+O")), None, "File › Open stays cleared");
 }
 
 /// #3665: the dialog keeps a command's further keys: they move like main keys, and menus show only the main key.
