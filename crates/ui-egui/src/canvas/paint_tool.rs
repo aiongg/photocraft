@@ -412,7 +412,8 @@ impl CanvasTool for PaintTool<'_> {
         scope.with_app(|app| {
             drop_stroke(app, state);
             with_resize(app, |r, app| r.cancel(app, cx));
-            crate::color_hud::release(&mut app.ui);
+            // A cancelled right-press (Escape) ends the HUD whoever opened it; the held button's release is then no gesture.
+            crate::color_hud::close(&mut app.ui);
         });
     }
 
