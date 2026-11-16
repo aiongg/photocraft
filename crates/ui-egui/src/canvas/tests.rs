@@ -2,7 +2,7 @@ use super::document_display::{CanvasHost, active_view};
 use super::*;
 use craft::behavior::canvas::ZoomLadder;
 use craft::behavior::kurbo::Size;
-use craft::ui::canvas::PixelRect;
+use craft::ui::canvas::{PixelRect, RasterSource};
 use craft::ui::primitives::Revision;
 
 #[test]

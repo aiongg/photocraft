@@ -1,7 +1,7 @@
 use super::*;
 
 use craft::automation::actions::{ActionList, ActionStep};
-use craft::automation::ui::actions::{ActionSelection, ActionsEvent};
+use craft::automation::ui::actions::{ActionSelection, ActionsEvent, ActionsHost};
 use craft::text::ui::spelling::CheckSpellingDialog;
 use craft::ui::dialog::DialogId;
 

@@ -3,7 +3,8 @@ use craft::behavior::geometry::quad::BoxState;
 use craft::behavior::kurbo::{Point, Rect, Vec2};
 use craft::behavior::{EditEvent, EditEvents, GestureId, Mixed};
 use craft::draw::ui::transform::{TransformChoice, TransformEdit, TransformMenuWords};
-use craft::imaging::trace::outline;
+use craft::i18n::WordSet;
+use craft::imaging::trace::{MaskSource, outline};
 use craft::imaging::ui::warp::{CylinderValues, WarpMesh, WarpSplit};
 
 use super::preview::AbovePlan;

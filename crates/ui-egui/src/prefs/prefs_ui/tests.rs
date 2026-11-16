@@ -5,7 +5,7 @@ use craft::draw::ui::transform::Interpolation;
 use craft::keymap::{Binding, CommandRef, Policy};
 use craft::menu::{Chord, ItemKind, Node, ThemeChoice, ThemeLabels};
 use craft::settings::testing::{MemoryFiles, retry_delay};
-use craft::settings::{Location, OpenOptions, Settings, SettingsStore};
+use craft::settings::{Location, OpenOptions, Settings, SettingsFiles, SettingsStore};
 use craft::theme::ThemeId;
 use craft::ui::patterns::preferences::{PrefValue, SettingsDraft};
 use egui::{Color32, vec2};
