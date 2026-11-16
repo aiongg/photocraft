@@ -64,7 +64,7 @@ pub fn navigator_waits_for_gpu(app: &PhotocraftApp, idx: usize, ctx: &egui::Cont
         return false;
     }
     ctx.data_mut(|d| d.insert_temp(key, waited + 1));
-    ctx.request_repaint();
+    craft::ui::runtime::frame::request_own_repaint(ctx);
     true
 }
 
@@ -93,7 +93,7 @@ pub fn navigator_texture(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usiz
         && r.ptr_eq(&snapshot)
         && crate::adjust_preview::settling(app, NAVIGATOR_SETTLE_MS)
     {
-        ctx.request_repaint_after(std::time::Duration::from_millis(NAVIGATOR_SETTLE_MS as u64));
+        craft::ui::runtime::frame::request_repaint_after(ctx, NAVIGATOR_SETTLE_MS / 1000.0);
         return Some(t.id());
     }
     let t0 = crate::gpu_canvas::now_ms();
