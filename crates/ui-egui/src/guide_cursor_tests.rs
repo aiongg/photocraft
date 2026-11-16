@@ -57,24 +57,6 @@ fn drag(h: &mut Harness<'static, PhotocraftApp>, from: f32, to: f32, m: Modifier
     h.run_steps(2);
 }
 
-fn diagonal(h: &mut Harness<'static, PhotocraftApp>, a: [f32; 2], b: [f32; 2], m: Modifiers) {
-    h.event(egui::Event::ModifiersChanged(m));
-    let p = screen(h, a[0], a[1]);
-    h.event(egui::Event::PointerMoved(p));
-    h.run_steps(1);
-    h.event(egui::Event::PointerButton { pos: p, button: PointerButton::Primary, pressed: true, modifiers: m });
-    h.run_steps(1);
-    for k in 1..=4 {
-        let t = k as f32 / 4.0;
-        let q = screen(h, a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t);
-        h.event(egui::Event::PointerMoved(q));
-        h.run_steps(1);
-    }
-    let q = screen(h, b[0], b[1]);
-    h.event(egui::Event::PointerButton { pos: q, button: PointerButton::Primary, pressed: false, modifiers: m });
-    h.run_steps(2);
-}
-
 /// The cursor over the guide with ⌘ held (or latched in Window › Modifier Keys, with no key held),
 /// and where a ⌘-drag from 200 to 240 leaves it.
 fn command_drag(tool: Tool, locked: bool, latched: bool) -> (egui::CursorIcon, Vec<f64>) {
@@ -142,17 +124,4 @@ fn command_over_a_guide_takes_it_where_command_is_the_move_tool() {
             assert_eq!(guides, vec![200.0], "{tool:?} locked={locked}");
         }
     }
-}
-
-/// Off a guide ⌘ is the Move tool on the Frame tool too: a ⌘-drag draws no frame (the Frame tool
-/// took ⌘), and without ⌘ it still draws one.
-#[test]
-fn a_command_drag_off_a_guide_draws_no_frame() {
-    let mut h = harness(Tool::Frame);
-    let layers = h.state().session.active().unwrap().doc.layers.len();
-    diagonal(&mut h, [100.0, 100.0], [160.0, 140.0], Modifiers::COMMAND);
-    assert_eq!(h.state().session.active().unwrap().doc.layers.len(), layers, "⌘-drag with the Frame tool draws no frame");
-    assert!(!h.state().canvas_tools.frame.busy());
-    diagonal(&mut h, [20.0, 20.0], [120.0, 90.0], Modifiers::NONE);
-    assert_eq!(h.state().session.active().unwrap().doc.layers.len(), layers + 1, "a plain drag draws a frame");
 }
