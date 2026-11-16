@@ -809,6 +809,8 @@ fn esc_leaves_full_screen_modes_unless_something_else_owns_it() {
     app.run("select.all", json!({})).unwrap();
     crate::transform_tool::begin(&mut app, &ctx).unwrap();
     assert!(app.ui.transform.is_some());
+    // The tool host claims Esc for the transform in a pass after the transform opens.
+    crate::canvas::testing::frame(&mut app);
     press_esc(&mut app, &ctx);
     assert!(app.ui.transform.is_none());
     assert_mode(&app, "fullScreen");
