@@ -114,6 +114,7 @@ fn run_frame(app: &mut PhotocraftApp) {
         crate::shortcuts::handle(app, &ui.ctx().clone());
         egui::CentralPanel::default().show(ui, |ui| super::document_area(app, ui));
         crate::dialogs::run(app, ui);
+        crate::shortcuts::escape_keys(app, &ui.ctx().clone());
     });
     app.canvas_tools.frames = Some(frames);
 }

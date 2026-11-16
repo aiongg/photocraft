@@ -266,6 +266,8 @@ impl PhotocraftApp {
         canvas::extra_windows(self, ui);
         screen_picker::show(self, ui);
         smart_svg_ui::poll(self, &ctx);
+        // Esc and the view keys read the window's intents last, once every UI above had its chance at Esc.
+        crate::shortcuts::escape_keys(self, &ctx);
         // A device lost while drawing this frame: switch to the CPU canvas before the next one.
         gpu_status::check(self, &ctx);
         // The tool's brush (settings and tip references) is remembered the same way. Like the
