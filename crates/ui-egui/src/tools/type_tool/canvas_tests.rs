@@ -215,7 +215,8 @@ fn panel_harness_without_frame_logic(app: PhotocraftApp) -> Harness<'static, Pho
 
 fn bar_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let _ = photocraft_text::shared();
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1100.0, 80.0)).with_max_steps(16).build_app(
+    // As tall as a window, so the bar's popup lists open in full below it.
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1100.0, 600.0)).with_max_steps(16).build_app(
         |ui, app: &mut PhotocraftApp| {
             ui.horizontal(|ui| show_bar(app, ui));
         },
