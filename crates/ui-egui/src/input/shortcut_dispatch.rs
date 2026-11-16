@@ -204,7 +204,17 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
     // Live menu items whose command has no row yet carry the catalogue's key.
     for &(_, label, shortcut, id) in crate::menu_catalog::CATALOG {
         // A Window panel item runs its shell command (`menus::panel_alias`), which has the row.
-        if label == "---" || !crate::menus::is_live(id) || seen.contains(id) || crate::menus::panel_alias(id).is_some_and(|alias| seen.contains(alias)) {
+        let owner = crate::menus::panel_alias(id).filter(|alias| seen.contains(*alias)).unwrap_or(id);
+        if label == "---" || !crate::menus::is_live(id) {
+            continue;
+        }
+        if seen.contains(owner) {
+            // An engine row that names no key takes the catalogue's.
+            if let Some(key) = shortcut.and_then(binding)
+                && let Some(row) = rows.iter_mut().find(|row| row.command.id == owner && row.defaults.is_empty())
+            {
+                row.defaults.push(key);
+            }
             continue;
         }
         let mut def = app_row(id, label.trim_end_matches('…'));
@@ -305,13 +315,42 @@ pub(crate) fn overrides(app: &PhotocraftApp) -> Overrides {
             overrides.insert(id, Vec::new());
         }
     }
+    let taken: Vec<Chord> = prefs
+        .shortcuts
+        .iter()
+        .filter(|(id, key)| id.starts_with(crate::actions::SHORTCUT_PREFIX) && !key.is_empty())
+        .filter_map(|(_, key)| Chord::parse(key).ok())
+        .collect();
     for (id, bridged) in RUNTIME_COMMANDS {
         let main = crate::shortcuts::effective_shortcut(app, id, crate::shortcuts::default_shortcut(id).as_deref());
         let mut keys: Vec<String> = main.iter().cloned().collect();
         keys.extend(prefs.alternates(id, main.as_deref()));
+        keys.retain(|key| !held_by_action(&taken, key));
         overrides.insert(bridged.command().key(), keys);
     }
+    // A key an action holds is the action's alone (it is checked before every command's key, as in Photoshop): the
+    // command that has it by default keeps its other keys.
+    if !taken.is_empty() {
+        for row in command_rows(app) {
+            let id = row.command.id.as_str();
+            if id.starts_with(crate::actions::SHORTCUT_PREFIX) || is_bridged(id) {
+                continue;
+            }
+            let main = crate::shortcuts::effective_shortcut(app, id, crate::shortcuts::default_shortcut(id).as_deref());
+            let mut keys: Vec<String> = main.iter().cloned().collect();
+            keys.extend(prefs.alternates(id, main.as_deref()));
+            if keys.iter().any(|key| held_by_action(&taken, key)) {
+                keys.retain(|key| !held_by_action(&taken, key));
+                overrides.insert(id, keys);
+            }
+        }
+    }
     overrides
+}
+
+/// Whether `key` is one of the chords the actions hold.
+fn held_by_action(taken: &[Chord], key: &str) -> bool {
+    Chord::parse(key).is_ok_and(|chord| taken.contains(&chord))
 }
 
 /// Delete's key (Delete / Backspace) with nothing selected deletes the selected layers, of any
@@ -410,6 +449,7 @@ pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
     for fired in std::mem::take(&mut app.framework.delivered) {
         if let Some((id, Bridged::View(_))) = bridge_of(&fired.command) {
             crate::panels::actions::journal_view(app, id, json!({}));
+            record(&app.ctx(), id, Outcome::Ran);
         }
     }
 }
@@ -547,6 +587,7 @@ fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
         }
     }
     if crate::app::framework::run_command(app, ctx, &f.command) {
+        record(ctx, id, Outcome::Ran);
         return;
     }
     // The Delete key is Edit › Clear, or deletes the layers when nothing is selected (`delete_key_command`).
@@ -604,6 +645,11 @@ fn dispatch_as(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, last: boo
             }
         }
     };
+    record(ctx, id, outcome);
+}
+
+/// Notes in the run log that command `id` ended as `outcome`.
+fn record(ctx: &egui::Context, id: &str, outcome: Outcome) {
     ctx.data_mut(|d| {
         let log = d.get_temp_mut_or_default::<Vec<(String, Outcome)>>(log_id());
         if log.len() >= 64 {

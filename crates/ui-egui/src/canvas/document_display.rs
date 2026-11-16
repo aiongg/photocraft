@@ -317,6 +317,10 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
             Some(picture) => Some(Prepared::Gpu(picture)),
             None => CompositePrep::new(app, ctx, idx, output, live.as_ref()).map(Prepared::Cpu),
         };
+        // The grid reads the committed composite; with the GPU picture on there is no CPU one yet.
+        let grid_prep = (app.ui.view.shows(app.ui.view.show.pixel_grid) && matches!(prepared, Some(Prepared::Gpu(_))))
+            .then(|| CompositePrep::new(app, ctx, idx, output, None))
+            .flatten();
         let overlay = OverlayPrep::new(app, ctx, idx, output, live.as_ref());
         // The canvas edge isn't outlined while the pixels past it show (Photoshop's crop preview), nor while the Crop
         // tool hides everything outside its box (Show Cropped Area off).
@@ -349,6 +353,14 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
                 None => display,
             };
             display.show_at(ui, body.rect);
+        }
+        // The grid is drawn over the picture.
+        if app.ui.view.shows(app.ui.view.show.pixel_grid) {
+            let own = grid_prep.map(|prep| prep.source(app));
+            let source: Option<&dyn RasterSource> = composite.as_ref().map(|c| c as &dyn RasterSource).or(own.as_ref().map(|c| c as &dyn RasterSource));
+            if let Some(source) = source {
+                craft::ui::canvas_controls::PixelGrid::new(label.clone(), source).show_at(ui, body.rect);
+            }
         }
     });
     // The refresh the CPU display made is the app's to record: the display reports what it read.
@@ -412,14 +424,6 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
     }
     if let Some(edges) = super::transform_controls::layer_edges(app, idx) {
         SelectionOutline::solid(label.to_owned(), std::slice::from_ref(&edges)).show_at(ui, rect);
-    }
-    if app.ui.view.shows(app.ui.view.show.pixel_grid) {
-        let ctx = ui.ctx().clone();
-        // The grid reads the committed composite: a tool's live proposal comes from the controls shown after it.
-        if let Some(prep) = CompositePrep::new(app, &ctx, idx, output, None) {
-            let composite = prep.source(app);
-            craft::ui::canvas_controls::PixelGrid::new(label.to_owned(), &composite as &dyn RasterSource).show_at(ui, rect);
-        }
     }
 }
 
