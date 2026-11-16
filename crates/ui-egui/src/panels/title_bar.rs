@@ -17,7 +17,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // The bar runs `leading` in its body and `trailing` in its end region, one after the other, so the two borrows
     // of the app never overlap.
     let app = RefCell::new(app);
-    let out = TitleBar::new().separator().show_titled(
+    let out = TitleBar::new().show_titled(
         ui,
         Title::new(title),
         |ui, _| {
