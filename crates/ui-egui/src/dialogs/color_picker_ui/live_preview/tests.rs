@@ -265,7 +265,7 @@ fn the_crop_shield_colour_follows_its_picker() {
 fn preferences_apply_waits_for_an_open_picker() {
     let mut app = app();
     crate::prefs_ui::open_preferences(&mut app, "guidesGridAndSlices");
-    assert!(app.prefs_rt.window.is_some(), "Preferences opens");
+    assert!(crate::prefs_ui::window_open(&app), "Preferences opens");
     let before = app.session.prefs().guides_grid_and_slices.guide_color.clone();
     let request = ColorRequest::new("guidesGridAndSlices.guideColor", Srgba::from_rgb_array([0.0, 1.0, 0.0]));
     let picker = open_for_window(&mut app, request);

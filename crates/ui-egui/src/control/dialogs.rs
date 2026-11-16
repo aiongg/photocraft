@@ -435,7 +435,6 @@ fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value
 }
 
 fn apply(app: &mut PhotocraftApp, id: DialogId) -> Reply {
-    // PLAN: assumed the Preferences window's key is `preferences`; `prefs_ui::apply_window(app)` takes no id (top-w17).
     if key_of(app, id).as_deref() == Some("preferences") {
         return Reply::from_result(crate::prefs_ui::apply_window(app));
     }
