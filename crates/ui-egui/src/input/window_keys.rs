@@ -45,12 +45,6 @@ pub fn take_escape(ctx: &Context) -> bool {
     take_escape_with(ctx, Modifiers::NONE)
 }
 
-/// Takes this pass's Escape for a modal layer that opens in the pass: the window's, or the one routed to the focused
-/// component (a part of the crop frame), which would otherwise act on it beneath the layer.
-pub fn take_escape_for_layer(ctx: &Context) -> bool {
-    take_escape(ctx) || craft::ui::runtime::keys::take_cancel(ctx)
-}
-
 /// Takes this pass's Escape when the held modifiers match `mods` logically.
 pub fn take_escape_with(ctx: &Context, mods: Modifiers) -> bool {
     ctx.input_mut(|i| i.consume_key(mods, Key::Escape)) || window_cancel(ctx, Some(mods), true)
