@@ -109,15 +109,23 @@ fn run_frame(app: &mut PhotocraftApp) {
     let mut frames = app.canvas_tools.frames.take().unwrap_or_else(|| Frames::over(ctx.clone()));
     app.canvas_tools.last_response = None;
     app.framework_before_input(&ctx);
-    frames.frame_without_input(Vec::new(), |ui| {
+    // The platform completes an IME reset the framework asked for in the pass before; without it the engine drops
+    // every composition event after an interrupted composition.
+    let os_input = ctx.data_mut(|d| d.remove_temp::<Vec<egui::Event>>(egui::Id::new(OS_IME_RESETS))).unwrap_or_default();
+    frames.frame_without_input(os_input, |ui| {
         crate::shortcut_dispatch::record_view_commands(app);
         crate::shortcuts::handle(app, &ui.ctx().clone());
         egui::CentralPanel::default().show(ui, |ui| super::document_area(app, ui));
         crate::dialogs::run(app, ui);
         crate::shortcuts::escape_keys(app, &ui.ctx().clone());
     });
+    if let Some(request_id) = frames.ime().and_then(|ime| ime.reset) {
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new(OS_IME_RESETS), vec![egui::Event::ImeResetCompleted { request_id }]));
+    }
     app.canvas_tools.frames = Some(frames);
 }
+
+const OS_IME_RESETS: &str = "photocraft.test-os-ime-resets";
 
 /// Runs frames until the window host has delivered everything queued.
 fn settle(app: &mut PhotocraftApp) {
