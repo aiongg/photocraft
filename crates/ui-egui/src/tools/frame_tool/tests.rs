@@ -25,13 +25,6 @@ fn double_click(app: &mut PhotocraftApp, at: [f64; 2]) {
     click(app, at);
 }
 
-struct TestMask(photocraft_doc::Path);
-impl TestMask {
-    fn value(&self, x: i32, y: i32) -> f32 {
-        photocraft_vector::path_coverage(&self.0, Rect::new(x, y, x + 1, y + 1))[0]
-    }
-}
-
 fn app() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width":400,"height":300})).unwrap();
