@@ -52,8 +52,6 @@ const RESULT_SHOWN: &str = "resultShown";
 /// The size and name of the LUT Load 3D LUT… embedded, and why one could not be read.
 const LUT_SIZE: &str = "lutSize";
 const LUT_ERROR: &str = "lutError";
-/// The Match Color source the layer row last saw, to drop a layer of another document.
-const SOURCE_SEEN: &str = "sourceSeen";
 
 /// Builds the rows `command`'s dialog shows from the rows `params` the spec parser made.
 pub(crate) fn custom_rows(app: &mut PhotocraftApp, command: &str, params: &mut Vec<Param>) {
@@ -377,6 +375,10 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
         options.extend(documents.iter().enumerate().map(|(i, st)| (i.to_string(), Label::from(st.doc.name.clone()))));
         params.push(Param::new("source", Label::from(tl!("Source")), ParamKind::choice(options, Some("-1".into()))));
     }
+    // A layer belongs to the document that was chosen: another source returns the layer to Merged.
+    if let Some(source) = row(params, "source") {
+        *source = source.clone().resets(["sourceLayer"]);
+    }
     let layers: Arc<Vec<Vec<(i64, String)>>> = Arc::new(
         documents
             .iter()
@@ -389,15 +391,6 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
     let count = documents.len();
     params.push(Param::custom("sourceLayer", label, move |ui, fields, _| {
         let source = fields.text("source").map(str::to_owned);
-        // A layer belongs to the document that was chosen: another source drops it.
-        if fields.text(SOURCE_SEEN).map(str::to_owned) != source {
-            if fields.contains(SOURCE_SEEN) {
-                fields.remove("sourceLayer");
-            }
-            if let Some(source) = &source {
-                fields.set(SOURCE_SEEN, source.as_str());
-            }
-        }
         let listed = source.as_deref().and_then(|s| s.parse::<usize>().ok()).and_then(|i| layers.get(i));
         let shown = layer_ref(fields).filter(|id| listed.is_some_and(|l| l.iter().any(|(known, _)| known == id))).unwrap_or(-1);
         let mut entries = vec![Entry::new(-1i64, Label::from(tl!("Merged")))];
