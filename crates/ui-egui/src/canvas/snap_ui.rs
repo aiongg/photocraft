@@ -51,18 +51,21 @@ fn selection_moves(app: &PhotocraftApp) -> bool {
     pixels || transform
 }
 
-/// The layers a drag moves or resizes: they are not targets. What the Move tool would move whole
-/// (the selected layers, the layers linked to them and everything inside a group, so a group does not
-/// snap to its own layers' starting edges), the type layer being edited (a paragraph-box handle
-/// drag does not snap to the text it resizes, #6819) and the layers of the open Free Transform.
+/// The layers a drag moves or resizes: they are not targets. The selected layers when the Move tool drags and,
+/// unless selected pixels float, what it moves whole (the layers linked to them and everything inside a group, so a
+/// group does not snap to its own layers' starting edges), the type layer being edited (a paragraph-box handle drag
+/// does not snap to the text it resizes, #6819) and the layers of the open Free Transform.
 fn moving_set(app: &PhotocraftApp) -> Vec<LayerId> {
     let mut set = Vec::new();
     if moves_as_move_tool(app)
-        && !crate::move_ui::moves_selected_pixels_with(app, Tool::Move)
         && let Some(st) = app.session.active()
     {
         let selected = st.selected_layers();
-        set.extend(crate::move_ui::with_descendants(&st.doc, &move_targets(&st.doc, &selected)));
+        // Selected pixels float off the selected layers alone (a floating piece never snaps to its own layer), so
+        // the layers linked to them stay put and stay targets.
+        if !crate::move_ui::moves_selected_pixels_with(app, Tool::Move) {
+            set.extend(crate::move_ui::with_descendants(&st.doc, &move_targets(&st.doc, &selected)));
+        }
         set.extend(selected);
     }
     if let Some(edit) = app.ui.text_edit.as_ref() {
