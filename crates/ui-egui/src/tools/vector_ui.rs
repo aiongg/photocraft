@@ -8,7 +8,7 @@ use egui::{Color32, Rect, Sense, Stroke, pos2, vec2};
 use photocraft_doc::vector::Path;
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Affine;
-use serde_json::Value;
+use serde_json::{Value, json};
 
 use craft::draw::ui::{EditSubpath, VectorMode};
 
