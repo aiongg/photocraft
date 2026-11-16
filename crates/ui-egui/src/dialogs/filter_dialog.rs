@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use craft::host::{PickRequest, Picked};
 use craft::ui::contract::Bind;
-use craft::ui::dialog::DialogId;
-use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, Param, ParamDialog, ParamKind, ParamLayout, ParamResult};
+use craft::ui::dialog::{DialogId, dialog_id};
+use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, HostedParamDialog, Param, ParamDialog, ParamKind, ParamLayout, ParamResult};
 use craft::ui::runtime::env::{Label, UnitKind};
 use craft::ui::runtime::requests::PathKind;
 use photocraft_doc::Document;
@@ -531,7 +531,11 @@ pub fn open(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, String> 
     let captured = if command == MATCH_COLOR { json!(app.session.active().map(|st| (st.doc.id, st.active_layer))) } else { Value::Null };
     let reset = reset_values(&params, &fields);
     let build = builder(app, command, title_of(spec.label), params, reset);
-    Ok(crate::dialogs::params::open_param(app, command, fields, captured, build))
+    let id = crate::dialogs::params::open_param(app, command, fields, captured, build);
+    if command == MATCH_COLOR {
+        reconcile_match_color(app);
+    }
+    Ok(id)
 }
 
 /// A filter dialog for `command` whose parameters follow `spec` (registry notation) instead of the
@@ -677,6 +681,38 @@ pub(crate) fn cancel(app: &mut PhotocraftApp, _ctx: &egui::Context, dialog: Dial
     }
 }
 
+/// The document index Match Color's `source` row holds (a choice id, so text; a number from a caller).
+fn source_index(fields: &Map<String, Value>) -> Option<usize> {
+    let source = fields.get("source")?;
+    source.as_u64().or_else(|| source.as_str()?.parse().ok()).and_then(|i| usize::try_from(i).ok())
+}
+
+/// Runs [`refresh_match_color_sources`] on the open Match Color dialog and writes back what it changed: the source
+/// index after a document closed, a source layer that was deleted, and the identities it compares the next frame with.
+pub(crate) fn reconcile_match_color(app: &mut PhotocraftApp) {
+    let id = dialog_id(MATCH_COLOR);
+    let Some(dialog) = app.framework.dialogs.get_by_id::<HostedParamDialog>(id) else { return };
+    let mut fields = fields_map(dialog.fields());
+    fields.insert("__command".into(), json!(MATCH_COLOR));
+    let before = fields.clone();
+    refresh_match_color_sources(&app.session, &mut fields);
+    if fields == before {
+        return;
+    }
+    let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedParamDialog>(id) else { return };
+    for (key, value) in &fields {
+        if before.get(key) != Some(value) {
+            match value.as_str().filter(|_| key == "source") {
+                Some(text) => dialog.set_field(key.clone(), FieldValue::Text(text.to_owned())),
+                None => dialog.set_field(key.clone(), FieldValue::Json(value.clone())),
+            }
+        }
+    }
+    for key in before.keys().filter(|key| !fields.contains_key(*key)) {
+        dialog.clear_field(key);
+    }
+}
+
 /// Keep Match Color's source choices live without reinterpreting a shifted document index.
 /// Rebuild layer lists only when a document changes; a closed source remains visibly unavailable.
 pub(crate) fn refresh_match_color_sources(session: &photocraft_engine::Session, fields: &mut Map<String, Value>) {
@@ -688,7 +724,7 @@ pub(crate) fn refresh_match_color_sources(session: &photocraft_engine::Session, 
     if fields.get("__sourceState") == Some(&state) {
         return;
     }
-    let old_index = fields.get("source").and_then(Value::as_u64).and_then(|i| usize::try_from(i).ok());
+    let old_index = source_index(fields);
     let selected = old_index.and_then(|i| fields.get("__sourceDocuments")?.as_array()?.get(i)?.as_u64());
     let mut ids: Vec<_> = documents.iter().map(|st| st.doc.id.0).collect();
     let mut names: Vec<_> = documents.iter().map(|st| st.doc.name.clone()).collect();
@@ -705,9 +741,9 @@ pub(crate) fn refresh_match_color_sources(session: &photocraft_engine::Session, 
             layers.push(Value::Null);
             index
         });
-        fields.insert("source".into(), json!(index));
+        fields.insert("source".into(), json!(index.to_string()));
     }
-    let source = fields.get("source").and_then(Value::as_u64).and_then(|i| usize::try_from(i).ok());
+    let source = source_index(fields);
     if let Some(layer) = fields.get("sourceLayer").and_then(Value::as_u64) {
         let contains_layer = |choices: Option<&Value>| {
             choices.and_then(Value::as_array).is_some_and(|choices| choices.iter().any(|choice| choice.get("id").and_then(Value::as_u64) == Some(layer)))

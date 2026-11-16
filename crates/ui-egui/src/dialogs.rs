@@ -473,6 +473,7 @@ pub fn run(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         ui.ctx().request_repaint();
     }
     palette::show(app, ui);
+    crate::filter_dialog::reconcile_match_color(app);
     filter_preview_ui::feed(app, ui.ctx());
     app.framework.dialogs.run(ui);
     take_results(app, &ui.ctx().clone());

@@ -68,15 +68,16 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
         let (cmd, params) = crate::smart_filter_dialog::params_command(app, &captured, &key, params).ok()?;
         (id, cmd, params)
     } else {
-        let (id, key, dialog_fields, mut fields) = {
+        let (id, key, dialog_fields, fields) = {
             let d = app.framework.dialogs.get::<HostedParamDialog>()?;
             if !d.is_previewing() {
                 return None;
             }
-            let serde_json::Value::Object(fields) = serde_json::to_value(d.fields()).ok()? else { return None };
-            (d.id(), d.key()?.to_owned(), d.fields().clone(), fields)
+            let key = d.key()?.to_owned();
+            // The values OK runs: a document choice is its index, a colour its hex.
+            let serde_json::Value::Object(fields) = crate::filter_dialog::command_params(&key, d.fields()) else { return None };
+            (d.id(), key, d.fields().clone(), fields)
         };
-        crate::filter_dialog::refresh_match_color_sources(&app.session, &mut fields);
         // Previews edit what the command will: a targeted layer mask included (#780).
         let target = crate::dialogs::params::captured(app, &key);
         crate::filter_dialog::validate_match_color_destination(app, &key, &target, &fields).ok()?;
