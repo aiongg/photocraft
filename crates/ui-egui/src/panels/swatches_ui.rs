@@ -4,17 +4,9 @@
 //!
 //! As in Photoshop, clicking a swatch sets the foreground colour (and recolours selected type or
 //! fills the selected shape layers with a shape, Pen or path selection tool);
-<<<<<<< HEAD
 //! Alt- or Ctrl/Cmd-clicking sets the background colour. The panel menu adds New Swatch, New Group,
 //! Import/Replace (`.aco`, `.act`, `.ase`), Export (`.aco`) and Export for Exchange (`.ase`) and Reset. The panel
 //! reports `SwatchEdit`s; [`apply_edit`] maps each to one `swatches.*` engine command.
-=======
-//! Alt- or Ctrl/Cmd-clicking sets the background colour; double-clicking renames it. The
-//! panel menu (the group's "…" button) adds New Swatch, New Group, Import/Replace (`.aco`,
-//! `.act`, `.ase`), Export (`.aco`) and Export for Exchange (`.ase`) and Reset. Every action is a
-//! `swatches.*` engine command; this module only draws and dispatches. Colours are shown in the
-//! RGB working space through `craft-cms` (cached per library revision and colour settings).
->>>>>>> upstream/main
 
 use std::ffi::OsStr;
 
@@ -61,10 +53,7 @@ pub fn use_swatch(app: &mut PhotocraftApp, name: &str, background: bool) {
 /// The converter that shows CMYK swatches and the colour models behind them: the working CMYK profile's.
 /// `CmykConverter::new` shares the transforms of a profile, so building it per use costs a lookup.
 fn cmyk_converter(app: &PhotocraftApp) -> Option<CmykConverter> {
-    // The engine's profile type is `photocraft_cms`'s and the framework's converter takes `craft::cms`'s: the ICC bytes
-    // carry it over.
-    let working = app.session.color.working(photocraft_doc::ColorMode::Cmyk);
-    craft::cms::Profile::parse(&working.to_bytes()).ok().and_then(|profile| CmykConverter::new(std::sync::Arc::new(profile)).ok())
+    CmykConverter::new(app.session.color.working(photocraft_doc::ColorMode::Cmyk)).ok()
 }
 
 /// The words of the panel and of its file entries, from the context's environment, so the names a menu command makes

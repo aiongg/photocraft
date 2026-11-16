@@ -1,21 +1,11 @@
 //! Window › Swatches: named colours in groups (folders), as in Photoshop's Swatches panel.
 //!
-<<<<<<< HEAD
 //! The swatch model is craft-color's (`craft::color::palette`), re-exported here: a swatch keeps
 //! its colour in the model it was made in (RGB, HSB, CMYK, Lab or grayscale) as `f32` components
 //! that hold 16-bit file values exactly, plus colour-book entries we cannot evaluate kept
 //! verbatim. Nothing assumes sRGB: RGB and HSB components are in the RGB working space, CMYK and
 //! gray in the CMYK and gray working spaces (Edit › Color Settings), Lab is D50. Turning a swatch
-//! into the RGB the foreground colour holds goes through `photocraft-cms` ([`SwatchConv`]).
-=======
-//! A swatch keeps its colour in the model it was made in: RGB, HSB, CMYK, Lab or grayscale,
-//! as `f32` components that hold 16-bit file values exactly (an `.aco` → `.aco` round trip is
-//! lossless), plus colour-book entries we cannot evaluate kept verbatim. Nothing assumes sRGB:
-//! RGB and HSB components are in the RGB working space, CMYK and gray in the CMYK and gray
-//! working spaces (Edit › Color Settings), Lab is D50. Turning a swatch into the RGB the
-//! foreground colour holds (and the panel shows) goes through `craft-cms`
-//! ([`SwatchConv`]).
->>>>>>> upstream/main
+//! into the RGB the foreground colour holds goes through `craft-cms` ([`SwatchConv`]).
 //!
 //! The library persists with the preferences document (`presets.swatches`, see
 //! [`super::PresetState::to_json`]). The default set is `default_swatches()`. The commands live in

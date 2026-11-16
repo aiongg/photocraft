@@ -24,28 +24,11 @@ fn add_layer(app: &mut PhotocraftApp, size: f32) -> LayerId {
     LayerId(made["layer"].as_u64().unwrap())
 }
 
-<<<<<<< HEAD
 /// The options bar in a window, once the app's fonts are set up. Up to 16 passes, because the font list arrives
 /// in batches (see `canvas_tests::controls`).
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let ctx = app.ctx().clone();
     let mut h = Harness::builder().with_context(ctx).with_size(vec2(1400.0, 300.0)).with_max_steps(16).build_app(
-=======
-/// An app whose one selected type layer is `size` points.
-fn app_with_layer(size: f32) -> (PhotocraftApp, LayerId) {
-    let mut app = new_app();
-    let id = add_layer(&mut app, size);
-    app.run("layer.select", json!({"layer": id.0, "mode": "replace"})).unwrap();
-    (app, id)
-}
-
-/// `draw` in a window tall enough for the list, once the app's fonts are set up. Up to 16 passes,
-/// because the font list arrives in batches (see `canvas_tests::controls`).
-fn harness(app: PhotocraftApp, draw: fn(&mut PhotocraftApp, &mut egui::Ui)) -> Harness<'static, PhotocraftApp> {
-    // Load the fonts first: if they finish mid-test the bar swaps "Loading fonts…" for its menus and a click is lost (#13408).
-    let _ = photocraft_text::shared();
-    let mut h = Harness::builder().with_size(vec2(1400.0, 800.0)).with_max_steps(16).build_ui_state(
->>>>>>> upstream/main
         move |ui, app| {
             ui.horizontal(|ui| super::options_bar(app, ui));
         },

@@ -343,31 +343,7 @@ fn develop(source: &Surface, curve: Option<&[[f32; 2]]>, area: PixelRect, params
     result
 }
 
-<<<<<<< HEAD
-/// Pixels per band [`display_image`] reads and colour-converts at once: at least `photocraft-cms`'s
-=======
-fn visible_pixels(image: Rect, viewport: Rect, area: PixelRect, max_side: usize) -> Option<PixelRect> {
-    let visible = image.intersect(viewport);
-    if !image.is_finite() || image.width() <= 0.0 || image.height() <= 0.0 || !visible.is_positive() || area.is_empty() {
-        return None;
-    }
-    let scale = vec2(area.width() as f32, area.height() as f32) / image.size();
-    let lo = (visible.min - image.min) * scale;
-    let hi = (visible.max - image.min) * scale;
-    let crop = PixelRect::new(
-        area.x0.saturating_add((lo.x.floor() as i32).saturating_sub(1)),
-        area.y0.saturating_add((lo.y.floor() as i32).saturating_sub(1)),
-        area.x0.saturating_add((hi.x.ceil() as i32).saturating_add(1)),
-        area.y0.saturating_add((hi.y.ceil() as i32).saturating_add(1)),
-    )
-    .intersect(&area);
-    // Proxy is sufficient below its native scale; a larger intermediate should never be
-    // allocated if an unusually large viewport exceeds the device's texture limit.
-    (crop.width() as usize <= max_side && crop.height() as usize <= max_side && crop.width() as u64 * crop.height() as u64 <= 16_777_216).then_some(crop)
-}
-
 /// Pixels per band [`display_image`] reads and colour-converts at once: at least `craft-cms`'s
->>>>>>> upstream/main
 /// parallel threshold (16K pixels), and small enough that a band's float scratch is 1 MiB.
 const CROP_BAND_PIXELS: usize = 64 * 1024;
 
@@ -535,7 +511,7 @@ mod tests {
                 assert!(light[0] - dark[0] > 0.5, "native alternating pixels survive: {mode:?}/{depth:?}");
                 let mut doc =
                     photocraft_doc::Document::new("test", photocraft_geom::Size::new(40, 30), photocraft_doc::ColorMode::Rgb, photocraft_doc::SampleType::U8);
-                doc.icc_profile = Some(craft_cms::Builtin::Srgb.profile().to_bytes());
+                doc.icc_profile = Some(craft::cms::Builtin::Srgb.profile().to_bytes());
                 let display = photocraft_engine::color_cmds::ColorState::default().canvas_display(&doc).unwrap();
                 assert_eq!(crop_image(&expected, PixelRect::new(-12, 8, -10, 9), &display).size, [2, 1]);
                 assert!(preview.sample([f32::NAN, 0.0], 1, false, &params).is_none());
@@ -551,7 +527,7 @@ mod tests {
             Surface::new(photocraft_color::PixelFormat { mode: photocraft_color::ColorMode::Rgb, sample: photocraft_color::SampleType::F32, alpha: true });
         source.write_region(area, &[0.25, 0.25, 0.25, 1.0]);
         let mut doc = photocraft_doc::Document::new("test", photocraft_geom::Size::new(1, 1), photocraft_doc::ColorMode::Rgb, photocraft_doc::SampleType::F32);
-        doc.icc_profile = Some(craft_cms::Builtin::LinearSrgb.profile().to_bytes());
+        doc.icc_profile = Some(craft::cms::Builtin::LinearSrgb.profile().to_bytes());
         let mut color = photocraft_engine::color_cmds::ColorState::default();
         color.settings.monitor_profile = "srgb".into();
         let display = color.canvas_display(&doc).unwrap();
@@ -576,7 +552,7 @@ mod tests {
         let values: Vec<f32> = (0..8).flat_map(|i| if i % 4 == 0 { [1.0, 1.0, 1.0, 1.0] } else { [0.5, 0.5, 0.5, 1.0] }).collect();
         source.write_region(area, &values);
         let mut doc = photocraft_doc::Document::new("test", photocraft_geom::Size::new(16, 8), photocraft_doc::ColorMode::Rgb, photocraft_doc::SampleType::U8);
-        doc.icc_profile = Some(photocraft_cms::Builtin::Srgb.profile().to_bytes());
+        doc.icc_profile = Some(craft::cms::Builtin::Srgb.profile().to_bytes());
         let display = photocraft_engine::color_cmds::ColorState::default().canvas_display(&doc).unwrap();
         let mut preview = DetailPreview::new(source.clone(), area, Coverage::None);
         let mut out = ColorImage::new([4, 2], vec![Color32::RED; 8]);
@@ -605,14 +581,14 @@ mod tests {
         let n = (area.width() * area.height()) as usize;
         let px: Vec<f32> = (0..n).flat_map(|i| [(i % 251) as f32 / 255.0, (i % 241) as f32 / 255.0, (i % 239) as f32 / 255.0, (i % 7) as f32 / 6.0]).collect();
         source.write_region(area, &px);
-        for profile in [craft_cms::Builtin::AdobeRgbCompat, craft_cms::Builtin::Srgb] {
+        for profile in [craft::cms::Builtin::AdobeRgbCompat, craft::cms::Builtin::Srgb] {
             let mut doc =
                 photocraft_doc::Document::new("test", photocraft_geom::Size::new(1024, 1024), photocraft_doc::ColorMode::Rgb, photocraft_doc::SampleType::U8);
             doc.icc_profile = Some(profile.profile().to_bytes());
             let mut color = photocraft_engine::color_cmds::ColorState::default();
             color.settings.monitor_profile = "srgb".into();
             let display = color.canvas_display(&doc).unwrap();
-            assert_eq!(display.transform.is_some(), profile == craft_cms::Builtin::AdobeRgbCompat);
+            assert_eq!(display.transform.is_some(), profile == craft::cms::Builtin::AdobeRgbCompat);
             let mut whole = photocraft_compose::Buffer { rect: area, px: vec![[0.0; 4]; n] };
             source.read_rgba_into(area, &mut whole.px);
             let expected = display.to_rgba8(&whole);

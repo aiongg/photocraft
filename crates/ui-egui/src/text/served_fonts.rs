@@ -17,15 +17,6 @@ use crate::PhotocraftApp;
 /// Layers whose document was busy with a background job when their font arrived.
 static PENDING: Mutex<Vec<TypeLayerRef>> = Mutex::new(Vec::new());
 
-<<<<<<< HEAD
-/// The served craft-fonts faces of the UI's font stack and what fetches them.
-#[derive(Clone)]
-pub struct Served {
-    /// The faces the host serves, in the manifest's order.
-    pub faces: Vec<ServedFace>,
-    /// Fetches a face's file.
-    pub fetcher: Arc<dyn FontFetcher>,
-=======
 /// The served catalog is process-wide, and every family added while a font menu is open adds a
 /// row that egui styles on its next pass, so `Harness::run` takes one more pass per family. Tests
 /// that add families hold this for writing ([`changing_catalog`]), and tests that wait for an
@@ -45,21 +36,13 @@ pub(crate) fn steady_catalog() -> std::sync::RwLockReadGuard<'static, ()> {
     CATALOG.read().unwrap_or_else(PoisonError::into_inner)
 }
 
-/// Served script fallbacks in the UI's font stack, by egui font name, unscaled: kept so the stack
-/// `theme::install_fonts` rebuilds on a language change includes them again.
-static UI_FACES: Mutex<Vec<(String, Arc<FontData>)>> = Mutex::new(Vec::new());
-
-/// The served faces for the end of the UI's font stack (see [`UI_FACES`]), the interface
-/// language's own first: a Japanese and a Simplified Chinese face both cover Han, and egui draws a
-/// character with the first face in the stack that has it, so a Chinese interface must not get
-/// the Japanese face only because it arrived first.
-pub fn ui_faces() -> Vec<(String, Arc<FontData>)> {
-    let mut faces = UI_FACES.lock().unwrap_or_else(PoisonError::into_inner).clone();
-    if let Some(own) = ui_language_face() {
-        faces.sort_by_key(|(n, _)| *n != own);
-    }
-    faces
->>>>>>> upstream/main
+/// The served craft-fonts faces of the UI's font stack and what fetches them.
+#[derive(Clone)]
+pub struct Served {
+    /// The faces the host serves, in the manifest's order.
+    pub faces: Vec<ServedFace>,
+    /// Fetches a face's file.
+    pub fetcher: Arc<dyn FontFetcher>,
 }
 
 fn served_id() -> egui::Id {
@@ -208,108 +191,4 @@ mod tests {
         assert!(!redraws_for(&layer("hello"), &[thai.into()]));
         assert!(redraws_for(&layer("hello"), &["Inter".into()]), "and a layer still redraws for its own family");
     }
-<<<<<<< HEAD
-=======
-
-    /// #10006: the web build has no system fonts, so a served Arabic fallback is what draws an
-    /// Arabic interface, also after a language change rebuilds the UI's font stack.
-    #[test]
-    fn a_served_script_fallback_draws_the_ui_and_survives_a_font_rebuild() {
-        // The web build's sources: no system fonts, no embedded craft fonts.
-        let web = || crate::cjk_fonts::Sources {
-            locale: || None,
-            files: |_| Vec::new(),
-            last_resort: Vec::new,
-            pending: || false,
-            scripts: |_| Vec::new(),
-            covers: |_, _| None,
-            embedded: crate::cjk_fonts::no_embedded,
-            eager_craft_fonts: false,
-        };
-        let ctx = egui::Context::default();
-        crate::theme::install_fonts_with(&ctx, web());
-        ctx.set_missing_glyph_policy(egui::MissingGlyphPolicy::Panic);
-        // Font changes take effect on the next pass: one empty pass, then draw Arabic.
-        let draw = |ctx: &egui::Context, text: &str| {
-            ctx.run_ui(egui::RawInput::default(), |ui| {
-                ui.label(text);
-            })
-            .textures_delta
-            .clear();
-        };
-        draw(&ctx, "File");
-        add_ui_face(&ctx, "Served Test Arabic", &crate::cjk_fonts::tests::synthetic_font(&[(0x0600, 0x06FF)]));
-        draw(&ctx, "File");
-        draw(&ctx, "ملف");
-        // A language change rebuilds the stack; the served face comes back with it.
-        crate::theme::install_fonts_with(&ctx, web());
-        draw(&ctx, "File");
-        draw(&ctx, "ملف");
-    }
-
-    /// #10006: a host serving a broken file as a script fallback must not stop the interface;
-    /// egui panics on a configured font it cannot parse.
-    #[test]
-    fn an_unreadable_served_font_stays_out_of_the_ui() {
-        let ctx = egui::Context::default();
-        crate::theme::install_fonts(&ctx);
-        let draw = |ctx: &egui::Context| {
-            ctx.run_ui(egui::RawInput::default(), |ui| {
-                ui.label("File ملف");
-            })
-            .textures_delta
-            .clear();
-        };
-        draw(&ctx);
-        add_ui_face(&ctx, "Served Test Broken", b"<html>not found</html>");
-        draw(&ctx);
-        crate::theme::install_fonts(&ctx);
-        draw(&ctx);
-        assert!(!ui_faces().iter().any(|(n, _)| n == "served-Served Test Broken"));
-    }
-
-    /// #10006: a Japanese and a Simplified Chinese face both cover Han. A Chinese interface draws
-    /// it with the Chinese one, even when the Japanese face arrived first.
-    #[test]
-    fn the_interface_languages_served_face_comes_first_in_the_ui_stack() {
-        if !crate::i18n::needs_catalogs() {
-            return;
-        }
-        let (jpan, hans) = ("Served Test Jpan", "Served Test Hans");
-        {
-            let _catalog = changing_catalog();
-            photocraft_text::served::add_fonts(
-                &parse_manifest(&format!("{jpan} | Regular | fonts/j/J.ttf | Jpan\n{hans} | Regular | fonts/h/H.ttf | Hans\n")).0,
-            );
-        }
-        crate::i18n::set_current(crate::i18n::Lang::from_code("zh-hans").expect("Simplified Chinese"));
-        let ctx = egui::Context::default();
-        crate::theme::install_fonts(&ctx);
-        let draw = |ctx: &egui::Context| {
-            ctx.run_ui(egui::RawInput::default(), |ui| {
-                ui.label("文件");
-            })
-            .textures_delta
-            .clear();
-        };
-        let order = |ctx: &egui::Context| {
-            let stack = ctx.fonts(|f| f.definitions().families[&FontFamily::Proportional].clone());
-            let at = |family: &str| stack.iter().position(|n| *n == format!("served-{family}"));
-            (at(hans), at(jpan))
-        };
-        draw(&ctx);
-        let han = crate::cjk_fonts::tests::synthetic_font(&[(0x4E00, 0x9FFF)]);
-        add_ui_face(&ctx, jpan, &han);
-        draw(&ctx);
-        add_ui_face(&ctx, hans, &han);
-        draw(&ctx);
-        let (h, j) = order(&ctx);
-        assert!(h.is_some() && h < j, "the Chinese face goes ahead of the Japanese one: {h:?} {j:?}");
-        crate::theme::install_fonts(&ctx);
-        draw(&ctx);
-        let (h, j) = order(&ctx);
-        assert!(h.is_some() && h < j, "also after a rebuild: {h:?} {j:?}");
-        crate::i18n::set_current(crate::i18n::Lang::EN);
-    }
->>>>>>> upstream/main
 }

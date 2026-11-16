@@ -151,12 +151,8 @@ pub(crate) fn same_inks(a: [f32; 4], b: [f32; 4]) -> bool {
 
 /// The CMYK converter of the document colour settings; the built-in coated one when the profile is unusable.
 fn converter(app: &PhotocraftApp) -> CmykConverter {
-    // The engine's profile type is `photocraft_cms`'s and the framework's converter takes `craft::cms`'s: the ICC bytes
-    // carry it over.
-    let working = app.session.color.working(photocraft_doc::ColorMode::Cmyk);
-    craft::cms::Profile::parse(&working.to_bytes())
+    CmykConverter::new(app.session.color.working(photocraft_doc::ColorMode::Cmyk))
         .ok()
-        .and_then(|profile| CmykConverter::new(std::sync::Arc::new(profile)).ok())
         .unwrap_or_else(|| CmykConverter::coated().clone())
 }
 

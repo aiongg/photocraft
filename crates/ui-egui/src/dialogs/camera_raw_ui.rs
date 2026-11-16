@@ -84,13 +84,7 @@ pub(crate) struct Developed {
     pub(crate) settings: CameraRaw,
     /// The developed proxy (straight RGBA).
     pub(crate) processed: Vec<[f32; 4]>,
-<<<<<<< HEAD
     /// The developed proxy's histogram.
-=======
-    pub(crate) lab_transform: std::sync::Arc<craft_cms::Transform>,
-    pub(crate) scope_transform: std::sync::Arc<craft_cms::Transform>,
-    pub(crate) scope: crate::camera_raw_scope_ui::ScopeView,
->>>>>>> upstream/main
     pub(crate) after_histogram: RgbHistogram,
     /// Milliseconds of the whole job, of the develop alone and of the histogram.
     pub(crate) render_ms: f64,
@@ -166,8 +160,8 @@ pub(crate) struct SourceInit {
     pub(crate) display: Arc<photocraft_engine::display_color::CanvasDisplay>,
     pub(crate) gpu: Option<CameraRawGpu>,
     pub(crate) encoding_gamma: f32,
-    pub(crate) lab_transform: Arc<photocraft_cms::Transform>,
-    pub(crate) scope_transform: Arc<photocraft_cms::Transform>,
+    pub(crate) lab_transform: Arc<craft::cms::Transform>,
+    pub(crate) scope_transform: Arc<craft::cms::Transform>,
     pub(crate) detail: DetailPreview,
     pub(crate) ctx: egui::Context,
 }
@@ -193,8 +187,8 @@ pub(crate) struct PcRawSource {
     source_key: u64,
     /// The develop's inputs besides the settings: the proxy's scale and the document's transfer curve.
     pub(crate) inputs: DevelopInputs,
-    pub(crate) lab_transform: Arc<photocraft_cms::Transform>,
-    pub(crate) scope_transform: Arc<photocraft_cms::Transform>,
+    pub(crate) lab_transform: Arc<craft::cms::Transform>,
+    pub(crate) scope_transform: Arc<craft::cms::Transform>,
     pub(crate) before_histogram: RgbHistogram,
     pub(crate) detail: Arc<Mutex<DetailPreview>>,
     before: Arc<SharedPicture>,

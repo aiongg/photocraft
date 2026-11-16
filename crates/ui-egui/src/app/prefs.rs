@@ -1,8 +1,4 @@
-<<<<<<< HEAD
 use super::{PhotocraftApp, theme};
-=======
-use super::{PhotocraftApp, dock, field_wheel, panel_docking, single_line_drag, text_field_menu, theme, tool_cursor, wheel_nav};
->>>>>>> upstream/main
 
 impl PhotocraftApp {
     /// Shows `theme` and saves it as the theme of its mode, which becomes the appearance mode.
@@ -70,7 +66,6 @@ impl PhotocraftApp {
 }
 
 impl PhotocraftApp {
-<<<<<<< HEAD
     /// Install the app's icons, fonts, image loaders and the theme. Call from the app creator
     /// (and again for a replacement Context) before the first `run_ui` so the very first frame
     /// renders; otherwise `logic` does it and the first frame is skipped.
@@ -88,20 +83,6 @@ impl PhotocraftApp {
     fn setup(ctx: &egui::Context, theme: theme::AppTheme, frame: Option<craft::window::policy::Decision>) {
         crate::icons::register();
         theme::install_runtime(ctx, frame);
-=======
-    /// Install fonts, image loaders and the theme. Call from the app creator (and again for a
-    /// replacement Context) before the first `run_ui` so the very first frame renders and the
-    /// Type reset begin/end pass markers exist; otherwise `logic` does it and the first frame is
-    /// skipped, with the begin-pass marker necessarily starting on the following pass.
-    pub fn setup_context(ctx: &egui::Context, kind: theme::ThemeKind) {
-        Self::install_type_reset_hooks(ctx);
-        ctx.add_plugin(tool_cursor::CursorLifecycle);
-        ctx.add_plugin(single_line_drag::SingleLineDrag::default());
-        // The wheel goes to a focused value field before the canvas or a panel sees it (#5473), in
-        // every window: a floated panel's window has input of its own (#11353).
-        ctx.add_plugin(field_wheel::FieldWheel);
-        theme::install_fonts(ctx);
->>>>>>> upstream/main
         egui_extras::install_image_loaders(ctx);
         theme::apply(ctx, &theme);
         // egui's own ⌘+ / ⌘- / ⌘0 scale the whole interface; PhotoCraft zooms the canvas instead
