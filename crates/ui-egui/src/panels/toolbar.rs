@@ -1,10 +1,10 @@
 use super::{PhotocraftApp, Tool, json, vec2};
-use craft::behavior::IconId;
 use craft::color::ui::{PairWell, SwatchPair, Well};
-use craft::ui::buttons::ToggleButton;
-use craft::ui::contract::{Bind, Gap, PaneEdge, Show as _, ShowContainer as _, clicked};
+use craft::ui::contract::{Bind, Gap, PaneEdge, Props as _, Show as _, ShowContainer as _, clicked};
+use craft::ui::layout::RowAlign;
 use craft::ui::layout_components::{Row, Stack};
-use craft::ui::rails::{DrawerGroup, LastUsed, ToolRail, ToolSlot, ToolbarDrawer, ToolbarEdit, apply_toolbar_edit};
+use craft::ui::rails::{DrawerGroup, FlyoutButton, LastUsed, RailTool, ToolRail, ToolSlot, ToolbarDrawer, ToolbarEdit, apply_toolbar_edit};
+use craft::ui::runtime::commands::CommandRef;
 use craft::ui::runtime::env::Label;
 use craft::ui::shell::ScreenModeButton;
 use photocraft_engine::prefs::ToolbarCustomization;
@@ -136,13 +136,30 @@ fn last_used(slots: &[ToolSlot<Tool>], group_tools: &[Tool]) -> LastUsed<Tool> {
     last
 }
 
+/// The tool rail's column count: two while the header's column toggle asks for them. The shell's tools slot and the
+/// rail both take it.
+pub(crate) fn columns(app: &PhotocraftApp) -> usize {
+    if app.ui.panels.toolbar_double { 2 } else { 1 }
+}
+
+/// The Edit in Quick Mask Mode command, which the rail's footer shows as a rail button.
+pub(crate) const QUICK_MASK: &str = "select.editInQuickMaskMode";
+
+/// Quick Mask as a rail button, the size of the tool buttons: a click runs Edit in Quick Mask Mode, and the button shows
+/// on while the active document is in Quick Mask.
+fn quick_mask_button(app: &PhotocraftApp, ui: &mut egui::Ui) {
+    let on = app.session.active().is_some_and(|s| s.doc.quick_mask.is_some());
+    let tools = [RailTool::new(0_u8, CommandRef::new(QUICK_MASK))];
+    let _ = FlyoutButton::new(&tools, &0).id_salt("quick-mask").selected(on).show(ui);
+}
+
 /// The rail's edge for the physical side the toolbar sits on: the rail names its edge by the interface direction.
 fn rail_edge(side: ToolbarSide) -> PaneEdge {
     if (side.resolve() == ToolbarSide::Right) != crate::direction::is_rtl() { PaneEdge::End } else { PaneEdge::Start }
 }
 
-/// The tool palette: a `ToolRail` over the slots, with the Quick Mask and Screen Mode buttons and the colour chips in
-/// its footer, and, while the Edit Toolbar drawer is open, the drawer beside it. The caller places it on the side
+/// The tool palette: a `ToolRail` over the slots, with the colour chips and then the Quick Mask and Screen Mode buttons
+/// in its footer, and, while the Edit Toolbar drawer is open, the drawer beside it. The caller places it on the side
 /// `panels.toolbar_side` gives (AppShell's tools slot).
 ///
 /// A frame can run this twice. Every outcome comes from the pass's own widgets (a click, a drop), and the slots and
@@ -152,7 +169,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let slots = tool_commands::slots(&app.session.prefs().toolbar);
     let remembered = last_used(&slots, &app.ui.group_tools);
     let current = app.ui.tool;
-    let columns = if app.ui.panels.toolbar_double { 2 } else { 1 };
+    let columns = columns(app);
     let side = app.ui.panels.toolbar_side.resolve();
     let edge = rail_edge(side);
     let other_side = side.other();
@@ -169,17 +186,20 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         rail = rail.editing();
     }
     let out = rail.show_rail(ui, |ui, footer| {
-        let modes = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
-            ToggleButton::command("select.editInQuickMaskMode").icon(IconId::new("square-dashed")).icon_only().show(ui);
-            ScreenModeButton::new(app.ui.view.screen_mode).show(ui);
-        };
-        if footer.columns > 1 {
-            Row::new().gap(Gap::Tight).show(ui, |ui, _| modes(ui, app));
-        } else {
-            Stack::new().gap(Gap::Tight).show(ui, |ui, _| modes(ui, app));
-        }
         let column = ui.available_width();
         color_chips(app, ui, column);
+        let modes = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
+            quick_mask_button(app, ui);
+            ScreenModeButton::new(app.ui.view.screen_mode).show(ui);
+        };
+        // The two buttons sit centred in the rail's columns, side by side in two columns.
+        Row::new().fill_width().align(RowAlign::Center).gap(Gap::Tight).show(ui, |ui, _| {
+            if footer.columns > 1 {
+                modes(ui, app);
+            } else {
+                Stack::new().gap(Gap::Tight).show(ui, |ui, _| modes(ui, app));
+            }
+        });
     });
 
     if let Some(tool) = out.select {

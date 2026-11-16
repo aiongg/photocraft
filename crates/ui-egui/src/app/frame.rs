@@ -242,7 +242,7 @@ impl PhotocraftApp {
             .screen_mode(Bind::bound(&mut mode))
             .title_bar_if(menu_bar, |ui, _cx, app| panels::title_bar(app, ui))
             .options_bar(options_bar && !home, |ui, _cx, app| panels::options_bar(app, ui))
-            .tools(toolbar_edge, toolbar && !home, tool_rail)
+            .tools(toolbar_edge, panels::toolbar::columns(self), toolbar && !home, tool_rail)
             .status(status_bar && !home, |ui, _cx, app| panels::status_bar(app, ui))
             .body(|ui, _cx, app| {
                 if home {
