@@ -116,7 +116,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         rows: super::swatches_ui::panel_rows,
         states: super::swatches_ui::command_states,
         run: super::swatches_ui::run_fired,
-        ..panel("swatches", || tl!("Swatches").to_string(), "swatch-book", LEAST, |app, ui| scrolled(app, ui, super::swatches_ui::panel))
+        ..panel("swatches", || tl!("Swatches").to_string(), "swatch-book", LEAST, super::swatches_ui::panel)
     },
     panel("gradients", || tl!("Gradients").to_string(), "blend", LEAST, super::preset_panels::gradients_panel),
     panel("patterns", || tl!("Patterns").to_string(), "grid", LEAST, super::preset_panels::patterns_panel),
