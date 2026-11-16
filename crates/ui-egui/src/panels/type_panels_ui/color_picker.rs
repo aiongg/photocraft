@@ -121,6 +121,18 @@ pub(crate) fn answered(app: &mut PhotocraftApp, result: DialogResult<ColorPicker
     }
 }
 
+/// Takes the open picker's result and files it with [`answered`]; a picker that is gone without one ends the target.
+/// A taker of `dialogs::take_results`, so a confirm or cancel from the dialog's buttons or from automation both end here.
+pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
+    let Some(dialog) = app.ui.type_panels.color_target.as_ref().map(|t| t.dialog) else { return };
+    if let Some(result) = app.framework.dialogs.take_by_id::<ColorPickerDialog>(dialog) {
+        answered(app, result);
+    } else if app.framework.dialogs.get_by_id::<ColorPickerDialog>(dialog).is_none() {
+        app.ui.type_panels.color_target = None;
+        app.text_style_preview = None;
+    }
+}
+
 /// CPU and GPU canvases use the same isolated document; unchanged frames reuse its Arc.
 pub(crate) fn display_doc(app: &mut PhotocraftApp, idx: usize) -> Option<(Arc<Document>, u64)> {
     let t = app.ui.type_panels.color_target.clone()?;
