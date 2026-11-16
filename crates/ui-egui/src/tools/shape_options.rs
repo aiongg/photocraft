@@ -178,10 +178,9 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
         .stroke_style(StrokeStyle::from(&style))
         .locked(locked);
     let ppi = app.session.active().map_or(72.0, |st| f64::from(st.doc.resolution_dpi));
-    let sampled = [ShapePaint::Fill, ShapePaint::Stroke]
-        .into_iter()
-        .find_map(|p| crate::screen_picker::take(app, ("shape-bar", p)).map(|c| (p, c)));
-    let recent_colors: Vec<craft::theme::Srgba> = crate::paint_picker::recent_colors(&app.session).into_iter().map(|c| srgba([c[0], c[1], c[2], 1.0])).collect();
+    let sampled = [ShapePaint::Fill, ShapePaint::Stroke].into_iter().find_map(|p| crate::screen_picker::take(app, ("shape-bar", p)).map(|c| (p, c)));
+    let recent_colors: Vec<craft::theme::Srgba> =
+        crate::paint_picker::recent_colors(&app.session).into_iter().map(|c| srgba([c[0], c[1], c[2], 1.0])).collect();
     let groups = ShapeGradients::groups_of(&app.session.presets.gradients, fg, bg);
     let gradients = ShapeGradients { groups, current: &app.session.presets.gradient, recent: &mut app.ui.recent_gradients, fg, bg };
     let current = [fill.clone(), stroke.as_ref().map(|s| s.paint.clone())];

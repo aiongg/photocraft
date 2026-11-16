@@ -3,9 +3,7 @@
 //! contributors/contributors.json; nothing is read at run time. The framework's `AboutDialog` draws them.
 
 use craft::ui::dialog::DialogId;
-use craft::ui::patterns::form_dialogs::{
-    AboutInfo, AboutLink, AboutTab, Contributor as CreditedPerson, Credits, HostedAbout, HostedReport, ModelCredit,
-};
+use craft::ui::patterns::form_dialogs::{AboutInfo, AboutLink, AboutTab, Contributor as CreditedPerson, Credits, HostedAbout, HostedReport, ModelCredit};
 
 use crate::PhotocraftApp;
 
@@ -74,7 +72,8 @@ pub fn credits() -> Credits {
             person
         })
         .collect();
-    let models: Vec<ModelCredit> = MODELS.iter().map(|m| ModelCredit::new(m.company, m.model, m.version).work(m.commits, m.lines_added, m.lines_deleted)).collect();
+    let models: Vec<ModelCredit> =
+        MODELS.iter().map(|m| ModelCredit::new(m.company, m.model, m.version).work(m.commits, m.lines_added, m.lines_deleted)).collect();
     Credits::new(people, models, TOTAL_COMMITS)
 }
 

@@ -129,8 +129,8 @@ fn apply(app: &mut PhotocraftApp, percent: f32, shift: bool) {
 mod tests {
     use super::*;
     use crate::blend_keys::test_fired;
-    use egui::{Event, Key};
     use OpacityDigit as D;
+    use egui::{Event, Key};
 
     fn app(tool: Tool) -> PhotocraftApp {
         prepared(PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()), tool)

@@ -18,9 +18,8 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let document = app.session.active().map(|st| Size::new(st.doc.size.width as f64, st.doc.size.height as f64));
     // The active document's main canvas as its last pass showed it; a document not yet shown has no readout.
     let mut view = crate::canvas::active_view(app);
-    let message = (!app.ui.status.is_empty()).then(|| {
-        StatusMessage::new(app.ui.status.clone()).tone(if app.ui.status_error { Tone::Warn } else { Tone::Neutral })
-    });
+    let message =
+        (!app.ui.status.is_empty()).then(|| StatusMessage::new(app.ui.status.clone()).tone(if app.ui.status_error { Tone::Warn } else { Tone::Neutral }));
     let render_path = chrome_ui::render_path_label(app)
         .map(|(label, tip, command)| StatusMessage::new(label).tone(Tone::Warn).command(CommandRef::new(command)).tooltip(tip));
     // The passes of a frame each report their own entries; the last pass's are the ones applied below.

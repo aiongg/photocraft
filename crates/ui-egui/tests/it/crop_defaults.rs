@@ -2,10 +2,10 @@
 //! becomes active, and keeps Content-Aware Fill otherwise (tool switches, new documents, a
 //! committed crop, a cancelled crop).
 
+use craft::draw::ui::crop::CropFill;
 use photocraft_ui_egui::PhotocraftApp;
 use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::crop_ui;
-use craft::draw::ui::crop::CropFill;
 use serde_json::{Value, json};
 
 type Harness = egui_kittest::Harness<'static, PhotocraftApp>;

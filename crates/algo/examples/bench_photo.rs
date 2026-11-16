@@ -73,11 +73,18 @@ fn main() {
     });
     time("camera raw: clarity + texture + dehaze", &only, || {
         let mut a = px.clone();
-        develop(&mut a, w, h, &cr(|p| {
-            p.clarity = 30.0;
-            p.texture = 20.0;
-            p.dehaze = 25.0;
-        }), &DevelopInputs::default(), false);
+        develop(
+            &mut a,
+            w,
+            h,
+            &cr(|p| {
+                p.clarity = 30.0;
+                p.texture = 20.0;
+                p.dehaze = 25.0;
+            }),
+            &DevelopInputs::default(),
+            false,
+        );
     });
     time("camera raw: hsl + grading + curve", &only, || {
         let mut a = px.clone();
@@ -154,10 +161,7 @@ fn main() {
         ])
     });
     time("wide angle solve: 800x533 proxy, 2 free", &only, || {
-        solve_case(vec![
-            Constraint::new([60.0, 80.0], [740.0, 95.0], Orientation::Free),
-            Constraint::new([100.0, 60.0], [110.0, 470.0], Orientation::Free),
-        ])
+        solve_case(vec![Constraint::new([60.0, 80.0], [740.0, 95.0], Orientation::Free), Constraint::new([100.0, 60.0], [110.0, 470.0], Orientation::Free)])
     });
     time("hdr: merge 3 exposures + local adaptation", &only, || {
         let shots: Vec<Vec<[f32; 4]>> =

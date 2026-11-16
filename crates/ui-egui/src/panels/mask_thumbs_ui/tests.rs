@@ -349,7 +349,7 @@ fn a_new_adjustment_or_fill_layer_shows_its_settings_until_the_mask_thumbnail_is
         s.execute("file.new", json!({"width": 200, "height": 100})).unwrap();
         s.execute("layer.new.layer", json!({})).unwrap();
         let mut app = app_of(s);
-    let ctx = app.ctx().clone();
+        let ctx = app.ctx().clone();
         app.run(command, json!({})).unwrap();
         let id = app.session.active().unwrap().active_layer.unwrap().0;
         assert!(app.ui.mask_target, "{command}: the new mask is targeted");

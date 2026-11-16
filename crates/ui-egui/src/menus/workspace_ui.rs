@@ -101,7 +101,9 @@ fn refused(error: WorkspaceError) -> String {
 /// `panel_layout`) move into the set once and are cleared.
 pub fn load(app: &mut PhotocraftApp) {
     let prefs = app.session.prefs().clone();
-    let mut set = WorkspaceSet::new(BUILTIN.iter().map(|&(id, english)| NamedWorkspace::new(id, tl!(english).to_string(), crate::panels::registry::preset(english))).collect());
+    let mut set = WorkspaceSet::new(
+        BUILTIN.iter().map(|&(id, english)| NamedWorkspace::new(id, tl!(english).to_string(), crate::panels::registry::preset(english))).collect(),
+    );
     let stored = (!prefs.workspace_set.is_null()).then(|| serde_json::from_value::<WorkspaceSet<String>>(prefs.workspace_set.clone()).ok()).flatten();
     match stored {
         Some(stored) => {
@@ -144,7 +146,8 @@ fn migrate(app: &mut PhotocraftApp, prefs: &Preferences, set: &mut WorkspaceSet<
         }
     }
     set.locked = prefs.workspace_locked;
-    set.current = current.and_then(|name| set.builtin.iter().chain(&set.saved).find(|w| w.name == name).map(|w| w.id.clone())).unwrap_or_else(|| BUILTIN[0].0.to_owned());
+    set.current =
+        current.and_then(|name| set.builtin.iter().chain(&set.saved).find(|w| w.name == name).map(|w| w.id.clone())).unwrap_or_else(|| BUILTIN[0].0.to_owned());
     app.session.prefs.edit(|p| {
         p.workspace_extras.extend(extras);
         p.workspaces.clear();
@@ -229,7 +232,14 @@ fn save_keeping(app: &mut PhotocraftApp, name: &str, keeps: WorkspaceKeeps) -> R
 /// Deletes the saved workspace named `name` (any case).
 pub fn delete(app: &mut PhotocraftApp, name: &str) -> Result<(), String> {
     let wanted = name.trim().to_lowercase();
-    let id = app.workspaces.set.saved.iter().find(|w| w.name.to_lowercase() == wanted).map(|w| w.id.clone()).ok_or_else(|| format!("no saved workspace \"{name}\""))?;
+    let id = app
+        .workspaces
+        .set
+        .saved
+        .iter()
+        .find(|w| w.name.to_lowercase() == wanted)
+        .map(|w| w.id.clone())
+        .ok_or_else(|| format!("no saved workspace \"{name}\""))?;
     delete_id(app, &id)
 }
 
@@ -356,10 +366,8 @@ fn open_form(app: &mut PhotocraftApp, key: &'static str, title: &'static str, fi
 
 fn open_custom_par(app: &mut PhotocraftApp) -> Result<Value, String> {
     let fields = DialogFields::from_pairs([("name", FieldValue::Text(String::new())), ("ratio", FieldValue::Number(1.0))]);
-    let params = vec![
-        Param::new("name", tl!("Name:"), ParamKind::text("")),
-        Param::new("ratio", tl!("Factor:"), ParamKind::range(0.1, 10.0, 1.0, SliderScale::Linear)),
-    ];
+    let params =
+        vec![Param::new("name", tl!("Name:"), ParamKind::text("")), Param::new("ratio", tl!("Factor:"), ParamKind::range(0.1, 10.0, 1.0, SliderScale::Linear))];
     open_form(app, CUSTOM_PAR, "Save Pixel Aspect Ratio", fields, params)
 }
 
@@ -384,10 +392,8 @@ fn open_preview32(app: &mut PhotocraftApp) -> Option<Result<Value, String>> {
         ("exposure", FieldValue::Number(f64::from(h.exposure))),
         ("gamma", FieldValue::Number(f64::from(h.gamma))),
     ]);
-    let methods = vec![
-        ("exposureGamma".to_owned(), tl!("Exposure and Gamma").into()),
-        ("highlightCompression".to_owned(), tl!("Highlight Compression").into()),
-    ];
+    let methods =
+        vec![("exposureGamma".to_owned(), tl!("Exposure and Gamma").into()), ("highlightCompression".to_owned(), tl!("Highlight Compression").into())];
     let params = vec![
         Param::new("method", tl!("Mode"), ParamKind::choice(methods, Some("exposureGamma".into()))),
         Param::new("exposure", tl!("Exposure:"), ParamKind::range(-20.0, 20.0, 0.0, SliderScale::Linear)).enabled_when("method", "exposureGamma"),

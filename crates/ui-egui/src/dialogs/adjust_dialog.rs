@@ -14,8 +14,8 @@
 
 use std::sync::{Arc, Mutex};
 
-use craft::theme::Srgba;
 use craft::imaging::ui::adjust::{AdjustDialogCx, CurvesPanel, HostedAdjustDialog as FrameworkDialog, ToneChannels, TonePicker};
+use craft::theme::Srgba;
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::runtime::env::Label;
 use craft::ui::runtime::memory::{SaveKey, saved_value, set_saved_value};
@@ -224,7 +224,10 @@ fn set_params(app: &mut PhotocraftApp, id: DialogId, params: &Value, change: Cha
 
 /// The parameter keys that address the command (not settings): they stay when parameters are replaced.
 fn addressing(params: &Value) -> Map<String, Value> {
-    params.as_object().map(|p| p.iter().filter(|(key, _)| matches!(key.as_str(), "target" | "layer" | "document")).map(|(k, v)| (k.clone(), v.clone())).collect()).unwrap_or_default()
+    params
+        .as_object()
+        .map(|p| p.iter().filter(|(key, _)| matches!(key.as_str(), "target" | "layer" | "document")).map(|(k, v)| (k.clone(), v.clone())).collect())
+        .unwrap_or_default()
 }
 
 /// Sample the committed colour composite or targeted grayscale plane and set the armed Levels or Curves point on the
@@ -279,7 +282,8 @@ pub(crate) fn pick(app: &mut PhotocraftApp, at: [f64; 2]) -> bool {
     };
     // Scalar samples retain their native precision. The colour picker keeps its existing hundredth-level
     // curve-point convention, independently of source sample depth.
-    let mut params = if gray { photocraft_engine::adjust_params::to_dialog_params(&adjustment) } else { photocraft_engine::adjust_params::to_params(&adjustment) };
+    let mut params =
+        if gray { photocraft_engine::adjust_params::to_dialog_params(&adjustment) } else { photocraft_engine::adjust_params::to_params(&adjustment) };
     if let (Value::Object(object), Some(dialog)) = (&mut params, hosted(app, id)) {
         object.extend(addressing(&dialog.value().cx.base));
     }
@@ -313,7 +317,8 @@ pub(crate) fn add_point(app: &mut PhotocraftApp, at: [f64; 2], every_channel: bo
     let Some(open) = open_value(app).filter(|open| open.kind == "curves") else { return false };
     let id = open.id;
     let Some(base) = hosted(app, id).map(|dialog| &dialog.value().cx.base) else { return false };
-    let names_plane = base.get("target").is_some_and(|target| matches!(target.as_str(), Some("mask" | "filterMask" | "quickMask")) || target.get("channel").is_some());
+    let names_plane =
+        base.get("target").is_some_and(|target| matches!(target.as_str(), Some("mask" | "filterMask" | "quickMask")) || target.get("channel").is_some());
     // A mask, saved channel or Quick Mask holds its own gray levels, not the composite's.
     let gray_plane = open.target.channel.as_ref().is_some_and(|c| c.gray.is_some());
     let isolated = open.target.channel.clone();
@@ -529,7 +534,8 @@ fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: C
         _ => Vec::new(),
     };
     let rgb = mode == ColorMode::Rgb;
-    let pickers_unavailable = ![TonePicker::Black, TonePicker::Gray, TonePicker::White].iter().any(|picker| picker.supported(rgb, adjust_editors::is_gray(mode)));
+    let pickers_unavailable =
+        ![TonePicker::Black, TonePicker::Gray, TonePicker::White].iter().any(|picker| picker.supported(rgb, adjust_editors::is_gray(mode)));
     EditorSetup {
         // An unresolved Action target has no channels to show: the panel draws no Channel select.
         channels: if unresolved && matches!(kind, "levels" | "curves") {
@@ -548,7 +554,10 @@ fn build_setup(app: &mut PhotocraftApp, kind: &str, target: &ToneTarget, mode: C
 }
 
 /// The kind's editor over a setup the app can replace when the target changes.
-fn shared_editor(kind: String, setup: Arc<Mutex<EditorSetup>>) -> impl for<'b> Fn(&mut egui::Ui, &mut DialogValue, &mut AdjustDialogCx<'b>) -> Option<AdjustAsk> + Send + 'static {
+fn shared_editor(
+    kind: String,
+    setup: Arc<Mutex<EditorSetup>>,
+) -> impl for<'b> Fn(&mut egui::Ui, &mut DialogValue, &mut AdjustDialogCx<'b>) -> Option<AdjustAsk> + Send + 'static {
     move |ui, value, cx| {
         let setup = setup.lock().ok()?.clone();
         if setup.stale {
@@ -594,11 +603,12 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, recorded: Value, smart: O
     let gray = gray_context(app, &kind, &seeded.target);
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
     let value = DialogValue { value: seeded.value, cx: seeded.cx };
-    let mut dialog = HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), crate::i18n::t(spec.label).to_string(), value, shared_editor(kind.clone(), setup.clone()))
-        .context(dynamic, gray)
-        .reset_with(reset_target(kind.clone()))
-        .json_form(json_form)
-        .held_ok();
+    let mut dialog =
+        HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), crate::i18n::t(spec.label).to_string(), value, shared_editor(kind.clone(), setup.clone()))
+            .context(dynamic, gray)
+            .reset_with(reset_target(kind.clone()))
+            .json_form(json_form)
+            .held_ok();
     if let Some(idx) = app.session.active_index() {
         dialog = dialog.canvas(crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
     }
@@ -707,7 +717,10 @@ fn remember(app: &PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, cx: &Va
             object.remove(key);
         }
     }
-    if app.session.active().is_some_and(|st| st.doc.mode == ColorMode::Lab) && combined_lab_target(&cx.base) && matches!(open.kind.as_str(), "levels" | "curves") {
+    if app.session.active().is_some_and(|st| st.doc.mode == ColorMode::Lab)
+        && combined_lab_target(&cx.base)
+        && matches!(open.kind.as_str(), "levels" | "curves")
+    {
         settings["__combinedLab"] = json!(true);
     }
     set_saved_value(ctx, &last_key(&open.kind), Some(settings));
@@ -718,7 +731,8 @@ fn remember(app: &PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust, cx: &Va
 pub(crate) fn smart_filter_params(app: &PhotocraftApp, open: &OpenAdjust, value: &DialogValue, edited: bool) -> Result<Value, String> {
     let params = value.params(edited);
     if matches!(open.kind.as_str(), "levels" | "curves") {
-        photocraft_engine::adjust_params::from_params(&open.kind, &params, None, curve_mode(app, &open.kind, &open.target)).map_err(|error| error.to_string())?;
+        photocraft_engine::adjust_params::from_params(&open.kind, &params, None, curve_mode(app, &open.kind, &open.target))
+            .map_err(|error| error.to_string())?;
     }
     Ok(params)
 }

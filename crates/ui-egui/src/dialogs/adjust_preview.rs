@@ -524,7 +524,12 @@ fn live_region(doc: &Document, layer: LayerId) -> Rect {
 /// measuring its region) when the document, revision or layer changes.
 pub fn live_key(app: &mut PhotocraftApp, doc: &Document, revision: u64, layer: LayerId, params: &Value) -> u64 {
     let session = PreviewSession::new(doc.id.0, revision, layer.0);
-    let p = app.live_adjust_preview.get_or_insert_with(|| LiveAdjust { doc: doc.id, revision, live: LivePreview::new(PreviewLane::Properties), keyed: PreviewKey::NONE });
+    let p = app.live_adjust_preview.get_or_insert_with(|| LiveAdjust {
+        doc: doc.id,
+        revision,
+        live: LivePreview::new(PreviewLane::Properties),
+        keyed: PreviewKey::NONE,
+    });
     (p.doc, p.revision) = (doc.id, revision);
     // The region is measured once per session.
     if p.live.session() != Some(session) {

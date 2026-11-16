@@ -2,8 +2,7 @@ use photocraft_doc::Effect;
 use serde_json::json;
 
 use super::tests::{
-    ColorStop, DialogId, EffectId, EffectKind, GradientStops, LayerStyleDraft, StyleValue, Srgba, app_with_layer, draft, edit,
-    first_of, ok, param,
+    ColorStop, DialogId, EffectId, EffectKind, GradientStops, LayerStyleDraft, Srgba, StyleValue, app_with_layer, draft, edit, first_of, ok, param,
 };
 use super::*;
 use crate::PhotocraftApp;

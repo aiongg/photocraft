@@ -211,8 +211,7 @@ fn autosave(app: &mut PhotocraftApp, now: Instant) {
             }
         }
     }
-    let docs: Vec<AutosaveDoc> =
-        app.session.documents().iter().map(|d| AutosaveDoc { id: d.doc.id.0, revision: d.revision, dirty: d.is_dirty() }).collect();
+    let docs: Vec<AutosaveDoc> = app.session.documents().iter().map(|d| AutosaveDoc { id: d.doc.id.0, revision: d.revision, dirty: d.is_dirty() }).collect();
     let due = app.autosave.due(now, docs);
     if let Some(discard) = app.services.discard_autosave.as_mut() {
         for id in &due.discard {

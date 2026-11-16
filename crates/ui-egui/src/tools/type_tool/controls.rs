@@ -13,10 +13,10 @@ use craft::behavior::{DocKey, GesturePhase, PointerButton};
 use craft::draw::ui::transform::TransformBox;
 use craft::imaging::selection::{ColorIndicates, PreviewMode, QuickMaskLook};
 use craft::imaging::trace::{MaskRect, MaskSource};
+use craft::imaging::ui::selection::SelectionOverlay;
 use craft::text::quotes::QuoteStyle;
 use craft::text::ui::editor::{EditorEnd, TextEditor, TextSelection};
 use craft::theme::Srgba;
-use craft::imaging::ui::selection::SelectionOverlay;
 use craft::ui::canvas::canvas_space;
 use craft::ui::canvas_controls::SelectionOutline;
 use craft::ui::contract::{Bind, Props as _, Show as _};
@@ -246,7 +246,10 @@ fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &craft::behavior::Ca
 /// height in text space, through the layer's transform `aff`.
 fn box_of(state: &BoxState, aff: &Affine) -> Option<[f64; 4]> {
     let inverse = aff.inverse()?;
-    let (top_left, bottom_right) = (inverse.apply(photocraft_geom::Point::new(state.quad[0].x, state.quad[0].y)), inverse.apply(photocraft_geom::Point::new(state.quad[2].x, state.quad[2].y)));
+    let (top_left, bottom_right) = (
+        inverse.apply(photocraft_geom::Point::new(state.quad[0].x, state.quad[0].y)),
+        inverse.apply(photocraft_geom::Point::new(state.quad[2].x, state.quad[2].y)),
+    );
     let boxed = [state.quad[0].x, state.quad[0].y, bottom_right.x - top_left.x, bottom_right.y - top_left.y];
     (boxed.iter().all(|v| v.is_finite()) && boxed[2] > 0.0 && boxed[3] > 0.0).then_some(boxed)
 }

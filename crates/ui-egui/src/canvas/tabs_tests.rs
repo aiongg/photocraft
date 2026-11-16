@@ -123,10 +123,7 @@ fn ctrl_tab_with_one_document_or_a_focused_field() {
     h.key_press_modifiers(ctrl(), egui::Key::Tab);
     h.run_steps(2);
     assert_eq!(h.state().session.active_index(), Some(0));
-    assert!(
-        crate::shortcut_dispatch::take_log(&h.ctx).iter().all(|(_, o)| *o == crate::shortcut_dispatch::Outcome::Ran),
-        "no disabled-shortcut report"
-    );
+    assert!(crate::shortcut_dispatch::take_log(&h.ctx).iter().all(|(_, o)| *o == crate::shortcut_dispatch::Outcome::Ran), "no disabled-shortcut report");
     for (key, command) in [("Ctrl+Tab", "window.nextDocument"), ("Ctrl+Shift+Tab", "window.previousDocument")] {
         assert_eq!(crate::shortcuts::chord(h.state(), command), craft::keymap::Chord::parse(key).ok(), "{command} is bound to {key}");
     }

@@ -1,9 +1,9 @@
 use std::sync::Arc;
 
 use craft::host::{PickKind, Picked, ScriptedFiles};
+use craft::imaging::raw::RawDevelopSettings as CameraRaw;
 use craft::imaging::ui::raw_develop::RawDevelopWorkspace;
 use craft::ui::dialog::HostedWorkspace;
-use craft::imaging::raw::RawDevelopSettings as CameraRaw;
 use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
@@ -17,7 +17,6 @@ use crate::PhotocraftApp;
 fn take_queued(app: &mut PhotocraftApp) -> Option<RawOpen> {
     (!app.raw_shelf.is_empty()).then(|| app.raw_shelf.remove(0).raw)
 }
-
 
 /// One frame of the app, whose hosted dialogs show the workspace and `take` what it reports. The framework's job
 /// runtime delivers a develop only inside the app's frame.
@@ -68,7 +67,14 @@ fn settle(app: &mut PhotocraftApp) {
     }
     let d = describe(app);
     let open: Vec<_> = app.framework.dialogs.open_dialogs().into_iter().map(|d| d.key).collect();
-    panic!("the RAW Develop preview never finished: pending={} histogram={} revision={} detail={} dialogs={open:?} raw_none={}", d["previewPending"], d["histogram"].is_null(), d["previewRevision"], d["detailPending"], app.raw.is_none());
+    panic!(
+        "the RAW Develop preview never finished: pending={} histogram={} revision={} detail={} dialogs={open:?} raw_none={}",
+        d["previewPending"],
+        d["histogram"].is_null(),
+        d["previewRevision"],
+        d["detailPending"],
+        app.raw.is_none()
+    );
 }
 
 /// Done on the open raw: the request queues it and the workspace's next pass answers it, so the reply is the one the
@@ -169,7 +175,11 @@ fn worker_preview_matches_the_synchronous_render_and_ends_on_the_latest_settings
     let now = shown(&app);
     assert_eq!((now.exposure, now.highlights, now.shadows), (1.0, -60.0, 45.0));
     // PLAN: the develop `Job` cannot be run outside the runtime, so the frame is compared with a fresh dialog's develop of the same settings, not a direct `ProxyJob::run`.
-    assert_eq!(last["histogram"], single_develop_histogram(json!({"exposure": 1.0, "highlights": -60, "shadows": 45})), "the frame is a develop of the latest settings");
+    assert_eq!(
+        last["histogram"],
+        single_develop_histogram(json!({"exposure": 1.0, "highlights": -60, "shadows": 45})),
+        "the frame is a develop of the latest settings"
+    );
 }
 
 /// An older develop that lands after a newer request must not replace the frame of the newer

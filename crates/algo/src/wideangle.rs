@@ -561,10 +561,7 @@ mod tests {
         let p = wide(
             WideModel::Fisheye,
             8.0,
-            vec![
-                Constraint::new([60.0, 70.0], [420.0, 70.0], Orientation::Horizontal),
-                Constraint::new([80.0, 60.0], [80.0, 260.0], Orientation::Free),
-            ],
+            vec![Constraint::new([60.0, 70.0], [420.0, 70.0], Orientation::Horizontal), Constraint::new([80.0, 60.0], [80.0, 260.0], Orientation::Free)],
         );
         let cam = Camera::new(&p, frame);
         let before = {
@@ -604,14 +601,8 @@ mod tests {
     fn direct_solve_matches_the_dense_reference() {
         let frame = Rect::new(0, 0, 240, 160);
         for constraints in [
-            vec![
-                Constraint::new([30.0, 40.0], [210.0, 40.0], Orientation::Horizontal),
-                Constraint::new([40.0, 30.0], [45.0, 130.0], Orientation::Free),
-            ],
-            vec![
-                Constraint::new([20.0, 120.0], [220.0, 110.0], Orientation::Free),
-                Constraint::new([200.0, 20.0], [205.0, 140.0], Orientation::Vertical),
-            ],
+            vec![Constraint::new([30.0, 40.0], [210.0, 40.0], Orientation::Horizontal), Constraint::new([40.0, 30.0], [45.0, 130.0], Orientation::Free)],
+            vec![Constraint::new([20.0, 120.0], [220.0, 110.0], Orientation::Free), Constraint::new([200.0, 20.0], [205.0, 140.0], Orientation::Vertical)],
         ] {
             let p = wide(WideModel::Fisheye, 8.0, constraints);
             let mut system: Option<StaticSystem> = None;
@@ -630,7 +621,9 @@ mod tests {
     fn many_constraints_use_the_conjugate_gradient_fallback() {
         let frame = Rect::new(0, 0, 240, 160);
         let constraints: Vec<Constraint> = (0..12)
-            .map(|k| Constraint::new([20.0 + 4.0 * k as f64, 15.0 + 10.0 * k as f64], [210.0 - 3.0 * k as f64, 18.0 + 10.0 * k as f64], Orientation::Horizontal))
+            .map(|k| {
+                Constraint::new([20.0 + 4.0 * k as f64, 15.0 + 10.0 * k as f64], [210.0 - 3.0 * k as f64, 18.0 + 10.0 * k as f64], Orientation::Horizontal)
+            })
             .collect();
         let p = wide(WideModel::Fisheye, 8.0, constraints);
         let mut rows = 0;
@@ -701,10 +694,7 @@ mod tile_tests {
         let frame = Rect::new(0, 0, 772, 517);
         let mut s = Surface::new(PixelFormat::RGBA8);
         s.fill_rect(frame, &[0.2, 0.4, 0.6, 1.0]);
-        for p in [
-            WideAngle::default(),
-            wide(WideModel::Fisheye, 12.0, vec![Constraint::new([20.0, 30.0], [700.0, 35.0], Orientation::Horizontal)]),
-        ] {
+        for p in [WideAngle::default(), wide(WideModel::Fisheye, 12.0, vec![Constraint::new([20.0, 30.0], [700.0, 35.0], Orientation::Horizontal)])] {
             let out = apply(&s, frame, &p, Interp::Bilinear);
             let holes: Vec<(i32, i32)> = (80..440).flat_map(|y| (80..690).map(move |x| (x, y))).filter(|&(x, y)| out.rgba(x, y)[3] < 0.5).collect();
             let m = solve(&p, frame);

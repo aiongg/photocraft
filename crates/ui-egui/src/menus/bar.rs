@@ -6,8 +6,18 @@ use super::menu_gate;
 
 /// Mnemonic letters of the top-level menus (File F, Edit E, …). A title takes its letter only when
 /// no earlier title took it.
-pub(super) const TOP_PREFERRED: [(&str, char); 10] =
-    [("File", 'F'), ("Edit", 'E'), ("Image", 'I'), ("Layer", 'L'), ("Type", 'Y'), ("Select", 'S'), ("Filter", 'T'), ("View", 'V'), ("Window", 'W'), ("Help", 'H')];
+pub(super) const TOP_PREFERRED: [(&str, char); 10] = [
+    ("File", 'F'),
+    ("Edit", 'E'),
+    ("Image", 'I'),
+    ("Layer", 'L'),
+    ("Type", 'Y'),
+    ("Select", 'S'),
+    ("Filter", 'T'),
+    ("View", 'V'),
+    ("Window", 'W'),
+    ("Help", 'H'),
+];
 
 /// Draws the in-window menu bar over the one menu model. Picks are fired commands from
 /// `FireSource::Menu`, run by the frame's command drain; the bar's keys wait while a dialog or the

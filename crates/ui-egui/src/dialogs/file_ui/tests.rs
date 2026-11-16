@@ -1,6 +1,6 @@
+use craft::print::ui::HostedPrint;
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, HostedSaveForWeb, Resample, SAVE_PATH_KEY, WebFormat, WebSlices};
-use craft::print::ui::HostedPrint;
 
 use super::*;
 use std::sync::Arc;
@@ -56,7 +56,6 @@ fn field(f: &DialogFields, key: &str) -> Value {
 fn print_fields(app: &mut PhotocraftApp, id: DialogId) -> &mut DialogFields {
     app.framework.dialogs.get_mut_by_id::<HostedPrint>(id).expect("Print is open").fields_mut()
 }
-
 
 #[cfg(windows)]
 #[test]
@@ -464,7 +463,8 @@ fn the_printable_area_goes_only_with_a_print_to_the_printer() {
 fn print_dialog_opens_with_the_settings_remembered_from_an_earlier_session() {
     let mut app = app();
     app.session.prefs.edit(|p| {
-        p.dialogs.insert(photocraft_engine::print_cmds::REMEMBERED.into(), json!({"paper": "a5", "scale": 50, "orientation": "landscape", "intent": "perceptual"}));
+        p.dialogs
+            .insert(photocraft_engine::print_cmds::REMEMBERED.into(), json!({"paper": "a5", "scale": 50, "orientation": "landscape", "intent": "perceptual"}));
     });
     let id = open_print(&mut app);
     let f = print_fields(&mut app, id);
@@ -517,7 +517,6 @@ fn print_dialog_does_not_inherit_scripted_send_override() {
         std::fs::remove_file(out).unwrap();
     }
 }
-
 
 /// Selected Slices exports only the chosen slices: the numbers go with the parameters, nothing selected is an
 /// error, and a document without slices ignores the choice.

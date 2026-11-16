@@ -35,13 +35,7 @@ pub(super) fn dodge_burn(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<R
     let ranges = string_entries(&[("shadows", tl!("Shadows")), ("midtones", tl!("Midtones")), ("highlights", tl!("Highlights"))]);
     choose(ui, tl!("Range"), &mut o.tone_range, &ranges, true, Some(tl!("Painting Mode")));
     let exposure = number(tl!("Exposure"), &mut o.exposure, 1.0..=100.0).unit("%").tooltip(tl!("Set exposure for stroke")).show(ui).out_of_range;
-    check(
-        ui,
-        tl!("Protect Tones"),
-        &mut o.protect_tones,
-        true,
-        Some(tl!("Minimizes clipping in shadows and highlights, and keeps colors from shifting hue")),
-    );
+    check(ui, tl!("Protect Tones"), &mut o.protect_tones, true, Some(tl!("Minimizes clipping in shadows and highlights, and keeps colors from shifting hue")));
     exposure
 }
 
@@ -92,8 +86,12 @@ pub(super) fn color_replacement(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> O
     Divider::vertical().show(ui);
     let limits = string_entries(&[("discontiguous", tl!("Discontiguous")), ("contiguous", tl!("Contiguous")), ("findEdges", tl!("Find Edges"))]);
     choose(ui, tl!("Limits"), &mut o.cr_limits, &limits, true, Some(tl!("Determines the spread of replaced color")));
-    let tolerance =
-        number(tl!("Tolerance"), &mut o.cr_tolerance, 1.0..=100.0).whole().unit("%").tooltip(tl!("Tolerance for choosing related colors")).show(ui).out_of_range;
+    let tolerance = number(tl!("Tolerance"), &mut o.cr_tolerance, 1.0..=100.0)
+        .whole()
+        .unit("%")
+        .tooltip(tl!("Tolerance for choosing related colors"))
+        .show(ui)
+        .out_of_range;
     check(ui, tl!("Anti-alias"), &mut o.cr_anti_alias, true, Some(tl!("Anti-alias brush application")));
     tolerance
 }

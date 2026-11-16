@@ -219,11 +219,8 @@ struct GpuFallback;
 
 /// The Switched to CPU prompt for `reason`. Escape keeps the CPU.
 fn prompt(app: &PhotocraftApp, reason: &str) -> StandardPrompt {
-    let retry_line = if can_retry_now(app) {
-        tl!("Retry GPU tries the graphics processor again now.")
-    } else {
-        tl!("Retry GPU requires a restart. Save your work first.")
-    };
+    let retry_line =
+        if can_retry_now(app) { tl!("Retry GPU tries the graphics processor again now.") } else { tl!("Retry GPU requires a restart. Save your work first.") };
     StandardPrompt::custom(tl!("GPU acceleration could not continue. Your documents are unchanged.").to_string())
         .title(tl!("Switched to CPU rendering").to_string())
         .paragraph(tl!("PhotoCraft is using the CPU image compositor. The window may still use your graphics adapter.").to_string())

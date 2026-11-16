@@ -165,7 +165,14 @@ fn the_dialog_shows_the_size_it_will_write() {
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     super::super::park(h.state_mut(), "p.jpg".into(), false, "file.saveAs").unwrap();
     h.run_steps(1);
-    let quality = h.state().framework.dialogs.get::<HostedFormatOptions>().and_then(|d| d.json_fields()).and_then(|f| f["quality"].as_f64()).expect("the dialog has a quality") as u8;
+    let quality = h
+        .state()
+        .framework
+        .dialogs
+        .get::<HostedFormatOptions>()
+        .and_then(|d| d.json_fields())
+        .and_then(|f| f["quality"].as_f64())
+        .expect("the dialog has a quality") as u8;
     let src = Source::of(h.state_mut()).unwrap();
     *wanted.borrow_mut() = encoded_size(&src.doc, &src.settings(quality, JpegFormat::Baseline));
     let deadline = Instant::now() + Duration::from_secs(20);

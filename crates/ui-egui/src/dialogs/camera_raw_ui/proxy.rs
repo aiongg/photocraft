@@ -1,8 +1,8 @@
 #[cfg(not(target_arch = "wasm32"))]
 use super::PARALLEL_MIN_PIXELS;
 use super::open::raw_stage;
-use craft::imaging::ui::raw_develop::RawPreviewRequest;
 use craft::imaging::raw::RawDevelopSettings as CameraRaw;
+use craft::imaging::ui::raw_develop::RawPreviewRequest;
 use photocraft_algo::camera_raw::DevelopInputs;
 use photocraft_algo::histogram::RgbHistogram;
 

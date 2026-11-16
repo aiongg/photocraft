@@ -104,8 +104,10 @@ fn integer_cell_sizes_and_defaults_preserve_playback() {
 /// Skipping is explicit and reports exactly which edits were lost, preserving supported order.
 #[test]
 fn skipping_fractional_cell_sizes_reports_action_and_step() {
-    let action =
-        Action::new("Mixed Crystallize", [5.0, 5.4, 10.0, 10.25].into_iter().map(|cell_size| ActionStep::new(CRYSTALLIZE, json!({"cellSize": cell_size}))).collect());
+    let action = Action::new(
+        "Mixed Crystallize",
+        [5.0, 5.4, 10.0, 10.25].into_iter().map(|cell_size| ActionStep::new(CRYSTALLIZE, json!({"cellSize": cell_size}))).collect(),
+    );
     let error = atn_cmds::export("Crystallize", &[&action], &[], false).unwrap_err();
     assert!(error.contains("step 2 of `Mixed Crystallize`"), "{error}");
     assert!(error.contains(CRYSTALLIZE) && error.contains("skipUnsupported"), "{error}");

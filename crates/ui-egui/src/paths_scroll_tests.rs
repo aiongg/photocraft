@@ -57,5 +57,3 @@ fn scrolling_the_paths_list_does_not_move_the_footer() {
         assert!(moved || h.query_by_label("Path 1").is_none(), "{ppp}x, {height} high: the list scrolled");
     }
 }
-
-

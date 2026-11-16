@@ -94,7 +94,13 @@ fn reveal(h: &mut Harness<'_, PhotocraftApp>, label: &str) {
         }
         let list = h.query_all_by_role(egui::accesskit::Role::ListBox).last().expect("an open list").rect();
         h.hover_at(list.center());
-        h.event(Event::MouseWheel { source: egui::MouseWheelSource::Unknown, unit: egui::MouseWheelUnit::Line, delta: vec2(0.0, -3.0), phase: egui::TouchPhase::Move, modifiers: Modifiers::NONE });
+        h.event(Event::MouseWheel {
+            source: egui::MouseWheelSource::Unknown,
+            unit: egui::MouseWheelUnit::Line,
+            delta: vec2(0.0, -3.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: Modifiers::NONE,
+        });
         h.run_steps(2);
     }
     panic!("the row {label} never came into view");

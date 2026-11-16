@@ -67,10 +67,7 @@ fn history(app: &PhotocraftApp) -> usize {
 
 /// The app drawn through `dialogs::run`, as the window shows its dialogs.
 fn harness(app: PhotocraftApp, size: egui::Vec2) -> Harness<'static, PhotocraftApp> {
-    let h = Harness::builder().with_context(app.ctx().clone()).with_size(size).build_ui_state(
-        |ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui),
-        app,
-    );
+    let h = Harness::builder().with_context(app.ctx().clone()).with_size(size).build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h
 }
@@ -84,7 +81,12 @@ fn color_settings_working_spaces_list_installed_profiles_of_their_space() {
     // #6323: a press condition installed in the system can be the CMYK working space, as in
     // Photoshop's Color Settings; each working-space menu lists only profiles of its space.
     use photocraft_cms::{ColorSpace, ProfileClass};
-    let p = |path: &str, class, color_space| photocraft_engine::installed_profiles::InstalledProfile { path: path.into(), description: path.to_uppercase(), class, color_space };
+    let p = |path: &str, class, color_space| photocraft_engine::installed_profiles::InstalledProfile {
+        path: path.into(),
+        description: path.to_uppercase(),
+        class,
+        color_space,
+    };
     let installed = [
         p("gracol.icc", ProfileClass::Output, ColorSpace::Cmyk),
         p("monitor.icc", ProfileClass::Display, ColorSpace::Rgb),
@@ -778,7 +780,14 @@ fn match_color_after_source_change(change: &str) {
         let prompt = crate::dialogs::delete_layer_prompt::intercept(&mut app, command, &json!({"layer": reference_id, "__trash": true}))
             .unwrap_or_else(|| panic!("{change}: {command} asks first"))
             .unwrap();
-        let child = app.framework.dialogs.open_dialogs().into_iter().map(|dialog| dialog.id).find(|id| prompt["dialog"].as_u64() == Some(id.value())).expect("the Delete prompt is open");
+        let child = app
+            .framework
+            .dialogs
+            .open_dialogs()
+            .into_iter()
+            .map(|dialog| dialog.id)
+            .find(|id| prompt["dialog"].as_u64() == Some(id.value()))
+            .expect("the Delete prompt is open");
         assert!(ok(&mut app, child), "{change}: the nested command is confirmed");
     } else {
         let child = open(&mut app, command).unwrap_or_else(|e| panic!("{change}: {command} opens over Match Color: {e}"));
@@ -1542,7 +1551,8 @@ fn assign_profile_offers(mode: Option<&str>) -> (Vec<String>, Vec<String>) {
         options.into_iter().map(|(id, _)| id).collect::<Vec<String>>()
     };
     let offered = ids(params(&mut app, "edit.assignProfile", spec.params));
-    let accepted = ids(Param::parse_list(spec.params)).into_iter().filter(|name| app.session.execute("edit.assignProfile", json!({"profile": name})).is_ok()).collect();
+    let accepted =
+        ids(Param::parse_list(spec.params)).into_iter().filter(|name| app.session.execute("edit.assignProfile", json!({"profile": name})).is_ok()).collect();
     (offered, accepted)
 }
 

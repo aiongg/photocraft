@@ -72,7 +72,9 @@ pub fn rows(app: &PhotocraftApp) -> Vec<Param> {
         let entries: Vec<(Label, Srgba)> = shown
             .iter()
             .enumerate()
-            .map(|(i, [r, g, b])| (Label::from(format!("{i} #{r:02x}{g:02x}{b:02x}")), Srgba::rgb(f32::from(*r) / 255.0, f32::from(*g) / 255.0, f32::from(*b) / 255.0)))
+            .map(|(i, [r, g, b])| {
+                (Label::from(format!("{i} #{r:02x}{g:02x}{b:02x}")), Srgba::rgb(f32::from(*r) / 255.0, f32::from(*g) / 255.0, f32::from(*b) / 255.0))
+            })
             .collect();
         SwatchTable::new(tl!("Colors"), &entries).per_row(16).tips(true).show_all(ui).response
     })]

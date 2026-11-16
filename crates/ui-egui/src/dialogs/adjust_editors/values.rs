@@ -14,8 +14,8 @@ use craft::imaging::ui::adjust::{
 use craft::imaging::ui::curve::Curve;
 use craft::imaging::ui::histogram::ChannelColor;
 use craft::theme::Srgba;
-use photocraft_doc::adjust::{CURVE_MAP_LEN, CurvePoint, ToneSpace, curve_map, curve_map_outputs};
 use photocraft_doc::ColorMode;
+use photocraft_doc::adjust::{CURVE_MAP_LEN, CurvePoint, ToneSpace, curve_map, curve_map_outputs};
 use photocraft_engine::adjust_params::{self, HUE_RANGES};
 use photocraft_engine::channel_cmds::IsolatedCurveChannel;
 use serde_json::{Map, Value, json};
@@ -143,7 +143,8 @@ fn tone_entries(space: ToneSpace, gray: bool, isolated: Option<&IsolatedCurveCha
         entries.extend(colors.indices().filter_map(|k| keys.get(k).map(|key| (channel_of_key(key, space), k + 1))));
         return entries;
     }
-    let channel = if iso.gray.is_none() && !iso.key.is_empty() { channel_of_key(iso.key, space) } else { ToneChannel::named(iso.name.clone(), ChannelColor::Neutral) };
+    let channel =
+        if iso.gray.is_none() && !iso.key.is_empty() { channel_of_key(iso.key, space) } else { ToneChannel::named(iso.name.clone(), ChannelColor::Neutral) };
     vec![(channel, iso.hist)]
 }
 
@@ -293,7 +294,12 @@ pub fn from_params(kind: &str, params: &Value, cx: &ValueCx) -> Result<AdjustVal
         "channelMixer" => {
             let gray = flag(&v, "monochrome", false).then(|| numbers(&v, "gray", numbers(&v, "red", [0.0; 4])));
             AdjustValue::ChannelMixer {
-                value: ChannelMixer::new(numbers(&v, "red", [100.0, 0.0, 0.0, 0.0]), numbers(&v, "green", [0.0, 100.0, 0.0, 0.0]), numbers(&v, "blue", [0.0, 0.0, 100.0, 0.0]), gray),
+                value: ChannelMixer::new(
+                    numbers(&v, "red", [100.0, 0.0, 0.0, 0.0]),
+                    numbers(&v, "green", [0.0, 100.0, 0.0, 0.0]),
+                    numbers(&v, "blue", [0.0, 0.0, 100.0, 0.0]),
+                    gray,
+                ),
             }
         }
         "threshold" => AdjustValue::Threshold { level: number(&v, "level", 128.0) },
@@ -369,7 +375,11 @@ fn read_hue_saturation(v: &Value) -> HueSaturation {
 fn read_gradient_map(v: &Value) -> GradientMap {
     let source = v.get("source").filter(|s| s.is_object());
     let held = source.unwrap_or(v);
-    let mids: Vec<f32> = source.and_then(|s| s.get("midpoints")).and_then(Value::as_array).map(|a| a.iter().filter_map(|m| m.as_f64().map(|m| m as f32)).collect()).unwrap_or_default();
+    let mids: Vec<f32> = source
+        .and_then(|s| s.get("midpoints"))
+        .and_then(Value::as_array)
+        .map(|a| a.iter().filter_map(|m| m.as_f64().map(|m| m as f32)).collect())
+        .unwrap_or_default();
     let mut stops: Vec<ColorStop> = held
         .get("stops")
         .and_then(Value::as_array)
@@ -655,7 +665,8 @@ mod tests {
                 let isolated = channel_cmds::isolated_curve_channel(st).unwrap();
                 let colors = isolated.components.unwrap();
                 let space = adjust_params::default_space(st.doc.mode);
-                let hist = tone::compute_histograms(&st.doc, HistSource::Colors { layer: st.active_layer.unwrap(), colors }, space, tone::HistScope::WholeInput);
+                let hist =
+                    tone::compute_histograms(&st.doc, HistSource::Colors { layer: st.active_layer.unwrap(), colors }, space, tone::HistScope::WholeInput);
                 assert_eq!(hist.ch.len(), 1 + st.doc.pixel_format().mode.color_channels());
                 let slots = histogram_slots(space, false, Some(&isolated));
                 assert_eq!(slots.len(), tone_channels(space, false, Some(&isolated)).len());

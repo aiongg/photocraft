@@ -1,6 +1,6 @@
+use crate::app::framework::BuildApp as _;
 use egui::{Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
-use crate::app::framework::BuildApp as _;
 use serde_json::json;
 
 use super::*;

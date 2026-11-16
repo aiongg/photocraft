@@ -262,9 +262,7 @@ fn params(svg: bool) -> Vec<Param> {
     rows.push(Param::new("editor", Label::from(tr("Editor")), ParamKind::radio(options, Some("vectorCraft".to_owned()))));
     let extensions: &[&str] = if cfg!(windows) { &["exe"] } else { &[] };
     rows.push(
-        Param::new("program", Label::from(tr("Executable")), ParamKind::text(""))
-            .browse(PathKind::open_file(extensions))
-            .visible_when("editor", "program"),
+        Param::new("program", Label::from(tr("Executable")), ParamKind::text("")).browse(PathKind::open_file(extensions)).visible_when("editor", "program"),
     );
     let saved = tr(if svg {
         "Save to the opened SVG file. Each saved change becomes one undo step in PhotoCraft."
@@ -272,7 +270,9 @@ fn params(svg: bool) -> Vec<Param> {
         "Save to the opened original-format file. Each saved change becomes one undo step in PhotoCraft."
     });
     rows.push(Param::read_only_text("savedNote", Label::Empty, Label::from(saved)).full_width());
-    rows.push(Param::read_only_text("waitNote", Label::Empty, Label::from(tr("Updates wait while another document or an editing dialog is active."))).full_width());
+    rows.push(
+        Param::read_only_text("waitNote", Label::Empty, Label::from(tr("Updates wait while another document or an editing dialog is active."))).full_width(),
+    );
     rows
 }
 
@@ -284,11 +284,7 @@ fn dialog(ctx: &egui::Context, pending: &Pending, running: bool) -> HostedParamD
     HostedParamDialog::new(ctx, KEY, fields, move |fields| {
         let title = tr(if svg { "Edit SVG Smart Object" } else { "Edit Vector Smart Object" });
         let dialog = ParamDialog::new(KEY, Label::from(title), params(svg)).values(Bind::bound(fields));
-        if running {
-            dialog.extra_buttons(vec![(STOP_SYNC.to_owned(), Label::from(tr("Stop syncing this Smart Object")))])
-        } else {
-            dialog
-        }
+        if running { dialog.extra_buttons(vec![(STOP_SYNC.to_owned(), Label::from(tr("Stop syncing this Smart Object")))]) } else { dialog }
     })
 }
 

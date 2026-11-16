@@ -234,7 +234,15 @@ fn holding_space_still_pans_while_transforming() {
 fn transform_preview_stays_visible_while_panning() {
     let mut h = harness();
     begin(&mut h);
-    let texture = h.state().transform_preview.as_ref().unwrap().textures.pick(&h.ctx, craft::imaging::ui::transform_preview::PreviewTextures::choose(1.0, 1.0, false), None).expect("the preview uploads its texels").0;
+    let texture = h
+        .state()
+        .transform_preview
+        .as_ref()
+        .unwrap()
+        .textures
+        .pick(&h.ctx, craft::imaging::ui::transform_preview::PreviewTextures::choose(1.0, 1.0, false), None)
+        .expect("the preview uploads its texels")
+        .0;
     let has_preview = |h: &Harness<'static, PhotocraftApp>| {
         h.output().shapes.iter().any(|clipped| matches!(&clipped.shape, egui::epaint::Shape::Mesh(mesh) if mesh.texture_id == texture))
     };

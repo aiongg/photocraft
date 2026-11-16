@@ -1,7 +1,6 @@
 use super::*;
 use crate::{Services, menus};
 use craft::host::{Picked, ScriptedFiles};
-use std::sync::Arc;
 use craft::ui::runtime::drag::OsFile;
 use photocraft_color::{ColorMode, SampleType};
 use photocraft_doc::Document;
@@ -9,6 +8,7 @@ use photocraft_geom::Size;
 use serde_json::json;
 use std::cell::RefCell;
 use std::rc::Rc;
+use std::sync::Arc;
 
 /// Writes recorded by the fake writer: (path, bytes).
 type Written = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
@@ -1401,7 +1401,12 @@ fn views_and_windows_stay_with_their_documents() {
     // Each floating window with the index of the document it shows.
     let windows = |app: &PhotocraftApp| {
         let docs = app.session.documents();
-        app.ui.document_windows.floating.iter().map(|(group, _)| (group.id, docs.iter().position(|d| d.doc.id == group.documents[0]).unwrap())).collect::<Vec<_>>()
+        app.ui
+            .document_windows
+            .floating
+            .iter()
+            .map(|(group, _)| (group.id, docs.iter().position(|d| d.doc.id == group.documents[0]).unwrap()))
+            .collect::<Vec<_>>()
     };
     assert_eq!(app.run("document.move", json!({"document": 0, "to": 3})).unwrap(), json!({"document": 3}));
     assert_eq!(doc_names(&app), ["b.psd", "c.psd", "d.psd", "a.psd"]);
@@ -1416,7 +1421,6 @@ fn views_and_windows_stay_with_their_documents() {
     assert_eq!(zooms(&app), [2.0, 4.0, 1.0]);
     assert_eq!(windows(&app), [(made[0], 2), (made[1], 0), (made[3], 1)]);
 }
-
 
 #[test]
 fn open_documents_as_tabs_preference_controls_floating_windows() {
@@ -1939,7 +1943,10 @@ fn open_as_smart_object_dialog_opens_one_document_per_selected_file() {
 
     assert_eq!(app.session.documents().iter().map(|d| d.doc.name.as_str()).collect::<Vec<_>>(), ["one-1", "two-1"]);
     assert!(app.session.documents().iter().all(|d| d.path.is_none() && d.doc.layers.len() == 1));
-    assert!(app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.starts_with("Couldn't open bad.png")), "the unreadable file is reported");
+    assert!(
+        app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.starts_with("Couldn't open bad.png")),
+        "the unreadable file is reported"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }
 
@@ -1961,6 +1968,9 @@ fn open_as_smart_object_opens_in_the_background_in_name_order() {
     tick_until(&mut app, &ctx, |app| app.jobs.opens.is_empty());
     assert_eq!(app.session.documents().iter().map(|d| d.doc.name.as_str()).collect::<Vec<_>>(), ["one-1", "two-1"]);
     assert!(app.session.documents().iter().all(|d| d.path.is_none() && d.doc.layers.len() == 1));
-    assert!(app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.starts_with("Couldn't open bad.png")), "the unreadable file is reported");
+    assert!(
+        app.ui.notices.iter().any(|n| n.tone == craft::theme::variant::Tone::Bad && n.title.starts_with("Couldn't open bad.png")),
+        "the unreadable file is reported"
+    );
     let _ = std::fs::remove_dir_all(&dir);
 }

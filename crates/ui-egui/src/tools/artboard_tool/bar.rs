@@ -229,13 +229,7 @@ fn proposed(event: &EditEvent<Size>) -> Option<Size> {
 
 /// Applies what the bar reported: sizes edit the board (`board`) or the tool's option, a background goes to
 /// [`set_background`], and a colour request opens the picker.
-pub(crate) fn route(
-    app: &mut PhotocraftApp,
-    board: Option<LayerId>,
-    size: EditEvents<Size>,
-    background: Option<Shown>,
-    pick_color: Option<ColorRequest>,
-) {
+pub(crate) fn route(app: &mut PhotocraftApp, board: Option<LayerId>, size: EditEvents<Size>, background: Option<Shown>, pick_color: Option<ColorRequest>) {
     for event in &size {
         let Some(value) = proposed(event) else { continue };
         let (w, h) = (value.width.round(), value.height.round());

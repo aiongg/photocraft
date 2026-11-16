@@ -668,11 +668,7 @@ fn a_batch_that_fails_on_its_files_says_which_and_why() {
         app.run("file.saveACopy", json!({"path": dir.join("in").join(name).to_string_lossy()})).unwrap();
     }
     // A step for a layer that only the recording document has.
-    app.session
-        .actions
-        .list
-        .push(Action::new("Stale", vec![ActionStep::new("layer.setProps", json!({"layer": 424_242, "opacity": 50}))]))
-        .unwrap();
+    app.session.actions.list.push(Action::new("Stale", vec![ActionStep::new("layer.setProps", json!({"layer": 424_242, "opacity": 50}))])).unwrap();
     let d = open_form(&mut app, &ctx, "file.automate.batch");
     set(&mut app, &ctx, d, "input", json!(dir.join("in").to_string_lossy()));
     set(&mut app, &ctx, d, "output", json!(dir.join("out").to_string_lossy()));

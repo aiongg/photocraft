@@ -14,10 +14,8 @@ use crate::state::Tool;
 
 /// The options bar of `app`, rendered through the real host on the app's own context.
 fn bar(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder()
-        .with_size(vec2(1600.0, 200.0))
-        .with_context(app.ctx().clone())
-        .build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
+    let mut h =
+        Harness::builder().with_size(vec2(1600.0, 200.0)).with_context(app.ctx().clone()).build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
     h.run_steps(4);
     h
 }

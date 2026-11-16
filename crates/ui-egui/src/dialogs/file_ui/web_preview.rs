@@ -40,7 +40,12 @@ pub fn prepare_table(app: &PhotocraftApp, p: &mut Value) -> Result<(), String> {
     let st = app.session.active().ok_or("no document")?;
     let mut source = p.clone();
     let Some(m) = source.as_object_mut() else { return Err("invalid web settings".into()) };
-    m.retain(|k, _| matches!(k.as_str(), "preset" | "format" | "palette" | "colors" | "transparency" | "matte" | "webSnap" | "convertToSrgb" | "width" | "height" | "percent" | "resample"));
+    m.retain(|k, _| {
+        matches!(
+            k.as_str(),
+            "preset" | "format" | "palette" | "colors" | "transparency" | "matte" | "webSnap" | "convertToSrgb" | "width" | "height" | "percent" | "resample"
+        )
+    });
     let settings = WebSettings::from_params(&source, "preview").map_err(|e| e.to_string())?;
     let (w, h) = dimensions(&st.doc, &source)?;
     let scale = (2048.0 / w.max(h)).min(1.0);
@@ -53,7 +58,8 @@ pub fn prepare_table(app: &PhotocraftApp, p: &mut Value) -> Result<(), String> {
     }
     let (doc, _, _) = web_cmds::web_document(&st.doc, &proxy, &settings).map_err(|e| e.to_string())?;
     let buf = photocraft_compose::flatten(&doc);
-    let mut optimized = web_cmds::optimize(&buf.px, doc.size.width as usize, doc.bounds(), &settings, None, None, None, doc.resolution_dpi, false).map_err(|e| e.to_string())?;
+    let mut optimized = web_cmds::optimize(&buf.px, doc.size.width as usize, doc.bounds(), &settings, None, None, None, doc.resolution_dpi, false)
+        .map_err(|e| e.to_string())?;
     // Tiny transparent features may disappear in the proxy; keep room for their index.
     if settings.transparency {
         optimized.color_table.truncate(255);
@@ -105,7 +111,8 @@ pub fn optimized(
         let (px, w, h) = source()?;
         let settings = WebSettings::from_params(&base, "preview").map_err(|e| e.to_string())?;
         let encoded = Arc::new(
-            web_cmds::optimize(&px, w as usize, photocraft_geom::Rect::new(0, 0, w as i32, h as i32), &settings, None, None, None, 72.0, true).map_err(|e| e.to_string())?,
+            web_cmds::optimize(&px, w as usize, photocraft_geom::Rect::new(0, 0, w as i32, h as i32), &settings, None, None, None, 72.0, true)
+                .map_err(|e| e.to_string())?,
         );
         ctx.data_mut(|d| d.insert_temp(key, (signature, encoded.clone())));
         encoded
@@ -155,7 +162,8 @@ mod tests {
 
     #[test]
     fn absurd_dimensions_are_refused() {
-        let doc = photocraft_doc::Document::new("fixture", photocraft_geom::Size::new(100, 50), photocraft_color::ColorMode::Rgb, photocraft_color::SampleType::U8);
+        let doc =
+            photocraft_doc::Document::new("fixture", photocraft_geom::Size::new(100, 50), photocraft_color::ColorMode::Rgb, photocraft_color::SampleType::U8);
         assert!(dimensions(&doc, &json!({"percent": 1e308})).is_err());
         assert!(dimensions(&doc, &json!({"width": 1e300})).is_err());
     }

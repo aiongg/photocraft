@@ -206,4 +206,3 @@ fn background_eraser_members(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
         option_cells::range_alert(app, ui, alert);
     }
 }
-

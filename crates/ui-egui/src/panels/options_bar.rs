@@ -80,9 +80,7 @@ fn ending(app: &PhotocraftApp, tool: Tool) -> Option<Ending> {
     }
     match tool {
         Tool::Crop if crate::crop_ui::bar::commits_shown(app) => pair(End::Crop, tl!("Commit current crop operation"), tl!("Cancel current crop operation")),
-        Tool::PerspectiveCrop if crate::perspective_crop_ui::commit_shown(app) => {
-            pair(End::PerspectiveCrop, tl!("Commit"), tl!("Cancel"))
-        }
+        Tool::PerspectiveCrop if crate::perspective_crop_ui::commit_shown(app) => pair(End::PerspectiveCrop, tl!("Commit"), tl!("Cancel")),
         tool if is_type_tool(tool) && app.ui.text_edit.is_some() => pair(End::Type, tl!("Commit any current edits"), tl!("Cancel any current edits")),
         tool => crate::retouch_ui::bar::pending(app, tool).map(|p| Ending { end: End::Retouch, commit: Label::from(p.commit), cancel: Label::from(p.cancel) }),
     }
@@ -211,11 +209,8 @@ fn stamp_members(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
     // Pattern Stamp's list has Behind, greyed on the Background.
     let entries = fill::mode_entries(tool, crate::brush_mode_menu::enabled(app, crate::brush_mode_menu::Item::Behind));
     if !entries.is_empty() {
-        let current = if tool == Tool::PatternStamp && brush.behind {
-            PaintMode::Behind
-        } else {
-            PaintMode::Blend(crate::blend_keys::brush_tool_mode(tool, brush.mode))
-        };
+        let current =
+            if tool == Tool::PatternStamp && brush.behind { PaintMode::Behind } else { PaintMode::Blend(crate::blend_keys::brush_tool_mode(tool, brush.mode)) };
         let picked = labelled(ui, tl!("Mode"), |ui| fill::mode_select(Bind::given(current), &entries).show(ui));
         if let Some(mode) = picked.and_then(|shown| shown.events.value().cloned()) {
             let mut after = brush.clone();

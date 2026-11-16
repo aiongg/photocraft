@@ -48,7 +48,8 @@ pub(super) fn brush_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         app.ui.brush_section = 0;
     }
     let rows = sections(&mut brush);
-    let can_update = app.session.tools.current_preset.as_deref().is_some_and(|name| app.session.tools.presets.iter().any(|p| p.name.eq_ignore_ascii_case(name)));
+    let can_update =
+        app.session.tools.current_preset.as_deref().is_some_and(|name| app.session.tools.presets.iter().any(|p| p.name.eq_ignore_ascii_case(name)));
     let strip = BrushStrokeStrip::new(
         tl!("Stroke preview"),
         Revision::of(&(brush_preview::preview_sig(&before), text)),

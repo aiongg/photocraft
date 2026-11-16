@@ -82,7 +82,10 @@ pub(super) fn arrange(app: &mut PhotocraftApp, k: &str, p: &Value) -> Result<Val
 /// zoom apart.
 fn keep_own_view(app: &mut PhotocraftApp) {
     let Some((group, _)) = app.ui.document_windows.floating.last() else { return };
-    let Some(view) = group.documents.first().and_then(|doc| crate::canvas::tabs::document_index(app, *doc)).and_then(|doc| app.ui.views.get(doc)).cloned() else { return };
+    let Some(view) = group.documents.first().and_then(|doc| crate::canvas::tabs::document_index(app, *doc)).and_then(|doc| app.ui.views.get(doc)).cloned()
+    else {
+        return;
+    };
     app.ui.window_views.insert(group.id, view);
 }
 

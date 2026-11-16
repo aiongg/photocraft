@@ -148,11 +148,7 @@ fn expand_layer_group_on_click_switches_the_opening_of_closed_parent_groups() {
         crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Down { x: 12.0, y: 12.0, pressure: 1.0 }, egui::Modifiers::default());
         crate::canvas::tool_event(&mut app, crate::canvas::ToolEvent::Up { x: 12.0, y: 12.0 }, egui::Modifiers::default());
         // The row is still revealed (scrolled to) either way.
-        assert_eq!(
-            track(&mut app),
-            Some((inner, if on { Groups::Open } else { Groups::Keep })),
-            "Expand layer group on click = {on}"
-        );
+        assert_eq!(track(&mut app), Some((inner, if on { Groups::Open } else { Groups::Keep })), "Expand layer group on click = {on}");
     }
 }
 
@@ -226,11 +222,7 @@ fn expand_layer_group_on_click_governs_a_ctrl_click_pick_of_a_position_locked_la
         app.session.execute("layer.setProps", json!({"layer": inner.0, "locks": {"position": true}})).unwrap();
         ctrl_click(&mut app);
         assert_eq!(app.session.active().unwrap().active_layer, Some(inner), "the Ctrl-click picked the locked layer (on = {on})");
-        assert_eq!(
-            track(&mut app),
-            Some((inner, if on { Groups::Open } else { Groups::Keep })),
-            "Expand layer group on click = {on}"
-        );
+        assert_eq!(track(&mut app), Some((inner, if on { Groups::Open } else { Groups::Keep })), "Expand layer group on click = {on}");
     }
 }
 

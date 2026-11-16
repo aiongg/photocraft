@@ -756,9 +756,7 @@ fn invoke_view_command(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, p
             let at = params.get("at").and_then(Value::as_array).and_then(|array| Some([array.first()?.as_f64()?, array.get(1)?.as_f64()?]));
             Some(crate::transform_tool::split(app, id, at).map(|_| transform_reply(app)))
         }
-        "edit.transform.warpGrid"
-            if app.ui.transform.as_ref().is_some_and(|transform| transform.session.warp().is_some()) && params.get("warp").is_none() =>
-        {
+        "edit.transform.warpGrid" if app.ui.transform.as_ref().is_some_and(|transform| transform.session.warp().is_some()) && params.get("warp").is_none() => {
             Some(crate::transform_tool::edit_session_warp(app, id, params).map(|_| transform_reply(app)))
         }
         sz if crate::sizing::is_sizing(sz) && params.as_object().is_none_or(|object| object.is_empty()) => {

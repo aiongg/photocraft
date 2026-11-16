@@ -110,7 +110,6 @@ fn checkmark(h: &mut H) {
 /// A font chosen for a range commits by the check mark and by `commit`, keeping styles and pixels.
 #[test]
 fn selected_fonts_commit() {
-
     for pattern in 0..4 {
         {
             for range in [[2, 4], [4, 2], [0, 6]] {

@@ -1675,7 +1675,10 @@ fn step_commands_and_bad_params_fail_gracefully() {
         assert!(s.execute(PHOTOSHOP_STEP, p.clone()).is_err(), "{p}");
     }
     // A Photoshop step with a damaged descriptor is left out of a save rather than crashing it.
-    s.actions.list.push(Action::new("Broken", vec![ActionStep::new(PHOTOSHOP_STEP, json!({"event": "GsnB", "name": "Blur", "descriptor": b64(b"\x00\x00\x00")}))])).unwrap();
+    s.actions
+        .list
+        .push(Action::new("Broken", vec![ActionStep::new(PHOTOSHOP_STEP, json!({"event": "GsnB", "name": "Blur", "descriptor": b64(b"\x00\x00\x00")}))]))
+        .unwrap();
     assert!(s.execute("actions.save", json!({"action": "Broken"})).is_err());
     assert_eq!(s.execute("actions.save", json!({"action": "Broken", "skipUnsupported": true})).unwrap()["skipped"].as_array().unwrap().len(), 1);
 }
@@ -3542,7 +3545,10 @@ fn select_rect_modes_export_without_becoming_replace() {
     s.execute("file.new", json!({"width": 8, "height": 8})).unwrap();
 
     // Default or "replace" mode succeeds
-    s.actions.list.push(Action::new("ReplaceAct", vec![ActionStep::new("select.rect", json!({"x": 4, "y": 4, "width": 2, "height": 2, "mode": "replace"}))])).unwrap();
+    s.actions
+        .list
+        .push(Action::new("ReplaceAct", vec![ActionStep::new("select.rect", json!({"x": 4, "y": 4, "width": 2, "height": 2, "mode": "replace"}))]))
+        .unwrap();
     let saved = s.execute("actions.save", json!({"action": "ReplaceAct"})).unwrap();
     assert_eq!(saved["steps"], 1);
 
@@ -3573,25 +3579,32 @@ fn radial_blur_off_center_strict_export_refuses_silent_recentering() {
     s.execute("file.new", json!({"width": 16, "height": 16})).unwrap();
 
     // Default center (omitted) exports successfully
-    s.actions.list.push(Action::new("DefaultCenter", vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good"}))])).unwrap();
+    s.actions
+        .list
+        .push(Action::new("DefaultCenter", vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good"}))]))
+        .unwrap();
     let saved = s.execute("actions.save", json!({"action": "DefaultCenter"})).unwrap();
     assert_eq!(saved["steps"], 1);
 
     // Explicit (0.5, 0.5) center also exports successfully
-    s.actions.list.push(Action::new(
-        "ExplicitDefaultCenter",
-        vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good", "centerX": 0.5, "centerY": 0.5}))],
-    ))
-    .unwrap();
+    s.actions
+        .list
+        .push(Action::new(
+            "ExplicitDefaultCenter",
+            vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good", "centerX": 0.5, "centerY": 0.5}))],
+        ))
+        .unwrap();
     let saved_exp = s.execute("actions.save", json!({"action": "ExplicitDefaultCenter"})).unwrap();
     assert_eq!(saved_exp["steps"], 1);
 
     // Off-center radial blur cannot be silently recentered in strict export
-    s.actions.list.push(Action::new(
-        "OffCenter",
-        vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good", "centerX": 0.1, "centerY": 0.2}))],
-    ))
-    .unwrap();
+    s.actions
+        .list
+        .push(Action::new(
+            "OffCenter",
+            vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good", "centerX": 0.1, "centerY": 0.2}))],
+        ))
+        .unwrap();
     let before_actions = s.actions.list.actions().to_vec();
     let err = s.execute("actions.save", json!({"action": "OffCenter"}));
     assert!(err.is_err(), "strict export must reject off-center radial blur rather than silently recentering it");
@@ -3605,7 +3618,10 @@ fn radial_blur_off_center_strict_export_refuses_silent_recentering() {
     // Radial blur targeting a mask must not export as a plain filter that edits pixels
     s.actions
         .list
-        .push(Action::new("MaskTarget", vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good", "target": "mask"}))]))
+        .push(Action::new(
+            "MaskTarget",
+            vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good", "target": "mask"}))],
+        ))
         .unwrap();
     let before_actions = s.actions.list.actions().to_vec();
     let err_mask = s.execute("actions.save", json!({"action": "MaskTarget"}));
@@ -3617,11 +3633,13 @@ fn radial_blur_off_center_strict_export_refuses_silent_recentering() {
     assert_eq!(skipped_mask["skipped"][0]["id"], "filter.blur.radialBlur");
 
     // Explicit pixels target exports successfully
-    s.actions.list.push(Action::new(
-        "PixelsTarget",
-        vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good", "target": "pixels"}))],
-    ))
-    .unwrap();
+    s.actions
+        .list
+        .push(Action::new(
+            "PixelsTarget",
+            vec![ActionStep::new("filter.blur.radialBlur", json!({"amount": 50, "method": "spin", "quality": "good", "target": "pixels"}))],
+        ))
+        .unwrap();
     let saved_pixels = s.execute("actions.save", json!({"action": "PixelsTarget"})).unwrap();
     assert_eq!(saved_pixels["steps"], 1);
 }
@@ -3640,7 +3658,8 @@ fn crop_with_output_size_or_resolution_is_not_exported_as_plain_crop() {
         let (_, skipped) = export("Audit", &[&sized], &[], true).unwrap();
         assert_eq!(skipped, vec![Skipped { action: "Probe".into(), step: 0, id: "image.crop".into() }]);
     }
-    let plain = Action { name: "Plain".into(), steps: vec![ActionStep::new("image.crop", json!({"x": 1, "y": 1, "width": 4, "height": 3}))], ..Default::default() };
+    let plain =
+        Action { name: "Plain".into(), steps: vec![ActionStep::new("image.crop", json!({"x": 1, "y": 1, "width": 4, "height": 3}))], ..Default::default() };
     let (bytes, skipped) = export("Audit", &[&plain], &[], false).unwrap();
     assert!(skipped.is_empty());
     let imported = import(&bytes).unwrap();
@@ -3881,7 +3900,7 @@ fn loaded_camera_raw_filter_steps_save_back_unchanged() {
     let mut edited = recorded.clone();
     edited.params["exposure"] = json!(1.5);
     s.actions.list.replace_step(0, 0, edited).unwrap();
-    let e =s.execute("actions.save", json!({"action": "A"})).unwrap_err().to_string();
+    let e = s.execute("actions.save", json!({"action": "A"})).unwrap_err().to_string();
     assert!(e.contains("filter.cameraRaw"), "{e}");
     // Recorded by PhotoCraft: no descriptor to write back.
     let mut plain = recorded;
@@ -4846,7 +4865,10 @@ fn mapped_adjustment_label_survives_export() {
         .with("null", class_ref("AdjL"))
         .with("Usng", D::Descriptor(desc("AdjL").with("Type", D::Descriptor(desc("Invr"))).with("Clr ", enm("Clr ", "Rd  "))));
     let loaded = mapped_recording("Mk  ", d);
-    assert_eq!(loaded.actions[0].steps, vec![ActionStep::new("layer.newAdjustmentLayer.invert", json!({})), ActionStep::new("layer.setLabelColor", json!({"color":"red"}))]);
+    assert_eq!(
+        loaded.actions[0].steps,
+        vec![ActionStep::new("layer.newAdjustmentLayer.invert", json!({})), ActionStep::new("layer.setLabelColor", json!({"color":"red"}))]
+    );
     let (bytes, _) = export("Labels", &[&loaded.actions[0]], &[], false).unwrap();
     assert_eq!(import(&bytes).unwrap().actions[0].steps, loaded.actions[0].steps);
     let mut s = Session::new();
@@ -6235,7 +6257,8 @@ fn pattern_fill_ids_beat_names_across_document_and_library() {
 /// that name, rather than a step with no pattern (which plays the current one).
 #[test]
 fn pattern_steps_named_only_by_pattern_name_export_the_name() {
-    let one = Action { name: "P".into(), steps: vec![ActionStep::new("layer.newFillLayer.pattern", json!({"patternName": "Checkerboard"}))], ..Default::default() };
+    let one =
+        Action { name: "P".into(), steps: vec![ActionStep::new("layer.newFillLayer.pattern", json!({"patternName": "Checkerboard"}))], ..Default::default() };
     let (bytes, skipped) = export("Pat", &[&one], &[], false).unwrap();
     assert!(skipped.is_empty());
     let steps = import(&bytes).unwrap().actions[0].steps.clone();

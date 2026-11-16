@@ -139,7 +139,8 @@ fn preview_matches_the_canonical_deformation_and_the_committed_layer() {
             }
             assert_eq!(mesh.order, canonical_order.iter().map(|&t| t as u32).collect::<Vec<_>>());
             // The engine's interpolation isolates geometry from GPU texture sampling.
-            let expected = render(&s.solver.surface, s.solver.bounds, &s.solver.puppet_mesh, &canonical, &canonical_order, photocraft_algo::transform::Interp::Bicubic);
+            let expected =
+                render(&s.solver.surface, s.solver.bounds, &s.solver.puppet_mesh, &canonical, &canonical_order, photocraft_algo::transform::Interp::Bicubic);
             let layer = s.layer;
             let past = past_len(&app);
             commit(&mut app);

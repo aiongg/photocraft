@@ -80,15 +80,8 @@ fn picking_a_preset_sets_the_selected_layers_and_the_tool_default_in_one_step() 
     let mut app = new_app();
     let id = add_layer(&mut app, 12.0);
     app.run("layer.select", json!({"layer": id.0, "mode": "replace"})).unwrap();
-    app.ui.text_edit = Some(crate::state::TextEdit {
-        layer: id.0,
-        document: None,
-        caret: 3,
-        anchor: 1,
-        session: "size-presets".into(),
-        created: false,
-        mask: false,
-    });
+    app.ui.text_edit =
+        Some(crate::state::TextEdit { layer: id.0, document: None, caret: 3, anchor: 1, session: "size-presets".into(), created: false, mask: false });
     let mut h = harness(app);
     pick(&mut h, "48 pt");
     // "A" is one byte, "éB" three, "CD" two.

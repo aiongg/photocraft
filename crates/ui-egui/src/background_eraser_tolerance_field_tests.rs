@@ -32,13 +32,7 @@ fn bar(tool: Tool) -> Harness<'static, PhotocraftApp> {
 
 /// The messages of the open framework alerts.
 fn alerts(h: &Harness<'static, PhotocraftApp>) -> Vec<String> {
-    h.state()
-        .framework
-        .dialogs
-        .open_dialogs()
-        .iter()
-        .filter_map(|d| d.fields.as_ref()?.get("message")?.as_str().map(str::to_string))
-        .collect()
+    h.state().framework.dialogs.open_dialogs().iter().filter_map(|d| d.fields.as_ref()?.get("message")?.as_str().map(str::to_string)).collect()
 }
 
 /// Types `text` into the number field named `name` and commits it with Enter.
@@ -113,4 +107,3 @@ fn angle_and_pressure_are_the_background_erasers_own() {
     let brush = &h.state().session.tools.brush;
     assert_eq!((brush.angle, brush.pressure_size), (30.0, true), "the Background Eraser keeps its own");
 }
-

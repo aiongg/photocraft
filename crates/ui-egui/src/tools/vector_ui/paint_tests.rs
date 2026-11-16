@@ -7,7 +7,10 @@ use craft::draw::ui::shape::VectorMode;
 use craft::keymap::Mods;
 use craft::theme::Srgba;
 use egui::{Event, Key, Modifiers};
-use egui_kittest::{Harness, kittest::{NodeT, Queryable}};
+use egui_kittest::{
+    Harness,
+    kittest::{NodeT, Queryable},
+};
 use photocraft_doc::ShapeLayer;
 
 fn app(mode: &str, depth: u32) -> PhotocraftApp {
@@ -226,7 +229,7 @@ fn zero_width_style_can_be_inspected_removed_or_reenabled_explicitly() {
 
         stroke_style_button(&mut h).click();
         h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
+        h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
         h.run_steps(3);
         let stroke = shape(h.state()).stroke.as_ref().unwrap();
         assert_eq!(stroke.width, 3.0, "a deliberate style choice enables the dormant stroke");
@@ -661,7 +664,7 @@ fn width_and_stroke_type_give_a_strokeless_shape_the_tool_stroke_gradient() {
         } else {
             stroke_style_button(&mut h).click();
             h.run_steps(3);
-    h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
+            h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
             h.run_steps(3);
         }
         let stroke = shape(h.state()).stroke.clone().expect("a stroke");

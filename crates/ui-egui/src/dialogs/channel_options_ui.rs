@@ -142,7 +142,13 @@ fn rows(kind: Kind, spot: bool) -> Vec<Param> {
     }
     rows.push(color);
     let solid = ink || spot;
-    let (key, label) = if ink { ("solidity", tl!("Solidity:")) } else if spot { ("opacity", tl!("Solidity:")) } else { ("opacity", tl!("Opacity:")) };
+    let (key, label) = if ink {
+        ("solidity", tl!("Solidity:"))
+    } else if spot {
+        ("opacity", tl!("Solidity:"))
+    } else {
+        ("opacity", tl!("Opacity:"))
+    };
     rows.push(Param::new(key, label, ParamKind::number(Some(0.0), Some(100.0), if solid { 0.0 } else { 50.0 }, 1.0, 0)));
     rows
 }

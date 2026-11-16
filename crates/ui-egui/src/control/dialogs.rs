@@ -23,17 +23,11 @@ pub(crate) const KINDS: &[(&str, Opener)] = &[
     ("newDocument", |app, _, _| Ok(crate::new_doc_ui::open(app))),
     ("about", open_about),
     ("colorPicker", open_color_picker),
-    ("layerStyle", |app, _, p| {
-        crate::layer_style::open(app, p.get("effect").and_then(Value::as_str)).ok_or_else(|| "no active layer".to_string())
-    }),
+    ("layerStyle", |app, _, p| crate::layer_style::open(app, p.get("effect").and_then(Value::as_str)).ok_or_else(|| "no active layer".to_string())),
     ("newCropPreset", |app, _, _| {
-
         crate::crop_presets::open_new(app).ok_or_else(|| "nothing to save: set W and H (W x H x Resolution) or a ratio first".to_string())
     }),
-    ("deleteCropPreset", |app, _, _| {
-
-        crate::crop_presets::open_delete(app).ok_or_else(|| "no crop presets are saved".to_string())
-    }),
+    ("deleteCropPreset", |app, _, _| crate::crop_presets::open_delete(app).ok_or_else(|| "no crop presets are saved".to_string())),
     ("command", |app, _, p| {
         let Some(cmd) = p.get("command").and_then(Value::as_str) else { return Err("command dialogs need `command`".into()) };
         let label = photocraft_engine::commands::find(cmd).map(|c| c.label).unwrap_or(cmd);
@@ -155,7 +149,6 @@ fn is_prompt<T: std::any::Any>(app: &PhotocraftApp, id: DialogId) -> bool {
 }
 
 fn is_unsaved(app: &PhotocraftApp, id: DialogId) -> bool {
-
     host(app).get_by_id::<craft::ui::dialog::UnsavedChangesDialog>(id).is_some()
 }
 
@@ -165,7 +158,6 @@ pub(crate) fn is_save_answer(app: &PhotocraftApp, id: DialogId) -> bool {
 }
 
 fn is_profile(app: &PhotocraftApp, id: DialogId) -> bool {
-
     host(app).get_by_id::<craft::color::ui::ProfileMismatchDialog>(id).is_some()
 }
 
@@ -268,7 +260,13 @@ pub(crate) const FIELD_KEYS: &[FieldKey] = &[
     FieldKey { which: Which::Is(is_unsaved), from: "choice", to: "choice", values: &[], with: None },
     FieldKey { which: Which::Is(is_unsaved), from: "choice", to: "choice", values: &[("saveAll", "save")], with: Some(save_all) },
     FieldKey { which: Which::Is(is_unsaved), from: "choice", to: "choice", values: &[("dontSaveAll", "dontSave")], with: Some(dont_save_all) },
-    FieldKey { which: Which::Is(is_profile), from: "action", to: "action", values: &[("preserve", "useEmbedded"), ("convert", "convertToWorking"), ("discard", "discard")], with: None },
+    FieldKey {
+        which: Which::Is(is_profile),
+        from: "action",
+        to: "action",
+        values: &[("preserve", "useEmbedded"), ("convert", "convertToWorking"), ("discard", "discard")],
+        with: None,
+    },
     FieldKey { which: Which::Is(is_color_picker), from: "webOnly", to: "webColors", values: &[], with: None },
     FieldKey { which: Which::Key("edit.fill"), from: "mode", to: "mode", values: &[], with: Some(mode_row) },
     FieldKey { which: Which::Key("edit.stroke"), from: "mode", to: "mode", values: &[], with: Some(mode_row) },
@@ -297,9 +295,14 @@ pub(crate) fn map_request(app: &PhotocraftApp, id: DialogId, field: &str, value:
         };
         // A row with `with` and a plain row for one prompt (the unsaved prompt) are told apart by the value.
         let fits = row.with.is_none() || row.values.is_empty() || value.as_str().is_some_and(|v| row.values.iter().any(|(from, _)| *from == v));
-        let plain_shadowed = row.with.is_none() && row.values.is_empty() && FIELD_KEYS.iter().any(|r| {
-            r.from == field && r.with.is_some() && matches!((r.which, row.which), (Which::Is(a), Which::Is(b)) if a as usize == b as usize) && value.as_str().is_some_and(|v| r.values.iter().any(|(from, _)| *from == v))
-        });
+        let plain_shadowed = row.with.is_none()
+            && row.values.is_empty()
+            && FIELD_KEYS.iter().any(|r| {
+                r.from == field
+                    && r.with.is_some()
+                    && matches!((r.which, row.which), (Which::Is(a), Which::Is(b)) if a as usize == b as usize)
+                    && value.as_str().is_some_and(|v| r.values.iter().any(|(from, _)| *from == v))
+            });
         if !hit || row.from != field || !fits || plain_shadowed {
             continue;
         }
@@ -339,7 +342,8 @@ fn command_of(app: &PhotocraftApp, id: DialogId, choice: &str) -> Option<(String
 /// engine command or a shell one such as `file.save`). Automation is judged for it when the dialog is confirmed.
 pub(crate) fn hosted_command(app: &PhotocraftApp, id: DialogId) -> Option<(String, Value)> {
     let key = key_of(app, id)?;
-    (host(app).get_by_id::<craft::ui::patterns::form_dialogs::HostedParamDialog>(id).is_some() && crate::menus::is_live(&key)).then(|| (key, fields_of(app, id)))
+    (host(app).get_by_id::<craft::ui::patterns::form_dialogs::HostedParamDialog>(id).is_some() && crate::menus::is_live(&key))
+        .then(|| (key, fields_of(app, id)))
 }
 
 // ---- ui.dialog.* ----
@@ -384,7 +388,11 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value) ->
     let value = p.get("value").cloned().unwrap_or(Value::Null);
     // An adjustment dialog's address (`target`, `layer`, `document`) is not one of its fields: it retargets the dialog.
     if matches!(field, "target" | "layer" | "document") && app.adjust_open.as_ref().is_some_and(|open| open.id == id) {
-        return if crate::adjust_dialog::apply_params(app, id, &json!({ field: value })) { ok(Value::Null) } else { err(format!("the dialog refused `{field}`")) };
+        return if crate::adjust_dialog::apply_params(app, id, &json!({ field: value })) {
+            ok(Value::Null)
+        } else {
+            err(format!("the dialog refused `{field}`"))
+        };
     }
     for (field, value) in map_request(app, id, field, value) {
         if let Err(e) = app.framework.dialogs.set_json_field(ctx, id, &field, value) {
@@ -422,11 +430,7 @@ fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value
     let unsaved = is_unsaved(app, id);
     super::run_waiting(app, wait_param(p), |app| {
         crate::dialogs::confirm(app, ctx, id)?;
-        Ok(if unsaved {
-            json!({"open": app.discard.is_some(), "fileDialog": app.file_dialog_open()})
-        } else {
-            Value::Null
-        })
+        Ok(if unsaved { json!({"open": app.discard.is_some(), "fileDialog": app.file_dialog_open()}) } else { Value::Null })
     })
 }
 

@@ -50,18 +50,18 @@ pub mod mask_thumbs_ui;
 mod navigator;
 pub(crate) mod options_bar;
 pub(super) mod panel_docking;
-pub(crate) mod rail_commands;
 pub(crate) mod preset_browser;
 pub mod preset_panels;
 mod properties;
+pub(crate) mod rail_commands;
 pub(crate) mod registry;
 pub mod smart_ui;
 mod status_bar;
 pub mod swatches_ui;
 pub(super) mod timeline_ui;
 pub(crate) mod title_bar;
-pub(crate) mod toolbar;
 pub(crate) mod tool_commands;
+pub(crate) mod toolbar;
 pub mod type_panels_ui;
 pub(super) mod variables_ui;
 
@@ -74,9 +74,9 @@ pub(crate) use layers_tree::listed_filter;
 pub use options_bar::options_bar;
 pub use status_bar::status_bar;
 pub use title_bar::{title_bar, window_title};
+pub use toolbar::toolbar;
 #[cfg(test)]
 use toolbar::{TOOL_SECTIONS, color_chips};
-pub use toolbar::toolbar;
 
 /// Photoshop's Shift+Alt letter position of blend mode `m`; `None` for the modes without a letter (Darker Color,
 /// Lighter Color, Subtract, Divide) and for PhotoCraft's own extra modes.
@@ -144,7 +144,10 @@ mod swatch_type_tests {
         let fg = app.session.tools.foreground;
         app.ui.tool = Tool::Type;
         app.ui.text_edit = Some(crate::state::TextEdit { layer: id, document: None, caret: 0, anchor: 5, session: "s".into(), created: false, mask: false });
-        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(300.0, 300.0)).build_ui_state(|ui, app: &mut PhotocraftApp| crate::panels::color::panel(app, ui), app);
+        let mut h = Harness::builder()
+            .with_context(app.ctx().clone())
+            .with_size(vec2(300.0, 300.0))
+            .build_ui_state(|ui, app: &mut PhotocraftApp| crate::panels::color::panel(app, ui), app);
         h.run_steps(4);
         assert_eq!(h.state().session.tools.foreground, fg);
         let st = h.state().session.active().unwrap();
@@ -164,4 +167,3 @@ mod mask_properties_tests;
 
 #[cfg(test)]
 mod history_panel_select_tests;
-

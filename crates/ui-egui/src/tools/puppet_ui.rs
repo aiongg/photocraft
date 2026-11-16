@@ -351,11 +351,7 @@ pub fn canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, at: egui::Rect) {
     let Some(s) = app.distort.puppet.as_ref() else { return };
     let b = s.bounds;
     let source = DocRect::new(f64::from(b.x0), f64::from(b.y0), f64::from(b.x1), f64::from(b.y1));
-    TransformPreview::new("Moving layer", &s.textures)
-        .map(PreviewMap::pins(s.solver.mesh(), source))
-        .opacity(s.opacity)
-        .clip(size)
-        .show_at(ui, at);
+    TransformPreview::new("Moving layer", &s.textures).map(PreviewMap::pins(s.solver.mesh(), source)).opacity(s.opacity).clip(size).show_at(ui, at);
     let output = PinWarp::new("Pins", Bind::given(s.warp.pins().to_vec()), s.solver.mesh())
         .selected_pins(s.warp.selected())
         .show_mesh(s.warp.show_mesh())

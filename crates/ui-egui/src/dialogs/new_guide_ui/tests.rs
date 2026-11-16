@@ -1,6 +1,6 @@
 use craft::ui::dialog::StackDialog;
-use egui_kittest::kittest::Queryable;
 use egui_kittest::Harness;
+use egui_kittest::kittest::Queryable;
 use serde_json::json;
 
 use super::*;

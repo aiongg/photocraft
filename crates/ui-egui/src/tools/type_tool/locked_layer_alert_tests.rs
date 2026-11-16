@@ -40,7 +40,6 @@ fn history_len(app: &PhotocraftApp) -> usize {
     app.session.active().unwrap().history.past_len()
 }
 
-
 /// A press and release of the primary button at `at` through the canvas's tool events.
 fn click(app: &mut PhotocraftApp, (x, y): (f64, f64)) {
     tool_click(app, x, y, egui::Modifiers::NONE);

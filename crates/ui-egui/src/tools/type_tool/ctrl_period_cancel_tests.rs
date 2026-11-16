@@ -22,7 +22,6 @@ fn new_app(tool: Tool) -> PhotocraftApp {
     app
 }
 
-
 fn press(mut app: PhotocraftApp, k: egui::Key, modifiers: Modifiers) -> PhotocraftApp {
     crate::canvas::testing::key(&mut app, k, modifiers);
     app

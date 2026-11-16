@@ -20,7 +20,8 @@ fn session() -> Session {
 #[test]
 fn action_copies_follow_the_source_without_retargeting_calls_or_function_keys() {
     let mut s = session();
-    let mut source = Action::new("Source", vec![ActionStep::new("actions.play", json!({"action": 1})), ActionStep::new("layer.select", json!({"layer": "Photo"}))]);
+    let mut source =
+        Action::new("Source", vec![ActionStep::new("actions.play", json!({"action": 1})), ActionStep::new("layer.select", json!({"layer": "Photo"}))]);
     source.disabled.insert(1);
     source.dialogs.insert(0);
     source.set = Some("Retouch".into());
@@ -74,7 +75,10 @@ fn action_copies_follow_the_source_without_retargeting_calls_or_function_keys() 
 fn step_copies_preserve_payloads_and_shift_both_flag_columns() {
     let mut s = session();
     let payload = json!({"layer": "Photo", "_actionLayer": {"name": "Photo", "ordinal": 2}});
-    let mut a = Action::new("Steps", vec![ActionStep::new("layer.select", payload.clone()), ActionStep::new("select.all", Value::Null), ActionStep::new("select.deselect", json!({}))]);
+    let mut a = Action::new(
+        "Steps",
+        vec![ActionStep::new("layer.select", payload.clone()), ActionStep::new("select.all", Value::Null), ActionStep::new("select.deselect", json!({}))],
+    );
     a.disabled.extend([0, 2]);
     a.dialogs.extend([0, 1]);
     s.actions.list.push(a).unwrap();

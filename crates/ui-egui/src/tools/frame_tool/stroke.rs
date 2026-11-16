@@ -1,8 +1,8 @@
 //! The frame's stroke cells: the check box, colour well, width and alignment shared by the options bar and the
 //! Properties section, and the stroke's JSON for the engine.
 
-use craft::color::ui::{ColorPopover, PickedColor};
 use craft::behavior::EditEvents;
+use craft::color::ui::{ColorPopover, PickedColor};
 use craft::theme::Srgba;
 use craft::ui::choice::Checkbox;
 use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};
@@ -67,10 +67,8 @@ pub(super) fn cells(ui: &mut Ui, value: &mut Option<ShapeStroke>, key: &str) -> 
         _ => Color::BLACK,
     };
     let [r, g, b] = color.to_rgb();
-    let well = ColorPopover::new(tl!("Stroke Color"), Bind::given(PickedColor::rgb(Srgba::new(r, g, b, color.alpha))))
-        .picker(|p| p.alpha(true))
-        .show(ui)
-        .events;
+    let well =
+        ColorPopover::new(tl!("Stroke Color"), Bind::given(PickedColor::rgb(Srgba::new(r, g, b, color.alpha)))).picker(|p| p.alpha(true)).show(ui).events;
     if let Some((picked, c)) = land(key, &well) {
         let p = picked.color;
         s.paint = Fill::Solid(Color::rgba(p.r, p.g, p.b, p.a));
@@ -79,12 +77,7 @@ pub(super) fn cells(ui: &mut Ui, value: &mut Option<ShapeStroke>, key: &str) -> 
 
     let width = Field::new(tl!("Stroke:"))
         .show(ui, |ui, _| {
-            NumberField::new(tl!("Stroke:"), Bind::given(Some(f64::from(s.width))))
-                .range(0.0..=1000.0)
-                .unit_kind(UnitKind::Pixels)
-                .show(ui)
-                .edit
-                .events
+            NumberField::new(tl!("Stroke:"), Bind::given(Some(f64::from(s.width)))).range(0.0..=1000.0).unit_kind(UnitKind::Pixels).show(ui).edit.events
         })
         .inner
         .unwrap_or_default();
@@ -93,11 +86,8 @@ pub(super) fn cells(ui: &mut Ui, value: &mut Option<ShapeStroke>, key: &str) -> 
         change = Some(c);
     }
 
-    let aligns = [
-        Entry::new(StrokeAlign::Inside, tl!("Inside")),
-        Entry::new(StrokeAlign::Center, tl!("Center")),
-        Entry::new(StrokeAlign::Outside, tl!("Outside")),
-    ];
+    let aligns =
+        [Entry::new(StrokeAlign::Inside, tl!("Inside")), Entry::new(StrokeAlign::Center, tl!("Center")), Entry::new(StrokeAlign::Outside, tl!("Outside"))];
     let picked = Select::new(tl!("Align"), Bind::given(s.align), &aligns).show(ui).events;
     if let Some((align, c)) = land(key, &picked) {
         s.align = align;

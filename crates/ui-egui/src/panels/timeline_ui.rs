@@ -45,11 +45,7 @@ impl TimelineUi {
 /// Stops playback with the playhead at the frame the active document shows. For a stop that comes from outside
 /// the body (the panel closing), where no frame time is at hand.
 pub(crate) fn stop(app: &mut PhotocraftApp) {
-    let at = app
-        .session
-        .active()
-        .and_then(|d| d.doc.timeline.as_ref())
-        .map_or(Tick(0), |tl| FrameRate::from_f64(f64::from(tl.fps)).tick_of(tl.current as i64));
+    let at = app.session.active().and_then(|d| d.doc.timeline.as_ref()).map_or(Tick(0), |tl| FrameRate::from_f64(f64::from(tl.fps)).tick_of(tl.current as i64));
     app.ui.timeline.clock.halt(at);
 }
 
@@ -188,7 +184,8 @@ mod tests {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 100, "height": 80})).unwrap();
         app.run("timeline.create", json!({"duration": 10, "fps": 30.0})).unwrap();
-        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).with_step_dt(0.001).build_ui_state(|ui, app| body(app, ui), app);
+        let mut h =
+            Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1000.0, 700.0)).with_step_dt(0.001).build_ui_state(|ui, app| body(app, ui), app);
         h.run_steps(2);
 
         // The Play button starts playback.

@@ -83,7 +83,8 @@ fn refused_creation_changes_nothing() {
         Ok(())
     }));
     app.automation_input = true;
-    let answer = crate::canvas::testing::control(&mut app, "ui.pointer", json!({"events": [{"kind": "down", "x": 130, "y": 70}, {"kind": "up", "x": 130, "y": 70}]}));
+    let answer =
+        crate::canvas::testing::control(&mut app, "ui.pointer", json!({"events": [{"kind": "down", "x": 130, "y": 70}, {"kind": "up", "x": 130, "y": 70}]}));
 
     assert_eq!(answer["ok"], true);
     assert_eq!(denials.get(), 1);
@@ -111,5 +112,3 @@ fn selecting_and_dragging_an_existing_note_preserve_hidden_notes() {
     assert_eq!(notes.len(), 1);
     assert_eq!(notes[0].position, [60.0, 50.0]);
 }
-
-

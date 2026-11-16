@@ -12,9 +12,9 @@ use photocraft_doc::BlendMode;
 use photocraft_paint::BrushSettings;
 use serde_json::json;
 
+use crate::PhotocraftApp;
 use crate::brush_mode_menu::{self, Item};
 use crate::state::Tool;
-use crate::PhotocraftApp;
 
 /// The blend key of the Brush's and Pencil's Mode list: a blend mode, or one of the two
 /// painting-only modes the brush stores apart from its blend mode.

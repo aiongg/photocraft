@@ -38,7 +38,6 @@ fn history_len(app: &PhotocraftApp) -> usize {
     app.session.active().unwrap().history.entries().len()
 }
 
-
 /// Only one Convert entry: Convert to Paragraph Text on point text, Convert to Point Text on
 /// paragraph text — the row that does not apply is absent, not greyed.
 #[test]
@@ -94,7 +93,6 @@ fn edit_type_starts_editing_the_right_clicked_layer() {
     choose(&mut app, &ctx, "type.editText");
     assert_eq!(app.ui.text_edit.as_ref().map(|e| e.layer), Some(bottom), "Edit Type… edits the clicked layer");
 }
-
 
 /// A drawn harness over the committed type, as in the canvas gesture tests.
 fn menu_harness(mut app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {

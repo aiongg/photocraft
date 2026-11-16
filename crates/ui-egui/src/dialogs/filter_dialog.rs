@@ -279,8 +279,10 @@ pub(crate) fn params(app: &mut PhotocraftApp, command: &str, spec: &str) -> Vec<
         .into_iter()
         // Optional parameters the generic dialog can't express keep their defaults.
         .filter(|p| {
-            !(matches!(command, "edit.fade" | "edit.findAndReplaceText" | "edit.defineBrushPreset" | "edit.defineCustomShape" | "edit.autoAlignLayers" | "edit.autoBlendLayers")
-                && matches!(p.key.as_str(), "reference" | "path"))
+            !(matches!(
+                command,
+                "edit.fade" | "edit.findAndReplaceText" | "edit.defineBrushPreset" | "edit.defineCustomShape" | "edit.autoAlignLayers" | "edit.autoBlendLayers"
+            ) && matches!(p.key.as_str(), "reference" | "path"))
         })
         .map(|mut p| {
             if documents.contains(&p.key) {
@@ -493,15 +495,14 @@ fn builder(
     let key = command.to_owned();
     let canvas = app.session.active_index().map(|idx| crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
     move |fields: &mut DialogFields| {
-        let mut dialog = ParamDialog::command(key.clone(), title.clone(), params.clone())
-            .values(Bind::bound(fields))
-            .reset_to(reset.clone())
-            .previews(previews(&key));
+        let mut dialog =
+            ParamDialog::command(key.clone(), title.clone(), params.clone()).values(Bind::bound(fields)).reset_to(reset.clone()).previews(previews(&key));
         if let Some(canvas) = canvas {
             dialog = dialog.canvas(canvas);
         }
         if key == "image.mode.colorTable" {
-            dialog = dialog.extra_buttons(vec![("load".to_owned(), Label::from(tl!("Load…").to_string())), ("save".to_owned(), Label::from(tl!("Save…").to_string()))]);
+            dialog = dialog
+                .extra_buttons(vec![("load".to_owned(), Label::from(tl!("Load…").to_string())), ("save".to_owned(), Label::from(tl!("Save…").to_string()))]);
         }
         dialog
     }
@@ -572,7 +573,9 @@ pub(crate) fn command_params(command: &str, fields: &DialogFields) -> Value {
         }
     }
     // The exports to files take the JPEG quality only for a JPEG (a quality would make a WebP lossy).
-    if matches!(command, "file.export.artboardsToFiles" | "file.export.layersToFiles" | "file.export.layerCompsToFiles") && map.get("format").and_then(Value::as_str) != Some("jpg") {
+    if matches!(command, "file.export.artboardsToFiles" | "file.export.layersToFiles" | "file.export.layerCompsToFiles")
+        && map.get("format").and_then(Value::as_str) != Some("jpg")
+    {
         map.remove("quality");
     }
     // An emptied embedded LUT is no data: a stored empty `data` would be read over the chosen `lut`.
@@ -644,7 +647,8 @@ fn validate_match_color_source_layer(app: &PhotocraftApp, command: &str, fields:
     let Some(layer) = fields.get("sourceLayer").filter(|layer| !layer.is_null()) else { return Ok(()) };
     let source = fields.get("source").and_then(|source| source.as_u64().or_else(|| source.as_str()?.parse().ok())).and_then(|i| usize::try_from(i).ok());
     let Some(source) = source.and_then(|i| app.session.documents().get(i)) else { return Ok(()) };
-    let listed = source.doc.walk().into_iter().any(|(_, _, l)| layer.as_u64() == Some(l.id.0) || layer.as_i64().is_some_and(|v| i64::try_from(l.id.0) == Ok(v)));
+    let listed =
+        source.doc.walk().into_iter().any(|(_, _, l)| layer.as_u64() == Some(l.id.0) || layer.as_i64().is_some_and(|v| i64::try_from(l.id.0) == Ok(v)));
     if listed { Ok(()) } else { Err("the Match Color source layer is not in the source document".into()) }
 }
 
@@ -869,7 +873,15 @@ fn abandon(app: &mut PhotocraftApp, token: Option<u64>) {
 
 /// The tail of [`run_command`], shared with the Displace map answer: the smart-filter edit, the
 /// command, its preview and the action's next step.
-fn finish(app: &mut PhotocraftApp, ctx: &egui::Context, command: &str, params: Value, captured: &Value, result: &ParamResult, token: Option<u64>) -> Result<Value, String> {
+fn finish(
+    app: &mut PhotocraftApp,
+    ctx: &egui::Context,
+    command: &str,
+    params: Value,
+    captured: &Value,
+    result: &ParamResult,
+    token: Option<u64>,
+) -> Result<Value, String> {
     let (cmd, params) = match crate::smart_ui::confirm_command(app, captured, command.to_owned(), params) {
         Ok(edit) => edit,
         Err(error) => {

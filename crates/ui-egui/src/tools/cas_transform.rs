@@ -108,9 +108,10 @@ fn source_size(t: &FreeTransform) -> [f64; 2] {
 }
 
 fn bounds(t: &FreeTransform) -> (f64, f64, f64, f64) {
-    t.session.quad().iter().fold((f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY), |(x0, y0, x1, y1), q| {
-        (x0.min(q.x), y0.min(q.y), x1.max(q.x), y1.max(q.y))
-    })
+    t.session
+        .quad()
+        .iter()
+        .fold((f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY), |(x0, y0, x1, y1), q| (x0.min(q.x), y0.min(q.y), x1.max(q.x), y1.max(q.y)))
 }
 
 /// `edit.contentAwareScale`'s params for the box: its size and options, and with `place` its
@@ -307,7 +308,10 @@ mod tests {
         assert!(!t.session.allows().warp);
         // The right edge narrows the box to 24 px.
         app.ui.transform.as_mut().unwrap().edit_box(|b| b.quad = [Point::new(8.0, 8.0), Point::new(32.0, 8.0), Point::new(32.0, 32.0), Point::new(8.0, 32.0)]);
-        assert_eq!(app.ui.transform.as_ref().unwrap().session.quad(), [Point::new(8.0, 8.0), Point::new(32.0, 8.0), Point::new(32.0, 32.0), Point::new(8.0, 32.0)]);
+        assert_eq!(
+            app.ui.transform.as_ref().unwrap().session.quad(),
+            [Point::new(8.0, 8.0), Point::new(32.0, 8.0), Point::new(32.0, 32.0), Point::new(8.0, 32.0)]
+        );
         // The live preview carves a reduced copy in the background.
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(20);
         while app.transform_preview.as_ref().and_then(|pv| pv.content_aware.as_ref()).is_none_or(|l| l.shown.is_none()) {

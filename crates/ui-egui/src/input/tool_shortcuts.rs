@@ -103,7 +103,6 @@ mod tests {
             assert!(crate::menus::invoke(&mut app, &ctx, id, json!({})).is_err());
         }
     }
-
 }
 
 #[cfg(test)]

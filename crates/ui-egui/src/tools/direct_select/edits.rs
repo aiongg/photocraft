@@ -164,8 +164,7 @@ fn change_path(app: &mut PhotocraftApp, change: &PathEdit, refs: &[PathRef], too
             command(app, r, "path.moveAnchors", json!({"anchors": ids(anchors), "move": [by.x, by.y], "curvature": true}));
         }
         PathEdit::MoveHandle { knot, side, to, alone, .. } => {
-            let mut params =
-                json!({"subpath": knot.subpath, "knot": knot.knot, "handle": side_name(*side), "to": [to.x, to.y], "independent": alone});
+            let mut params = json!({"subpath": knot.subpath, "knot": knot.knot, "handle": side_name(*side), "to": [to.x, to.y], "independent": alone});
             if convert_tool && *alone {
                 params["stepName"] = json!("Corner Drag");
             }
@@ -285,9 +284,6 @@ fn edit_draft(app: &mut PhotocraftApp, edit: impl FnOnce(&mut EditPath) -> bool)
 }
 
 #[cfg(test)]
-#[path = "../anchor_tools/tests.rs"]
-mod tests;
-#[cfg(test)]
 #[path = "../anchor_tools/add_anchor_delete_key_tests.rs"]
 mod add_anchor_delete_key_tests;
 #[cfg(test)]
@@ -317,3 +313,6 @@ mod delete_anchor_lock_tests;
 #[cfg(test)]
 #[path = "../anchor_tools/delete_anchor_targeted_path_tests.rs"]
 pub(crate) mod delete_anchor_targeted_path_tests;
+#[cfg(test)]
+#[path = "../anchor_tools/tests.rs"]
+mod tests;

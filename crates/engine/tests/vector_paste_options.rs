@@ -24,7 +24,11 @@ use craft_psd::{
 };
 use photocraft_color::{ColorMode, SampleType};
 use photocraft_doc::{Fill, Layer, LayerContent, Path, Subpath};
-use photocraft_engine::{actions_cmds::{Action, ActionList, ActionStep, ActionsFile}, atn_cmds, edit_cmds::Clip};
+use photocraft_engine::{
+    actions_cmds::{Action, ActionList, ActionStep, ActionsFile},
+    atn_cmds,
+    edit_cmds::Clip,
+};
 use photocraft_geom::{Point, Size};
 use serde_json::Value;
 

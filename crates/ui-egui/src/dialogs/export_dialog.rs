@@ -11,8 +11,8 @@ use craft::behavior::PixelSize;
 use craft::ui::contract::SaveKey;
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::patterns::form_dialogs::{
-    ExportAsResult, ExportFormat, ExportFormatDefaults, ExportMetadata, ExportOptions, ExportPreview, ExportProfile, ExportSize as DialogSize,
-    HostedExportAs, PreviewRequest, PreviewState, Resample, SizeEstimate,
+    ExportAsResult, ExportFormat, ExportFormatDefaults, ExportMetadata, ExportOptions, ExportPreview, ExportProfile, ExportSize as DialogSize, HostedExportAs,
+    PreviewRequest, PreviewState, Resample, SizeEstimate,
 };
 use craft::ui::patterns::presets::{GroupPath, NamedPresetEvent, PresetLibrary};
 use photocraft_cms::Profile;
@@ -796,7 +796,9 @@ fn drive(app: &mut PhotocraftApp, ctx: &egui::Context, open: &mut ExportOpen) ->
     let saved: Vec<(String, ExportOptions)> = events
         .iter()
         .filter_map(|event| match event {
-            NamedPresetEvent::Create { name, .. } => dialog.saved_presets().items().into_iter().find(|item| &item.name == name).map(|item| (name.clone(), item.value.clone())),
+            NamedPresetEvent::Create { name, .. } => {
+                dialog.saved_presets().items().into_iter().find(|item| &item.name == name).map(|item| (name.clone(), item.value.clone()))
+            }
             _ => None,
         })
         .collect();

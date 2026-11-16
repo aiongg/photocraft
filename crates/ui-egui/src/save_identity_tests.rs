@@ -135,7 +135,7 @@ fn save_as_flat_keeps_the_layered_original() {
     // A layered document, and a one-layer one (the issue's case: the dialog offered a JPEG).
     for layered in [true, false] {
         let mut app = app();
-    let ctx = app.ctx().clone();
+        let ctx = app.ctx().clone();
         if !layered {
             app.run("file.new", json!({"width": 4, "height": 4, "name": "Untitled-2"})).unwrap();
         }
@@ -204,7 +204,6 @@ fn automation_flat_save_is_a_copy() {
     assert_eq!((st.doc.name.as_str(), st.path.as_deref()), ("layers.psd", Some("layers.psd")));
     assert_eq!(st.saved_revision, st.revision);
 }
-
 
 /// Preferences › File Handling › Save Full-Size Composite in .pcraft Files reaches the exporter
 /// of Save As, Save and automation saves, and is off by default.

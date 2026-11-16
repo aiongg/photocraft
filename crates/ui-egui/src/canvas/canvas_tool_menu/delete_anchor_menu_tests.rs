@@ -107,7 +107,6 @@ pub(super) fn add_on_the_edge(tool: Tool) {
     assert_undo_redo(&mut h, &original, &path);
 }
 
-
 #[test]
 fn right_click_on_an_anchor_offers_delete_anchor_point_on_top_and_it_deletes() {
     delete_the_corner(Tool::DeleteAnchorPoint);
@@ -117,7 +116,6 @@ fn right_click_on_an_anchor_offers_delete_anchor_point_on_top_and_it_deletes() {
 fn right_click_on_a_segment_offers_add_anchor_point_on_top() {
     add_on_the_edge(Tool::DeleteAnchorPoint);
 }
-
 
 /// The entry is about the path as it was when the menu opened: an edit meanwhile (a control call
 /// inserting an anchor before the corner) shifts the knots, so choosing it deletes nothing.

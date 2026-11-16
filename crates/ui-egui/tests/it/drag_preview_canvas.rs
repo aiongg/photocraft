@@ -12,10 +12,10 @@
 //! move (each move's frame shows the new outline) and that the animated ants keep frames coming
 //! while the pointer is held still. Skips when no GPU adapter exists (like `live_stroke_canvas.rs`).
 
-use egui::{Modifiers, PointerButton, Pos2};
-use photocraft_ui_egui::PhotocraftApp;
 use craft::behavior::CanvasView;
 use craft::behavior::kurbo::Point;
+use egui::{Modifiers, PointerButton, Pos2};
+use photocraft_ui_egui::PhotocraftApp;
 use photocraft_ui_egui::control::{ControlRequest, handle};
 use serde_json::{Value, json};
 use std::sync::{Arc, Mutex};

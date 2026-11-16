@@ -40,7 +40,8 @@ pub fn target(s: &Session, p: &Value) -> Result<RecordAgainTarget> {
 pub(super) fn run(s: &mut Session, p: &Value) -> Result<Value> {
     let selected = target(s, p)?;
     let params = p.get("params").filter(|p| p.is_object()).cloned().ok_or_else(|| bad(COMMAND, "supply the step's new settings in `params`"))?;
-    let original = s.actions.list.action(selected.action).and_then(|a| a.steps.get(selected.step)).cloned().ok_or_else(|| bad(COMMAND, "step is out of range"))?;
+    let original =
+        s.actions.list.action(selected.action).and_then(|a| a.steps.get(selected.step)).cloned().ok_or_else(|| bad(COMMAND, "step is out of range"))?;
     let revision = s.actions.list.revision();
     // Resolve portable recorded targets for execution; keep their portable form in the step.
     let resolved = crate::actions_cmds::playback_params(s, &selected.command, &params)?;

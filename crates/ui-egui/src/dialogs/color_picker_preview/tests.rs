@@ -338,10 +338,7 @@ fn a_gradient_stop_colour_is_previewed_before_ok_and_cancel_changes_nothing() {
         let (doc, revision, dirty, history) = committed(&app);
         crate::gradient_ui::edit_stop_color(&mut app, id, 0);
         let dialog = top_picker(&app);
-        assert!(
-            crate::color_picker_ui::target(&app, dialog).is_some_and(owns),
-            "{depth}-bit: the stop picker is previewed"
-        );
+        assert!(crate::color_picker_ui::target(&app, dialog).is_some_and(owns), "{depth}-bit: the stop picker is previewed");
         set_color(&mut app, "#ff0000");
 
         let (shown, key) = crate::canvas::display_doc(&mut app, 0);

@@ -46,9 +46,9 @@ pub(crate) use path_ops::{
 };
 pub(crate) use paths_panel::command_params;
 pub use paths_panel::{PathEntry, PathRow, path_rows, paths_panel};
-pub(crate) use pen::{PATH_OPS, freeform_finish_owned, path_op_field, pen_path, pen_replace};
 #[cfg(test)]
 use pen::pen_path_op;
+pub(crate) use pen::{PATH_OPS, freeform_finish_owned, path_op_field, pen_path, pen_replace};
 pub use pen::{cancel_stale, pen_commit};
 pub use shapes::is_shape_tool;
 pub(crate) use shapes::{create_geometry, kind_of};

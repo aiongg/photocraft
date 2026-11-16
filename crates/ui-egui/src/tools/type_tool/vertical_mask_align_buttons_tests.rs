@@ -4,9 +4,9 @@
 use egui_kittest::kittest::Queryable;
 use photocraft_doc::LayerId;
 
-use crate::canvas::testing::{ToolEvent, tool_event};
 use super::super::vertical_align_buttons_tests::{HORIZONTAL, VERTICAL, bar, new_app, shown};
 use crate::PhotocraftApp;
+use crate::canvas::testing::{ToolEvent, tool_event};
 use crate::state::Tool;
 
 /// The Vertical Type Mask tool typing a new mask; returns its hidden working layer.

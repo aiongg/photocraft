@@ -490,7 +490,8 @@ fn idle_frames_never_read_the_os_clipboard() {
             n.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
             Ok(b.lock().unwrap().clone())
         };
-        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), Session::new(), Services { clipboard_get_image: Some(Box::new(get)), ..Default::default() });
+        let mut app =
+            PhotocraftApp::with_context(cc.egui_ctx.clone(), Session::new(), Services { clipboard_get_image: Some(Box::new(get)), ..Default::default() });
         app.session.execute("file.new", serde_json::json!({"width": 64, "height": 64})).unwrap();
         app
     });

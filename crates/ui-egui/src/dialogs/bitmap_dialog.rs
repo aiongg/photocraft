@@ -55,7 +55,9 @@ pub(crate) fn defaults(app: &PhotocraftApp, f: &mut DialogFields) {
 
 pub(crate) fn params(app: &PhotocraftApp) -> Vec<Param> {
     let input = input_resolution(app);
-    let choice = |list: &[(&'static str, &'static str)]| -> Vec<(String, craft::ui::runtime::env::Label)> { list.iter().map(|(id, l)| (id.to_string(), tl!(l).into())).collect() };
+    let choice = |list: &[(&'static str, &'static str)]| -> Vec<(String, craft::ui::runtime::env::Label)> {
+        list.iter().map(|(id, l)| (id.to_string(), tl!(l).into())).collect()
+    };
 
     vec![
         Param::read_only_text("inputResolution", tl!("Input:"), format!("{input} {}", tl!("Pixels/Inch"))),

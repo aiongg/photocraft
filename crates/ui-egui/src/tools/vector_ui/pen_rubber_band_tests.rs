@@ -24,7 +24,6 @@ fn the_setting_is_saved_inspected_and_reset() {
     let inspect = |app: &mut PhotocraftApp| {
         let (req, _rx) = ControlRequest::new("ui.inspect", json!({}));
         match handle(app, &ctx, &req) {
-
             Reply::Done(v) => v["result"]["toolOptions"]["path_options"]["rubberBand"].clone(),
             _ => panic!("ui.inspect: expected an immediate reply"),
         }

@@ -218,14 +218,7 @@ fn check(name: &str, sets: &[Case]) {
 
 #[test]
 fn white_balance_and_exposure() {
-    check(
-        "white balance",
-        &[
-            cr! { temperature: 40.0, tint: -25.0},
-            cr! { temperature: -70.0, tint: 60.0, exposure: -1.2},
-            cr! { exposure: 1.5},
-        ],
-    );
+    check("white balance", &[cr! { temperature: 40.0, tint: -25.0}, cr! { temperature: -70.0, tint: 60.0, exposure: -1.2}, cr! { exposure: 1.5}]);
 }
 
 #[test]
@@ -254,30 +247,23 @@ fn tone_curves() {
         "tone curves",
         &[
             cr! {
-                curve_highlights: -60.0,
-                curve_lights: 30.0,
-                curve_darks: 40.0,
-                curve_shadows: -20.0,
-                curve_splits: [20.0, 45.0, 80.0]},
+            curve_highlights: -60.0,
+            curve_lights: 30.0,
+            curve_darks: 40.0,
+            curve_shadows: -20.0,
+            curve_splits: [20.0, 45.0, 80.0]},
             cr! { point_curve: vec![[0.0, 20.0], [64.0, 50.0], [192.0, 220.0], [255.0, 245.0]]},
             cr! {
-                point_curve_red: vec![[0.0, 0.0], [128.0, 160.0], [255.0, 255.0]],
-                point_curve_green: vec![[0.0, 10.0], [255.0, 230.0]],
-                point_curve_blue: vec![[0.0, 0.0], [100.0, 70.0], [255.0, 255.0]]},
+            point_curve_red: vec![[0.0, 0.0], [128.0, 160.0], [255.0, 255.0]],
+            point_curve_green: vec![[0.0, 10.0], [255.0, 230.0]],
+            point_curve_blue: vec![[0.0, 0.0], [100.0, 70.0], [255.0, 255.0]]},
         ],
     );
 }
 
 #[test]
 fn vibrance_and_saturation() {
-    check(
-        "presence",
-        &[
-            cr! { vibrance: 70.0},
-            cr! { saturation: -60.0},
-            cr! { vibrance: -40.0, saturation: 50.0},
-        ],
-    );
+    check("presence", &[cr! { vibrance: 70.0}, cr! { saturation: -60.0}, cr! { vibrance: -40.0, saturation: 50.0}]);
 }
 
 #[test]
@@ -301,11 +287,11 @@ fn color_grading() {
         &[
             cr! { grade_shadows: Wheel { hue: 220.0, sat: 70.0, lum: 20.0 }},
             cr! {
-                grade_midtones: Wheel { hue: 120.0, sat: 30.0, lum: -15.0 },
-                grade_highlights: Wheel { hue: 40.0, sat: 50.0, lum: 10.0 },
-                grade_global: Wheel { hue: 300.0, sat: 15.0, lum: 5.0 },
-                grade_blending: 80.0,
-                grade_balance: -40.0},
+            grade_midtones: Wheel { hue: 120.0, sat: 30.0, lum: -15.0 },
+            grade_highlights: Wheel { hue: 40.0, sat: 50.0, lum: 10.0 },
+            grade_global: Wheel { hue: 300.0, sat: 15.0, lum: 5.0 },
+            grade_blending: 80.0,
+            grade_balance: -40.0},
         ],
     );
 }
@@ -318,10 +304,10 @@ fn vignette() {
             cr! { vignette_amount: -70.0},
             cr! { vignette_amount: -50.0, vignette_roundness: -60.0, vignette_feather: 20.0, vignette_highlights: 70.0},
             cr! {
-                vignette_amount: 60.0,
-                vignette_roundness: 80.0,
-                vignette_midpoint: 20.0,
-                vignette_style: StoredVignetteStyle::ColorPriority},
+            vignette_amount: 60.0,
+            vignette_roundness: 80.0,
+            vignette_midpoint: 20.0,
+            vignette_style: StoredVignetteStyle::ColorPriority},
             cr! { vignette_amount: -40.0, vignette_style: StoredVignetteStyle::PaintOverlay},
             cr! { vignette_amount: 40.0, vignette_style: StoredVignetteStyle::PaintOverlay},
         ],
@@ -349,23 +335,23 @@ fn every_per_pixel_stage_at_once() {
     check(
         "all stages",
         &[cr! {
-            temperature: 25.0,
-            tint: 10.0,
-            exposure: 0.3,
-            contrast: 25.0,
-            whites: 20.0,
-            blacks: -15.0,
-            vibrance: 30.0,
-            saturation: 10.0,
-            curve_darks: 20.0,
-            point_curve: vec![[0.0, 8.0], [255.0, 250.0]],
-            hsl_hue: hsl,
-            hsl_sat: hsl,
-            hsl_lum: hsl,
-            grade_shadows: Wheel { hue: 210.0, sat: 25.0, lum: 0.0 },
-            vignette_amount: -30.0,
-            grain_amount: 20.0,
-            pixel_scale: 0.2}],
+        temperature: 25.0,
+        tint: 10.0,
+        exposure: 0.3,
+        contrast: 25.0,
+        whites: 20.0,
+        blacks: -15.0,
+        vibrance: 30.0,
+        saturation: 10.0,
+        curve_darks: 20.0,
+        point_curve: vec![[0.0, 8.0], [255.0, 250.0]],
+        hsl_hue: hsl,
+        hsl_sat: hsl,
+        hsl_lum: hsl,
+        grade_shadows: Wheel { hue: 210.0, sat: 25.0, lum: 0.0 },
+        vignette_amount: -30.0,
+        grain_amount: 20.0,
+        pixel_scale: 0.2}],
     );
 }
 
@@ -377,22 +363,14 @@ fn identity_leaves_pixels_alone_and_detail_has_no_pass() {
     let stages = per_pixel(&p, 64, 32, false, None).unwrap();
     let out = g.dev.develop(&g.device, &g.queue, None, &src, Some(1), [64, 32], &stages).unwrap();
     assert_eq!(out, src, "the CPU develop returns early, unclipped");
-    for set in [
-        cr! { sharpen_amount: 10.0},
-        cr! { noise_luminance: 10.0, clarity: 20.0},
-        cr! { noise_color: 10.0, dehaze: 20.0},
-    ] {
+    for set in [cr! { sharpen_amount: 10.0}, cr! { noise_luminance: 10.0, clarity: 20.0}, cr! { noise_color: 10.0, dehaze: 20.0}] {
         assert!(spatial(&set) && per_pixel(&set, 64, 32, false, Some((0.0, 1.0))).is_none(), "{set:?}");
     }
     // Whites and Blacks need the image's points, unless a spatial stage's passes measure them.
     assert!(per_pixel(&cr! { whites: 10.0}, 64, 32, false, None).is_none());
     let toned = per_pixel(&cr! { whites: 10.0, shadows: 20.0}, 64, 32, false, None).unwrap();
     assert!(toned.local_tone.is_some() && toned.whites_blacks.is_none() && toned.measure_whites_blacks == Some([10.0, 0.0]));
-    for p in [
-        cr! { blacks: -10.0, dehaze: 20.0},
-        cr! { blacks: -10.0, clarity: 20.0},
-        cr! { blacks: -10.0, texture: 20.0},
-    ] {
+    for p in [cr! { blacks: -10.0, dehaze: 20.0}, cr! { blacks: -10.0, clarity: 20.0}, cr! { blacks: -10.0, texture: 20.0}] {
         let s = per_pixel(&p, 64, 32, false, None).unwrap();
         assert!(s.whites_blacks.is_none() && s.measure_whites_blacks == Some([0.0, -10.0]), "{p:?}");
     }
@@ -479,25 +457,25 @@ fn shadows_and_highlights_with_per_pixel_stages() {
     hsl[1] = 35.0;
     hsl[5] = -50.0;
     let all = cr! {
-        temperature: 25.0,
-        tint: 10.0,
-        exposure: 0.3,
-        contrast: 25.0,
-        shadows: 45.0,
-        highlights: -55.0,
-        whites: 20.0,
-        blacks: -15.0,
-        vibrance: 30.0,
-        saturation: 10.0,
-        curve_darks: 20.0,
-        point_curve: vec![[0.0, 8.0], [255.0, 250.0]],
-        hsl_hue: hsl,
-        hsl_sat: hsl,
-        hsl_lum: hsl,
-        grade_shadows: Wheel { hue: 210.0, sat: 25.0, lum: 0.0 },
-        vignette_amount: -30.0,
-        grain_amount: 20.0,
-        pixel_scale: 0.2};
+    temperature: 25.0,
+    tint: 10.0,
+    exposure: 0.3,
+    contrast: 25.0,
+    shadows: 45.0,
+    highlights: -55.0,
+    whites: 20.0,
+    blacks: -15.0,
+    vibrance: 30.0,
+    saturation: 10.0,
+    curve_darks: 20.0,
+    point_curve: vec![[0.0, 8.0], [255.0, 250.0]],
+    hsl_hue: hsl,
+    hsl_sat: hsl,
+    hsl_lum: hsl,
+    grade_shadows: Wheel { hue: 210.0, sat: 25.0, lum: 0.0 },
+    vignette_amount: -30.0,
+    grain_amount: 20.0,
+    pixel_scale: 0.2};
     check(
         "shadows/highlights + per pixel",
         &[
@@ -553,28 +531,28 @@ fn clarity_texture_and_dehaze_with_shadows_highlights_and_per_pixel_stages() {
     hsl[1] = 35.0;
     hsl[5] = -50.0;
     let all = cr! {
-        temperature: 25.0,
-        tint: 10.0,
-        exposure: 0.3,
-        contrast: 25.0,
-        dehaze: 35.0,
-        shadows: 45.0,
-        highlights: -55.0,
-        clarity: 40.0,
-        texture: 30.0,
-        whites: 20.0,
-        blacks: -15.0,
-        vibrance: 30.0,
-        saturation: 10.0,
-        curve_darks: 20.0,
-        point_curve: vec![[0.0, 8.0], [255.0, 250.0]],
-        hsl_hue: hsl,
-        hsl_sat: hsl,
-        hsl_lum: hsl,
-        grade_shadows: Wheel { hue: 210.0, sat: 25.0, lum: 0.0 },
-        vignette_amount: -30.0,
-        grain_amount: 20.0,
-        pixel_scale: 0.2};
+    temperature: 25.0,
+    tint: 10.0,
+    exposure: 0.3,
+    contrast: 25.0,
+    dehaze: 35.0,
+    shadows: 45.0,
+    highlights: -55.0,
+    clarity: 40.0,
+    texture: 30.0,
+    whites: 20.0,
+    blacks: -15.0,
+    vibrance: 30.0,
+    saturation: 10.0,
+    curve_darks: 20.0,
+    point_curve: vec![[0.0, 8.0], [255.0, 250.0]],
+    hsl_hue: hsl,
+    hsl_sat: hsl,
+    hsl_lum: hsl,
+    grade_shadows: Wheel { hue: 210.0, sat: 25.0, lum: 0.0 },
+    vignette_amount: -30.0,
+    grain_amount: 20.0,
+    pixel_scale: 0.2};
     let sets = [
         all.clone(),
         cr! { dehaze: 50.0, shadows: 60.0, highlights: -40.0},

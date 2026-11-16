@@ -157,11 +157,22 @@ impl PrefsCustom<'_> {
         if let Some(ram) = self.installed_ram {
             let installed = ram / (1 << 20);
             let percent = mb as f64 * 100.0 / installed as f64;
-            help(ui, &crate::i18n::fmt(tl!("Installed RAM: {ram} MB; this limit: {percent}%"), &[("ram", &installed.to_string()), ("percent", &format!("{percent:.1}"))]));
+            help(
+                ui,
+                &crate::i18n::fmt(
+                    tl!("Installed RAM: {ram} MB; this limit: {percent}%"),
+                    &[("ram", &installed.to_string()), ("percent", &format!("{percent:.1}"))],
+                ),
+            );
         }
         help(ui, tl!("Limits each open document's pixels plus History. Oldest undo states are discarded when the limit is exceeded."));
         help(ui, tl!("Applies immediately when saved. Memory is not reserved in advance."));
-        help(ui, tl!("With GPU Memory set to Automatic, this also limits the GPU layer budget. That budget is capped at one quarter of installed RAM and, when known, three eighths of the graphics card's memory, with a 512 MB minimum. Raising this limit beyond those caps does not increase the GPU budget."));
+        help(
+            ui,
+            tl!(
+                "With GPU Memory set to Automatic, this also limits the GPU layer budget. That budget is capped at one quarter of installed RAM and, when known, three eighths of the graphics card's memory, with a 512 MB minimum. Raising this limit beyond those caps does not increase the GPU budget."
+            ),
+        );
     }
 
     /// The Graphics status block: GPU info lines, then the backend and adapter under Advanced.
@@ -263,11 +274,7 @@ impl PrefsCustom<'_> {
 /// One user-facing choice; legacy flags remain compatible with older settings.
 pub(super) fn rendering_mode_value(draft: &SettingsDraft) -> String {
     draft.get::<String>(RENDERING_MODE).unwrap_or_else(|| {
-        if draft.get::<bool>(USE_GPU) == Some(false) || draft.get::<String>(GPU_BACKEND).as_deref() == Some("cpu") {
-            "cpu".into()
-        } else {
-            "auto".into()
-        }
+        if draft.get::<bool>(USE_GPU) == Some(false) || draft.get::<String>(GPU_BACKEND).as_deref() == Some("cpu") { "cpu".into() } else { "auto".into() }
     })
 }
 
@@ -310,7 +317,9 @@ fn scratch_disks_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
     if scratch.free_space_unmeasured {
         let dir = scratch.dir.as_deref().map(|p| p.display().to_string()).unwrap_or_else(|| tl!("Unknown").into());
         let warning = crate::i18n::fmt(
-            tl!("The current scratch directory ({path}) doesn't report its free space, so PhotoCraft can't stop before it fills up, and large files get no extra room from it without a Scratch Size Limit. This warning applies to the current configuration; changes above take effect on Apply or OK. Set a limit or use a local disk."),
+            tl!(
+                "The current scratch directory ({path}) doesn't report its free space, so PhotoCraft can't stop before it fills up, and large files get no extra room from it without a Scratch Size Limit. This warning applies to the current configuration; changes above take effect on Apply or OK. Set a limit or use a local disk."
+            ),
             &[("path", &dir)],
         );
         Text::new(warning).tone(Tone::Warn).show(ui);
@@ -338,6 +347,11 @@ fn tablet_input_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
     if let Some(next) = choose(ui, tl!("Tablet Input"), "tablet-input", current, &choices_of("tools.tabletInput")) {
         draft.set("tools.tabletInput", &next);
     }
-    help(ui, tl!("WinTab reads pressure, tilt, rotation and the eraser end from the tablet driver. Turn off Windows Ink in your tablet's software utility (for example Wacom Center) before using it."));
+    help(
+        ui,
+        tl!(
+            "WinTab reads pressure, tilt, rotation and the eraser end from the tablet driver. Turn off Windows Ink in your tablet's software utility (for example Wacom Center) before using it."
+        ),
+    );
     help(ui, tl!("Applies at next launch."));
 }

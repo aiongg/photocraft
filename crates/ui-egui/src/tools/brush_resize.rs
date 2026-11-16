@@ -12,8 +12,8 @@ use craft::behavior::{GesturePhase, PointerButton};
 use craft::keymap::Mods;
 use craft::ui::canvas::{ToolContext, ToolPointer};
 use craft::ui::canvas_controls::CanvasControlWords;
-use craft::ui::contract::Show as _;
 use craft::ui::canvas_controls::brush::{BrushDimensions, BrushLevel, BrushResize, BrushResizeOptions, ResizeStep, TipFalloff};
+use craft::ui::contract::Show as _;
 use craft::ui::style::DataColor;
 use photocraft_engine::paint::MAX_BRUSH_SIZE;
 
@@ -57,7 +57,8 @@ fn options(app: &PhotocraftApp) -> BrushResizeOptions {
         options.level(BrushLevel::Opacity).travel(OPACITY_TRAVEL)
     };
     // Preferences ▸ Cursors ▸ Brush Preview colour; red, as in Photoshop, when it is unreadable.
-    let [r, g, b] = crate::color_picker_ui::parse_hex(&app.session.prefs().cursors.brush_preview_color).map_or([255, 0, 0], |c| c.map(|v| (v * 255.0).round() as u8));
+    let [r, g, b] =
+        crate::color_picker_ui::parse_hex(&app.session.prefs().cursors.brush_preview_color).map_or([255, 0, 0], |c| c.map(|v| (v * 255.0).round() as u8));
     options.tint(DataColor::new(egui::Color32::from_rgba_unmultiplied(r, g, b, TINT_ALPHA)))
 }
 

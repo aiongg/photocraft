@@ -80,10 +80,12 @@ impl SelectionTools {
 
     /// The whole-pixel offset of the selection drag in progress, from the tool that runs it.
     pub(crate) fn drag_offset(&self) -> Option<(i32, i32)> {
-        [self.marquee.phase(), self.lasso.phase(), self.polygon.phase(), self.magnetic.phase(), self.wand.drag.phase()].into_iter().find_map(|phase| match phase {
-            SelectPhase::Dragging(drag) => Some((drag.delta[0], drag.delta[1])),
-            _ => None,
-        })
+        [self.marquee.phase(), self.lasso.phase(), self.polygon.phase(), self.magnetic.phase(), self.wand.drag.phase()].into_iter().find_map(
+            |phase| match phase {
+                SelectPhase::Dragging(drag) => Some((drag.delta[0], drag.delta[1])),
+                _ => None,
+            },
+        )
     }
 }
 
@@ -134,9 +136,7 @@ impl PcSelection {
             let b = st.doc.bounds();
             (st.doc.id.0 ^ app.session.active_generation(), PixelSize::new(b.width().max(0) as u32, b.height().max(0) as u32))
         });
-        let piece = st
-            .and_then(photocraft_engine::float_cmds::floating)
-            .map(|f| Piece { offset: f.offset, outline: f.parts.outline().cloned() });
+        let piece = st.and_then(photocraft_engine::float_cmds::floating).map(|f| Piece { offset: f.offset, outline: f.parts.outline().cloned() });
         Self { document, size, has_selection: crate::tool_feedback::has_selection(app), selection: st.and_then(|st| st.doc.selection.clone()), piece }
     }
 }
@@ -532,7 +532,11 @@ fn wand_click(app: &mut PhotocraftApp, click: &WandClick) {
     }
     let o = app.ui.tool_options.clone();
     let mode = crate::tool_feedback::mode_name(click.operation);
-    run(app, "select.magicWand", json!({"x": x, "y": y, "tolerance": o.tolerance, "contiguous": o.contiguous, "antiAlias": o.anti_alias, "sampleAllLayers": o.sample_all.magic_wand, "mode": mode}));
+    run(
+        app,
+        "select.magicWand",
+        json!({"x": x, "y": y, "tolerance": o.tolerance, "contiguous": o.contiguous, "antiAlias": o.anti_alias, "sampleAllLayers": o.sample_all.magic_wand, "mode": mode}),
+    );
 }
 
 fn drag_event(app: &mut PhotocraftApp, prompted: &mut bool, edit: EditEvent<SelectionDrag>) {
@@ -670,15 +674,23 @@ mod tests {
             step: None,
         };
         vec![
-            row("rectangle, New", Tool::RectMarquee, "select.rect", &[[20.0, 20.0], [60.0, 50.0]], || {
-                json!({"x": 20, "y": 20, "width": 40, "height": 30, "mode": "replace", "ellipse": false, "antiAlias": true, "feather": 3})
-            }),
+            row(
+                "rectangle, New",
+                Tool::RectMarquee,
+                "select.rect",
+                &[[20.0, 20.0], [60.0, 50.0]],
+                || json!({"x": 20, "y": 20, "width": 40, "height": 30, "mode": "replace", "ellipse": false, "antiAlias": true, "feather": 3}),
+            ),
             Row {
                 mods: Modifiers::SHIFT,
                 existing: Some(FAR),
-                ..row("ellipse, Shift at the press adds", Tool::EllipseMarquee, "select.rect", &[[20.0, 20.0], [60.0, 50.0]], || {
-                    json!({"mode": "add", "ellipse": true})
-                })
+                ..row(
+                    "ellipse, Shift at the press adds",
+                    Tool::EllipseMarquee,
+                    "select.rect",
+                    &[[20.0, 20.0], [60.0, 50.0]],
+                    || json!({"mode": "add", "ellipse": true}),
+                )
             },
             Row {
                 bar: 2,
@@ -687,30 +699,46 @@ mod tests {
             },
             Row {
                 step: Some("Single Row Marquee"),
-                ..row("single row", Tool::SingleRowMarquee, "select.rect", &[[120.3, 37.6]], || {
-                    json!({"x": 0, "y": 37, "width": 400, "height": 1, "mode": "replace", "line": "row", "antiAlias": false})
-                })
+                ..row(
+                    "single row",
+                    Tool::SingleRowMarquee,
+                    "select.rect",
+                    &[[120.3, 37.6]],
+                    || json!({"x": 0, "y": 37, "width": 400, "height": 1, "mode": "replace", "line": "row", "antiAlias": false}),
+                )
             },
             Row {
                 mods: Modifiers::SHIFT,
                 existing: Some(FAR),
-                ..row("single column, Shift adds", Tool::SingleColumnMarquee, "select.rect", &[[42.9, 80.0]], || {
-                    json!({"x": 42, "y": 0, "width": 1, "height": 300, "mode": "add", "line": "column", "antiAlias": false})
-                })
+                ..row(
+                    "single column, Shift adds",
+                    Tool::SingleColumnMarquee,
+                    "select.rect",
+                    &[[42.9, 80.0]],
+                    || json!({"x": 42, "y": 0, "width": 1, "height": 300, "mode": "add", "line": "column", "antiAlias": false}),
+                )
             },
             Row {
                 absent: &["polygonal"],
                 step: Some("Lasso"),
-                ..row("freehand lasso, feather from the bar", Tool::Lasso, "select.lasso", &[[40.0, 30.0], [160.0, 30.0], [160.0, 120.0], [40.0, 120.0]], || {
-                    json!({"mode": "replace", "antiAlias": true, "feather": 3})
-                })
+                ..row(
+                    "freehand lasso, feather from the bar",
+                    Tool::Lasso,
+                    "select.lasso",
+                    &[[40.0, 30.0], [160.0, 30.0], [160.0, 120.0], [40.0, 120.0]],
+                    || json!({"mode": "replace", "antiAlias": true, "feather": 3}),
+                )
             },
             Row {
                 clicks: true,
                 step: Some("Polygonal Lasso"),
-                ..row("polygon closed on its start", Tool::PolygonLasso, "select.lasso", &[[100.0, 100.0], [300.0, 100.0], [300.0, 200.0], [100.0, 100.0]], || {
-                    json!({"mode": "replace", "polygonal": true, "feather": 3})
-                })
+                ..row(
+                    "polygon closed on its start",
+                    Tool::PolygonLasso,
+                    "select.lasso",
+                    &[[100.0, 100.0], [300.0, 100.0], [300.0, 200.0], [100.0, 100.0]],
+                    || json!({"mode": "replace", "polygonal": true, "feather": 3}),
+                )
             },
             Row {
                 clicks: true,
@@ -737,9 +765,13 @@ mod tests {
             Row {
                 existing: Some(SQUARE),
                 step: Some("Move Selection"),
-                ..row("a drag inside moves the outline", Tool::RectMarquee, "select.transformSelection", &[[20.0, 20.0], [30.0, 25.0]], || {
-                    json!({"dx": 10, "dy": 5, "stepName": "Move Selection"})
-                })
+                ..row(
+                    "a drag inside moves the outline",
+                    Tool::RectMarquee,
+                    "select.transformSelection",
+                    &[[20.0, 20.0], [30.0, 25.0]],
+                    || json!({"dx": 10, "dy": 5, "stepName": "Move Selection"}),
+                )
             },
             Row {
                 mods: Modifiers::COMMAND,
@@ -753,9 +785,7 @@ mod tests {
             },
             Row {
                 step: Some("Magic Wand"),
-                ..row("wand click", Tool::MagicWand, "select.magicWand", &[[50.0, 50.0]], || {
-                    json!({"x": 50, "y": 50, "mode": "replace", "antiAlias": true})
-                })
+                ..row("wand click", Tool::MagicWand, "select.magicWand", &[[50.0, 50.0]], || json!({"x": 50, "y": 50, "mode": "replace", "antiAlias": true}))
             },
             Row {
                 existing: Some(SQUARE),

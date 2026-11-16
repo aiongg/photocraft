@@ -9,7 +9,11 @@ use craft_psd::{
 use photocraft_cms::Builtin;
 use photocraft_color::{ColorMode, PixelFormat, SampleType};
 use photocraft_doc::{Document, Layer, LayerContent, SmartObject, SmartSource};
-use photocraft_engine::{Session, actions_cmds::{Action, ActionList, ActionStep, ActionsFile}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionList, ActionStep, ActionsFile},
+    atn_cmds,
+};
 use photocraft_geom::{Affine, Size};
 use photocraft_raster::Surface;
 use serde_json::{Value, json};

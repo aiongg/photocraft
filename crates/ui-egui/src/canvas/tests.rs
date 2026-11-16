@@ -1,9 +1,9 @@
 use super::document_display::{CanvasHost, active_view};
 use super::*;
 use craft::behavior::canvas::ZoomLadder;
+use craft::behavior::kurbo::Size;
 use craft::ui::canvas::{PixelRect, RasterSource};
 use craft::ui::primitives::Revision;
-use craft::behavior::kurbo::Size;
 
 #[test]
 fn display_image_matches_egui_unmultiplied_conversion() {
@@ -529,7 +529,8 @@ fn guides_draw_over_the_puppet_perspective_and_vanishing_point_previews() {
             out.textures_delta.clear();
             out
         };
-        let button = |pos: Pos2, pressed: bool| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
+        let button =
+            |pos: Pos2, pressed: bool| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
         // At 100 % centred on the document, screen and document coordinates coincide.
         let drag = |app: &mut PhotocraftApp, from: Pos2, to: Pos2| {
             pass(app, vec![egui::Event::PointerMoved(from)]);

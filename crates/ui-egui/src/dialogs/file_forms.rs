@@ -24,7 +24,6 @@ pub(crate) fn owns(key: &str) -> bool {
     matches!(key, CONTACT_SHEET | CREATE_DROPLET | SCRIPT_EVENTS | PACKAGE | PATHS_TO_FILE)
 }
 
-
 /// The folder of the active document, else the working directory.
 pub(crate) fn default_dir(app: &PhotocraftApp) -> String {
     app.session.active().and_then(|d| d.path.as_deref()).and_then(|p| p.rfind(['/', '\\']).map(|i| p[..i].to_string())).unwrap_or_else(|| ".".into())
@@ -50,7 +49,6 @@ pub(crate) fn droplet_default_dir(app: &PhotocraftApp) -> String {
 pub(crate) fn doc_stem(app: &PhotocraftApp) -> String {
     app.session.active().map(|d| d.doc.name.rsplit_once('.').map_or(d.doc.name.clone(), |(a, _)| a.to_string())).unwrap_or_else(|| tl!("Untitled").into())
 }
-
 
 /// Choice options whose labels are the ids read as words.
 fn ids(ids: &[&str]) -> Vec<(String, Label)> {
@@ -149,7 +147,6 @@ pub(crate) fn open_paths_to_file(app: &mut PhotocraftApp) -> DialogId {
     ];
     open_form(app, PATHS_TO_FILE, tl!("Export Paths to File"), rows)
 }
-
 
 #[cfg(test)]
 mod tests;

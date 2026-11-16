@@ -29,7 +29,8 @@ pub fn pick(app: &mut PhotocraftApp, at: [f64; 2], size: SampleSize, source: Sam
     if let Some((surface, canvas)) = eyedropper_mask_source(app, source) {
         return sample_layer_mask(surface, canvas, at, size.pixels());
     }
-    sample_color(app, at, size, source).map(|rgb| if super::paint_target(app) == json!("pixels") { rgb } else { [photocraft_color::convert::rgb_to_gray(rgb); 3] })
+    sample_color(app, at, size, source)
+        .map(|rgb| if super::paint_target(app) == json!("pixels") { rgb } else { [photocraft_color::convert::rgb_to_gray(rgb); 3] })
 }
 
 /// What the Eyedropper tool (and a painting tool's ⌥-click) picks at document point `at`: its options
@@ -51,7 +52,7 @@ pub fn composite_color(app: &mut PhotocraftApp, x: f64, y: f64) -> Option<[f32; 
 fn eyedropper_mask_source(app: &PhotocraftApp, source: SampleSource) -> Option<(&photocraft_raster::Surface, photocraft_geom::Rect)> {
     use photocraft_engine::{channel_cmds::ChannelTarget, mask_view_cmds};
 
-    if app.ui.tool != Tool::Eyedropper|| app.ui.vector_mask_target || !matches!(source, SampleSource::Current | SampleSource::CurrentAndBelow) {
+    if app.ui.tool != Tool::Eyedropper || app.ui.vector_mask_target || !matches!(source, SampleSource::Current | SampleSource::CurrentAndBelow) {
         return None;
     }
     let st = app.session.active()?;

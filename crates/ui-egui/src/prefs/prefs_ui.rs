@@ -69,13 +69,13 @@ pub(crate) use appearance::{appearance_button, cycle_appearance, interface_zoom,
 pub use appearance::{canvas_style, pasteboard_color};
 #[cfg(test)]
 use appearance::{display_scale, selected_theme};
-pub use dialogs::{apply_window, invoke, open_preferences, show, window_open};
 #[cfg(test)]
 pub(crate) use dialogs::set_draft;
+pub use dialogs::{apply_window, invoke, open_preferences, show, window_open};
 pub(crate) use presets::{PRESETS_FAMILY, open_io, open_manager, take as take_presets};
 pub(crate) use save::save_preferences;
 pub use save::{autosave_now, tick};
-pub use shortcuts::{open as open_shortcuts, recording, show as show_shortcuts, shortcuts_open};
+pub use shortcuts::{open as open_shortcuts, recording, shortcuts_open, show as show_shortcuts};
 pub use startup::load;
 pub(crate) use startup::{on_recovery_event, remember_rulers};
 

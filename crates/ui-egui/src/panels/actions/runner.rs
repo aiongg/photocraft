@@ -482,7 +482,13 @@ fn refusal_text(refusal: &PlaybackRefusal) -> String {
 /// Play an action's steps in the shell (dialogs, shell saves and views), under whatever gate
 /// [`play_owned`] installed; pauses at a step whose dialog is toggled on. `inner` is as in
 /// [`play_owned`].
-fn play_steps(app: &mut PhotocraftApp, params: &Value, suspended: Option<Value>, inner: &[(String, usize)], budget: &mut PlaybackBudget) -> Result<Value, String> {
+fn play_steps(
+    app: &mut PhotocraftApp,
+    params: &Value,
+    suspended: Option<Value>,
+    inner: &[(String, usize)],
+    budget: &mut PlaybackBudget,
+) -> Result<Value, String> {
     let planned = actions_cmds::playback_plan(&app.session, params).map_err(|e| e.to_string());
     let (index, action, from) = match planned {
         Ok(plan) => plan,
@@ -1133,7 +1139,6 @@ pub fn stopped(app: &mut PhotocraftApp, token: u64) {
     app.ui.status = tl!("Action playback stopped").to_string();
     app.ui.status_error = false;
 }
-
 
 #[cfg(test)]
 mod tests {

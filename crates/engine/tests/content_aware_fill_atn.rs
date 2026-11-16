@@ -5,7 +5,11 @@ use craft_psd::{
     descriptor::{Descriptor, Id, UnicodeString, Value as D},
 };
 use photocraft_doc::{LayerId, Rect};
-use photocraft_engine::{Session, actions_cmds::{Action, ActionList, ActionStep, ActionsFile}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionList, ActionStep, ActionsFile},
+    atn_cmds,
+};
 use serde_json::{Value, json};
 
 const FLAGS: [(&str, &str); 4] = [

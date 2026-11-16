@@ -127,8 +127,7 @@ const CURVES: &[(&str, Curve)] = &[
     ("ToneCurvePV2012Blue", |p| &mut p.point_curve_blue),
 ];
 
-const STYLES: &[(&str, VignetteStyle)] =
-    &[("1", VignetteStyle::HighlightPriority), ("2", VignetteStyle::ColorPriority), ("3", VignetteStyle::PaintOverlay)];
+const STYLES: &[(&str, VignetteStyle)] = &[("1", VignetteStyle::HighlightPriority), ("2", VignetteStyle::ColorPriority), ("3", VignetteStyle::PaintOverlay)];
 
 /// Bookkeeping fields Camera Raw writes that carry no setting.
 const METADATA: &[&str] = &[
@@ -541,14 +540,14 @@ mod tests {
     #[test]
     fn save_then_load_round_trips() {
         let mut p = cr! {
-            temperature: -12.0,
-            exposure: 1.25,
-            contrast: 30.0,
-            sharpen_radius: 1.4,
-            vignette_amount: -40.0,
-            vignette_style: VignetteStyle::PaintOverlay,
-            curve_splits: [20.0, 45.0, 80.0],
-            point_curve: vec![[0.0, 10.0], [128.0, 150.0], [255.0, 240.0]]};
+        temperature: -12.0,
+        exposure: 1.25,
+        contrast: 30.0,
+        sharpen_radius: 1.4,
+        vignette_amount: -40.0,
+        vignette_style: VignetteStyle::PaintOverlay,
+        curve_splits: [20.0, 45.0, 80.0],
+        point_curve: vec![[0.0, 10.0], [128.0, 150.0], [255.0, 240.0]]};
         p.hsl_lum[5] = -33.0;
         p.grade_shadows.hue = 210.0;
         p.grade_shadows.sat = 40.0;

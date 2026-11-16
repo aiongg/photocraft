@@ -16,8 +16,8 @@ use craft::ui::runtime::env::{Env, Label, UnitKind};
 use craft::ui::text::NumberField;
 use photocraft_engine::prefs::Unit;
 
-use crate::state::Tool;
 use crate::PhotocraftApp;
+use crate::state::Tool;
 
 /// The ruler units Fixed Size can show, with the framework's kind of each.
 const FIXED_SIZE_UNITS: [(Unit, UnitKind); 7] = [
@@ -65,7 +65,15 @@ pub(crate) fn operation_segments(app: &mut PhotocraftApp, ui: &mut egui::Ui, ena
 
 /// A captioned number cell over `value`; the new value when the user edited it. A body can run more
 /// than once in a pass and only the run that reads the input reports, so an edit is kept once seen.
-fn number(ui: &mut egui::Ui, key: &'static str, caption: Label, value: f64, range: RangeInclusive<f64>, unit: Option<UnitKind>, tip: Option<Label>) -> Option<f64> {
+fn number(
+    ui: &mut egui::Ui,
+    key: &'static str,
+    caption: Label,
+    value: f64,
+    range: RangeInclusive<f64>,
+    unit: Option<UnitKind>,
+    tip: Option<Label>,
+) -> Option<f64> {
     let mut edited = None;
     Field::new(caption.clone()).side(SideLabel::new().scrub(true)).id_salt(key).sizing(Sizing::Content).show(ui, |ui, _| {
         let mut field = NumberField::new(caption.clone(), Bind::given(Some(value))).range(range.clone()).commit_decimals(0).scrub_by_label();
@@ -204,10 +212,7 @@ fn lasso(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
             let del = crate::shortcuts::pretty("Backspace");
             hint(
                 ui,
-                crate::i18n::fmt(
-                    tl!("Click the first point or press {key} to close · {del} removes a point · Esc cancels"),
-                    &[("key", &enter), ("del", &del)],
-                ),
+                crate::i18n::fmt(tl!("Click the first point or press {key} to close · {del} removes a point · Esc cancels"), &[("key", &enter), ("del", &del)]),
             );
         }
     } else if app.canvas_tools.selection.outline_open() {
@@ -220,8 +225,17 @@ fn lasso(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
 /// The Magnetic Lasso's Width, Contrast, Frequency and pen-pressure toggle.
 fn magnetic_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let o = &app.ui.tool_options;
-    let (width, contrast, frequency, pressure) = (f64::from(o.magnetic.width), f64::from(o.magnetic.contrast), f64::from(o.magnetic.frequency), o.magnetic.pressure_width);
-    let width = number(ui, "magnetic-width", label("Width"), width, 1.0..=256.0, Some(UnitKind::Pixels), Some(label("Follows only edges this close to the pointer ([ and ] change it)")));
+    let (width, contrast, frequency, pressure) =
+        (f64::from(o.magnetic.width), f64::from(o.magnetic.contrast), f64::from(o.magnetic.frequency), o.magnetic.pressure_width);
+    let width = number(
+        ui,
+        "magnetic-width",
+        label("Width"),
+        width,
+        1.0..=256.0,
+        Some(UnitKind::Pixels),
+        Some(label("Follows only edges this close to the pointer ([ and ] change it)")),
+    );
     let contrast = number(
         ui,
         "magnetic-contrast",
@@ -231,7 +245,8 @@ fn magnetic_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         Some(UnitKind::Percent),
         Some(label("Higher values follow only edges that contrast sharply with their surroundings")),
     );
-    let frequency = number(ui, "magnetic-frequency", label("Frequency"), frequency, 0.0..=100.0, None, Some(label("How often fastening points are placed by themselves")));
+    let frequency =
+        number(ui, "magnetic-frequency", label("Frequency"), frequency, 0.0..=100.0, None, Some(label("How often fastening points are placed by themselves")));
     let toggled = ToggleButton::new(label("Use tablet pressure to change pen width"), Bind::given(pressure))
         .icon(craft::behavior::IconId::new("circle-dot"))
         .icon_only()

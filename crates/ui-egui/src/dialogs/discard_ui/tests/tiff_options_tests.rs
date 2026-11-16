@@ -1,7 +1,7 @@
 //! TIFF Options on Save As and Save a Copy (#8827): Image Compression, Save Image Pyramid, Save
 //! Transparency and the layers choice; the scripted params that skip it; recording and playback.
-use super::*;
 use super::jpeg_tests::{fields, parked, set_field, steps};
+use super::*;
 use crate::tiff_options_ui;
 use craft::automation::actions::ActionStep;
 use craft::host::{Picked, ScriptedFiles};

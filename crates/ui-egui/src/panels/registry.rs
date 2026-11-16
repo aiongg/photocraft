@@ -4,8 +4,8 @@
 //! The dock (`panel_docking`) reads a panel's spec and body from here; the command sources read each panel's menu
 //! states and run its fired commands through [`states`] and [`run_fired`]. One arrangement serves every theme.
 
-use craft::behavior::dock::{Action, Column, DockEdge, Floating, Group, Layout, Node, Permissions, SplitSize, Workspace};
 use craft::behavior::Axis;
+use craft::behavior::dock::{Action, Column, DockEdge, Floating, Group, Layout, Node, Permissions, SplitSize, Workspace};
 use craft::color::ui::{ColorPanelCommand, ColorPanelMenu};
 use craft::ui::docking::DockHeights;
 use craft::ui::menu::PanelRow;
@@ -192,16 +192,24 @@ pub(crate) static PANELS: &[PanelEntry] = &[
     PanelEntry {
         rows: super::type_panels_ui::styles::panel_rows,
         run: super::type_panels_ui::styles::run_fired,
-        ..floating("characterStyles", || tl!("Character Styles").to_string(), "type", [280.0, 360.0], |app, ui| {
-            super::type_panels_ui::styles::panel(app, ui, false)
-        })
+        ..floating(
+            "characterStyles",
+            || tl!("Character Styles").to_string(),
+            "type",
+            [280.0, 360.0],
+            |app, ui| super::type_panels_ui::styles::panel(app, ui, false),
+        )
     },
     PanelEntry {
         rows: super::type_panels_ui::styles::panel_rows,
         run: super::type_panels_ui::styles::run_fired,
-        ..floating("paragraphStyles", || tl!("Paragraph Styles").to_string(), "pilcrow", [280.0, 360.0], |app, ui| {
-            super::type_panels_ui::styles::panel(app, ui, true)
-        })
+        ..floating(
+            "paragraphStyles",
+            || tl!("Paragraph Styles").to_string(),
+            "pilcrow",
+            [280.0, 360.0],
+            |app, ui| super::type_panels_ui::styles::panel(app, ui, true),
+        )
     },
     floating("glyphs", || tl!("Glyphs").to_string(), "text-cursor", [360.0, 320.0], super::type_panels_ui::glyphs::body),
     // The Timeline docks below the canvas; it lays out its own tracks.
@@ -300,15 +308,9 @@ fn float_rect(id: &str, size: [f32; 2]) -> Rect {
 /// bottom, and each floating panel in its own window. The built-in workspaces close what they do not show, so every
 /// closed panel keeps the place it comes back to.
 fn full_layout() -> Layout<String> {
-    let column = Column::new(
-        LEGACY_GROUPS.iter().map(|(_, panels)| Group::new(panels.iter().map(|panel| (*panel).to_owned()).collect(), 0)).collect(),
-    );
-    let canvas = Node::split(
-        Axis::Y,
-        SplitSize::FixedSecond(TIMELINE_HEIGHT),
-        Node::tabs(vec![CANVAS.to_owned()], 0),
-        Node::tabs(vec!["timeline".to_owned()], 0),
-    );
+    let column = Column::new(LEGACY_GROUPS.iter().map(|(_, panels)| Group::new(panels.iter().map(|panel| (*panel).to_owned()).collect(), 0)).collect());
+    let canvas =
+        Node::split(Axis::Y, SplitSize::FixedSecond(TIMELINE_HEIGHT), Node::tabs(vec![CANVAS.to_owned()], 0), Node::tabs(vec!["timeline".to_owned()], 0));
     let root = Node::split(Axis::X, SplitSize::Ratio(0.8), canvas, Node::dock(DockEdge::End, vec![column]));
     // Ids from the table order, so the built-in layout's windows are the same on every build of it.
     let floating = PANELS
@@ -332,8 +334,7 @@ fn preset_panels(name: &str) -> Vec<&'static str> {
         "Motion" => &["properties", "layers"],
         _ => &["color", "properties", "layers"],
     };
-    let mut shown: Vec<&'static str> =
-        LEGACY_GROUPS.iter().filter(|(key, _)| groups.contains(key)).flat_map(|(_, panels)| panels.iter().copied()).collect();
+    let mut shown: Vec<&'static str> = LEGACY_GROUPS.iter().filter(|(key, _)| groups.contains(key)).flat_map(|(_, panels)| panels.iter().copied()).collect();
     if name == "Motion" {
         shown.push("timeline");
     }

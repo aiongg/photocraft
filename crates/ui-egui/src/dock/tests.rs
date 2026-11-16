@@ -60,11 +60,8 @@ fn reset_workspace_restores_the_default_layout_and_new_workspaces_keep_theirs() 
     let (mut app, _, _) = app_with_layers();
     let ctx = egui::Context::default();
     let default = registry::default_workspace().layout;
-    crate::panel_docking::apply(
-        &mut app,
-        vec![Action::resize_group("properties".to_owned(), Some(120.0)), Action::set_minimized("color".to_owned(), true)],
-    )
-    .unwrap();
+    crate::panel_docking::apply(&mut app, vec![Action::resize_group("properties".to_owned(), Some(120.0)), Action::set_minimized("color".to_owned(), true)])
+        .unwrap();
     let mine = app.ui.docking.layout.clone();
     assert_ne!(mine, default);
     crate::menus::invoke(&mut app, &ctx, "workspace.new", json!({"name": "Tall Layers"})).unwrap();

@@ -150,4 +150,3 @@ fn confirm_io(app: &mut PhotocraftApp, f: &DialogFields) -> Result<Value, String
         })
     }
 }
-

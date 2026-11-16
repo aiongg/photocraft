@@ -14,6 +14,7 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use std::time::Instant;
 
 use craft::behavior::PixelSize;
+use craft::host::queue::Cancel;
 use craft::imaging::trace::{MaskRect, MaskSource};
 use craft::imaging::ui::mask_view::MaskViewRecipe;
 use craft::imaging::ui::select_mask::{
@@ -21,7 +22,6 @@ use craft::imaging::ui::select_mask::{
     SelectMaskWorkspace,
 };
 use craft::imaging::ui::wide_angle::PreviewDone;
-use craft::host::queue::Cancel;
 use craft::ui::canvas::RasterSource;
 use craft::ui::dialog::{DialogId, HostedWorkspace};
 use craft::ui::runtime::memory::SaveKey;
@@ -50,7 +50,6 @@ type Hosted = HostedWorkspace<SelectMaskWorkspace>;
 fn lock<T>(m: &Mutex<T>) -> MutexGuard<'_, T> {
     m.lock().unwrap_or_else(PoisonError::into_inner)
 }
-
 
 /// The selection after the first `edits` (document coordinates) on the copy reduced by `k`.
 #[derive(Clone)]

@@ -4,8 +4,8 @@ use craft::keymap::Mods;
 use craft::ui::contract::ReorderMove;
 use craft::ui::menu::PanelRow;
 use craft::ui::patterns::presets::{PresetEvent, PresetRow, PresetView};
-use craft::ui::runtime::env::Env;
 use craft::ui::runtime::commands::{CommandRef, CommandSet as _, CommandState};
+use craft::ui::runtime::env::Env;
 use egui::vec2;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
@@ -490,8 +490,13 @@ fn preset_rows_nest_presets_in_panel_order() {
         kit("Quill", "Kit", &["Inks"]),
         kit("Deep", "Kit", &deep),
     ];
-    let out: Vec<String> =
-        rows_of(app, PresetView::List).iter().map(|r| match r.count { Some(n) => format!("{}:{}#{n}", r.depth, r.label), None => format!("{}:{}", r.depth, r.label) }).collect();
+    let out: Vec<String> = rows_of(app, PresetView::List)
+        .iter()
+        .map(|r| match r.count {
+            Some(n) => format!("{}:{}#{n}", r.depth, r.label),
+            None => format!("{}:{}", r.depth, r.label),
+        })
+        .collect();
     assert_eq!(out[..10], ["0:Kit#6", "1:Top", "1:Inks#3", "2:Pen", "2:Fine#1", "3:Nib", "2:Quill", "1:Dry#1", "2:Chalk", "1:d#1"]);
     assert_eq!(out.iter().filter(|s| s.ends_with(":d#1")).count(), max, "paths are cut at the folder depth");
     assert_eq!(out.last().map(String::as_str), Some(format!("{}:Deep", max + 1).as_str()));

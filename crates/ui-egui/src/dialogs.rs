@@ -61,7 +61,12 @@ pub(crate) mod params {
     pub(crate) const PARAM_FAMILIES: &[ParamFamily] = &[
         ParamFamily { check: Some(fill_ui::check), ..ParamFamily::new(fill_ui::owns, fill_ui::run) },
         ParamFamily { check: Some(stroke_ui::check), ..ParamFamily::new(stroke_ui::owns, stroke_ui::run) },
-        ParamFamily { check: Some(smart_filter_dialog::check), cancel: Some(filter_dialog::cancel), document: Some(smart_filter_dialog::document), ..ParamFamily::new(smart_filter_dialog::owns, smart_filter_dialog::run) },
+        ParamFamily {
+            check: Some(smart_filter_dialog::check),
+            cancel: Some(filter_dialog::cancel),
+            document: Some(smart_filter_dialog::document),
+            ..ParamFamily::new(smart_filter_dialog::owns, smart_filter_dialog::run)
+        },
         ParamFamily::new(new_layer_ui::owns, new_layer_ui::run),
         ParamFamily::new(new_group_ui::owns, new_group_ui::run),
         ParamFamily { check: Some(duplicate_layer_ui::check), ..ParamFamily::new(duplicate_layer_ui::owns, duplicate_layer_ui::run) },
@@ -71,10 +76,18 @@ pub(crate) mod params {
         ParamFamily { check: Some(equalize_ui::check), ..ParamFamily::new(equalize_ui::owns, equalize_ui::run) },
         ParamFamily::new(channel_options_ui::owns, channel_options_ui::run),
         ParamFamily { check: Some(merge_channels_ui::check), ..ParamFamily::new(merge_channels_ui::owns, merge_channels_ui::run) },
-        ParamFamily { check: Some(filter_dialog::check), footer: Some(color_table_ui::footer_action), cancel: Some(filter_dialog::cancel), ..ParamFamily::new(|key| key == "image.mode.colorTable", filter_dialog::run) },
+        ParamFamily {
+            check: Some(filter_dialog::check),
+            footer: Some(color_table_ui::footer_action),
+            cancel: Some(filter_dialog::cancel),
+            ..ParamFamily::new(|key| key == "image.mode.colorTable", filter_dialog::run)
+        },
         ParamFamily { cancel: Some(filter_dialog::cancel), ..ParamFamily::new(file_forms::owns, filter_dialog::run) },
         ParamFamily { listing: Some(stack_dialog::listing), ..ParamFamily::new(stack_dialog::owns, stack_dialog::run) },
-        ParamFamily { check: Some(crate::canvas_tool_menu::pen_dialogs::check), ..ParamFamily::new(crate::canvas_tool_menu::pen_dialogs::owns, crate::canvas_tool_menu::pen_dialogs::run) },
+        ParamFamily {
+            check: Some(crate::canvas_tool_menu::pen_dialogs::check),
+            ..ParamFamily::new(crate::canvas_tool_menu::pen_dialogs::owns, crate::canvas_tool_menu::pen_dialogs::run)
+        },
         ParamFamily::new(crate::analysis::dialogs::owns, crate::analysis::dialogs::run),
         ParamFamily::new(crate::layers_panel_ui::owns, crate::layers_panel_ui::run),
         ParamFamily { cancel: Some(filter_dialog::cancel), ..ParamFamily::new(crate::view_cmds::dialogs::is_form, filter_dialog::run) },
@@ -635,16 +648,16 @@ pub mod adjust_preview;
 pub mod alerts;
 #[cfg(test)]
 mod arbitrary_ruler_prefill_tests;
-pub mod blend_options;
 pub(crate) mod bitmap_dialog;
+pub mod blend_options;
 pub mod blur_pins;
 pub mod brush_preset_dialog;
 pub mod caf_ui;
-pub(crate) mod canvas_input;
 pub(super) mod camera_raw_detail_ui;
 pub(super) mod camera_raw_gpu;
 pub(super) mod camera_raw_scope_ui;
 pub mod camera_raw_ui;
+pub(crate) mod canvas_input;
 pub mod channel_options_ui;
 pub(crate) mod color_picker_preview;
 pub mod color_picker_ui;

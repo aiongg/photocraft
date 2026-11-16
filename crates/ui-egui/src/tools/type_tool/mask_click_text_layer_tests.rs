@@ -10,10 +10,10 @@ use serde_json::json;
 
 use super::super::commit;
 use super::super::commit_tests::{frames, key};
+use super::super::current_text;
 use super::super::host::type_text;
 use super::super::layout::{hit_layer, offset_at};
 use super::super::mask_replace_selection_tests::{click, new_app, selection};
-use super::super::current_text;
 use crate::PhotocraftApp;
 use crate::dialogs::alerts::alerts;
 use crate::state::Tool;
@@ -41,7 +41,6 @@ fn txt(tool: Tool) -> (PhotocraftApp, LayerId, (f64, f64)) {
     let y = 185.0;
     let x = (100..200)
         .map(f64::from)
-
         .find(|&x| hit_layer(&mut app, x, y) == Some(id) && offset_at(&mut app, id, x, y) == 1)
         .expect("a point after the first letter");
     (app, id, (x, y))
@@ -58,7 +57,6 @@ fn history(app: &PhotocraftApp) -> Vec<String> {
 fn layers(app: &PhotocraftApp) -> usize {
     app.session.active().unwrap().doc.layers.len()
 }
-
 
 #[test]
 fn a_type_mask_click_on_text_edits_that_layer_as_the_type_tool_does() {

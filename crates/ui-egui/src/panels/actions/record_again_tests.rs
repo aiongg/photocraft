@@ -3,10 +3,10 @@
 use std::sync::atomic::{AtomicUsize, Ordering};
 
 use craft::automation::ui::actions::{ActionSelection, ActionsPanelCommands};
-use craft::ui::runtime::commands::CommandRef;
 use craft::ui::contract::Bind;
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::{DialogFields, HostedParamDialog, Param, ParamDialog, ParamKind};
+use craft::ui::runtime::commands::CommandRef;
 use egui_kittest::Harness;
 use photocraft_engine::actions_cmds::{Action, ActionStep};
 use photocraft_engine::{EngineError, Session};
@@ -26,7 +26,8 @@ fn harness(command: &str, params: Value) -> Harness<'static, PhotocraftApp> {
     action.dialogs.insert(0);
     app.session.actions.list.push(action).unwrap();
     app.ui.actions.panel.selected = Some(ActionSelection::Step(0, 0));
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1000.0, 760.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let mut h =
+        Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1000.0, 760.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());
     h.run_steps(3);
     h

@@ -61,7 +61,10 @@ pub fn note_automation_step(s: &mut Session, id: &str, params: &Value) {
 /// removed, so the job passes the origin it captured when it was admitted rather than whatever
 /// gate the caller polling it has.
 pub(crate) fn note_step_origin(s: &mut Session, automation: bool, id: &str, params: &Value) {
-    if automation && recorded(id, params) && let Some((_, idx)) = s.actions.recording {
+    if automation
+        && recorded(id, params)
+        && let Some((_, idx)) = s.actions.recording
+    {
         let _ = s.actions.list.set_automation(idx, true);
     }
 }

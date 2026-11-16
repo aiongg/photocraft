@@ -11,11 +11,11 @@ use std::collections::{BTreeMap, HashMap, HashSet};
 use std::sync::Arc;
 
 use craft::color::gradient::GradientStops;
+use craft::color::ui::ColorPickerDialog;
 use craft::imaging::layer_style::{
     BlendIf, BlendIfRange, Blending, EffectId, EffectInstance, EffectKind, EffectSpec, FieldKind, Knockout, LayerStyle, LayerStyleDraft, LayerStylePage,
     StyleParams, StyleValue,
 };
-use craft::color::ui::ColorPickerDialog;
 use craft::imaging::ui::layer_style::{ContourEditorDialog, HostedLayerStyle, LayerStyleAsk};
 use craft::theme::Srgba;
 use craft::ui::contract::Entry;

@@ -317,15 +317,8 @@ fn begin_several(app: &mut PhotocraftApp, ctx: &egui::Context, doc: Arc<Document
     let above = Above::new(&doc, top, max_side);
     above.hide_in(&mut under.layers);
     // Opacity, fill, masks and styles are in the composite already.
-    let mut several = Several {
-        name: format!("transform-{session}"),
-        max_side,
-        moving: Several::shown(&doc, &ids, &lifted),
-        lifted,
-        ids: ids.clone(),
-        frame: b,
-        rect: b,
-    };
+    let mut several =
+        Several { name: format!("transform-{session}"), max_side, moving: Several::shown(&doc, &ids, &lifted), lifted, ids: ids.clone(), frame: b, rect: b };
     let textures = several.render();
     app.transform_preview = Some(OpenPreview {
         above: Some(above),
@@ -600,10 +593,8 @@ fn begin_path(app: &mut PhotocraftApp, params: serde_json::Value, path: photocra
     // A straight horizontal or vertical path still gets a box to turn.
     let rect = [x0, y0, x1.max(x0 + 1.0), y1.max(y0 + 1.0)];
     let session = app.ui.alloc_id();
-    let textures = PreviewTextures::new(
-        format!("transform-{session}"),
-        PreviewPixels::new(egui::ColorImage::new([1, 1], vec![Color32::TRANSPARENT]), [1.0, 1.0]),
-    );
+    let textures =
+        PreviewTextures::new(format!("transform-{session}"), PreviewPixels::new(egui::ColorImage::new([1, 1], vec![Color32::TRANSPARENT]), [1.0, 1.0]));
     app.transform_preview = Some(OpenPreview { path: Some(path), ..OpenPreview::new(session, doc, textures, app.ui.tool) });
     app.ui.transform = Some(FreeTransform {
         session: open_session(app, rect, BoxAllow::default(), true),

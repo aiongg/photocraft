@@ -156,9 +156,9 @@ pub(crate) fn open_with(app: &mut PhotocraftApp, command: &str, params: &Value) 
     } else {
         let values =
             CanvasSizeValues::new(size).pixels_per_inch(dpi).points_per_inch(points).unit(unit).has_background(d.background().is_some()).column_size(columns);
-        app.framework.dialogs.open(HostedCanvasSize::new(values, move |values: Bind<'_, CanvasSizeValues>| {
-            CanvasSize::new(values).bytes_per_pixel(bytes_per_pixel)
-        }))
+        app.framework
+            .dialogs
+            .open(HostedCanvasSize::new(values, move |values: Bind<'_, CanvasSizeValues>| CanvasSize::new(values).bytes_per_pixel(bytes_per_pixel)))
     };
     seed(app, id, command == IMAGE_COMMAND, params);
     Some(id)

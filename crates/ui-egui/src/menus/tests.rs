@@ -125,16 +125,19 @@ fn menu_rows_sit_where_photoshop_puts_them_and_show_their_state() {
             new_doc,
             &[
                 Want { id: "filter.other.offset", path: Some(&["Filter", "Other"]), ..Want::NONE },
-                Want { id: "filter.other.colorToAlpha", path: Some(&["Filter", "Other"]), enabled: Some(true), after: Some("filter.other.offset"), ..Want::NONE },
+                Want {
+                    id: "filter.other.colorToAlpha",
+                    path: Some(&["Filter", "Other"]),
+                    enabled: Some(true),
+                    after: Some("filter.other.offset"),
+                    ..Want::NONE
+                },
             ],
         ),
         (
             "proof setup",
             proofed,
-            &[
-                Want { id: "view.proofColors", checked: Some(true), ..Want::NONE },
-                Want { id: "view.gamutWarning", checked: Some(true), ..Want::NONE },
-            ],
+            &[Want { id: "view.proofColors", checked: Some(true), ..Want::NONE }, Want { id: "view.gamutWarning", checked: Some(true), ..Want::NONE }],
         ),
         ("Warp on a plain layer", painted_layer, &[Want { id: "edit.transform.warp", checked: Some(false), ..Want::NONE }]),
         ("Warp with its box open (#9798)", warp_box_open, &[Want { id: "edit.transform.warp", checked: Some(true), ..Want::NONE }]),

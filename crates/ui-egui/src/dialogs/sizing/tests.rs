@@ -113,9 +113,7 @@ fn indexed_color_resamples_with_nearest_neighbor_only() {
     }
 
     app.session.execute("image.mode.indexedColor", json!({})).unwrap();
-    for (pref, want) in
-        [("bicubic", Resample::NearestNeighbor), ("bicubicAutomatic", Resample::Automatic), ("nearestNeighbor", Resample::NearestNeighbor)]
-    {
+    for (pref, want) in [("bicubic", Resample::NearestNeighbor), ("bicubicAutomatic", Resample::Automatic), ("nearestNeighbor", Resample::NearestNeighbor)] {
         app.session.execute("prefs.set", json!({"path": "general.imageInterpolation", "value": pref})).unwrap();
         let id = open_hosted(&mut app, "image.imageSize");
         assert_eq!(image_fields(&app, id)["resample"], method(want), "{pref}");

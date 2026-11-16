@@ -388,21 +388,23 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
     let name = label.clone();
     params.retain(|p| p.key != "sourceLayer");
     let count = documents.len();
-    params.push(Param::custom("sourceLayer", label, move |ui, fields, _| {
-        let source = fields.text("source").map(str::to_owned);
-        let listed = source.as_deref().and_then(|s| s.parse::<usize>().ok()).and_then(|i| layers.get(i));
-        let shown = layer_ref(fields).filter(|id| listed.is_some_and(|l| l.iter().any(|(known, _)| known == id))).unwrap_or(-1);
-        let mut entries = vec![Entry::new(-1i64, Label::from(tl!("Merged")))];
-        entries.extend(listed.into_iter().flatten().map(|(id, layer)| Entry::new(*id, Label::from(layer.clone()))));
-        let out = Select::new(name.clone(), Bind::given(shown), &entries).enabled(listed.is_some()).show(ui);
-        match out.value().copied() {
-            Some(-1) => drop(fields.remove("sourceLayer")),
-            Some(id) => fields.set("sourceLayer", id),
-            None => {}
-        }
-        out.response().clone()
-    })
-    .enabled_when_in("source", (0..count).map(|i| i.to_string())));
+    params.push(
+        Param::custom("sourceLayer", label, move |ui, fields, _| {
+            let source = fields.text("source").map(str::to_owned);
+            let listed = source.as_deref().and_then(|s| s.parse::<usize>().ok()).and_then(|i| layers.get(i));
+            let shown = layer_ref(fields).filter(|id| listed.is_some_and(|l| l.iter().any(|(known, _)| known == id))).unwrap_or(-1);
+            let mut entries = vec![Entry::new(-1i64, Label::from(tl!("Merged")))];
+            entries.extend(listed.into_iter().flatten().map(|(id, layer)| Entry::new(*id, Label::from(layer.clone()))));
+            let out = Select::new(name.clone(), Bind::given(shown), &entries).enabled(listed.is_some()).show(ui);
+            match out.value().copied() {
+                Some(-1) => drop(fields.remove("sourceLayer")),
+                Some(id) => fields.set("sourceLayer", id),
+                None => {}
+            }
+            out.response().clone()
+        })
+        .enabled_when_in("source", (0..count).map(|i| i.to_string())),
+    );
 }
 
 /// The source layer a form holds: the row's own choice, or the id a caller set through the row's key.
@@ -520,7 +522,8 @@ fn points_at(fields: &DialogFields, key: &str) -> Vec<[f64; 2]> {
 
 /// The samples the dialog holds: `points`, `subtractPoints` and their click `order`.
 fn samples_of(fields: &DialogFields) -> ColorSamples {
-    let order: Vec<SampleSign> = fields.get("order").and_then(|v| serde_json::to_value(v).ok()).and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
+    let order: Vec<SampleSign> =
+        fields.get("order").and_then(|v| serde_json::to_value(v).ok()).and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
     ColorSamples { add: points_at(fields, "points"), subtract: points_at(fields, "subtractPoints"), order }
 }
 

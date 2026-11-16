@@ -847,7 +847,8 @@ impl PhotocraftApp {
     /// the dialog cannot show is ignored.
     #[allow(clippy::field_reassign_with_default)] // `DocumentOptions` is `#[non_exhaustive]`: it cannot be built with a struct expression here.
     pub(crate) fn new_document_options(&mut self) -> DocumentOptions {
-        let last = craft::ui::runtime::memory::saved_value::<Option<DocumentOptions>>(self.ctx(), &crate::new_doc_ui::LAST_CREATED).filter(DocumentOptions::fits);
+        let last =
+            craft::ui::runtime::memory::saved_value::<Option<DocumentOptions>>(self.ctx(), &crate::new_doc_ui::LAST_CREATED).filter(DocumentOptions::fits);
         let mut options = last.unwrap_or_else(|| {
             let mut defaults = DocumentOptions::default();
             defaults.size = PixelSize::new(1920, 1080);
@@ -918,7 +919,8 @@ mod tests {
 
         assert_eq!(app.session.active().unwrap().path.as_deref(), Some(path.as_str()), "the document save itself succeeded");
         assert!(assets.join("good.png").is_file(), "the good asset was exported");
-        let notice = app.ui.notices.iter().find(|notice| notice.tone == craft::theme::variant::Tone::Bad).expect("the failed asset is reported as an error notice");
+        let notice =
+            app.ui.notices.iter().find(|notice| notice.tone == craft::theme::variant::Tone::Bad).expect("the failed asset is reported as an error notice");
         assert_eq!(notice.title, format!("Saved {path}: 1 Image Assets output failed"), "the failure names the saved document by its full path");
         assert_eq!(notice.lines.len(), 1, "{:?}", notice.lines);
         assert!(notice.lines[0].starts_with("blocked/fail.png: asset path"), "{:?}", notice.lines[0]);

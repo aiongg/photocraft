@@ -30,7 +30,8 @@ fn first_han_face(ctx: &egui::Context) -> Option<String> {
 /// A face added after the install, as the on-demand loader and the served-face loader add one: at the lowest
 /// priority of both UI families.
 fn add_late_face(ctx: &egui::Context, name: &str) {
-    let families = [FontFamily::Proportional, FontFamily::Monospace].into_iter().map(|family| InsertFontFamily { family, priority: FontPriority::Lowest }).collect();
+    let families =
+        [FontFamily::Proportional, FontFamily::Monospace].into_iter().map(|family| InsertFontFamily { family, priority: FontPriority::Lowest }).collect();
     ctx.add_font(FontInsert::new(name, FontData::from_static(photocraft_text::fonts::INTER_REGULAR.as_slice()), families));
 }
 
@@ -326,10 +327,9 @@ fn craft_faces_draw_the_first_frame_in_both_families() {
 /// Changing the UI language installs the stack again in the new language's order.
 #[test]
 fn language_change_reloads_eager_faces_through_the_app_context() {
-    let (Some(ui_font), Some(chinese)) = (
-        craft_fonts::japanese_for_ui().first().copied().and_then(|f| craft_name(f.family, f.style)),
-        craft_name("Noto Sans CJK SC", "Regular"),
-    ) else {
+    let (Some(ui_font), Some(chinese)) =
+        (craft_fonts::japanese_for_ui().first().copied().and_then(|f| craft_name(f.family, f.style)), craft_name("Noto Sans CJK SC", "Regular"))
+    else {
         eprintln!("skipping: the craft-fonts manifest lacks a Japanese or a Simplified Chinese face");
         return;
     };

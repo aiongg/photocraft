@@ -58,7 +58,6 @@ pub(crate) fn visible(app: &PhotocraftApp, mods: Mods) -> bool {
     app.ui.tool.is_type() && app.ui.text_edit.is_some() && (mods.cmd || active(app))
 }
 
-
 /// The canvas view of the pass the control is shown in; `None` outside a canvas.
 pub(crate) fn view_of(ui: &egui::Ui) -> Option<CanvasView> {
     canvas_space(&Env::of(ui).view()).map(|space| space.view)

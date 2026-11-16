@@ -94,7 +94,8 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> Option<DialogId> {
     let st = app.session.active()?;
     let layer = st.active_layer?;
     let color = solid_fill(&st.doc, layer)?;
-    let target = ShapeTarget { which: Paint::Fill, layer: Some(layer), document: Some(st.doc.id), tool: false, thumbnail: true, alpha: color.alpha, solid: true };
+    let target =
+        ShapeTarget { which: Paint::Fill, layer: Some(layer), document: Some(st.doc.id), tool: false, thumbnail: true, alpha: color.alpha, solid: true };
     let start = Srgba::from_rgb_array(color.to_rgb());
     Some(color_picker_ui::open_for(app, "Color Picker (Solid Color)", start, None, PickTarget::Shape(target)))
 }
@@ -182,11 +183,8 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, t: &ShapeTarget, picker: &PickedC
 fn edit_paint(app: &mut PhotocraftApp, t: &ShapeTarget, layer: LayerId, rgba: [f32; 4]) -> Result<Value, String> {
     let which = t.which;
     let rgb_now = hex([rgba[0], rgba[1], rgba[2]]);
-    let same = app
-        .session
-        .active()
-        .and_then(|st| paint_of(&st.doc, layer, which))
-        .is_some_and(|p| matches!(p, Some(Fill::Solid(c)) if hex(c.to_rgb()) == rgb_now));
+    let same =
+        app.session.active().and_then(|st| paint_of(&st.doc, layer, which)).is_some_and(|p| matches!(p, Some(Fill::Solid(c)) if hex(c.to_rgb()) == rgb_now));
     if t.solid && same {
         return Ok(json!({"layer": layer.0, "unchanged": true}));
     }

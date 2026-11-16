@@ -1077,13 +1077,7 @@ mod tests {
         let vib = run(cr! { vibrance: 100.0});
         let spread = |q: [f32; 4]| q[0].max(q[1]).max(q[2]) - q[0].min(q[1]).min(q[2]);
         assert!(spread(vib[w * h / 2]) > spread(base[w * h / 2]));
-        for p in [
-            cr! { clarity: 80.0},
-            cr! { texture: 80.0},
-            cr! { dehaze: 60.0},
-            cr! { dehaze: -60.0},
-            cr! { whites: 50.0, blacks: -50.0},
-        ] {
+        for p in [cr! { clarity: 80.0}, cr! { texture: 80.0}, cr! { dehaze: 60.0}, cr! { dehaze: -60.0}, cr! { whites: 50.0, blacks: -50.0}] {
             let out = run(p.clone());
             assert!(out.iter().all(|q| q[..3].iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v))), "{p:?}");
             assert_ne!(out, base);
@@ -1136,8 +1130,7 @@ mod tests {
         assert!(var(&nr) < var(&noisy) * 0.5);
         // Out-of-range noise settings are held to their 0..=100 range, not turned into huge radii.
         let mut wild = noisy.clone();
-        let hostile =
-            cr! { noise_luminance: 1.0e30, noise_color: 1.0e30, noise_luminance_detail: 1.0e30, noise_color_detail: 1.0e30};
+        let hostile = cr! { noise_luminance: 1.0e30, noise_color: 1.0e30, noise_luminance_detail: 1.0e30, noise_color_detail: 1.0e30};
         develop(&mut wild, w, h, &hostile, false);
         assert!(wild.iter().all(|q| q[0].is_finite()));
         let mut sh = noisy.clone();
@@ -1162,11 +1155,7 @@ mod tests {
     fn calibration_keeps_the_develop_off_the_per_pixel_gpu_stages() {
         // The per-pixel stages (the Camera Raw dialog's GPU preview) don't run Calibration, so
         // settings with it must fall back to the CPU develop instead of previewing without it.
-        for p in [
-            cr! { shadow_tint: 40.0},
-            cr! { calibration_hue: [0.0, 0.0, 30.0], whites: 20.0},
-            cr! { calibration_sat: [-50.0, 0.0, 0.0], exposure: 0.5},
-        ] {
+        for p in [cr! { shadow_tint: 40.0}, cr! { calibration_hue: [0.0, 0.0, 30.0], whites: 20.0}, cr! { calibration_sat: [-50.0, 0.0, 0.0], exposure: 0.5}] {
             assert!(!spatial(&p));
             assert!(per_pixel(&p, 2, 2, false, Some((0.0, 1.0))).is_none(), "{p:?}");
         }

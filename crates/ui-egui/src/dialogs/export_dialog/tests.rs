@@ -27,12 +27,8 @@ fn export_app(width: u32, height: u32) -> PhotocraftApp {
 
 /// [`export_app`] over the file service `files` (the framework takes it when the app is built).
 fn export_app_over(width: u32, height: u32, files: Option<std::sync::Arc<dyn craft::host::Files>>) -> PhotocraftApp {
-    let services = crate::Services {
-        files,
-        export: Some(Box::new(|_, _, _| Ok((Vec::new(), Vec::new())))),
-        write: Some(Box::new(|_, _| Ok(()))),
-        ..Default::default()
-    };
+    let services =
+        crate::Services { files, export: Some(Box::new(|_, _, _| Ok((Vec::new(), Vec::new())))), write: Some(Box::new(|_, _| Ok(()))), ..Default::default() };
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
     app.run("file.new", json!({"width": width, "height": height})).unwrap();
     app
@@ -40,10 +36,11 @@ fn export_app_over(width: u32, height: u32, files: Option<std::sync::Arc<dyn cra
 
 /// The dialog host and its answers, as a frame runs them, on the app's own context.
 fn harness(app: PhotocraftApp) -> AppHarness {
-    let mut h = Harness::builder().with_size(egui::vec2(900.0, 700.0)).with_step_dt(1.0 / 60.0).with_context(app.ctx().clone()).build_ui_state(
-        |ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui),
-        app,
-    );
+    let mut h = Harness::builder()
+        .with_size(egui::vec2(900.0, 700.0))
+        .with_step_dt(1.0 / 60.0)
+        .with_context(app.ctx().clone())
+        .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
     h.run_steps(2);
     h
 }
@@ -492,8 +489,9 @@ fn the_estimate_is_the_exported_files_size() {
     let size = loop {
         let mut size = None;
         let mut output = ctx.run_ui(Default::default(), |ctx| {
-            egui::CentralPanel::default()
-                .show(ctx, |ui| size = poll_or_start_exact_estimate(ui.ctx(), key, "jpg32", doc.clone(), &f, photocraft_engine::color_cmds::document_profile(&doc)));
+            egui::CentralPanel::default().show(ctx, |ui| {
+                size = poll_or_start_exact_estimate(ui.ctx(), key, "jpg32", doc.clone(), &f, photocraft_engine::color_cmds::document_profile(&doc))
+            });
         });
         output.textures_delta.clear();
         if let Some(size) = size {
@@ -914,7 +912,8 @@ fn preview_cache_tracks_working_profiles_but_prefers_embedded_profiles() {
         let ctx = h.ctx.clone();
         h.state_mut().framework.dialogs.set_json_field(&ctx, id, "profile", serde_json::to_value(ExportProfile::Srgb).unwrap()).unwrap();
         settle_preview(&mut h);
-        let texture = |h: &AppHarness| h.state().export_open.as_ref().and_then(|open| open.texture.as_ref().map(egui::TextureHandle::id)).expect("a preview was made");
+        let texture =
+            |h: &AppHarness| h.state().export_open.as_ref().and_then(|open| open.texture.as_ref().map(egui::TextureHandle::id)).expect("a preview was made");
         let before = texture(&h);
         let options = dialog_options(&h);
         h.state_mut().session.execute("edit.colorSettings", json!({"workingRgb": "adobe-rgb-compat"})).unwrap();

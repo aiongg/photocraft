@@ -313,11 +313,7 @@ fn main_workspace_file_loads_as_the_default_and_saves_as_a_workspace() {
     crate::dock::apply(&mut app, &saved);
     app.ui.docking.validate().expect("the loaded workspace is valid");
     for entry in registry::PANELS {
-        assert!(
-            is_shown(&app, entry.id) || app.ui.docking.hidden.iter().any(|(panel, _)| panel == entry.id),
-            "{} is shown or can be reopened",
-            entry.id
-        );
+        assert!(is_shown(&app, entry.id) || app.ui.docking.hidden.iter().any(|(panel, _)| panel == entry.id), "{} is shown or can be reopened", entry.id);
     }
     assert!(is_shown(&app, "layers"));
 

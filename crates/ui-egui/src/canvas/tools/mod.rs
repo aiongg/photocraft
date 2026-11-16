@@ -22,8 +22,8 @@ use craft::behavior::{CancelReason, Cursor, GesturePhase, PointerButton};
 use craft::draw::ui::{CropShown, CropToolPass};
 use craft::keymap::Mods;
 use craft::ui::canvas::{
-    Autoscroll, CanvasOutput, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims, ToolContext,
-    ToolHost, ToolHostResponse, ToolKey, ToolPath, ToolPointer, ZoomTool,
+    Autoscroll, CanvasOutput, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims,
+    ToolContext, ToolHost, ToolHostResponse, ToolKey, ToolPath, ToolPointer, ZoomTool,
 };
 use craft::ui::primitives::Draw;
 
@@ -216,10 +216,7 @@ pub(crate) fn family(tool: Tool) -> Family {
 /// `run` installs the Command stand-in by it and the snap targets of the moving set follow it.
 pub(crate) fn takes_command_stand_in(tool: Tool) -> bool {
     !tool.is_type()
-        && !matches!(
-            family(tool),
-            Family::Move | Family::Hand | Family::Zoom | Family::RotateView | Family::Crop | Family::PerspectiveCrop | Family::Slice
-        )
+        && !matches!(family(tool), Family::Move | Family::Hand | Family::Zoom | Family::RotateView | Family::Crop | Family::PerspectiveCrop | Family::Slice)
         && family(tool) != Family::Vector
 }
 
@@ -532,7 +529,9 @@ fn with_rig<R>(
                 Family::Selection => dynamic(boxed.insert(selection::tool(&scope, selection, host))),
                 Family::Move => dynamic(boxed.insert(move_tool::tool(&scope, mover.take().expect("the Move state is free"), host))),
                 Family::Paint => dynamic(boxed.insert(super::paint_tool::tool(&scope, paint, host))),
-                Family::Eyedropper => dynamic(boxed.insert(super::eyedropper_tool::tool(&scope, eyedropper.take().expect("the Eyedropper state is free"), host))),
+                Family::Eyedropper => {
+                    dynamic(boxed.insert(super::eyedropper_tool::tool(&scope, eyedropper.take().expect("the Eyedropper state is free"), host)))
+                }
                 Family::Vector => dynamic(boxed.insert(crate::vector_ui::host::tool(&scope, vector, host))),
                 Family::Type => dynamic(boxed.insert(crate::type_tool::tool(&scope, type_tool, host))),
                 Family::Gradient => dynamic(boxed.insert(crate::gradient_ui::tool::tool(&scope, gradient, host))),
@@ -544,12 +543,21 @@ fn with_rig<R>(
                 Family::PerspectiveCrop => dynamic(boxed.insert(crate::perspective_crop_ui::tool(&scope, perspective, host))),
             }
         };
-        if command_wanted && !dialog_picked && let Some(state) = mover.take() {
+        if command_wanted
+            && !dialog_picked
+            && let Some(state) = mover.take()
+        {
             command_t = Some(move_tool::tool(&scope, state, host));
         }
-        if alt_wanted && !dialog_picked && let Some(state) = eyedropper.take() {
+        if alt_wanted
+            && !dialog_picked
+            && let Some(state) = eyedropper.take()
+        {
             alt_t = Some(super::eyedropper_tool::stand_in_tool(&scope, state, host));
-        } else if source_wanted && !dialog_picked && let Some(state) = retouch.take() {
+        } else if source_wanted
+            && !dialog_picked
+            && let Some(state) = retouch.take()
+        {
             alt_t = Some(retouch::source_tool(&scope, state, host));
         }
         let mut pre = Preflight { scope: &scope, inner: selected, tool, dialog: dialog_picked, outline_open };

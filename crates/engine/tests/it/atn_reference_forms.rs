@@ -1,6 +1,10 @@
 use craft_psd::atn::{self, AtnAction, AtnEvent, AtnFile, AtnItem};
 use craft_psd::descriptor::{Class, Descriptor, Id, ReferenceItem, UnicodeString, Value as D};
-use photocraft_engine::{Session, actions_cmds::{Action, ActionList, ActionStep, ActionsFile}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionList, ActionStep, ActionsFile},
+    atn_cmds,
+};
 use serde_json::{Value, json};
 
 fn class(name: &str) -> Class {
@@ -13,7 +17,8 @@ fn ordinal(name: &str) -> ReferenceItem {
 
 fn load(s: &mut Session, reference: ReferenceItem) {
     let descriptor = Descriptor::new("null").with("null", D::Reference(vec![reference]));
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: vec![imported(AtnEvent::Code(*b"slct"), descriptor)], sets: Vec::new() });
+    s.actions.list =
+        ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: vec![imported(AtnEvent::Code(*b"slct"), descriptor)], sets: Vec::new() });
 }
 
 fn bytes(event: AtnEvent, descriptor: Descriptor) -> Vec<u8> {

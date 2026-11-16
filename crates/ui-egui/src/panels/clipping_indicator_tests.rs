@@ -25,7 +25,11 @@ fn adjustment_harness(kind: &str, depth: u32) -> Harness<'static, PhotocraftApp>
             if !ui.ctx().fonts(|fonts| fonts.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
             }
-            properties |= app.session.active().and_then(|s| s.active_layer.and_then(|id| s.doc.layer(id))).is_some_and(|l| matches!(l.content, LayerContent::Adjustment(_)));
+            properties |= app
+                .session
+                .active()
+                .and_then(|s| s.active_layer.and_then(|id| s.doc.layer(id)))
+                .is_some_and(|l| matches!(l.content, LayerContent::Adjustment(_)));
             crate::i18n::with_language(crate::i18n::Lang::EN, || {
                 if properties {
                     super::properties::panel(app, ui);

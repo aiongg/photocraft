@@ -139,7 +139,8 @@ fn rows(performance: &str, seconds: f64, single: bool) -> Vec<Param> {
     let (least, most) = (f64::from(*range.start()), f64::from(*range.end()));
     vec![
         Param::new("performance", tl!("Performance"), ParamKind::radio(options, Some(performance.to_owned()))),
-        Param::new("seconds", tl!("seconds"), ParamKind::number(Some(least), Some(most), seconds, 1.0, 0)).enabled_when("performance", PlaybackPerformance::Pause.name()),
+        Param::new("seconds", tl!("seconds"), ParamKind::number(Some(least), Some(most), seconds, 1.0, 0))
+            .enabled_when("performance", PlaybackPerformance::Pause.name()),
         Param::new("singleState", tl!("Create a single history state"), ParamKind::bool(single)),
     ]
 }

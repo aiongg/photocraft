@@ -135,11 +135,8 @@ fn pin_json(kind: BlurKind, p: &BlurPin) -> Value {
 /// The pins in `fields`, cleaned, over `bounds`. A missing or hostile value takes its default.
 pub(crate) fn pins_of(fields: &DialogFields, kind: BlurKind, bounds: [f64; 4]) -> BlurPins {
     let mut pins = BlurPins::new(kind, bounds, BlurPin::new(0.5, 0.5, DEFAULT_AMOUNT));
-    pins.pins = if kind == BlurKind::TiltShift {
-        vec![start_of(fields, kind)]
-    } else {
-        json_pins(fields).iter().take(MAX_PINS).map(|v| pin_of(kind, v)).collect()
-    };
+    pins.pins =
+        if kind == BlurKind::TiltShift { vec![start_of(fields, kind)] } else { json_pins(fields).iter().take(MAX_PINS).map(|v| pin_of(kind, v)).collect() };
     pins.selected = fields.int("selected").and_then(|i| usize::try_from(i).ok());
     pins.clean();
     pins

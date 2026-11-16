@@ -38,9 +38,9 @@ use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
+use crate::camera_raw_gpu::CameraRawGpu;
 use crate::dialogs::camera_raw_detail_ui::DetailPreview;
 use crate::dialogs::camera_raw_scope_ui as scope_ui;
-use crate::camera_raw_gpu::CameraRawGpu;
 use crate::dialogs::shared_picture::SharedPicture;
 
 mod convert;
@@ -213,7 +213,8 @@ impl PcRawSource {
 
     /// A source over `init`; its pictures are empty until the first develop lands.
     pub(crate) fn new(init: SourceInit) -> Self {
-        let SourceInit { proxy, selection, proxy_size, full_size, block, float, display, gpu, encoding_gamma, lab_transform, scope_transform, detail, ctx } = init;
+        let SourceInit { proxy, selection, proxy_size, full_size, block, float, display, gpu, encoding_gamma, lab_transform, scope_transform, detail, ctx } =
+            init;
         let size = PixelSize::new(full_size.0 as u32, full_size.1 as u32);
         // Before (Y) is the undeveloped proxy, shown through the document's display.
         let before = SharedPicture::new(size);
@@ -307,7 +308,6 @@ impl RawDevelopSource for PcRawSource {
 
     fn develop(&self, request: &RawPreviewRequest) -> Job<PreviewDone, String> {
         if self.needs_detail(request) {
-
             self.detail.lock().unwrap_or_else(std::sync::PoisonError::into_inner).request(&self.ctx, request.revision, &request.settings, &self.inputs);
         }
         // The request's revision only counts source changes; the develops of one source are told apart by this order, so

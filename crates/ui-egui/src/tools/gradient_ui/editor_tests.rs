@@ -24,7 +24,10 @@ pub(super) fn editor(layer: bool) -> Harness<'static, PhotocraftApp> {
         app.run("gradient.presets.select", params).unwrap();
     }
     let ctx = app.ctx().clone();
-    let mut h = Harness::builder().with_size(vec2(1000.0, 900.0)).with_context(ctx).build_ui_state(|ui, app: &mut PhotocraftApp| crate::gradient_ui::editor::show(app, ui), app);
+    let mut h = Harness::builder()
+        .with_size(vec2(1000.0, 900.0))
+        .with_context(ctx)
+        .build_ui_state(|ui, app: &mut PhotocraftApp| crate::gradient_ui::editor::show(app, ui), app);
     h.run_steps(4);
     h
 }
@@ -129,7 +132,10 @@ fn a_typed_opacity_and_a_stop_drag_are_one_history_step_each() {
     select(&mut h, "40%");
     type_number(&mut h, "Opacity", "35", true);
     let typed = layer_fill(&h);
-    assert!(matches!(&typed, Fill::Gradient { opacity_stops, .. } if opacity_stops.iter().any(|s| (s.1 - 0.35).abs() < 1e-5)), "the typed opacity reached the fill");
+    assert!(
+        matches!(&typed, Fill::Gradient { opacity_stops, .. } if opacity_stops.iter().any(|s| (s.1 - 0.35).abs() < 1e-5)),
+        "the typed opacity reached the fill"
+    );
     assert_eq!(history(&h), steps + 1, "one step for the typed value");
 
     drag_marker(&mut h, "40%", 80.0, |h| {

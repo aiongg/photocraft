@@ -51,7 +51,6 @@ fn star_sits_in_the_shape_slot_after_polygon() {
     assert_eq!(pos(Tool::Star), pos(Tool::Polygon).map(|p| p + 1), "Tool::ALL keeps the slot order");
 }
 
-
 #[test]
 fn shift_u_steps_from_polygon_to_star_to_line() {
     let mut app = app();
@@ -87,4 +86,3 @@ fn a_drag_makes_a_live_star_shape_layer_with_one_undo_step() {
     app.run("edit.undo", json!({})).unwrap();
     assert!(live_shape(&app).is_none(), "undo takes the star away");
 }
-

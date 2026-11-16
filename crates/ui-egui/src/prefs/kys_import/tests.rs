@@ -86,9 +86,8 @@ fn plan_of(app: &PhotocraftApp, text: &str) -> ImportPlan {
 
 /// The keys the plan gives command `id`, as the preferences spell them.
 fn keys(plan: &ImportPlan, id: &str) -> Vec<String> {
-    let of = |p: &craft::keymap::import::Planned| -> Vec<String> {
-        p.bindings.iter().filter_map(|b| normalize_shortcut(&b.binding.text(&Scope::app()))).collect()
-    };
+    let of =
+        |p: &craft::keymap::import::Planned| -> Vec<String> { p.bindings.iter().filter_map(|b| normalize_shortcut(&b.binding.text(&Scope::app()))).collect() };
     plan.commands.iter().find(|p| p.command.id == id).map(of).unwrap_or_default()
 }
 

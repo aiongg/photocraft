@@ -295,12 +295,7 @@ mod tests {
             (
                 "Rasterize follows the whole selection, not the active layer",
                 type_and_raster,
-                &[
-                    ("layer.rasterize.layer", false),
-                    ("layer.rasterize.type", false),
-                    ("layer.rasterize.shape", true),
-                    ("layer.rasterize.smartObject", true),
-                ],
+                &[("layer.rasterize.layer", false), ("layer.rasterize.type", false), ("layer.rasterize.shape", true), ("layer.rasterize.smartObject", true)],
             ),
             ("nothing selected can be rasterized", background_and_raster, &[("layer.rasterize.layer", true)]),
             (
@@ -449,7 +444,6 @@ mod tests {
         }
         assert_eq!(checked, selections.len() * 2 * commands.len());
     }
-
 }
 
 #[cfg(test)]

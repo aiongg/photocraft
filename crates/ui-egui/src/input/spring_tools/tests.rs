@@ -179,15 +179,8 @@ fn the_newest_letter_wins_and_release_restores_the_original() {
 fn letters_type_while_editing_text() {
     let mut h = harness(Tool::Type);
     let id = h.state_mut().run("type.create", json!({"x": 20, "y": 80, "text": "a", "size": 40})).unwrap()["layer"].as_u64().unwrap();
-    h.state_mut().ui.text_edit = Some(crate::state::TextEdit {
-        layer: id,
-        document: None,
-        caret: 1,
-        anchor: 1,
-        session: "spring-test".into(),
-        created: false,
-        mask: false,
-    });
+    h.state_mut().ui.text_edit =
+        Some(crate::state::TextEdit { layer: id, document: None, caret: 1, anchor: 1, session: "spring-test".into(), created: false, mask: false });
     h.run_steps(2);
     h.event(Event::Key { key: Key::B, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
     h.event(Event::Text("b".into()));

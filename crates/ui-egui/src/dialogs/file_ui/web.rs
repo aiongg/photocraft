@@ -121,7 +121,8 @@ pub(super) fn options_of(p: &Value) -> SaveForWebOptions {
     o.slices = match text("slices") {
         Some("user") => WebSlices::User,
         Some("selected") => {
-            let numbers = p.get("numbers").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_u64).filter_map(|n| u32::try_from(n).ok()).collect());
+            let numbers =
+                p.get("numbers").and_then(Value::as_array).map(|a| a.iter().filter_map(Value::as_u64).filter_map(|n| u32::try_from(n).ok()).collect());
             WebSlices::Selected(numbers.unwrap_or_default())
         }
         _ => WebSlices::All,
@@ -203,7 +204,8 @@ fn original_texture(ctx: &egui::Context, doc: &photocraft_doc::Document) -> Size
     let image = web_cmds::web_document(doc, &size, &settings)
         .map(|(proxy, _, _)| {
             let (pw, ph) = (proxy.size.width as usize, proxy.size.height as usize);
-            let rgba: Vec<u8> = photocraft_compose::flatten(&proxy).into_px().iter().flat_map(|q| q.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8)).collect();
+            let rgba: Vec<u8> =
+                photocraft_compose::flatten(&proxy).into_px().iter().flat_map(|q| q.map(|v| (v.clamp(0.0, 1.0) * 255.0).round() as u8)).collect();
             egui::ColorImage::from_rgba_unmultiplied([pw, ph], &rgba)
         })
         .unwrap_or_else(|_| egui::ColorImage::from_rgba_unmultiplied([1, 1], &[0; 4]));
@@ -236,7 +238,10 @@ pub fn open_web(app: &mut PhotocraftApp) -> DialogId {
     } else {
         photocraft_doc::slices::resolve(&doc)
             .iter()
-            .map(|r| WebSlice { number: r.number as u32, rect: egui::Rect::from_min_max(egui::pos2(r.rect.x0 as f32, r.rect.y0 as f32), egui::pos2(r.rect.x1 as f32, r.rect.y1 as f32)) })
+            .map(|r| WebSlice {
+                number: r.number as u32,
+                rect: egui::Rect::from_min_max(egui::pos2(r.rect.x0 as f32, r.rect.y0 as f32), egui::pos2(r.rect.x1 as f32, r.rect.y1 as f32)),
+            })
             .collect()
     };
     let mut dialog = HostedSaveForWeb::new(doc.name.clone(), PixelSize::new(doc.size.width, doc.size.height), original_texture(&ctx, &doc))
@@ -248,7 +253,6 @@ pub fn open_web(app: &mut PhotocraftApp) -> DialogId {
     }
     app.framework.dialogs.open(dialog)
 }
-
 
 /// Seek a preview copy, preserving any edits to the source's currently displayed frame.
 pub(super) fn web_frame_document(doc: &photocraft_doc::Document, frame: Option<usize>) -> Result<photocraft_doc::Document, photocraft_engine::EngineError> {

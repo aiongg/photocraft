@@ -3,7 +3,6 @@ use crate::canvas::{ToolEvent, tool_event};
 use egui_kittest::kittest::Queryable;
 use photocraft_doc::LayerId;
 
-
 fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]) {
     let m = egui::Modifiers::NONE;
     // The frame's handles take presses from the pass that drew them: the state a test set is shown first.
@@ -59,10 +58,11 @@ fn add_photo(app: &mut PhotocraftApp, w: i32, h: i32) -> LayerId {
 /// The document area on the app's own context, for tests that need the canvas body.
 fn harness(app: PhotocraftApp) -> egui_kittest::Harness<'static, PhotocraftApp> {
     let ctx = app.ctx().clone();
-    let mut h = egui_kittest::Harness::builder().with_context(ctx).with_step_dt(1.0 / 60.0).with_size(egui::vec2(1000., 700.)).build_ui_state(
-        |ui, app: &mut PhotocraftApp| crate::canvas::document_area(app, ui),
-        app,
-    );
+    let mut h = egui_kittest::Harness::builder()
+        .with_context(ctx)
+        .with_step_dt(1.0 / 60.0)
+        .with_size(egui::vec2(1000., 700.))
+        .build_ui_state(|ui, app: &mut PhotocraftApp| crate::canvas::document_area(app, ui), app);
 
     h.run_steps(4);
     h

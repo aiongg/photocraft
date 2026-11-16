@@ -1,12 +1,19 @@
 //! Record Again edits one definition only after its concrete command succeeds.
-use photocraft_engine::{EngineError, Session, actions_cmds::{Action, ActionStep}, atn_cmds};
+use photocraft_engine::{
+    EngineError, Session,
+    actions_cmds::{Action, ActionStep},
+    atn_cmds,
+};
 use serde_json::{Value, json};
 
 /// A disabled, dialog-enabled resize followed by another step exposes flag and ordering loss.
 fn session() -> Session {
     let mut s = Session::new();
     s.execute("file.new", json!({"width": 8, "height": 6})).unwrap();
-    let mut a = Action::new("A", vec![ActionStep::new("image.imageSize", json!({"width": 4, "height": 3, "resample": "nearest"})), ActionStep::new("select.all", json!({}))]);
+    let mut a = Action::new(
+        "A",
+        vec![ActionStep::new("image.imageSize", json!({"width": 4, "height": 3, "resample": "nearest"})), ActionStep::new("select.all", json!({}))],
+    );
     a.disabled.insert(0);
     a.dialogs.insert(0);
     s.actions.list.push(a).unwrap();

@@ -1,5 +1,5 @@
-use super::*;
 use super::bars::count_size_params;
+use super::*;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -176,12 +176,7 @@ fn dialogs_open_on_the_host_and_ok_runs_their_commands() {
             opens_with: |_| true,
             ran: |app, _| app.session.active().unwrap().doc.measurement.scale.units == "cm",
         },
-        DialogRow {
-            menu: "image.analysis.placeScaleMarker",
-            edits: vec![],
-            opens_with: |f| f["length"] == 1.0,
-            ran: |_, changed| changed,
-        },
+        DialogRow { menu: "image.analysis.placeScaleMarker", edits: vec![], opens_with: |f| f["length"] == 1.0, ran: |_, changed| changed },
         DialogRow {
             menu: "image.analysis.selectDataPoints",
             edits: vec![("ruler", json!(["label", "length"]))],
@@ -306,7 +301,6 @@ fn add_layer(app: &mut PhotocraftApp, name: &str) -> u64 {
 fn on_a_layer(app: &mut PhotocraftApp) {
     add_layer(app, "Paint");
 }
-
 
 /// A refused click says so. `PhotocraftApp::run` reports what the *command* answered in the status
 /// line, but a refusal raised before it runs - the automation gate a control/MCP-driven click goes

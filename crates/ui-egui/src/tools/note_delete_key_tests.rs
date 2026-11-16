@@ -27,7 +27,6 @@ fn notes(app: &PhotocraftApp) -> usize {
     app.session.active().unwrap().doc.notes.len()
 }
 
-
 fn prompt(app: &PhotocraftApp) -> Option<egui::Id> {
     crate::dialogs::alerts::prompt_tagged::<NoteQuestion>(app)
 }

@@ -122,12 +122,11 @@ impl TextEditorHost for LayerHost<'_> {
         let (a, b) = (byte_of(&g.text, range.start), byte_of(&g.text, range.end));
         let mut out = Vec::new();
         for (li, ln) in g.l.lines.iter().enumerate() {
-            let (x0, x1) = g
-                .l
-                .clusters
-                .iter()
-                .filter(|c| c.line == li && c.range.start >= a && c.range.end <= b)
-                .fold((f32::MAX, f32::MIN), |(lo, hi), c| (lo.min(c.x), hi.max(c.x + c.advance)));
+            let (x0, x1) =
+                g.l.clusters
+                    .iter()
+                    .filter(|c| c.line == li && c.range.start >= a && c.range.end <= b)
+                    .fold((f32::MAX, f32::MIN), |(lo, hi), c| (lo.min(c.x), hi.max(c.x + c.advance)));
             if x0 >= x1 {
                 continue;
             }

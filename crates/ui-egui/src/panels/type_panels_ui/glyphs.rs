@@ -97,17 +97,12 @@ pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let can = can_insert(app);
     let families = type_tool::families();
     let styles = type_tool::styles(&family);
-    let out = GlyphsPanel::new(
-        tl!("Glyphs"),
-        &PhotoGlyphs,
-        Bind::bound(&mut family),
-        Bind::bound(&mut style),
-        Bind::bound(&mut app.ui.type_panels.glyph_settings),
-    )
-    .families(&families)
-    .styles(&styles)
-    .can_insert(can)
-    .show(ui);
+    let out =
+        GlyphsPanel::new(tl!("Glyphs"), &PhotoGlyphs, Bind::bound(&mut family), Bind::bound(&mut style), Bind::bound(&mut app.ui.type_panels.glyph_settings))
+            .families(&families)
+            .styles(&styles)
+            .can_insert(can)
+            .show(ui);
     if out.font_changed {
         let mut fonts = type_tool::font_state(app);
         fonts.settings.note_recent(&family);
@@ -155,15 +150,7 @@ mod tests {
         app.run("type.create", json!({"x": 10, "y": 60, "text": "ab"})).unwrap();
         app.sync_views();
         let layer = app.session.active().unwrap().active_layer.unwrap().0;
-        app.ui.text_edit = Some(crate::state::TextEdit {
-            layer,
-            document: None,
-            caret: 2,
-            anchor: 2,
-            session: "glyphs".into(),
-            created: false,
-            mask: false,
-        });
+        app.ui.text_edit = Some(crate::state::TextEdit { layer, document: None, caret: 2, anchor: 2, session: "glyphs".into(), created: false, mask: false });
         assert!(insert(&mut app, "→"));
         assert!(insert(&mut app, "€"));
         assert_eq!(text_of_active(&app), "ab→€");

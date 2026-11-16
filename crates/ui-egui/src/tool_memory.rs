@@ -355,12 +355,9 @@ pub(crate) fn upgrade(value: &mut Value) {
 /// keeps its name.
 pub(crate) fn upgrade_picker_view(value: &mut Value) {
     let Value::Object(o) = value else { return };
-    for (old, section, key) in [
-        ("showName", &["parts"][..], "name"),
-        ("showStroke", &["parts"][..], "stroke"),
-        ("showTip", &["parts"][..], "tip"),
-        ("showSearch", &[][..], "search"),
-    ] {
+    for (old, section, key) in
+        [("showName", &["parts"][..], "name"), ("showStroke", &["parts"][..], "stroke"), ("showTip", &["parts"][..], "tip"), ("showSearch", &[][..], "search")]
+    {
         if let Some(v) = o.remove(old).filter(Value::is_boolean) {
             put(o, section, key, v);
         }
@@ -394,7 +391,9 @@ fn upgrade_crop(o: &mut Map<String, Value>) {
         put(o, &["crop"], "fill", json!(if v { "contentAware" } else { "background" }));
     }
     // The guide, its show rule, orientation and the shield kept their keys and values.
-    for (old, key) in [("crop_overlay", "guide"), ("crop_overlay_show", "guideShow"), ("crop_overlay_orientation", "guideOrientation"), ("crop_shield", "shield")] {
+    for (old, key) in
+        [("crop_overlay", "guide"), ("crop_overlay_show", "guideShow"), ("crop_overlay_orientation", "guideOrientation"), ("crop_shield", "shield")]
+    {
         if let Some(v) = o.remove(old).filter(|v| !v.is_null()) {
             put(o, &["crop"], key, v);
         }

@@ -4,8 +4,8 @@
 //! so a press passes the preflight, the stand-ins, the dialog tool and the canvas controls of the body exactly as a
 //! mouse press does. Document points map through the view the canvas last showed (`view`).
 
-use craft::behavior::{CanvasView, PointerButton};
 use craft::behavior::kurbo::Point;
+use craft::behavior::{CanvasView, PointerButton};
 use craft::keymap::{Key, Mods};
 use craft::ui::canvas::ToolHostResponse;
 use craft::ui::runtime::windows::{Released, WindowHost};

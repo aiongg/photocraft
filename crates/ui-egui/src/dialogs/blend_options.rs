@@ -11,7 +11,8 @@ use crate::panels::layers_tree::blend_key;
 
 /// A blend-mode row `key` over the Layers panel's mode list (`group` adds Pass Through), opening on `current`.
 pub(crate) fn blend_param(key: &str, label: impl Into<Label>, group: bool, current: BlendMode) -> Param {
-    let modes = crate::panels::blend_options(group, current).into_iter().map(|(m, name)| (crate::panels::blend_entry(blend_key(m), m), Label::from(name))).collect();
+    let modes =
+        crate::panels::blend_options(group, current).into_iter().map(|(m, name)| (crate::panels::blend_entry(blend_key(m), m), Label::from(name))).collect();
     Param::new(key, label, ParamKind::blend(modes, Some(blend_key(current))))
 }
 

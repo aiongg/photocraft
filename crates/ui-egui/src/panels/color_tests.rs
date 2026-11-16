@@ -193,15 +193,7 @@ fn swap_and_default_colors_recolour_selected_type() {
         let id = LayerId(made["layer"].as_u64().unwrap());
         app.run("tools.setColors", json!({"foreground": "#ff0000", "background": "#0000ff"})).unwrap();
         let anchor = if selected { 6 } else { 11 };
-        app.ui.text_edit = Some(crate::state::TextEdit {
-            layer: id.0,
-            document: None,
-            caret: 11,
-            anchor,
-            session: "s".into(),
-            created: false,
-            mask: false,
-        });
+        app.ui.text_edit = Some(crate::state::TextEdit { layer: id.0, document: None, caret: 11, anchor, session: "s".into(), created: false, mask: false });
         let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(vec2(80.0, 120.0)).build_ui_state(
             |ui, app: &mut PhotocraftApp| {
                 let w = ui.available_width();

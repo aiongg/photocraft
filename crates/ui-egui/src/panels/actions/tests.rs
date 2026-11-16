@@ -38,7 +38,6 @@ fn two_set_app() -> PhotocraftApp {
     app
 }
 
-
 #[test]
 fn selected_layer_name_is_visible_during_recording_and_after_stop() {
     let mut app = new_app();
@@ -73,12 +72,7 @@ fn a_function_key_with_shift_and_command_plays_its_action() {
     app.session
         .actions
         .list
-        .push(Action {
-            name: "Action 1".into(),
-            steps: vec![step("layer.new.layer", json!({}))],
-            disabled: Default::default(),
-            ..Default::default()
-        })
+        .push(Action { name: "Action 1".into(), steps: vec![step("layer.new.layer", json!({}))], disabled: Default::default(), ..Default::default() })
         .unwrap();
     let key = photocraft_engine::atn_cmds::function_key_name(2, true, true);
     assert_eq!(key, "Cmd+Shift+F2");
@@ -299,8 +293,5 @@ fn save_set_on_an_empty_set_folder_opens_the_save_dialog() {
     apply_actions_events(&mut app, vec![ActionsEvent::save(Some("Later".into()))]);
     let requests = files.requests();
     // PLAN: assumed `ScriptedFiles::requests()` items expose `kind` and `file_name: Option<String>`
-    assert!(
-        matches!(requests.as_slice(), [r] if format!("{:?}", r.kind).contains("Save") && r.file_name.as_deref() == Some("Later.atn")),
-        "{requests:?}"
-    );
+    assert!(matches!(requests.as_slice(), [r] if format!("{:?}", r.kind).contains("Save") && r.file_name.as_deref() == Some("Later.atn")), "{requests:?}");
 }

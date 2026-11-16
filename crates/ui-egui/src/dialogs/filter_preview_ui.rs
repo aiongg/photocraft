@@ -26,7 +26,6 @@ struct Subject {
     previewed: String,
 }
 
-
 /// What `dialog` previews, or `None` when it has no preview picture: a filter dialog, or the Blending Options
 /// dialog of a smart filter.
 fn subject(app: &PhotocraftApp, dialog: &HostedParamDialog) -> Option<Subject> {
@@ -47,12 +46,16 @@ fn subject(app: &PhotocraftApp, dialog: &HostedParamDialog) -> Option<Subject> {
 /// The filtered proxy the canvas already computed for `id`, when there is one. Matching the dialog keeps a
 /// stacked dialog from showing another's preview; the Preview checkbox decides whether the filtered result
 /// (rather than the original) is shown.
-fn filtered_preview(app: &PhotocraftApp, id: DialogId, doc: photocraft_doc::DocId, previewed: &str, previewing: bool) -> Option<(FilterPreviewKey, std::sync::Arc<Document>)> {
+fn filtered_preview(
+    app: &PhotocraftApp,
+    id: DialogId,
+    doc: photocraft_doc::DocId,
+    previewed: &str,
+    previewing: bool,
+) -> Option<(FilterPreviewKey, std::sync::Arc<Document>)> {
     let preview = app.filter_preview.as_ref()?;
     let key = &preview.key;
-    (previewing && key.dialog == id && key.doc == doc && key.command == previewed)
-        .then(|| preview.result.clone().map(|result| (key.clone(), result)))
-        .flatten()
+    (previewing && key.dialog == id && key.doc == doc && key.command == previewed).then(|| preview.result.clone().map(|result| (key.clone(), result))).flatten()
 }
 
 /// The proxy factor of the picture the dialog shows: the filtered key's when it exists, else the request's.
@@ -411,7 +414,8 @@ mod tests {
         crate::filter_dialog::open(&mut app, "filter.sharpen.unsharpMask").unwrap();
         let id = top_dialog(&app);
         let (revision, history) = (app.session.active().unwrap().revision, app.session.active().unwrap().history.past_len());
-        let params = crate::filter_dialog::command_params("filter.sharpen.unsharpMask", app.framework.dialogs.get_by_id::<HostedParamDialog>(id).unwrap().fields());
+        let params =
+            crate::filter_dialog::command_params("filter.sharpen.unsharpMask", app.framework.dialogs.get_by_id::<HostedParamDialog>(id).unwrap().fields());
         let k = crate::canvas::filter_preview_factor(&app, &app.session.active().unwrap().doc, "filter.sharpen.unsharpMask", &params);
         // The pane shows its picture from the second pass on.
         frame(&mut app).textures_delta.clear();

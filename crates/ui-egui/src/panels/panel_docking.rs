@@ -119,9 +119,8 @@ fn spec(panel: &str) -> PanelSpec {
         return PanelSpec::new(tl!("Documents").to_string()).canvas().limits(least).allow_native(false);
     }
     let Some(entry) = registry::entry(panel) else { return PanelSpec::new(panel.to_owned()) };
-    let mut spec = PanelSpec::new((entry.label)())
-        .icon(IconSpec::svg(IconId::new(entry.icon)))
-        .limits(SizeLimits::at_least(egui::vec2(entry.min[0], entry.min[1])));
+    let mut spec =
+        PanelSpec::new((entry.label)()).icon(IconSpec::svg(IconId::new(entry.icon))).limits(SizeLimits::at_least(egui::vec2(entry.min[0], entry.min[1])));
     if let Some(heights) = entry.heights {
         spec = spec.heights(heights);
     }
@@ -279,7 +278,9 @@ pub(crate) fn command(app: &mut PhotocraftApp, id: &str, params: &Value) -> Opti
         }),
         "window.panel.group" => group_command(app, params),
         "window.panel.layout" => match params.get("action") {
-            Some(action) => serde_json::from_value::<Action<String>>(action.clone()).map_err(|error| error.to_string()).and_then(|action| run(app, vec![action])),
+            Some(action) => {
+                serde_json::from_value::<Action<String>>(action.clone()).map_err(|error| error.to_string()).and_then(|action| run(app, vec![action]))
+            }
             None => Err("action is required".into()),
         },
         "window.panel.move" => move_command(app, params),
@@ -422,11 +423,7 @@ fn move_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, String
     let actions = match fields.get("placement") {
         Some(placement) => {
             let placement: DockPlacement<String> = serde_json::from_value(placement.clone()).map_err(|error| error.to_string())?;
-            vec![if flag(&fields, "group") {
-                Action::move_group(panel, Target::at(anchor, placement))
-            } else {
-                Action::move_beside(panel, anchor, placement)
-            }]
+            vec![if flag(&fields, "group") { Action::move_group(panel, Target::at(anchor, placement)) } else { Action::move_beside(panel, anchor, placement) }]
         }
         None => {
             let to = destination(&fields, anchor)?;

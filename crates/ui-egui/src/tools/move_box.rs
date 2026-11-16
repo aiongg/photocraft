@@ -57,10 +57,8 @@ pub(crate) fn release(app: &mut PhotocraftApp, p: [f64; 2]) -> bool {
         // uses the marquee, and a click on transparent pixels inside the canvas does not.
         if let Some(st) = app.session.active() {
             let rect = st.doc.bounds();
-            let outside = b.start[0] < f64::from(rect.x0)
-                || b.start[1] < f64::from(rect.y0)
-                || b.start[0] >= f64::from(rect.x1)
-                || b.start[1] >= f64::from(rect.y1);
+            let outside =
+                b.start[0] < f64::from(rect.x0) || b.start[1] < f64::from(rect.y0) || b.start[0] >= f64::from(rect.x1) || b.start[1] >= f64::from(rect.y1);
             if outside {
                 let _ = app.run("select.deselectLayers", json!({}));
             }

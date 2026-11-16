@@ -1,6 +1,6 @@
 use super::{
-    DocId, PhotocraftApp, Value, actions, canvas, delete_layer_prompt, gpu_canvas, jobs_ui, json, mask_trash_prompt, notices, panel_docking,
-    smart_svg_ui, state, transform_tool, type_transform, vector_ui,
+    DocId, PhotocraftApp, Value, actions, canvas, delete_layer_prompt, gpu_canvas, jobs_ui, json, mask_trash_prompt, notices, panel_docking, smart_svg_ui,
+    state, transform_tool, type_transform, vector_ui,
 };
 
 impl PhotocraftApp {

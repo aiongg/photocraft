@@ -41,7 +41,6 @@ pub(crate) fn selected_saved_path_index(app: &PhotocraftApp) -> Option<(usize, P
     app.session.active()?.doc.paths.iter().enumerate().find(|(_, p)| p.name == sel).map(|(i, p)| (i, p.path.clone()))
 }
 
-
 /// View › Show › Target Path (under Extras) hides the paths; the Pen's path in progress stays.
 /// Free Transform Path draws the path through its box instead (transform_tool).
 fn paths_shown(app: &PhotocraftApp) -> bool {

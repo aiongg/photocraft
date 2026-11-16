@@ -3,8 +3,8 @@ use std::collections::HashMap;
 use craft::i18n::Words;
 use craft::keymap::{Chord, CommandRef, Mods};
 use craft::menu::{
-    Alternate, Customization, ItemKind, ItemRole, LanguageChoice, LanguageLabels, LanguageMenu, LayoutOptions, MenuBar, MenuRole, Node, Platforms, Row,
-    Target, ThemeLabels, from_items, layout,
+    Alternate, Customization, ItemKind, ItemRole, LanguageChoice, LanguageLabels, LanguageMenu, LayoutOptions, MenuBar, MenuRole, Node, Platforms, Row, Target,
+    ThemeLabels, from_items, layout,
 };
 use serde_json::json;
 
@@ -373,7 +373,8 @@ fn build(app: &PhotocraftApp, state: u64) -> MenuModel {
     let mut bar = from_items(&TOP_MENUS, &rows);
     bar.tag_item(&CommandRef::new("help.about"), ItemRole::About);
     bar.tag_item(&CommandRef::new("file.exit"), ItemRole::Quit);
-    for (title, role) in [("File", MenuRole::File), ("Edit", MenuRole::Edit), ("View", MenuRole::View), ("Window", MenuRole::Window), ("Help", MenuRole::Help)] {
+    for (title, role) in [("File", MenuRole::File), ("Edit", MenuRole::Edit), ("View", MenuRole::View), ("Window", MenuRole::Window), ("Help", MenuRole::Help)]
+    {
         bar.tag_menu(title, role);
     }
     bar.tag_submenu(MenuRole::Edit, "Preferences", ItemRole::Settings);

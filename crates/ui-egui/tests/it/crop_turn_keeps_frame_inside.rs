@@ -10,10 +10,10 @@
 //! Driven as an agent does, through `ui.pointer` (document px as the view showed them at the
 //! press), in an egui_kittest harness so the canvas takes each call's input on the frames after it.
 
+use craft::draw::ui::crop::CropFill;
 use photocraft_ui_egui::PhotocraftApp;
 use photocraft_ui_egui::control::{ControlRequest, Reply, handle};
 use photocraft_ui_egui::crop_ui::frame;
-use craft::draw::ui::crop::CropFill;
 use serde_json::{Value, json};
 
 type Harness = egui_kittest::Harness<'static, PhotocraftApp>;

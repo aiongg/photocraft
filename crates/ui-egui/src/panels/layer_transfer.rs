@@ -70,7 +70,13 @@ fn panel_transfer(app: &PhotocraftApp, ctx: &egui::Context) -> Option<Transfer> 
     }
     let hash = payload.document()?;
     let source = app.session.documents().iter().find(|d| document_hash(d.doc.id) == hash)?;
-    Some(Transfer { source: source.doc.id, layers: layers.iter().map(|l| l.0).collect(), grab: None, label: label_of(&source.doc, &layers), selection_only: false })
+    Some(Transfer {
+        source: source.doc.id,
+        layers: layers.iter().map(|l| l.0).collect(),
+        grab: None,
+        label: label_of(&source.doc, &layers),
+        selection_only: false,
+    })
 }
 
 /// Starts a Move-tool transfer of `layers` from the active document; `grab` is the document point
@@ -101,7 +107,9 @@ fn move_drag(app: &PhotocraftApp, ctx: &egui::Context) -> Option<[f64; 2]> {
     let d = layer_drag(app)?;
     let st = app.session.active()?;
     let canvas = CanvasHost::main(app.session.active_index()?).canvas_id();
-    let plain = app.ui.transform.is_none() && craft::ui::canvas_controls::reading::running(ctx, canvas).is_none() && ((st.doc.selection.is_none() && st.floating.is_none()) || d.moves_selection);
+    let plain = app.ui.transform.is_none()
+        && craft::ui::canvas_controls::reading::running(ctx, canvas).is_none()
+        && ((st.doc.selection.is_none() && st.floating.is_none()) || d.moves_selection);
     plain.then_some(d.start)
 }
 

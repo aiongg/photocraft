@@ -1,7 +1,7 @@
 use super::*;
 use crate::canvas_tool_menu::MenuKind;
-use craft::color::ui::{SampleSize, SampleSource};
 use craft::automation::actions::{Action, ActionList, ActionStep};
+use craft::color::ui::{SampleSize, SampleSource};
 use craft::keymap::CommandRef;
 
 /// An action named `name` whose steps run the given commands.
@@ -780,10 +780,7 @@ fn agent_right_click_on_a_pending_crop_opens_and_runs_the_crop_menu() {
         json!({"tool": "Crop", "events": [{"kind":"down","x":4,"y":4},{"kind":"move","x":16,"y":12},{"kind":"move","x":28,"y":20},{"kind":"up","x":28,"y":20}]}),
     );
     let frame = crate::crop_ui::frame(&app).unwrap();
-    let result = pointer(
-        &mut app,
-        json!({"tool": "Crop", "button": "secondary", "events": [{"kind":"down","x":16,"y":12},{"kind":"up","x":16,"y":12}]}),
-    );
+    let result = pointer(&mut app, json!({"tool": "Crop", "button": "secondary", "events": [{"kind":"down","x":16,"y":12},{"kind":"up","x":16,"y":12}]}));
     assert_eq!(result["ok"], true);
     let inspected = call(&mut app, &ctx, "ui.inspect", json!({}));
     assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Crop { .. })));
@@ -1026,10 +1023,7 @@ fn ui_set_drives_the_crop_overlay_options() {
     assert_eq!((guide(&app), serde_json::to_value(&o.guide_show).unwrap(), o.guide_orientation), (json!("goldenSpiral"), json!("always"), 2));
     let seen = call(&mut app, &ctx, "ui.inspect", json!({}));
     let t = &seen["result"]["toolOptions"]["crop"];
-    assert_eq!(
-        (t["guide"].as_str(), t["guideShow"].as_str(), t["guideOrientation"].as_u64()),
-        (Some("goldenSpiral"), Some("always"), Some(2))
-    );
+    assert_eq!((t["guide"].as_str(), t["guideShow"].as_str(), t["guideOrientation"].as_u64()), (Some("goldenSpiral"), Some("always"), Some(2)));
     for bad in [
         json!({"cropOverlay": "spiral"}),
         json!({"cropOverlay": 1}),
@@ -2274,10 +2268,7 @@ fn ui_pointer_rejects_bad_params_before_acting() {
     assert_eq!(app.ui.tool, Tool::Brush);
     assert!(app.session.active().unwrap().revision > before, "the stroke painted");
     for button in ["left", "middle", "right", "secondary"] {
-        let r = pointer(
-            &mut app,
-            json!({"tool": "move", "button": button, "events": [{"kind": "down", "x": 5, "y": 5}, {"kind": "up", "x": 5, "y": 5}]}),
-        );
+        let r = pointer(&mut app, json!({"tool": "move", "button": button, "events": [{"kind": "down", "x": 5, "y": 5}, {"kind": "up", "x": 5, "y": 5}]}));
         assert_eq!(r["ok"], true, "{button}: {r}");
     }
     assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Layers { .. })), "a right click with Move still opens the layer menu");

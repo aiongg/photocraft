@@ -2,9 +2,9 @@
 //! pixels float and drop with the history steps Photoshop names, a moved selection snaps to guides and the document
 //! (not to its own start), the arrows nudge the outline, and the lock refusal of the Move tool and ⌘-drags.
 
+use crate::app::framework::BuildApp as _;
 use egui::{Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
-use crate::app::framework::BuildApp as _;
 use photocraft_geom::Rect;
 use serde_json::json;
 

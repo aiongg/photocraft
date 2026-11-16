@@ -338,7 +338,6 @@ pub(crate) fn edit_paths(app: &PhotocraftApp, bezier: BezierTool) -> (Vec<EditPa
     let (mut paths, mut refs) = (Vec::new(), Vec::new());
     for (r, path) in front.into_iter().rev() {
         let edit = match (r, drafted(app)) {
-
             (PathRef::Pen, Some(pen)) => EditPath::new(r.key(), vec![pen.draft.clone()]),
             _ => crate::vector_ui::edit_path(&path, r.key()),
         };
@@ -436,9 +435,12 @@ pub(crate) fn writable(app: &PhotocraftApp, target: &PathRef) -> bool {
             let id = photocraft_doc::LayerId(*id);
             let locks = st.doc.effective_locks(id);
             // A hidden layer's path (or one in a hidden group) shows nothing to edit.
-            let shown = st.doc.walk().iter().find(|(_, _, l)| l.id == id).is_some_and(|(path, _, l)| {
-                l.visible && (1..=path.len()).all(|n| st.doc.layer_at(&path[..n]).is_some_and(|a| a.visible))
-            });
+            let shown = st
+                .doc
+                .walk()
+                .iter()
+                .find(|(_, _, l)| l.id == id)
+                .is_some_and(|(path, _, l)| l.visible && (1..=path.len()).all(|n| st.doc.layer_at(&path[..n]).is_some_and(|a| a.visible)));
             shown && !locks.all && !locks.pixels
         }),
         _ => app.session.active().is_some(),
@@ -483,8 +485,8 @@ mod convert_point_drag_segment_tests;
 #[cfg(test)]
 mod freeform_command_tests {
     use super::*;
-    use egui::Modifiers;
     use crate::canvas::testing::{move_to, press, release};
+    use egui::Modifiers;
 
     fn app(tool: Tool) -> PhotocraftApp {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());

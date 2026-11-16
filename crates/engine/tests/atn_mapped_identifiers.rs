@@ -4,7 +4,11 @@ use craft_psd::{
     atn::{self, AtnAction, AtnEvent, AtnFile, AtnItem},
     descriptor::{Class, Descriptor, Id, ReferenceItem, UnicodeString, Value as D},
 };
-use photocraft_engine::{Session, actions_cmds::{Action, ActionList, ActionStep, ActionsFile}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionList, ActionStep, ActionsFile},
+    atn_cmds,
+};
 use serde_json::json;
 
 /// A small marked document makes canvas translation and image resampling distinguishable.
@@ -556,8 +560,9 @@ fn recorded_vibrance_uses_the_string_event_and_keeps_legacy_playback() {
 /// The reported Gradient Map Make and the metadata-only default both round-trip atomically.
 #[test]
 fn recorded_adjustment_opacity_keeps_gradient_settings_and_defaults() {
-    let full =
-        saved(&Action::new("Recorded", vec![ActionStep::new("image.adjustments.gradientMap", json!({"stops":[[0,"#0000ff"],[1,"#ff0000"]]}))])).descriptor.unwrap();
+    let full = saved(&Action::new("Recorded", vec![ActionStep::new("image.adjustments.gradientMap", json!({"stops":[[0,"#0000ff"],[1,"#ff0000"]]}))]))
+        .descriptor
+        .unwrap();
     let default = Descriptor::new("GdMp").with("presetKind", enm("presetKindType", "presetKindDefault"));
     for t in [full, default] {
         let action = recorded(AtnEvent::Code(*b"Mk  "), adjustment_make(t.clone(), Some(D::UnitFloat { unit: *b"#Prc", value: 70.0 })));
@@ -611,8 +616,13 @@ fn adjustment_opacity_validation_and_endpoints_are_atomic() {
         assert!(s.execute("layer.newAdjustmentLayer.gradientMap", json!({"opacity":bad})).is_err());
         assert_eq!(s.execute("document.inspect", json!({})).unwrap(), before);
         assert!(
-            atn_cmds::export("Identifiers", &[&Action::new("Bad", vec![ActionStep::new("layer.newAdjustmentLayer.gradientMap", json!({"opacity":bad}))])], &[], false)
-                .is_err()
+            atn_cmds::export(
+                "Identifiers",
+                &[&Action::new("Bad", vec![ActionStep::new("layer.newAdjustmentLayer.gradientMap", json!({"opacity":bad}))])],
+                &[],
+                false
+            )
+            .is_err()
         );
     }
     for opacity in [None, Some(0.0), Some(1.0)] {
@@ -645,7 +655,10 @@ fn gradient_map_writes_the_named_event_and_keeps_legacy_code_imports() {
         .with("Dthr", D::Boolean(false));
     for event in [AtnEvent::name("gradientMapEvent"), AtnEvent::Code(*b"GdMp")] {
         let action = recorded(event, d.clone());
-        assert_eq!(action.steps, vec![ActionStep::new("image.adjustments.gradientMap", json!({"stops":[[0,"#0000ff"],[1,"#ff0000"]],"reverse":true,"dither":false}))]);
+        assert_eq!(
+            action.steps,
+            vec![ActionStep::new("image.adjustments.gradientMap", json!({"stops":[[0,"#0000ff"],[1,"#ff0000"]],"reverse":true,"dither":false}))]
+        );
         let written = saved(&action);
         assert_eq!(written.event, AtnEvent::name("gradientMapEvent"));
         assert!(written.descriptor.unwrap().class_id.is("GdMp"));
@@ -745,7 +758,10 @@ fn absolute_colorimetric_writes_aclr_and_rejects_unknown_intents() {
         let action = recorded(AtnEvent::name("convertToProfile"), profile().with("Inte", enm("Inte", input)));
         assert_eq!(
             action.steps,
-            vec![ActionStep::new("edit.convertToProfile", json!({"profile":"srgb","intent":"absolute","dither":false,"flatten":false,"rasterizePlaced":false}))]
+            vec![ActionStep::new(
+                "edit.convertToProfile",
+                json!({"profile":"srgb","intent":"absolute","dither":false,"flatten":false,"rasterizePlaced":false})
+            )]
         );
         assert_eq!(*enum_value(saved(&action).descriptor.as_ref().unwrap(), "Inte", "Inte"), Id::new("AClr"));
     }

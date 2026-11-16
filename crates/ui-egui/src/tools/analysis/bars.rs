@@ -123,7 +123,11 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
     if IconButton::new(IconId::new("new_folder")).label(Label::from(tl!("Create a new count group"))).show(ui).clicked() {
         run(app, "count.newGroup", json!({}));
     }
-    if IconButton::new(IconId::new("trash")).label(Label::from(tl!("Delete the currently selected count group"))).enabled(m.count_groups.len() >= 2).show(ui).clicked()
+    if IconButton::new(IconId::new("trash"))
+        .label(Label::from(tl!("Delete the currently selected count group")))
+        .enabled(m.count_groups.len() >= 2)
+        .show(ui)
+        .clicked()
         && let Some(gi) = group
     {
         run(app, "count.deleteGroup", json!({"group": gi}));

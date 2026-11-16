@@ -5,7 +5,11 @@ use craft_psd::{
     descriptor::{Class, Descriptor, Id, ReferenceItem, UnicodeString, Value as D},
 };
 use photocraft_doc::{LayerContent, LayerId};
-use photocraft_engine::{Session, actions_cmds::{Action, ActionStep}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionStep},
+    atn_cmds,
+};
 use photocraft_geom::Rect;
 use serde_json::{Value, json};
 

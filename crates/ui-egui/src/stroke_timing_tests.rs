@@ -34,7 +34,6 @@ fn harness() -> Harness<'static, PhotocraftApp> {
 }
 
 fn screen(h: &Harness<'static, PhotocraftApp>, x: f32, y: f32) -> Pos2 {
-
     crate::canvas::testing::to_screen(h.state(), [f64::from(x), f64::from(y)])
 }
 
@@ -96,7 +95,6 @@ fn stroke_points_carry_increasing_times_from_zero() {
 
 /// Points of the live stroke in progress.
 fn live_points(h: &Harness<'static, PhotocraftApp>) -> usize {
-
     crate::canvas::paint_tool::stroking(h.state()).map_or(0, |s| s.points.len())
 }
 
@@ -127,7 +125,6 @@ fn a_held_plain_brush_adds_nothing() {
     let (before, after) = held_points(&mut h);
     assert_eq!(after, before, "nothing changes with time, so nothing is repeated");
 }
-
 
 #[test]
 fn moves_in_one_frame_take_the_pressures_the_pen_reported_between_them() {

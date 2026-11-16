@@ -12,12 +12,10 @@
 // PLAN: the `craft::draw::ui::{artboard, add_beside}`, `craft::keymap::CommandRef` and
 // `craft::ui::runtime::commands::CommandState` facade paths are assumed from the other `craft::` paths in this crate.
 
-use craft::behavior::kurbo::{Rect as DocRect, Size};
 use craft::behavior::EditEvent;
+use craft::behavior::kurbo::{Rect as DocRect, Size};
 use craft::draw::ui::add_beside::{AddBesideHandles, AddSide};
-use craft::draw::ui::artboard::{
-    ArtboardBackground as Shown, ArtboardCommand, ArtboardEvent, ArtboardItem, ArtboardOverlay, ArtboardRules, ArtboardTool,
-};
+use craft::draw::ui::artboard::{ArtboardBackground as Shown, ArtboardCommand, ArtboardEvent, ArtboardItem, ArtboardOverlay, ArtboardRules, ArtboardTool};
 use craft::keymap::CommandRef;
 use craft::theme::Srgba;
 use craft::ui::canvas::ToolHostResponse;
@@ -180,15 +178,10 @@ pub(crate) fn show_overlay(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egu
     }
     let boards = items(app);
     let overlay = ArtboardOverlay::new(tl!("Artboards"), &boards.items, &boards.selected).rules(ArtboardRules::PHOTOSHOP).show_at(ui, rect);
-    let added = boards
-        .selected
-        .first()
-        .filter(|_| !overlay.dragging)
-        .and_then(|&i| boards.items.get(i))
-        .and_then(|item| {
-            let shown = AddBesideHandles::new(tl!("Add artboard"), item.rect.abs()).show_at(ui, rect);
-            shown.added.map(|side| (side, shown.copy))
-        });
+    let added = boards.selected.first().filter(|_| !overlay.dragging).and_then(|&i| boards.items.get(i)).and_then(|item| {
+        let shown = AddBesideHandles::new(tl!("Add artboard"), item.rect.abs()).show_at(ui, rect);
+        shown.added.map(|side| (side, shown.copy))
+    });
     if let Some((side, copy)) = added {
         // The tool names the board the button belongs to from its own snapshot, so give it this pass's.
         let placing = placing_size(app);

@@ -204,7 +204,8 @@ fn press_at(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64, mods: 
     // the Type tool, as Move's double-click does, and give the mask tool back at the end.
     app.ui.text_edit_return_tool = app.ui.tool.is_type_mask().then_some(app.ui.tool);
     if app.ui.text_edit_return_tool.is_some() {
-        let vertical = app.session.active().and_then(|st| text_layer(&st.doc, id)).is_some_and(|t| t.orientation == photocraft_doc::text::Orientation::Vertical);
+        let vertical =
+            app.session.active().and_then(|st| text_layer(&st.doc, id)).is_some_and(|t| t.orientation == photocraft_doc::text::Orientation::Vertical);
         app.ui.tool = if vertical { crate::state::Tool::VerticalType } else { crate::state::Tool::Type };
     }
     ToolAction::Done

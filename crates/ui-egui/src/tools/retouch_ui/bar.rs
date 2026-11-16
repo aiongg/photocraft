@@ -6,8 +6,8 @@ use craft::ui::text::RangeAlert;
 
 use super::{remove_pending_cancel, remove_pending_commit};
 use crate::PhotocraftApp;
-use crate::tools::option_cells::range_alert;
 use crate::state::Tool;
+use crate::tools::option_cells::range_alert;
 
 mod heal;
 pub(crate) mod history;

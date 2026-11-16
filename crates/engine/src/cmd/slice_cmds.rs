@@ -462,7 +462,10 @@ fn divide(s: &mut Session, p: &Value) -> Result<Value> {
     };
     let (down_parts, across_parts) = (down.parts(r.height()), across.parts(r.width()));
     if down_parts == 1 && across_parts == 1 {
-        return Err(bad(cmd, "give \"horizontal\" or \"horizontalSize\" (slices down) and/or \"vertical\" or \"verticalSize\" (slices across) that make more than one part"));
+        return Err(bad(
+            cmd,
+            "give \"horizontal\" or \"horizontalSize\" (slices down) and/or \"vertical\" or \"verticalSize\" (slices across) that make more than one part",
+        ));
     }
     let total = down_parts.saturating_mul(across_parts);
     if total > i64::from(MAX_DIVIDE_PARTS) {

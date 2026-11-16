@@ -13,8 +13,8 @@
 use std::collections::HashSet;
 
 use craft::keymap::{Binding, CommandDef, CommandKind, Overrides, Scope};
-use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
 use craft::layers::ui::panel::LayersPanelCommands;
+use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
 use craft::ui::rails::{LastUsed, RailTool};
 use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, CommandSet, EditCommands, FirePhase, FireSource, Fired};
 use serde_json::json;

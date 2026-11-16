@@ -86,4 +86,3 @@ fn tolerance_is_stored_with_the_tool_and_size_with_its_brush() {
         assert_eq!(size_control(&b), c);
     }
 }
-

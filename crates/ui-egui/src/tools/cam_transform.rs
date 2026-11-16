@@ -46,7 +46,8 @@ pub(crate) fn begin(app: &mut PhotocraftApp, offset: [i32; 2]) -> bool {
     if b.is_empty() {
         return false;
     }
-    let [x0, y0, x1, y1] = [b.x0.saturating_add(offset[0]), b.y0.saturating_add(offset[1]), b.x1.saturating_add(offset[0]), b.y1.saturating_add(offset[1])].map(f64::from);
+    let [x0, y0, x1, y1] =
+        [b.x0.saturating_add(offset[0]), b.y0.saturating_add(offset[1]), b.x1.saturating_add(offset[0]), b.y1.saturating_add(offset[1])].map(f64::from);
     // The patch's blend takes only a scale and a rotation: the box refuses skew, distort and warp.
     let session = TransformSession::<()>::new(Rect::new(x0, y0, x1, y1))
         .allow(BoxAllow::new(true, false, false).with_warp(false))

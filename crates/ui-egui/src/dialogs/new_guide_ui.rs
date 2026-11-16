@@ -34,7 +34,6 @@ const REMEMBER: SaveKey = SaveKey::new("craft_dialogs.photocraft.new_guide");
 /// New Guide's colour when nothing was remembered, as in Photoshop.
 const DEFAULT_COLOR: &str = "cyan";
 
-
 /// Accept the named guide colours and the explicit custom-colour choice.
 fn is_color_name(name: &str) -> bool {
     name == CUSTOM || GUIDE_COLORS.iter().any(|(n, ..)| *n == name)

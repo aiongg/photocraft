@@ -427,7 +427,10 @@ fn recording_folds_wrapped_move_tool_nudges() {
     s.execute("actions.stop", json!({})).unwrap();
     assert_eq!(
         s.actions.list.actions()[0].steps,
-        [ActionStep::new("layer.translate", json!({"dx": 3.0, "dy": 0.0, "wrap": true})), ActionStep::new("layer.translate", json!({"dx": 1.0, "dy": 0.0, "wrap": false}))]
+        [
+            ActionStep::new("layer.translate", json!({"dx": 3.0, "dy": 0.0, "wrap": true})),
+            ActionStep::new("layer.translate", json!({"dx": 1.0, "dy": 0.0, "wrap": false}))
+        ]
     );
 }
 
@@ -981,7 +984,8 @@ fn named_selection_preserves_modes_and_duplicate_occurrences() {
         assert!(s.execute("layer.select", p.clone()).is_err(), "{p}");
         assert_eq!(s.active().unwrap().selected_layers(), before);
     }
-    s.actions.list
+    s.actions
+        .list
         .push(Action {
             name: "Missing".into(),
             steps: vec![ActionStep::new("layer.select", json!({"name":"absent"})), ActionStep::new("layer.duplicate", json!({}))],
@@ -1020,7 +1024,8 @@ fn play_stops_at_the_failing_step_and_reports_it() {
 #[test]
 fn play_refuses_recursion() {
     let mut s = Session::new();
-    s.actions.list
+    s.actions
+        .list
         .push(Action {
             name: "Loop".into(),
             steps: vec![ActionStep::new("actions.play", json!({"action": "Loop"}))],
@@ -1043,7 +1048,8 @@ fn play_checks_each_step_with_the_authorize_hook() {
     }
     let mut s = Session::new();
     s.authorize = Some(deny_file);
-    s.actions.list
+    s.actions
+        .list
         .push(Action {
             name: "Open".into(),
             steps: vec![ActionStep::new("file.open", json!({"path": "/etc/passwd"})), ActionStep::new("layer.new.layer", json!({}))],
@@ -1220,7 +1226,8 @@ fn delete_one_step_while_recording_keeps_journal_and_remaining_steps() {
 fn nested_call_records_one_named_step_and_tracks_child_edits() {
     let mut s = Session::new();
     s.execute("file.new", json!({"width": 4, "height": 4})).unwrap();
-    s.actions.list
+    s.actions
+        .list
         .push(Action {
             name: "Child".into(),
             steps: vec![ActionStep::new("layer.new.layer", json!({"name": "Child layer"}))],
@@ -1234,7 +1241,10 @@ fn nested_call_records_one_named_step_and_tracks_child_edits() {
     assert_eq!(pending_steps(&s, 1).cloned().collect::<Vec<_>>(), [("actions.play".to_string(), json!({"action": "Child"}))]);
     s.execute("layer.new.layer", json!({"name": "After"})).unwrap();
     s.execute("actions.stop", json!({})).unwrap();
-    assert_eq!(s.actions.list.actions()[1].steps.iter().map(|st| st.command.as_str()).collect::<Vec<_>>(), ["layer.new.layer", "actions.play", "layer.new.layer"]);
+    assert_eq!(
+        s.actions.list.actions()[1].steps.iter().map(|st| st.command.as_str()).collect::<Vec<_>>(),
+        ["layer.new.layer", "actions.play", "layer.new.layer"]
+    );
     let at = s.actions.list.step_count(0);
     s.actions.list.insert_step(0, at, ActionStep::new("layer.new.layer", json!({"name": "Added later"}))).unwrap();
     s.execute("actions.move", json!({"action": "Child", "to": 1})).unwrap();
@@ -1250,7 +1260,8 @@ fn nested_call_records_one_named_step_and_tracks_child_edits() {
 #[test]
 fn nested_failure_cycles_depth_and_authorization_stop_parent() {
     let mut s = Session::new();
-    s.actions.list
+    s.actions
+        .list
         .push(Action {
             name: "A".into(),
             steps: vec![ActionStep::new("actions.play", json!({"action": "B"})), ActionStep::new("file.new", json!({"width": 2,"height": 2}))],
@@ -1258,7 +1269,8 @@ fn nested_failure_cycles_depth_and_authorization_stop_parent() {
             ..Default::default()
         })
         .unwrap();
-    s.actions.list
+    s.actions
+        .list
         .push(Action {
             name: "B".into(),
             steps: vec![ActionStep::new("actions.play", json!({"action": "A"}))],
@@ -1277,7 +1289,8 @@ fn nested_failure_cycles_depth_and_authorization_stop_parent() {
     s.authorize = None;
     s.actions.list.replace(ActionList::new());
     for i in 0..17 {
-        s.actions.list
+        s.actions
+            .list
             .push(Action {
                 name: format!("N{i}"),
                 steps: if i < 16 { vec![ActionStep::new("actions.play", json!({"action":format!("N{}", i + 1)}))] } else { vec![] },
@@ -1579,8 +1592,11 @@ fn scoped_source_slots_do_not_bind_previously_missing_references() {
     assert!(resolve(&called, &bad.steps[0].params, "actions.play").is_err());
     // A scoped source runs its raw references in the embedded namespace. An index beyond
     // the caller's library can therefore be valid there, even after capture adds a source copy.
-    let list =
-        vec![Action::new("Source", vec![ActionStep::new("actions.play", json!({"action": 3}))]), Action::new("Other", Vec::new()), Action::new("Last", Vec::new())];
+    let list = vec![
+        Action::new("Source", vec![ActionStep::new("actions.play", json!({"action": 3}))]),
+        Action::new("Other", Vec::new()),
+        Action::new("Last", Vec::new()),
+    ];
     let embedded = vec![
         Action::new("Gap0", Vec::new()),
         Action::new("Gap1", Vec::new()),
@@ -1693,7 +1709,10 @@ fn rename_leaves_calls_that_reach_another_sets_action_alone() {
         vec![
             ActionStep::new("file.automate.batch", json!({"action": "Target", "input": [], "output": "/out"})),
             ActionStep::new("file.automate.batch", json!({"action": "Target 2", "set": "B", "input": [], "output": "/out"})),
-            ActionStep::new("file.automate.batch", json!({"action": "Target 2", "set": "B", "steps": [["image.adjustments.invert", {}]], "input": [], "output": "/out"})),
+            ActionStep::new(
+                "file.automate.batch",
+                json!({"action": "Target 2", "set": "B", "steps": [["image.adjustments.invert", {}]], "input": [], "output": "/out"}),
+            ),
             ActionStep::new("actions.play", json!({"action": "Target"})),
             ActionStep::new("actions.conditional", json!({"if": "documentIsOpen", "then": "Target", "else": "Target"})),
         ]

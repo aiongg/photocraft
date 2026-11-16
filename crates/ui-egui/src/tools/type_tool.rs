@@ -28,24 +28,25 @@ mod panel;
 mod pointer;
 mod values;
 
+pub(crate) use controls::canvas_controls;
+#[cfg(test)]
+pub(crate) use craft::text::ui::editor::CharToggle;
 use defaults::apply;
 #[cfg(test)]
 use defaults::{default_style_params, default_styles, shown_scale};
 pub use defaults::{foreground_changed, open_color_picker};
 pub(crate) use defaults::{formatting_params, target, target_text};
-#[cfg(test)]
-pub(crate) use craft::text::ui::editor::CharToggle;
 use editing::selected_styles;
+pub use editing::{cancel, commit, commit_with, edit_active, edit_at, end_if_left};
 #[cfg(test)]
 pub(crate) use editing::{step_char_metric, toggle_char_style, toggle_hyphenate};
-pub use editing::{cancel, commit, commit_with, edit_active, edit_at, end_if_left};
-pub(crate) use fonts::{FontSourceState, finish_font_state, font_field, font_state, selected_style};
 #[cfg(test)]
 use fonts::preview_text;
+pub(crate) use fonts::{FontSourceState, finish_font_state, font_field, font_state, selected_style};
 pub use fonts::{families, style_label, styles, warm_fonts};
+pub(crate) use host::LayerHost;
 #[cfg(test)]
 pub(crate) use host::type_text;
-pub(crate) use host::LayerHost;
 pub use layout::layout;
 pub(crate) use layout::{hit_layer, offset_at, shows_own_layout};
 pub use options_bar::options_bar;
@@ -53,10 +54,9 @@ pub(crate) use options_bar::styles_at;
 #[cfg(test)]
 pub(crate) use panel::{OPENTYPE_BUTTONS, toggle_opentype};
 pub use panel::{character_panel, type_properties};
-pub(crate) use controls::canvas_controls;
-pub(crate) use pointer::{PathClick, TypeState, TypeTool, box_shape, drain, hover_path_target, inside_box, tool};
 #[cfg(test)]
 pub(crate) use pointer::path_target;
+pub(crate) use pointer::{PathClick, TypeState, TypeTool, box_shape, drain, hover_path_target, inside_box, tool};
 pub(crate) use values::doc_unit;
 
 pub const PLACEHOLDER: &str = "Lorem Ipsum";

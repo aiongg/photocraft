@@ -31,7 +31,6 @@ pub fn families() -> Arc<Vec<String>> {
     v
 }
 
-
 /// Style names available for a family: the names of the catalog's faces of it (named instances included),
 /// "Regular" when it has none. The picker's style rows list the same faces.
 pub fn styles(family: &str) -> Vec<String> {

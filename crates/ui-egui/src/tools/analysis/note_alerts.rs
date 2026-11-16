@@ -28,7 +28,6 @@ pub(crate) enum NoteQuestion {
     },
 }
 
-
 fn report(app: &mut PhotocraftApp, message: String) {
     app.ui.status = message;
     app.ui.status_error = true;

@@ -37,12 +37,7 @@ pub(in crate::tools) fn stroke(app: &mut PhotocraftApp) {
 
 /// The messages of the open framework alerts.
 pub(in crate::tools) fn alerts(app: &PhotocraftApp) -> Vec<String> {
-    app.framework
-        .dialogs
-        .open_dialogs()
-        .iter()
-        .filter_map(|d| d.fields.as_ref()?.get("message")?.as_str().map(str::to_string))
-        .collect()
+    app.framework.dialogs.open_dialogs().iter().filter_map(|d| d.fields.as_ref()?.get("message")?.as_str().map(str::to_string)).collect()
 }
 
 pub(in crate::tools) fn refused(app: &mut PhotocraftApp, want: &str) {
@@ -135,10 +130,15 @@ fn a_refused_press_alerts_or_reports_by_case() {
         ("sharpen lock pixels", Tool::Sharpen, lock_pixels, Layer(LOCKED)),
         ("sharpen group", Tool::Sharpen, group, Layer(GROUP)),
         ("sharpen lock transparency", Tool::Sharpen, lock_transparency, Paints),
-        ("sharpen bitmap before layer", Tool::Sharpen, |a| {
-            bitmap(a);
-            hide(a);
-        }, Mode(BITMAP)),
+        (
+            "sharpen bitmap before layer",
+            Tool::Sharpen,
+            |a| {
+                bitmap(a);
+                hide(a);
+            },
+            Mode(BITMAP),
+        ),
         ("dodge keeps today", Tool::Dodge, lock_all, Silent),
         ("sponge hidden", Tool::Sponge, hide, Layer(HIDDEN)),
         ("sponge lock all", Tool::Sponge, lock_all, Layer(LOCKED)),
@@ -153,9 +153,14 @@ fn a_refused_press_alerts_or_reports_by_case() {
         ("classic gradient lock transparency", Tool::Gradient, classic_transparency, Paints),
         ("live gradient hidden", Tool::Gradient, hide, Silent),
         ("brush lock all, again", Tool::Brush, lock_all, Layer(LOCKED)),
-        ("sponge lock position paints", Tool::Sponge, |a| {
-            a.run("layer.lockLayers", json!({"position": true})).unwrap();
-        }, Paints),
+        (
+            "sponge lock position paints",
+            Tool::Sponge,
+            |a| {
+                a.run("layer.lockLayers", json!({"position": true})).unwrap();
+            },
+            Paints,
+        ),
         ("sharpen hidden, again", Tool::Sharpen, hide, Layer(HIDDEN)),
         ("sponge hidden, again", Tool::Sponge, hide, Layer(HIDDEN)),
         ("brush group, again", Tool::Brush, group, Layer(GROUP)),
@@ -195,4 +200,3 @@ fn a_refused_press_alerts_or_reports_by_case() {
         }
     }
 }
-

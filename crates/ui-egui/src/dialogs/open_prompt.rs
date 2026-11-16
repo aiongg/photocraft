@@ -13,8 +13,8 @@ use craft::ui::runtime::env::Label;
 use photocraft_doc::{ColorMode, Document};
 use serde_json::{Value, json};
 
-use crate::PhotocraftApp;
 use super::alerts;
+use crate::PhotocraftApp;
 
 /// Tags the damaged-file prompt: the front of `held_opens` is the damaged file.
 pub(crate) struct DamageTag;

@@ -49,15 +49,7 @@ impl Notice {
 /// Show a notice (newest last); returns its id.
 pub fn post(app: &mut PhotocraftApp, title: impl Into<String>, lines: Vec<String>, tone: Tone, dismiss_pref: Option<&str>) -> u64 {
     let id = app.ui.alloc_id();
-    app.ui.notices.push(Notice {
-        id,
-        title: title.into(),
-        lines,
-        tone,
-        dismiss_pref: dismiss_pref.map(str::to_owned),
-        args: Vec::new(),
-        sticky: false,
-    });
+    app.ui.notices.push(Notice { id, title: title.into(), lines, tone, dismiss_pref: dismiss_pref.map(str::to_owned), args: Vec::new(), sticky: false });
     id
 }
 
@@ -219,12 +211,10 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     };
     // `NoticeCenter::timeout` takes seconds and cannot switch off; with auto-hide off every notice is posted sticky.
     let center = NoticeCenter::new().timeout(seconds);
-    let silenced: Vec<String> =
-        app.session.prefs().dialogs.iter().filter(|(_, value)| value.as_bool() == Some(true)).map(|(key, _)| key.clone()).collect();
+    let silenced: Vec<String> = app.session.prefs().dialogs.iter().filter(|(_, value)| value.as_bool() == Some(true)).map(|(key, _)| key.clone()).collect();
     for notice in std::mem::take(&mut app.ui.notices) {
-        let mut posted = PostedNotice::new(notice.text(&notice.title))
-            .lines(notice.lines.iter().map(|line| notice.text(line)).collect::<Vec<_>>())
-            .tone(notice.tone);
+        let mut posted =
+            PostedNotice::new(notice.text(&notice.title)).lines(notice.lines.iter().map(|line| notice.text(line)).collect::<Vec<_>>()).tone(notice.tone);
         if let Some(key) = &notice.dismiss_pref {
             posted = posted.dismiss_key(key.clone());
         }
@@ -362,5 +352,4 @@ mod tests {
             });
         }
     }
-
 }

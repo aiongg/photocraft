@@ -18,7 +18,6 @@ use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, tool_event};
 use crate::state::Tool;
 
-
 /// A fresh transparent document with the default brush and no smoothing, as the issue measured.
 fn app(tool: Tool) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
@@ -61,7 +60,6 @@ fn shift_drag_mostly_horizontal_paints_a_horizontal_line() {
     assert!(alpha(&app, 170, 100) > 0.9, "painted along the horizontal line");
     assert_eq!(alpha(&app, 170, 140), 0.0, "nothing where the pointer went diagonally");
 }
-
 
 /// The case the issue reports: 100,100 to 200,200 paints only the start dab -- no diagonal.
 #[test]

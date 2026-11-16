@@ -181,9 +181,13 @@ pub(crate) fn styled_composite(app: &PhotocraftApp, zoom: f32) -> Option<(egui::
     pv.styled.as_ref()?;
     let source = LayerStyleSource::new(app)?;
     let frame = StyledFrame::new(&pv.textures, texture_quad(t, pv), [pv.doc.size.width, pv.doc.size.height], zoom);
-    let plan = craft::imaging::ui::transform_preview::StylePlan::new(frame.quad, frame.canvas, frame.zoom, frame.budget.pixels(source.pixel_cost_ns(), false), |scale| {
-        source.reach(scale)
-    })?;
+    let plan = craft::imaging::ui::transform_preview::StylePlan::new(
+        frame.quad,
+        frame.canvas,
+        frame.zoom,
+        frame.budget.pixels(source.pixel_cost_ns(), false),
+        |scale| source.reach(scale),
+    )?;
     let level = PreviewTextures::choose(plan.scale as f32, frame.quad_scale, frame.nearest).level;
     let (image, uv) = frame.textures.level_image(level)?;
     let scaled = frame.quad.map(|p| Point::new(p.x * plan.scale, p.y * plan.scale));
@@ -333,7 +337,9 @@ fn flatten(sub: &EditSubpath, bends: bool) -> Vec<Point> {
         let curve = CubicBez::new(a.anchor, a.out_ctrl, b.in_ctrl, b.anchor);
         points.extend((1..OUTLINE_STEPS).map(|k| curve.eval(k as f64 / OUTLINE_STEPS as f64)));
     }
-    if !sub.closed && let Some(last) = sub.knots.last() {
+    if !sub.closed
+        && let Some(last) = sub.knots.last()
+    {
         points.push(last.anchor);
     }
     points
@@ -365,7 +371,11 @@ fn mapped_runs(points: &[Point], closed: bool, map: &dyn Fn(Point) -> Option<Poi
 /// `edit.transform.warp` map it like the pixels. Not Transform Selection (its ants are hidden), a
 /// path, Content-Aware Scale or a type layer's Warp Text, which leave the selection alone.
 fn carries_selection(app: &PhotocraftApp, t: &FreeTransform) -> bool {
-    !t.selection && !crate::frame_tool::frame_transform(t) && t.path.is_none() && t.content_aware.is_none() && !(t.session.warp().is_some() && super::warps_type(app))
+    !t.selection
+        && !crate::frame_tool::frame_transform(t)
+        && t.path.is_none()
+        && t.content_aware.is_none()
+        && !(t.session.warp().is_some() && super::warps_type(app))
 }
 
 /// Applying the open box moves the selection outline: Transform Selection's own box, or a box

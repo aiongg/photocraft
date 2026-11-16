@@ -273,4 +273,3 @@ fn read_at_launch(path: &str) -> bool {
         _ => false,
     }
 }
-

@@ -1,7 +1,7 @@
 //! Move tool transform controls through the control channel (#11105), and Free Transform's snapping.
 
-use egui::Modifiers;
 use craft::ui::dialog::DialogId;
+use egui::Modifiers;
 use photocraft_doc::LayerId;
 use photocraft_geom::Rect;
 use serde_json::{Value, json};
@@ -169,7 +169,9 @@ fn move_controls_press_zones_start_the_matching_gesture() {
                 [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]]
                     .map(|[x, y]| homography.apply(f64::from(x), f64::from(y)))
                     .into_iter()
-                    .fold([f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY], |b, (x, y)| [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)])
+                    .fold([f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY], |b, (x, y)| {
+                        [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)]
+                    })
             }))
         } else {
             None
@@ -184,10 +186,16 @@ fn move_controls_press_zones_start_the_matching_gesture() {
                 None => assert!(now.width() < previous.width() && now.height() < previous.height(), "{what}: both layers scale: {previous:?} -> {now:?}"),
                 Some(expected) => {
                     let expected = expected[index];
-                    assert!((expected[2] - expected[0] - f64::from(previous.width())).abs() > 2.0, "{what}: this fixture distinguishes rotation from translation");
+                    assert!(
+                        (expected[2] - expected[0] - f64::from(previous.width())).abs() > 2.0,
+                        "{what}: this fixture distinguishes rotation from translation"
+                    );
                     // The preview frame is continuous; committed raster bounds round to whole pixels.
                     for (actual, expected) in [now.x0, now.y0, now.x1, now.y1].into_iter().zip(expected) {
-                        assert!((f64::from(actual) - expected).abs() <= 1.0, "{what}: layer {id:?}: committed bound {actual} does not match preview {expected}");
+                        assert!(
+                            (f64::from(actual) - expected).abs() <= 1.0,
+                            "{what}: layer {id:?}: committed bound {actual} does not match preview {expected}"
+                        );
                     }
                 }
             }

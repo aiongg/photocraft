@@ -176,10 +176,7 @@ struct Last {
 
 fn remembered(app: &PhotocraftApp) -> Last {
     let saved: Remembered = saved_value(app.ctx(), &REMEMBER_KEY);
-    Last {
-        quality: saved.quality.filter(|&q| q <= MAX_QUALITY),
-        format: saved.jpeg_format.as_deref().and_then(JpegFormat::parse),
-    }
+    Last { quality: saved.quality.filter(|&q| q <= MAX_QUALITY), format: saved.jpeg_format.as_deref().and_then(JpegFormat::parse) }
 }
 
 /// Records an answered dialog for the next one. A quality left on the opened file's own is not

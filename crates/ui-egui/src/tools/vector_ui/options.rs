@@ -1,7 +1,7 @@
 use craft::behavior::EditEvent;
 use craft::color::ui::Paint;
-use craft::draw::ui::shape::{self as fw, Arrowheads, ArrowheadsPopover, ShapePanel, StrokeCells, VectorMode, VectorModeSelect};
 use craft::draw::ui::pen::PathOptionsPopover;
+use craft::draw::ui::shape::{self as fw, Arrowheads, ArrowheadsPopover, ShapePanel, StrokeCells, VectorMode, VectorModeSelect};
 use craft::theme::Srgba;
 use craft::ui::buttons::Button;
 use craft::ui::choice::Checkbox;
@@ -179,10 +179,8 @@ fn pen_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut Ba
     match tool {
         Tool::FreeformPen => {
             Divider::vertical().show(ui);
-            let field = NumberField::new(label(tl!("Curve Fit:")), Bind::given(Some(f64::from(o.curve_fit))))
-                .range(0.5..=10.0)
-                .unit_kind(UnitKind::Pixels)
-                .show(ui);
+            let field =
+                NumberField::new(label(tl!("Curve Fit:")), Bind::given(Some(f64::from(o.curve_fit)))).range(0.5..=10.0).unit_kind(UnitKind::Pixels).show(ui);
             if let Some(Some(v)) = field.value().copied() {
                 o.curve_fit = v as f32;
             }
@@ -191,7 +189,10 @@ fn pen_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut Ba
         }
         Tool::CurvaturePen => hint(
             ui,
-            &crate::i18n::fmt(tl!("Click: smooth point · Double-click: corner · Drag a point: move · Click first point: close · {key} finish"), &[("key", &enter)]),
+            &crate::i18n::fmt(
+                tl!("Click: smooth point · Double-click: corner · Drag a point: move · Click first point: close · {key} finish"),
+                &[("key", &enter)],
+            ),
         ),
         _ => hint(
             ui,
@@ -384,10 +385,9 @@ fn edit_of(change: &fw::ShapeChange, sh: &photocraft_doc::ShapeLayer, gradients:
         fw::ShapeChange::Sides(n) => plain("sides", json!({"sides": n})),
         fw::ShapeChange::StarRatio(f) => plain("star", json!({"starRatio": f})),
         fw::ShapeChange::Weight(w) => plain("weight", json!({"weight": w})),
-        fw::ShapeChange::Arrowheads(a) => plain(
-            "arrow",
-            json!({"arrowStart": a.start, "arrowEnd": a.end, "arrowWidth": a.width, "arrowLength": a.length, "arrowConcavity": a.concavity}),
-        ),
+        fw::ShapeChange::Arrowheads(a) => {
+            plain("arrow", json!({"arrowStart": a.start, "arrowEnd": a.end, "arrowWidth": a.width, "arrowLength": a.length, "arrowConcavity": a.concavity}))
+        }
         _ => None,
     }
 }
@@ -416,8 +416,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
     let mut linked = was_linked;
     let recent_colors: Vec<Srgba> = crate::paint_picker::recent_colors(&app.session).into_iter().map(|c| Srgba::new(c[0], c[1], c[2], 1.0)).collect();
     let groups = crate::shape_gradient_ui::ShapeGradients::groups_of(&app.session.presets.gradients, fg, bg);
-    let gradients =
-        crate::shape_gradient_ui::ShapeGradients { groups, current: &app.session.presets.gradient, recent: &mut app.ui.recent_gradients, fg, bg };
+    let gradients = crate::shape_gradient_ui::ShapeGradients { groups, current: &app.session.presets.gradient, recent: &mut app.ui.recent_gradients, fg, bg };
     let current = [sh.fill.clone(), sh.stroke.as_ref().map(|s| s.paint.clone())];
     let mut library = crate::shape_paint_ui::ChipLibrary::new(
         &recent_colors,

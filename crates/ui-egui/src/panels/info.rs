@@ -96,7 +96,9 @@ pub(crate) fn sampler_rows(app: &mut PhotocraftApp) -> Vec<(SamplerReadout, [Lab
     readouts
         .iter()
         .filter_map(|s| {
-            let at = s["position"].as_array().map_or((0.0, 0.0), |a| (a.first().and_then(Value::as_f64).unwrap_or(0.0), a.get(1).and_then(Value::as_f64).unwrap_or(0.0)));
+            let at = s["position"]
+                .as_array()
+                .map_or((0.0, 0.0), |a| (a.first().and_then(Value::as_f64).unwrap_or(0.0), a.get(1).and_then(Value::as_f64).unwrap_or(0.0)));
             let (rgb, cmyk) = (channels::<3>(&s["rgb"])?, channels::<4>(&s["cmyk"])?);
             let number = usize::try_from(s["number"].as_i64().unwrap_or(0)).unwrap_or(0);
             // The point sits on its pixel's centre (#11725); the row names the pixel, as the pointer row does.

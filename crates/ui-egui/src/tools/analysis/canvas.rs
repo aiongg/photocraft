@@ -5,8 +5,8 @@
 //! commands after the host ran, once each, so a second pass in a frame (which gets no new pointer input) edits nothing.
 
 use craft::behavior::kurbo::Point;
-use craft::behavior::{CancelReason, Cursor, CursorBadge, CursorIcon, CountMark, EditEvent, Input, Metrics, Mixed, PaintedCursor};
-use craft::color::ui::{ColorSamplerMarks, ColorSamplers, ColorSamplerTool, SamplerEvent};
+use craft::behavior::{CancelReason, CountMark, Cursor, CursorBadge, CursorIcon, EditEvent, Input, Metrics, Mixed, PaintedCursor};
+use craft::color::ui::{ColorSamplerMarks, ColorSamplerTool, ColorSamplers, SamplerEvent};
 use craft::draw::ui::{RulerLine, RulerTool};
 use craft::ui::canvas::{CanvasTool, NoTool, ToolAction, ToolClaims, ToolContext, ToolHostResponse, ToolKey, ToolPath, ToolPointer, canvas_space};
 use craft::ui::contract::{Access, Common, Component, Cx, MeasureCx, PaintUi, Props as _, Role, Show as _};
@@ -38,7 +38,13 @@ pub(crate) struct AnalysisTools {
 
 impl Default for AnalysisTools {
     fn default() -> Self {
-        Self { ruler: RulerTool::new(), sampler: ColorSamplerTool::new(), samplers: ColorSamplers::new(), count: CountTool::default(), note: NoteTool::default() }
+        Self {
+            ruler: RulerTool::new(),
+            sampler: ColorSamplerTool::new(),
+            samplers: ColorSamplers::new(),
+            count: CountTool::default(),
+            note: NoteTool::default(),
+        }
     }
 }
 
@@ -449,12 +455,7 @@ pub(crate) struct OverlayStyle {
 
 fn overlay_style(cx: &StyleCx<'_>) -> OverlayStyle {
     let tokens = cx.tokens;
-    OverlayStyle {
-        metrics: Metrics::new(),
-        ink: cx.color(tokens.color.overlay.stroke),
-        halo: cx.color(tokens.color.overlay.halo),
-        shadow: tokens.stroke.thin,
-    }
+    OverlayStyle { metrics: Metrics::new(), ink: cx.color(tokens.color.overlay.stroke), halo: cx.color(tokens.color.overlay.halo), shadow: tokens.stroke.thin }
 }
 
 /// The count markers of the visible groups, numbered in each group. Paint only.

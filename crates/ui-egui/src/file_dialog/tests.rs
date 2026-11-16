@@ -376,7 +376,13 @@ fn menu_open_exr_parts_asks_for_a_file_then_shows_the_parts_dialog() {
     app.poll_file_dialog();
     assert!(!app.ui.status_error, "{}", app.ui.status);
     // PLAN: assumed dialogs-w19/w57: the parts dialog is a hosted dialog whose json fields carry `path` and one `part/..` flag per part.
-    let dialog = app.framework.dialogs.open_dialogs().into_iter().find(|d| d.fields.as_ref().is_some_and(|f| f["path"] == json!(path))).expect("the parts dialog is open");
+    let dialog = app
+        .framework
+        .dialogs
+        .open_dialogs()
+        .into_iter()
+        .find(|d| d.fields.as_ref().is_some_and(|f| f["path"] == json!(path)))
+        .expect("the parts dialog is open");
     let fields = dialog.fields.clone().unwrap();
     let parts: Vec<&String> = fields.as_object().unwrap().keys().filter(|k| k.starts_with("part/")).collect();
     assert_eq!(parts.len(), 1, "{fields:?}");
@@ -435,7 +441,9 @@ fn menu_place_starts_transform_for_each_chosen_image() {
                     corner.x = left + (corner.x - left) * 2.0;
                 }
                 let before = craft::behavior::Mixed::Same(*transform.session.state());
-                transform.session.apply(craft::draw::ui::transform::TransformEdit::Box(craft::behavior::EditEvent::set(before, doubled, "Resize".into(), None)), 0.0);
+                transform
+                    .session
+                    .apply(craft::draw::ui::transform::TransformEdit::Box(craft::behavior::EditEvent::set(before, doubled, "Resize".into(), None)), 0.0);
                 crate::transform_tool::commit(&mut app);
                 assert!(app.ui.transform.is_none(), "resizing the placed image must commit");
                 let st = app.session.active().unwrap();

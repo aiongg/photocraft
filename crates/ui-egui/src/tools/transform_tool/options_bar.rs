@@ -35,7 +35,8 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // Held outside the bar's block: the warp slot borrows them for as long as the bar lives.
     let warp = t.session.warp().map(|w| (warp_values(w), w.on_type));
     let out = {
-        let mut bar = TransformBar::new(Label::from(tl!("Free Transform").to_string()), &t.session, Bind::bound(&mut settings)).units(x_text, y_text).size_units(&units);
+        let mut bar =
+            TransformBar::new(Label::from(tl!("Free Transform").to_string()), &t.session, Bind::bound(&mut settings)).units(x_text, y_text).size_units(&units);
         if t.content_aware.is_some() {
             // `TransformGroups` is non-exhaustive: start from none and switch the shown groups on.
             let mut groups = TransformGroups::NONE;

@@ -61,7 +61,8 @@ fn the_ruler_angle_is_rounded_before_the_first_frame() {
     assert_eq!(confirmed_angle(&mut app, id), Some(32.12), "undrawn, OK sends the rounded angle");
 
     let (app, id) = open_ruler([143, 127]);
-    let mut h = Harness::builder().with_context(app.ctx().clone())
+    let mut h = Harness::builder()
+        .with_context(app.ctx().clone())
         .with_size(egui::vec2(900.0, 700.0))
         .build_ui_state(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, Default::default());

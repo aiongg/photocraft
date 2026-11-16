@@ -109,8 +109,10 @@ fn integer_amounts_sizes_and_defaults_preserve_playback() {
 /// Opt-in skipping reports precisely the lost edits, keeping the supported steps in order.
 #[test]
 fn skipping_fractional_amounts_reports_action_and_step() {
-    let action =
-        Action::new("Mixed Ripple", [10.0, 81.4, -20.0, -0.5].into_iter().map(|amount| ActionStep::new(RIPPLE, json!({"amount": amount, "size": "small"}))).collect());
+    let action = Action::new(
+        "Mixed Ripple",
+        [10.0, 81.4, -20.0, -0.5].into_iter().map(|amount| ActionStep::new(RIPPLE, json!({"amount": amount, "size": "small"}))).collect(),
+    );
     let error = atn_cmds::export("Ripple", &[&action], &[], false).unwrap_err();
     assert!(error.contains("step 2 of `Mixed Ripple`"), "{error}");
     assert!(error.contains(RIPPLE) && error.contains("skipUnsupported"), "{error}");

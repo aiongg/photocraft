@@ -459,8 +459,7 @@ fn import(s: &mut Session, p: &Value) -> Result<Value> {
         }
         None => str_param(p, "path").and_then(|path| std::path::Path::new(path).extension()).and_then(|e| e.to_str()).unwrap_or("bin").to_string(),
     };
-    let format = SwatchFormat::sniff(&bytes, &format!("{group}.{hint}"))
-        .ok_or_else(|| bad(CMD, "not an .aco, .act, .ase or .gpl swatch file"))?;
+    let format = SwatchFormat::sniff(&bytes, &format!("{group}.{hint}")).ok_or_else(|| bad(CMD, "not an .aco, .act, .ase or .gpl swatch file"))?;
     // The group name is the file stem: craft-color names ungrouped colours after it.
     let (groups, report) = read_swatches(&bytes, &format!("{group}.{}", format.extension())).map_err(|e| bad(CMD, e.to_string()))?;
     let warnings: Vec<String> = report.notes.iter().map(|n| word_note(n, format, false)).collect();

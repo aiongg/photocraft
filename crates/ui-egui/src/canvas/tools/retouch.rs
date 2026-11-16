@@ -3,9 +3,9 @@
 
 use std::cell::RefCell;
 
+use craft::behavior::PointerButton;
 use craft::behavior::cursor::{Cursor, PaintedCursor};
 use craft::behavior::value::CancelReason;
-use craft::behavior::PointerButton;
 use craft::imaging::ui::select::{LassoTool, SelectEvent, SelectionShape};
 use craft::keymap::Mods;
 use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer};

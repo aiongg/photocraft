@@ -1,9 +1,9 @@
 //! Full-resolution refinement of Camera Raw's interactive proxy. Native work is off the
 //! UI thread; only one revision runs at a time, and obsolete results never replace new edits.
+use craft::imaging::raw::RawDevelopSettings as CameraRaw;
 use craft::imaging::scopes::{ClippingMask, clipping};
 use craft::ui::canvas::PixelRect as RasterRect;
 use egui::{Color32, ColorImage, Context};
-use craft::imaging::raw::RawDevelopSettings as CameraRaw;
 use photocraft_algo::camera_raw::DevelopInputs;
 use photocraft_geom::Rect as PixelRect;
 use photocraft_raster::Surface;
@@ -139,10 +139,11 @@ impl DetailPreview {
             if cancel.load(Ordering::Relaxed) {
                 return;
             }
-            let result =
-                std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| develop(&source, raw_curve.as_deref().map(Vec::as_slice), area, &params, &inputs, &coverage)))
-                    .map(|surface| (revision, surface))
-                    .map_err(|_| "RAW Develop detail preview failed; the proxy remains available".into());
+            let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+                develop(&source, raw_curve.as_deref().map(Vec::as_slice), area, &params, &inputs, &coverage)
+            }))
+            .map(|surface| (revision, surface))
+            .map_err(|_| "RAW Develop detail preview failed; the proxy remains available".into());
             if !cancel.load(Ordering::Relaxed) {
                 let _ = tx.send(result);
                 ctx.request_repaint();

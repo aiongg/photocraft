@@ -547,7 +547,10 @@ fn fit_shortcut_records_and_f6_fits_the_resized_canvas() {
     h.state_mut().run("image.canvasSize", json!({"width": 1800, "height": 1080})).unwrap();
     press(&mut h, "Cmd+0");
     h.state_mut().run("actions.stop", json!({})).unwrap();
-    assert_eq!(h.state().session.actions.list.actions()[0].steps.iter().map(|s| s.command.as_str()).collect::<Vec<_>>(), ["image.canvasSize", "view.fitOnScreen"]);
+    assert_eq!(
+        h.state().session.actions.list.actions()[0].steps.iter().map(|s| s.command.as_str()).collect::<Vec<_>>(),
+        ["image.canvasSize", "view.fitOnScreen"]
+    );
     let item = crate::menus::menu_rows(h.state()).into_iter().find(|i| i.command.id == "view.fitOnScreen").unwrap();
     assert_eq!(item.shortcut.as_ref().map(|c| c.portable()).as_deref(), Some("Cmd+0"));
     crate::actions::assign_shortcut(h.state_mut(), "Resize and fit", "F6").unwrap();

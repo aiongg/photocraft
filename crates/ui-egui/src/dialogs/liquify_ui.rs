@@ -12,8 +12,8 @@ use std::sync::{Arc, Mutex, MutexGuard, PoisonError};
 use craft::behavior::PixelSize;
 use craft::behavior::kurbo::Point;
 use craft::imaging::ui::liquify::{
-    BackdropUse, LiquifyBrush, LiquifyDone, LiquifyEvent, LiquifyGlobal, LiquifyMesh, LiquifyOpen, LiquifySettings, LiquifySource, LiquifyStep, LiquifyStroke as StepStroke,
-    LiquifyTool as StepTool, LiquifyWorkspace, MeshSize, StrokeEvent,
+    BackdropUse, LiquifyBrush, LiquifyDone, LiquifyEvent, LiquifyGlobal, LiquifyMesh, LiquifyOpen, LiquifySettings, LiquifySource, LiquifyStep,
+    LiquifyStroke as StepStroke, LiquifyTool as StepTool, LiquifyWorkspace, MeshSize, StrokeEvent,
 };
 use craft::ui::canvas::{PixelRect, RasterSource};
 use craft::ui::dialog::{DialogId, HostedWorkspace};
@@ -434,11 +434,8 @@ impl Engine {
         let skip = if commit { run.applied } else { 0 };
         let stationary = run.stroke.tool.is_stationary();
         for &p in s.points.iter().skip(skip) {
-            let d = if stationary {
-                self.field.stroke_segment(&run.stroke, run.last, p)
-            } else {
-                self.field.stroke_segment_live(&run.stroke, run.last, p, 0.0)
-            };
+            let d =
+                if stationary { self.field.stroke_segment(&run.stroke, run.last, p) } else { self.field.stroke_segment_live(&run.stroke, run.last, p, 0.0) };
             self.mark(d, edits_mask(run.stroke.tool));
             run.last = p;
             run.applied += 1;

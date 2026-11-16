@@ -1,5 +1,5 @@
-use crate::app::framework::BuildApp;
 use super::*;
+use crate::app::framework::BuildApp;
 use egui_kittest::kittest::Queryable;
 
 const HEIGHT: f32 = 360.0;

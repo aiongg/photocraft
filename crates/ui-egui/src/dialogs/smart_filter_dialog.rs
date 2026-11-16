@@ -71,7 +71,8 @@ pub fn open(app: &mut PhotocraftApp, layer: LayerId, index: usize) -> Result<Dia
     let title = Label::from(crate::i18n::fmt(tl!("Blending Options ({filter})"), &[("filter", name.as_str())]));
     let params = vec![
         blend_param("blend", tl!("Mode"), false, filter.blend),
-        Param::read_only_text("blendNote", "", tl!("Dissolve is approximated: it blends without Photoshop's dither.")).visible_when("blend", blend_key(BlendMode::Dissolve)),
+        Param::read_only_text("blendNote", "", tl!("Dissolve is approximated: it blends without Photoshop's dither."))
+            .visible_when("blend", blend_key(BlendMode::Dissolve)),
         Param::new("opacity", tl!("Opacity"), ParamKind::range(0.0, 100.0, 100.0, SliderScale::Linear)),
     ];
     let mut fields = DialogFields::new();

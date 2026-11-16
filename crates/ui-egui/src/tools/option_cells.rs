@@ -5,10 +5,10 @@ use std::ops::RangeInclusive;
 
 use craft::behavior::{EditEvents, NumberCodec};
 use craft::ui::contract::{Bind, FieldLayout, Props as _, Show as _, ShowContainer as _, SideLabel, Sizing};
-use craft::ui::primitives::IconSpec;
 use craft::ui::dialog::Alert;
 use craft::ui::display::{Elide, Shade, Text};
 use craft::ui::form::Field;
+use craft::ui::primitives::IconSpec;
 use craft::ui::runtime::env::{Env, Label};
 use craft::ui::text::{NumberField, RangeAlert};
 

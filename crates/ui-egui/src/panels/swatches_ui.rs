@@ -18,11 +18,11 @@ use craft::color::ui::PickedColor;
 use craft::color::ui::{SwatchAt, SwatchEdit, SwatchKey, SwatchesCommand, SwatchesMenu, SwatchesPanel, SwatchesWords};
 use craft::theme::Srgba;
 use craft::theme::variant::Tone;
+use craft::ui::bars::StatusMessage;
 use craft::ui::contract::{Bind, CommandSet};
 use craft::ui::menu::PanelRow;
 use craft::ui::patterns::presets::{PresetFileEvent, PresetFileRequest, PresetWords};
 use craft::ui::runtime::commands::{CommandRef, CommandState};
-use craft::ui::bars::StatusMessage;
 
 use crate::PhotocraftApp;
 
@@ -356,15 +356,7 @@ mod tests {
         app.run("file.new", json!({"width": 400, "height": 200})).unwrap();
         let id = app.run("type.create", json!({"text": "Hello world", "size": 40, "x": 20, "y": 100, "color": "#ffffff"})).unwrap()["layer"].as_u64().unwrap();
         app.ui.tool = Tool::Type;
-        app.ui.text_edit = Some(crate::state::TextEdit {
-            layer: id,
-            document: None,
-            caret: 0,
-            anchor: 5,
-            session: "s".into(),
-            created: false,
-            mask: false,
-        });
+        app.ui.text_edit = Some(crate::state::TextEdit { layer: id, document: None, caret: 0, anchor: 5, session: "s".into(), created: false, mask: false });
         use_swatch(&mut app, "Red", false);
         let red = [230.0 / 255.0, 40.0 / 255.0, 40.0 / 255.0, 1.0];
         assert_eq!(app.session.tools.foreground, red);

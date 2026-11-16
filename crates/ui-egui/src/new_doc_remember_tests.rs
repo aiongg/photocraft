@@ -163,6 +163,9 @@ fn created_documents_fill_the_recent_category() {
     assert_eq!(restarted.presets.recent_documents, recent);
     // The list the dialog opens with (its bound `recent`) holds every setting of each entry.
     let listed: Vec<DocumentOptions> = restarted.presets.recent_documents.iter().map(crate::new_doc_ui::to_options).collect();
-    assert_eq!((listed[1].size, listed[1].unit, listed[1].color_mode, listed[1].depth), (PixelSize::new(640, 480), UnitKind::Inches, ColorMode::Cmyk, BitDepth::Sixteen));
+    assert_eq!(
+        (listed[1].size, listed[1].unit, listed[1].color_mode, listed[1].depth),
+        (PixelSize::new(640, 480), UnitKind::Inches, ColorMode::Cmyk, BitDepth::Sixteen)
+    );
     assert_eq!(listed[1].background, BackgroundContents::Transparent);
 }

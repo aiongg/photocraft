@@ -88,16 +88,7 @@ pub fn intercept(app: &mut PhotocraftApp, id: &str, params: &Value) -> bool {
         log::warn!("quitting a window that lost its GPU device before its unsaved work could be saved for recovery");
         return false;
     }
-    let prompt = Prompt {
-        id: id.to_string(),
-        params: params.clone(),
-        target,
-        docs,
-        asked: None,
-        auto: None,
-        auto_answered: None,
-        auto_control: false,
-    };
+    let prompt = Prompt { id: id.to_string(), params: params.clone(), target, docs, asked: None, auto: None, auto_answered: None, auto_control: false };
     match &app.discard {
         None => ask(app, prompt),
         // Quitting overrides whatever is pending: it covers every document, so nothing is lost.

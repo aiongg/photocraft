@@ -12,13 +12,13 @@
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+use craft::behavior::PixelSize;
 use craft::imaging::selection::PreviewMode;
 use craft::imaging::trace::{MaskRect, MaskSource};
-use craft::behavior::PixelSize;
 use craft::imaging::ui::color_range::{ColorRangeSelect, ColorRangeValue, HostedColorRange};
 use craft::ui::canvas::{PixelRect, RasterSource};
-use craft::ui::primitives::Revision;
 use craft::ui::dialog::{DialogId, DialogResult};
+use craft::ui::primitives::Revision;
 use egui::Color32;
 use photocraft_doc::{DocId, Document};
 use serde_json::{Map, Value, json};

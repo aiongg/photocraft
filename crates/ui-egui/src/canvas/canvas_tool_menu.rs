@@ -19,8 +19,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Value, json};
 
 use crate::direct_select::PathRef;
-use craft::draw::ui::BezierHit;
 use crate::{PhotocraftApp, state::Tool};
+use craft::draw::ui::BezierHit;
 
 pub(crate) mod pen_dialogs;
 
@@ -1280,7 +1280,9 @@ pub fn open(app: &mut PhotocraftApp, tool: Tool, kind: MenuKind, at: Pos2, doc: 
         point: None,
     };
     match kind {
-        MenuKind::Pasteboard | MenuKind::Guide | MenuKind::BrushMode if kind == MenuKind::BrushMode && crate::brush_mode_menu::items(tool).is_empty() => return false,
+        MenuKind::Pasteboard | MenuKind::Guide | MenuKind::BrushMode if kind == MenuKind::BrushMode && crate::brush_mode_menu::items(tool).is_empty() => {
+            return false;
+        }
         MenuKind::Pasteboard | MenuKind::Guide => menu.kind = kind,
         MenuKind::BrushMode => {
             // The checked row reads the tool's own brush.

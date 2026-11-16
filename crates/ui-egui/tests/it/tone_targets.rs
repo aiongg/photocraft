@@ -869,7 +869,9 @@ fn last_tone_settings_follow_the_current_scalar_target() {
                 let fields = params(&h);
                 for key in ["red", "green", "blue"] {
                     // The gray plane's command parameters carry no colour records; one that is carried is neutral.
-                    let neutral = fields.get(key).is_none_or(|record| if kind == "levels" { record["gamma"] == 1.0 } else { *record == json!([[0.0, 0.0], [255.0, 255.0]]) });
+                    let neutral = fields
+                        .get(key)
+                        .is_none_or(|record| if kind == "levels" { record["gamma"] == 1.0 } else { *record == json!([[0.0, 0.0], [255.0, 255.0]]) });
                     assert!(neutral, "{mode:?} {target:?} {kind}: hidden {key} must stay neutral: {fields}");
                 }
                 assert!(fields.get("layer").is_none() && fields.get("document").is_none());
@@ -1315,7 +1317,11 @@ fn record_again_uses_recorded_alpha_settings_and_matches_its_preview() {
             let original = app.session.active().unwrap().doc.clone();
             let mut h = harness(app);
             h.run_steps(3);
-            let reply = control(&mut h, "ui.menu.invoke", json!({"id": craft::ui::runtime::commands::CommandRef::from(craft::automation::ui::actions::ActionsPanelCommands::RecordAgain).id}));
+            let reply = control(
+                &mut h,
+                "ui.menu.invoke",
+                json!({"id": craft::ui::runtime::commands::CommandRef::from(craft::automation::ui::actions::ActionsPanelCommands::RecordAgain).id}),
+            );
             assert_eq!(reply["ok"], true, "{reply}");
             assert_eq!(names(&h), ["Saved sky"], "{mode:?} {kind}");
             let values = params(&h);

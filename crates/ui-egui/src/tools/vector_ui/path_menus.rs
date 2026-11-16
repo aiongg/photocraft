@@ -11,8 +11,8 @@ use craft::ui::pickers::Select;
 use craft::ui::popover::Popover;
 use craft::ui::runtime::env::Label;
 
-use super::pen::{PATH_OPS, merge_target, tool_in_shape_mode, tool_path_op};
 use super::PhotocraftApp;
+use super::pen::{PATH_OPS, merge_target, tool_in_shape_mode, tool_path_op};
 
 /// Path alignment's Align entries: label and icon.
 pub(crate) const PATH_ALIGN_ENTRIES: [(&str, &str); 6] = [
@@ -80,12 +80,7 @@ pub(super) fn path_operations_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .collect();
     entries.push(Entry::separator());
     entries.push(Entry::new(OpsPick::Merge, label(tl!("Merge Shape Components"))).icon(IconId::new("path-op-merge")).enabled(merge.is_some()));
-    let button = IconButton::new(IconId::new(icon))
-        .label(label(tl!("Path operations")))
-        .popup(PopupKind::Menu)
-        .popup_mark(PopupMark::Menu)
-        .show(ui)
-        .response;
+    let button = IconButton::new(IconId::new(icon)).label(label(tl!("Path operations"))).popup(PopupKind::Menu).popup_mark(PopupMark::Menu).show(ui).response;
     let picked = Menu::new(label(tl!("Path operations"))).opened_by(&button, Trigger::Click).pick(ui, &entries).picked;
     let result = match picked {
         Some(OpsPick::Op(op)) => crate::path_components::set_op(app, op),
@@ -142,11 +137,7 @@ pub(super) fn path_alignment_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// has no command that reorders the components of a path yet.
 pub(super) fn path_arrangement_menu(_app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let entries: Vec<Entry<usize>> = PATH_ARRANGE_ENTRIES.iter().enumerate().map(|(i, name)| Entry::new(i, label(tl!(name))).enabled(false)).collect();
-    let button = IconButton::new(IconId::new("layers"))
-        .label(label(tl!("Path arrangement")))
-        .popup(PopupKind::Menu)
-        .popup_mark(PopupMark::Menu)
-        .show(ui)
-        .response;
+    let button =
+        IconButton::new(IconId::new("layers")).label(label(tl!("Path arrangement"))).popup(PopupKind::Menu).popup_mark(PopupMark::Menu).show(ui).response;
     let _ = Menu::new(label(tl!("Path arrangement"))).opened_by(&button, Trigger::Click).pick(ui, &entries);
 }

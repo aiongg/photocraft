@@ -282,7 +282,8 @@ fn thumbnail_selection_ctrl_click_paths_combines_with_shift_and_alt() {
 #[test]
 fn thumbnail_selection_ctrl_click_layer_path_preserves_panel_target() {
     let mut h = harness();
-    let shape = h.state_mut().run("shape.create", json!({"kind":"rect","rect":[40,20,60,40],"fill":"#cc3333","name":"Badge"})).unwrap()["layer"].as_u64().unwrap();
+    let shape =
+        h.state_mut().run("shape.create", json!({"kind":"rect","rect":[40,20,60,40],"fill":"#cc3333","name":"Badge"})).unwrap()["layer"].as_u64().unwrap();
     h.state_mut().run("path.set", json!({"name":"work","path":rect_path(0.0,0.0,10.0,10.0)})).unwrap();
     h.state_mut().ui.selected_path = Some("work".into());
     load(&mut h, PathRef::Layer(shape), SelectionOperation::New);

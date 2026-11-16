@@ -134,9 +134,11 @@ fn blend_keys_reach_each_tools_target() {
         assert_eq!(a.ui.tool, tool);
     }
     // Tools without a blend mode of their own set the layer.
-    for (tool, letter, mode) in
-        [(Tool::Eraser, S::Multiply, BlendMode::Multiply), (Tool::MagicEraser, S::Screen, BlendMode::Screen), (Tool::MixerBrush, S::Difference, BlendMode::Difference)]
-    {
+    for (tool, letter, mode) in [
+        (Tool::Eraser, S::Multiply, BlendMode::Multiply),
+        (Tool::MagicEraser, S::Screen, BlendMode::Screen),
+        (Tool::MixerBrush, S::Difference, BlendMode::Difference),
+    ] {
         let mut a = app(tool);
         key(&mut a, letter);
         assert_eq!(layer_blend(&a), mode, "{tool:?}");
@@ -152,7 +154,8 @@ fn blend_keys_reach_each_tools_target() {
     // Color Replacement: four letters set the active layer and the tool's Mode stays (#11928).
     let mut a = app(Tool::ColorReplacement);
     let tool_mode_before = tool_mode(&mut a);
-    for (letter, mode) in [(S::Multiply, BlendMode::Multiply), (S::Hue, BlendMode::Hue), (S::Luminosity, BlendMode::Luminosity), (S::Normal, BlendMode::Normal)] {
+    for (letter, mode) in [(S::Multiply, BlendMode::Multiply), (S::Hue, BlendMode::Hue), (S::Luminosity, BlendMode::Luminosity), (S::Normal, BlendMode::Normal)]
+    {
         key(&mut a, letter);
         assert_eq!(layer_blend(&a), mode, "{letter:?}");
     }

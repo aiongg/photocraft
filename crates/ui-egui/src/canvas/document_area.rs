@@ -158,8 +158,7 @@ fn arranged(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, active: usiz
     let Some(cells) = arranged_cells(app, rect) else { return false };
     let count = app.ui.document_windows.docked.len();
     let active_pane = app.ui.document_windows.docked.iter().position(|group| group.shown == Some(active_id)).unwrap_or(0);
-    let shown: Vec<Option<usize>> =
-        app.ui.document_windows.docked.iter().map(|group| group.shown.and_then(|id| document_index(app, id))).collect();
+    let shown: Vec<Option<usize>> = app.ui.document_windows.docked.iter().map(|group| group.shown.and_then(|id| document_index(app, id))).collect();
     // The panes are laid out from the dividers as this pass starts; an edit of them lands after the pass.
     let mut at = app.ui.split_at.clone();
     let out = SplitViews::new(tl!("Documents"), layout, Bind::bound(&mut at)).count(count).active(active_pane).show(ui, |ui, _| {

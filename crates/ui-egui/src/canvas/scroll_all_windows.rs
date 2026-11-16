@@ -70,8 +70,13 @@ pub fn follow(app: &mut PhotocraftApp, source: Source, pan: ViewPan) {
     // A New Window for Document draws its own view. Any other floating window draws its document's
     // own view (#11276), moved once however many windows share it, and not when the dragged window
     // is that view's own.
-    let floating: Vec<(u64, Option<usize>)> =
-        app.ui.document_windows.floating.iter().map(|(g, _)| (g.id, g.shown.or_else(|| g.documents.first().copied()).and_then(|d| super::tabs::document_index(app, d)))).collect();
+    let floating: Vec<(u64, Option<usize>)> = app
+        .ui
+        .document_windows
+        .floating
+        .iter()
+        .map(|(g, _)| (g.id, g.shown.or_else(|| g.documents.first().copied()).and_then(|d| super::tabs::document_index(app, d))))
+        .collect();
     let mut moved = Vec::new();
     if let Source::Window(id) = source
         && !app.ui.window_views.contains_key(&id)

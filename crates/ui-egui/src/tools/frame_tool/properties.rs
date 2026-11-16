@@ -4,8 +4,8 @@
 use super::{Target, report, select, stroke, target};
 use crate::PhotocraftApp;
 use craft::ui::buttons::Button;
-use craft::ui::contract::{Bind, Entry, GlyphLabel, LabelKind, LabelScheme, Props as _, Show as _, ShowContainer as _, SideLabel};
 use craft::ui::choice::Segmented;
+use craft::ui::contract::{Bind, Entry, GlyphLabel, LabelKind, LabelScheme, Props as _, Show as _, ShowContainer as _, SideLabel};
 use craft::ui::display::Divider;
 use craft::ui::form::{Field, FieldGroup};
 use craft::ui::layout_components::Row;
@@ -105,10 +105,7 @@ pub(crate) fn properties(app: &mut PhotocraftApp, ui: &mut Ui, l: &Layer) {
         && w > 0.
         && h > 0.
     {
-        let r = app.run(
-            "layer.frame.set",
-            json!({"layer":id.0,"transform":[a*nw/w,b*nw/w,c*nh/h,d*nh/h,nx,ny],"coalesce":ch.coalesce}),
-        );
+        let r = app.run("layer.frame.set", json!({"layer":id.0,"transform":[a*nw/w,b*nw/w,c*nh/h,d*nh/h,nx,ny],"coalesce":ch.coalesce}));
         report(app, r);
     }
     if let Some(ch) = stroke_change {

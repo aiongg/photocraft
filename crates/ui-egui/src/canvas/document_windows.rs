@@ -4,11 +4,11 @@
 
 use craft::behavior::canvas::zoom::wrapped_canvas;
 use craft::behavior::kurbo::Size;
-use photocraft_doc::DocId;
-use craft::ui::contract::{ShowContainer as _, SizeLimits};
 use craft::ui::canvas::ToolHost;
+use craft::ui::contract::{ShowContainer as _, SizeLimits};
 use craft::ui::shell::{DocumentWindow, Wrapped};
 use egui::{Rect, Vec2, vec2};
+use photocraft_doc::DocId;
 
 use super::canvas_view;
 use super::document_display::CanvasHost;
@@ -17,7 +17,6 @@ use crate::state::View;
 
 /// The smallest a document window gets: the Zoom Resizes Windows wrap never shrinks it below this.
 const MIN_SIZE: Vec2 = vec2(240.0, 160.0);
-
 
 /// Whether a zoom edit in a window asks the window to wrap the image (Preferences › General › Zoom
 /// Resizes Windows): the preference is on, the zoom differs between `before` and `after` (compared
@@ -76,22 +75,19 @@ pub fn extra_windows(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let doc_size = Size::new(f64::from(size.width), f64::from(size.height));
         let focused = app.session.active_index() == Some(doc);
         let mut view = start.clone();
-        let inner = DocumentWindow::new(title)
-            .first_placed(rect)
-            .overlay(|o| o.size_limits(SizeLimits::at_least(MIN_SIZE)))
-            .show(ui, |ui, cx| {
-                // A second run of the body in one pass continues from the first run's view; the wrap rule
-                // compares with the view the window started the pass with, so both runs file the same ask.
-                let (after, canvas) = document_window_canvas(app, ui, id, doc, view.clone(), focused);
-                // The view the window's canvas showed this pass, kept by the tool host that ran in it.
-                let host = CanvasHost { idx: doc, viewport: ui.ctx().viewport_id(), window: Some(id) };
-                if wants_wrap(preference, &start, &after)
-                    && let Some(drawn) = ToolHost::shown_space(ui.ctx(), host.canvas_id()).map(|space| space.view)
-                {
-                    DocumentWindow::wrap_in(cx, canvas, wrapped_canvas(&drawn, doc_size, canvas));
-                }
-                view = after;
-            });
+        let inner = DocumentWindow::new(title).first_placed(rect).overlay(|o| o.size_limits(SizeLimits::at_least(MIN_SIZE))).show(ui, |ui, cx| {
+            // A second run of the body in one pass continues from the first run's view; the wrap rule
+            // compares with the view the window started the pass with, so both runs file the same ask.
+            let (after, canvas) = document_window_canvas(app, ui, id, doc, view.clone(), focused);
+            // The view the window's canvas showed this pass, kept by the tool host that ran in it.
+            let host = CanvasHost { idx: doc, viewport: ui.ctx().viewport_id(), window: Some(id) };
+            if wants_wrap(preference, &start, &after)
+                && let Some(drawn) = ToolHost::shown_space(ui.ctx(), host.canvas_id()).map(|space| space.view)
+            {
+                DocumentWindow::wrap_in(cx, canvas, wrapped_canvas(&drawn, doc_size, canvas));
+            }
+            view = after;
+        });
         let output = inner.output;
         if output.close_requested.is_some() {
             closed.push(id);

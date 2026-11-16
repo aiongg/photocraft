@@ -36,8 +36,8 @@ pub mod file_open;
 pub mod frame_stages;
 pub mod gpu_memo;
 pub mod gpu_status;
-pub mod home_recent_ui;
 mod history_keys;
+pub mod home_recent_ui;
 pub mod i18n;
 mod icon_data;
 pub mod icons;
@@ -91,10 +91,10 @@ mod smart_svg_ui;
 mod text;
 mod tools;
 
+pub(crate) use app::adjustment_layer_active;
 #[cfg(test)]
 use app::layer_thumb_frame;
 pub use app::surface_fingerprint;
-pub(crate) use app::adjustment_layer_active;
 pub use canvas::artboard_ui;
 pub(crate) use canvas::background_redraw;
 pub(crate) use canvas::cam_preview;
@@ -122,8 +122,8 @@ pub(crate) use dialogs::bitmap_dialog;
 pub use dialogs::blur_pins;
 pub use dialogs::brush_preset_dialog;
 pub use dialogs::caf_ui;
-pub use dialogs::camera_raw_ui;
 use dialogs::camera_raw_gpu;
+pub use dialogs::camera_raw_ui;
 pub use dialogs::channel_options_ui;
 pub(crate) use dialogs::color_picker_preview;
 pub use dialogs::color_picker_ui;
@@ -141,8 +141,8 @@ pub use dialogs::export_dialog;
 pub use dialogs::file_ui;
 pub use dialogs::fill_ui;
 pub use dialogs::filter_dialog;
-pub(crate) use dialogs::format_prompts;
 use dialogs::filter_preview_ui;
+pub(crate) use dialogs::format_prompts;
 pub use dialogs::gallery_ui;
 use dialogs::guide_edit;
 pub use dialogs::guide_layout_ui;
@@ -234,10 +234,10 @@ pub(crate) use services::SAVE_OPTIONS_OPEN;
 pub(crate) use services::saved_revision_after_write;
 pub use services::{
     AdoptAutosaveFn, AppendTextFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationWriteFn, AutosaveFn, AutosaveResultsFn, CapsLockFn,
-    ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, ExportFn, ExportSettings,
-    ExternalSvgEditor, ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox,
-    LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn,
-    SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
+    ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, ExportFn, ExportSettings, ExternalSvgEditor,
+    ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox, LoadTextFn, OpenExternalSvgFn,
+    OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn, SameFileFn, SaveFileFn, SaveTextFn, Services,
+    SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
 };
 pub(crate) use services::{opaque_layer, saves_flat_in_place};
 pub use text::cjk_fonts;
@@ -253,7 +253,6 @@ pub use tools::brush_refusal;
 pub use tools::brush_resize;
 use tools::cam_transform;
 pub use tools::cas_transform;
-pub use tools::shape_controls;
 pub use tools::crop_presets;
 pub use tools::crop_task_bar;
 pub use tools::crop_ui;
@@ -276,6 +275,7 @@ pub use tools::perspective_crop_ui;
 pub use tools::perspective_ui;
 pub use tools::puppet_ui;
 pub use tools::retouch_ui;
+pub use tools::shape_controls;
 use tools::shape_gradient_ui;
 use tools::shape_options;
 use tools::shape_paint_ui;
@@ -710,9 +710,9 @@ mod cam_no_pixels_alert_tests;
 #[cfg(test)]
 mod eyedropper_context_menu_tests;
 #[cfg(test)]
-mod paths_scroll_tests;
-#[cfg(test)]
 mod patch_shift_constrain_tests;
+#[cfg(test)]
+mod paths_scroll_tests;
 #[cfg(test)]
 mod pencil_pressure_toggles_tests;
 
@@ -800,7 +800,6 @@ mod color_swatch_tests;
 #[cfg(test)]
 mod profile_open_tests;
 
-
 #[cfg(test)]
 mod input_tests;
 
@@ -851,18 +850,14 @@ mod transform_switch_tests;
 #[cfg(test)]
 mod transform_undo_tests;
 
-
 #[cfg(test)]
 mod transform_type_tests;
-
-
 
 #[cfg(test)]
 mod star_tool_tests;
 
 #[cfg(test)]
 mod transform_several_tests;
-
 
 #[cfg(test)]
 mod transform_selection_rules_tests;
@@ -901,7 +896,6 @@ mod color_tab_theme_tests;
 #[cfg(test)]
 mod new_layer_button_tests;
 
-
 #[cfg(test)]
 mod smart_filter_rows_tests;
 
@@ -928,11 +922,8 @@ mod new_doc_remember_tests;
 #[cfg(test)]
 mod hidden_layer_tests;
 
-
 #[cfg(test)]
 mod warp_text_dialog_tests;
-
-
 
 #[cfg(test)]
 mod options_bar_mode_wheel_tests;
@@ -942,7 +933,6 @@ mod field_wheel_app_tests;
 
 #[cfg(test)]
 mod brush_shift_drag_axis_tests;
-
 
 #[cfg(test)]
 mod marquee_tests;

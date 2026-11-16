@@ -32,7 +32,8 @@ pub struct PathEntry {
 /// The Paths panel's rows, top to bottom: saved paths, the work path, then the selected layer's
 /// shape path ("<Layer> Shape Path") or vector mask ("<Layer> Vector Mask"), like Photoshop.
 pub fn path_rows(doc: &Document, active: Option<photocraft_doc::LayerId>) -> Vec<PathEntry> {
-    let mut rows: Vec<_> = doc.paths.iter().map(|p| PathEntry { name: p.name.clone(), path: p.path.clone(), kind: PathRow::Saved, vector_mask: false }).collect();
+    let mut rows: Vec<_> =
+        doc.paths.iter().map(|p| PathEntry { name: p.name.clone(), path: p.path.clone(), kind: PathRow::Saved, vector_mask: false }).collect();
     if let Some(wp) = &doc.work_path {
         rows.push(PathEntry { name: "Work Path".into(), path: wp.clone(), kind: PathRow::Work, vector_mask: false });
     }
@@ -236,7 +237,8 @@ pub(crate) fn apply(app: &mut PhotocraftApp, event: PathsEvent<PathRef>) {
             }
         }
         PathsEvent::Footer { button, rows, mods, .. } => {
-            let selected = rows.first().cloned().or_else(|| app.ui.selected_path.as_deref().and_then(|n| key_of_name(&doc, n, active))).unwrap_or(PathRef::Work);
+            let selected =
+                rows.first().cloned().or_else(|| app.ui.selected_path.as_deref().and_then(|n| key_of_name(&doc, n, active))).unwrap_or(PathRef::Work);
             let name = name_of(&doc, &selected).unwrap_or_else(|| "work".into());
             match button {
                 PathsFooterButton::Fill => {

@@ -7,8 +7,7 @@
 
 use craft::behavior::EditEvents;
 use craft::draw::ui::brush_presets::{
-    BrushCardPart, BrushCardParts, BrushPick, BrushPickerSettings, BrushPickerState, BrushPickerValues, BrushPresetPicker, BrushPresetPickerOutput,
-    GearSection,
+    BrushCardPart, BrushCardParts, BrushPick, BrushPickerSettings, BrushPickerState, BrushPickerValues, BrushPresetPicker, BrushPresetPickerOutput, GearSection,
 };
 use craft::draw::ui::brush_settings::TipAngle;
 use craft::ui::buttons::{Button, ToggleButton};
@@ -64,7 +63,6 @@ impl PickerInput {
 fn take_state(app: &mut PhotocraftApp) -> BrushPickerState<BrushKey> {
     std::mem::replace(&mut app.ui.brush_picker_state, BrushPickerState::new())
 }
-
 
 /// Sends each event of a head edit as a `tools.setBrush`; the events of one gesture share the coalesce key, so the
 /// gesture is one command.
@@ -132,11 +130,8 @@ pub(crate) fn show_at(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
     let mut key = None;
     let out = {
         let picker = input.picker(&mut state).open_at(egui::pos2(at[0], at[1]), Bind::bound(&mut open));
-        let picker = if background_eraser {
-            picker.compact(true).rows(|ui| key = crate::bg_eraser_popup::rows(ui, &mut row_brush, &mut tolerance))
-        } else {
-            picker
-        };
+        let picker =
+            if background_eraser { picker.compact(true).rows(|ui| key = crate::bg_eraser_popup::rows(ui, &mut row_brush, &mut tolerance)) } else { picker };
         picker.show(ui)
     };
     app.ui.brush_picker_state = state;

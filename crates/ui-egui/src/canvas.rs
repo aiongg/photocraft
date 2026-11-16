@@ -69,16 +69,16 @@ pub(crate) mod tools;
 mod transform_controls;
 pub(crate) mod viewport_pages;
 
+pub(crate) use cursor_policy::alt_samples;
 pub(crate) use display::GPU_OUTPUT;
 #[cfg(test)]
 use display::sync_display_lut;
 use display::texture_key;
 pub(crate) use display::{cache_key, canvas_display, display_doc, display_image};
-pub(crate) use cursor_policy::alt_samples;
-pub use document_area::document_area;
 pub(crate) use document_area::arranged_cells;
-pub use document_display::{CanvasHost, active_view};
+pub use document_area::document_area;
 pub(crate) use document_display::view_target;
+pub use document_display::{CanvasHost, active_view};
 pub use document_windows::extra_windows;
 #[cfg(test)]
 pub(crate) use filter_preview::committed_filter_preview;
@@ -97,11 +97,11 @@ pub use navigator::{NAVIGATOR_SIDE, navigator_gpu_view, navigator_texture, navig
 pub(crate) use raster_source::CompositePrep;
 pub(crate) use raster_source::SourceLogs;
 pub(crate) use sampling::composite_color;
+#[cfg(test)]
+pub(crate) use strokes::live_retouch_points;
 pub(crate) use strokes::multiple_color_target;
 pub use strokes::paint_target;
 pub(crate) use strokes::{CommittedStroke, LiveStroke, strokes_live, unsmoothed_line};
-#[cfg(test)]
-pub(crate) use strokes::live_retouch_points;
 pub(crate) use tabs::tab_title_at;
 #[cfg(test)]
 use tabs::{main_canvas_document, move_target_after_filter, tab_context_items};

@@ -60,7 +60,8 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 Select::new(tl!("Blend Mode").to_owned(), Bind::bound(&mut o.gradient_blend_mode), &blends).show(ui);
             });
             labelled(ui, tl!("Opacity"), |ui| {
-                let field = NumberField::new(tl!("Opacity").to_owned(), Bind::given(Some(f64::from(o.fill_opacity)))).range(1.0..=100.0).unit("%").scrub_by_label();
+                let field =
+                    NumberField::new(tl!("Opacity").to_owned(), Bind::given(Some(f64::from(o.fill_opacity)))).range(1.0..=100.0).unit("%").scrub_by_label();
                 if let Some(next) = field.show(ui).value().copied().flatten() {
                     o.fill_opacity = next as f32;
                 }

@@ -497,7 +497,8 @@ pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
     if let Some((index, state)) = pending {
         match save(app, &state, Some(index)) {
             Ok(()) => {
-                let applied = app.session.active().map(|st| (VariablesState::from_doc(&st.doc.variables, state.page), (st.doc.id.0 as u64, st.revision as u64)));
+                let applied =
+                    app.session.active().map(|st| (VariablesState::from_doc(&st.doc.variables, state.page), (st.doc.id.0 as u64, st.revision as u64)));
                 if let (Some((mut fresh, at)), Some(dialog)) = (applied, app.framework.dialogs.get_mut::<VariablesDialog>()) {
                     fresh.cur = state.cur;
                     fresh.clamp();

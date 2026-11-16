@@ -4,7 +4,11 @@ use craft_psd::{
     descriptor::{Class, Descriptor, Id, ReferenceItem, UnicodeString, Value as D},
 };
 use photocraft_doc::{Layer, LayerContent, LayerId, SmartObject, SmartSource};
-use photocraft_engine::{Session, actions_cmds::{Action, ActionStep}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionStep},
+    atn_cmds,
+};
 use serde_json::json;
 use std::sync::Arc;
 
@@ -425,7 +429,10 @@ fn crop_parent_runs_once_and_the_kept_helper_stops_the_duplicate_crop_tail() {
     let mut f = atn::parse(&file("CropPhotosAuto0001", Descriptor::new("cjsp"))).unwrap();
     let helper = Descriptor::new("null").with("Vl  ", D::List([0.0, 0.0, 150.0, 0.0, 150.0, 120.0, 0.0, 120.0].into_iter().map(D::Double).collect()));
     f.actions[0].items.push(AtnItem { event: AtnEvent::name("CropPhotos0001"), descriptor: Some(helper.clone()), ..Default::default() });
-    let tail = Action::new("Tail", vec![ActionStep::new("image.duplicate", json!({})), ActionStep::new("image.crop", json!({"x": 1, "y": 1, "width": 10, "height": 10}))]);
+    let tail = Action::new(
+        "Tail",
+        vec![ActionStep::new("image.duplicate", json!({})), ActionStep::new("image.crop", json!({"x": 1, "y": 1, "width": 10, "height": 10}))],
+    );
     let (bytes, skipped) = atn_cmds::export("Tail", &[&tail], &[], false).unwrap();
     assert!(skipped.is_empty());
     f.actions[0].items.extend(atn::parse(&bytes).unwrap().actions[0].items.clone());

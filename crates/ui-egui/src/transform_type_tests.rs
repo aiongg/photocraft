@@ -42,7 +42,8 @@ fn type_layers_offer_free_transform_but_not_distort_or_perspective() {
         }
     }
     // The same rows in the marquee's canvas context menu.
-    let opened = crate::canvas_tool_menu::open(&mut app, Tool::RectMarquee, crate::canvas_tool_menu::MenuKind::Tool, egui::pos2(10.0, 10.0), [10.0, 10.0], None);
+    let opened =
+        crate::canvas_tool_menu::open(&mut app, Tool::RectMarquee, crate::canvas_tool_menu::MenuKind::Tool, egui::pos2(10.0, 10.0), [10.0, 10.0], None);
     assert!(opened, "the marquee's menu opens");
     let menu = app.ui.canvas_tool_menu.as_ref().expect("the menu is open");
     assert!(crate::canvas_tool_menu::available(&app, menu, "edit.freeTransform"));

@@ -20,8 +20,8 @@ use craft::imaging::ui::fill::{ContentAwareFillWorkspace, FillCommand, FillPrevi
 use craft::imaging::ui::select_mask::EditMode;
 use craft::imaging::ui::wide_angle::PreviewDone;
 use craft::ui::canvas::RasterSource;
-use craft::ui::dialog::HostedWorkspace;
 use craft::ui::dialog::DialogId;
+use craft::ui::dialog::HostedWorkspace;
 use craft::ui::runtime::memory::SaveKey;
 use craft::ui::runtime::pending::Job;
 use photocraft_algo::content_aware::{SamplingStroke as ProxyStroke, paint_strokes};

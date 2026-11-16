@@ -7,9 +7,9 @@ use craft::i18n::WordSet;
 use craft::imaging::trace::{MaskSource, outline};
 use craft::imaging::ui::warp::{CylinderValues, WarpMesh, WarpSplit};
 
-use crate::state::{FreeTransform, SessionWarp};
 use super::preview::AbovePlan;
 use super::warp::{cylinder_edit, cylinder_values, grid_edit};
+use crate::state::{FreeTransform, SessionWarp};
 
 // ---- Helpers ----
 

@@ -72,4 +72,3 @@ fn a_segment_with_handles_a_hair_off_its_anchors_still_drags() {
     let moved = anchors(&mut app);
     assert!(same(&moved[2..], &[[300.0, 540.0], [100.0, 540.0]]), "{moved:?}");
 }
-

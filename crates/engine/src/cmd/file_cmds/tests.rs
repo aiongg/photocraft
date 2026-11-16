@@ -129,7 +129,8 @@ fn batch_recorded_stop_for_errors_retains_earlier_outputs_and_stops_before_later
         "includeSubfolders":false,"overrideSaveAs":false,"flatOutput":true,
         "namingComponents":[{"component":"name"},{"component":"extension"}]});
     let sentinel = json!({"width":7,"height":9});
-    let driver = crate::actions_cmds::Action::new("Driver", vec![ActionStep::new("file.automate.batch", p.clone()), ActionStep::new("file.new", sentinel.clone())]);
+    let driver =
+        crate::actions_cmds::Action::new("Driver", vec![ActionStep::new("file.automate.batch", p.clone()), ActionStep::new("file.new", sentinel.clone())]);
     let (bytes, skipped) = crate::atn_cmds::export("S", &[&driver], &[], false).unwrap();
     assert!(skipped.is_empty());
     let imported = crate::atn_cmds::import(&bytes).unwrap();
@@ -498,11 +499,13 @@ fn batch_quiet_profile_open_uses_caller_policy_and_retains_diagnostics() {
     assert!(profile.same_colors(photocraft_cms::Builtin::Srgb.profile()));
     // A script calling an action with a failing inner Batch still retains both import reports.
     let inner = join(&dir, "inner");
-    s.actions.list.push(crate::actions_cmds::Action::new(
-        "Quiet inner",
-        vec![ActionStep::new("file.automate.batch", json!({"input":[source,bad],"output":inner,"suppressWarnings":true,"stopOnError":true,"steps":[]}))],
-    ))
-    .unwrap();
+    s.actions
+        .list
+        .push(crate::actions_cmds::Action::new(
+            "Quiet inner",
+            vec![ActionStep::new("file.automate.batch", json!({"input":[source,bad],"output":inner,"suppressWarnings":true,"stopOnError":true,"steps":[]}))],
+        ))
+        .unwrap();
     let nested = s
         .execute(
             "file.automate.batch",
@@ -588,14 +591,16 @@ fn named_open_document_batch_uses_effective_recorded_parameters() {
         s.execute("file.new", json!({"width":200,"height":100})).unwrap();
         let a = s.execute("layer.new.layer", json!({"name":"A"})).unwrap()["layer"].as_u64().unwrap();
         let b = s.execute("layer.new.layer", json!({"name":"B"})).unwrap()["layer"].as_u64().unwrap();
-        s.actions.list.push(crate::actions_cmds::Action::new(
-            "Recorded",
-            vec![
-                ActionStep::new("layer.setProps", json!({"visible":false,"_actionLayer":{"name":"A","ordinal":0}})),
-                ActionStep::new("type.create", json!({"text":"x","size":12,"xPercent":25.0,"yPercent":40.0})),
-            ],
-        ))
-        .unwrap();
+        s.actions
+            .list
+            .push(crate::actions_cmds::Action::new(
+                "Recorded",
+                vec![
+                    ActionStep::new("layer.setProps", json!({"visible":false,"_actionLayer":{"name":"A","ordinal":0}})),
+                    ActionStep::new("type.create", json!({"text":"x","size":12,"xPercent":25.0,"yPercent":40.0})),
+                ],
+            ))
+            .unwrap();
         if through_batch {
             s.authorize = Some(gate);
             let result = s.execute("file.automate.batch", json!({"source":"open","action":"Recorded"})).unwrap();
@@ -2863,7 +2868,8 @@ fn named_batch_cycles_stop_before_the_test_ceiling() {
             let params = json!({"action": "A", "source": source, "input": [input], "output": output, "format": "png"});
             let mut child = params.clone();
             child["action"] = json!(if route == "self" || route == "play-parent" { "A" } else { "B" });
-            let first = if route == "play-child" { ActionStep::new("actions.play", json!({"action": "B"})) } else { ActionStep::new("file.automate.batch", child) };
+            let first =
+                if route == "play-child" { ActionStep::new("actions.play", json!({"action": "B"})) } else { ActionStep::new("file.automate.batch", child) };
             let mut s = Session::new();
             if source == "open" {
                 s.execute("file.openAs", json!({"path": input})).unwrap();
@@ -2984,8 +2990,10 @@ fn named_batch_allows_nested_work_and_preserves_authorization() {
         let inner = join(&dir, &format!("inner-{denied}"));
         let child = json!({"action": "Leaf", "input": [input], "output": inner, "format": "png"});
         let mut s = Session::new();
-        s.actions.list =
-            list_of(vec![Action::new("Outer", vec![ActionStep::new("file.automate.batch", child)]), Action::new("Leaf", vec![ActionStep::new("image.adjustments.invert", json!({}))])]);
+        s.actions.list = list_of(vec![
+            Action::new("Outer", vec![ActionStep::new("file.automate.batch", child)]),
+            Action::new("Leaf", vec![ActionStep::new("image.adjustments.invert", json!({}))]),
+        ]);
         if denied {
             s.authorize = Some(deny_invert);
         }
@@ -3087,7 +3095,10 @@ fn successful_nested_batch_allows_later_action_steps() {
     let input = png(&dir, "red.png", 8, 8, "#ff0000");
     let mut s = Session::new();
     let batch = json!({"input": [input], "output": join(&dir, "success"), "steps": [], "format": "png"});
-    s.actions.list.push(Action::new("Success", vec![ActionStep::new("file.automate.batch", batch), ActionStep::new("file.new", json!({"width": 2, "height": 2}))])).unwrap();
+    s.actions
+        .list
+        .push(Action::new("Success", vec![ActionStep::new("file.automate.batch", batch), ActionStep::new("file.new", json!({"width": 2, "height": 2}))]))
+        .unwrap();
     let result = s.execute("actions.play", json!({"action": "Success"})).unwrap();
     assert!(result.get("failed").is_none(), "{result}");
     assert_eq!(result["ran"], 2);
@@ -4345,7 +4356,10 @@ fn playback_stops_after_a_cancelled_nested_batch() {
     REVIEW_CANCEL.with(|slot| *slot.borrow_mut() = Some(ctx.clone()));
     s.authorize = Some(cancel_at_marker);
     let batch = json!({"input": [input], "output": join(&dir, "out"), "steps": [["layer.renameLayer", {"name": "Cancel here"}]]});
-    s.actions.list.push(crate::actions_cmds::Action::new("Run", vec![ActionStep::new("file.automate.batch", batch), ActionStep::new("layer.new.layer", json!({}))])).unwrap();
+    s.actions
+        .list
+        .push(crate::actions_cmds::Action::new("Run", vec![ActionStep::new("file.automate.batch", batch), ActionStep::new("layer.new.layer", json!({}))]))
+        .unwrap();
     let layers = doc(&s).layers.len();
     let played = s.execute("actions.play", json!({"action": "Run"})).unwrap();
     REVIEW_CANCEL.with(|slot| *slot.borrow_mut() = None);

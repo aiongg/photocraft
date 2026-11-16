@@ -2,7 +2,11 @@
 use craft_psd::atn::{self, AtnAction, AtnEvent, AtnFile, AtnItem};
 use craft_psd::descriptor::{Class, Descriptor, Id, ReferenceItem, UnicodeString, Value as D};
 use photocraft_doc::LayerContent;
-use photocraft_engine::{Session, actions_cmds::{Action, ActionList, ActionStep, ActionsFile}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionList, ActionStep, ActionsFile},
+    atn_cmds,
+};
 use serde_json::{Value, json};
 
 /// A bounded synthetic document for command and channel comparisons.
@@ -233,7 +237,10 @@ fn named_batch_resolves_recorded_layer_targets() {
     source.execute("layer.new.layer", json!({"name":"Active"})).unwrap();
     std::fs::write(&input, photocraft_format::save_to_bytes(&source.active().unwrap().doc, &Default::default()).unwrap()).unwrap();
     let mut s = Session::new();
-    s.actions.list.push(Action::new("Hide", vec![ActionStep::new("layer.setProps", json!({"visible":false,"_actionLayer":{"name":"Target","ordinal":0}}))])).unwrap();
+    s.actions
+        .list
+        .push(Action::new("Hide", vec![ActionStep::new("layer.setProps", json!({"visible":false,"_actionLayer":{"name":"Target","ordinal":0}}))]))
+        .unwrap();
     let result = s.execute("file.automate.batch", json!({"input":[input],"output":dir.path().join("out"),"format":"pcraft","action":"Hide"})).unwrap();
     assert_eq!(result["files"].as_array().unwrap().len(), 1, "{result}");
     let saved = photocraft_io::import("saved.pcraft", &std::fs::read(dir.path().join("out/layers.pcraft")).unwrap()).unwrap().document;
@@ -945,7 +952,8 @@ fn called_actions_packages_explicit_batch_children_and_replays_them() {
     let dir = tempfile::tempdir().unwrap();
     let input = dir.path().join("input.png");
     std::fs::write(&input, small_image(photocraft_codecs::Format::Png)).unwrap();
-    let list = vec![Action::new("Decoy", vec![]), Action::new("Child", vec![ActionStep::new("image.imageSize", json!({"width":3,"height":1,"resample":"nearest"}))])];
+    let list =
+        vec![Action::new("Decoy", vec![]), Action::new("Child", vec![ActionStep::new("image.imageSize", json!({"width":3,"height":1,"resample":"nearest"}))])];
     for field in ["steps", "action"] {
         for shape in 0..3 {
             let step = match shape {

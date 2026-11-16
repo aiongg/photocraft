@@ -3,9 +3,9 @@
 //! change is an engine command (`slice.new`, `slice.set`, `slice.promote`, `slice.divide`,
 //! `slice.delete`); this module only turns the framework's slice events into them.
 
+use craft::behavior::EditEvent;
 use craft::behavior::geometry::Constraint;
 use craft::behavior::kurbo::Rect as DocRect;
-use craft::behavior::EditEvent;
 use craft::draw::ui::slice::{
     DivideBy, DivideSlices, DivideSlicesDialog, SliceBar, SliceCommand, SliceEvent, SliceItem, SliceKind, SliceMode, SliceOptions, SliceOptionsDialog,
     SliceOrigin as ItemOrigin, SliceOverlay, SliceRules, SliceTool, SliceToolSettings,
@@ -161,7 +161,6 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut SliceTool, _response: &
         apply(app, event);
     }
 }
-
 
 // ---------- the overlay ----------
 

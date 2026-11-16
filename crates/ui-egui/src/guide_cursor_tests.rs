@@ -29,7 +29,6 @@ fn harness(tool: Tool) -> Harness<'static, PhotocraftApp> {
 }
 
 fn screen(h: &Harness<'static, PhotocraftApp>, x: f32, y: f32) -> Pos2 {
-
     crate::canvas::testing::to_screen(h.state(), [f64::from(x), f64::from(y)])
 }
 

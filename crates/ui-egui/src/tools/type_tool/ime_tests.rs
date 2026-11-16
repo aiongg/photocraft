@@ -7,10 +7,10 @@ use photocraft_doc::LayerId;
 use serde_json::json;
 
 use super::commit_tests::{edit_active, ime, type_keys};
-use crate::canvas::testing;
-use super::{commit, end_if_left};
 use super::mask_replace_selection_tests::click;
+use super::{commit, end_if_left};
 use crate::PhotocraftApp;
+use crate::canvas::testing;
 
 /// A document with a Type session on new text reading "abc", the caret at its end.
 fn app() -> PhotocraftApp {

@@ -209,6 +209,14 @@ pub fn specs() -> Vec<CommandSpec> {
             menus,
             true
         ),
-        spec!("edit.toolbar", "Toolbar…", ["Edit"], None, r##"{"hidden":["<tool>",…]?,"slots":[{"id":u32,"tools":["<tool>",…],"groupEnd":bool},…]?,"reset":bool=false}"##, toolbar, true),
+        spec!(
+            "edit.toolbar",
+            "Toolbar…",
+            ["Edit"],
+            None,
+            r##"{"hidden":["<tool>",…]?,"slots":[{"id":u32,"tools":["<tool>",…],"groupEnd":bool},…]?,"reset":bool=false}"##,
+            toolbar,
+            true
+        ),
     ]
 }

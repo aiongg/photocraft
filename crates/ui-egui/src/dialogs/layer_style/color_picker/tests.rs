@@ -4,8 +4,8 @@ use serde_json::json;
 
 use super::*;
 use crate::dialogs::layer_style::tests::{
-    ColorStop, DialogId, EffectId, EffectKind, EffectSpec, FieldKind, GradientStops, KIND_KEYS, LayerStyle, LayerStyleDraft,
-    LayerStylePage, Srgba, StyleValue, cancel, defaults, draft, edit, first_of, kind, ok, param,
+    ColorStop, DialogId, EffectId, EffectKind, EffectSpec, FieldKind, GradientStops, KIND_KEYS, LayerStyle, LayerStyleDraft, LayerStylePage, Srgba, StyleValue,
+    cancel, defaults, draft, edit, first_of, kind, ok, param,
 };
 use crate::dialogs::layer_style::{self, preview_document};
 use crate::{PhotocraftApp, color_picker_ui};
@@ -54,15 +54,7 @@ fn stop_colors(style: &LayerStyle, id: EffectId) -> Vec<Srgba> {
 }
 
 fn others(style: &LayerStyle, id: EffectId) -> Vec<(String, StyleValue)> {
-    style
-        .effect(id)
-        .unwrap()
-        .params
-        .0
-        .iter()
-        .filter(|(_, v)| matches!(v, StyleValue::Other(_)))
-        .map(|(k, v)| (k.clone(), v.clone()))
-        .collect()
+    style.effect(id).unwrap().params.0.iter().filter(|(_, v)| matches!(v, StyleValue::Other(_))).map(|(k, v)| (k.clone(), v.clone())).collect()
 }
 
 fn top(app: &PhotocraftApp) -> Option<DialogId> {

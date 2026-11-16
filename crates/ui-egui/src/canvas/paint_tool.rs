@@ -19,13 +19,13 @@ use craft::ui::primitives::Draw;
 use super::cursor_policy::{alt_loads_mixer, alt_samples, mixer_target_locked};
 use super::document_display::CanvasHost;
 
+use super::PhotocraftApp;
 use super::paint_mouse::{SecondaryUse, clears, secondary_takes, sync_tool_brush};
 use super::strokes::{
     HOLD_REPEAT_MS, begin_live_stroke, feed_live_stroke, live_stroke, live_stroke_busy, paint_target, snap_aliased_tip, stroke_params, stroke_wants_time,
     strokes_live, tap_at_peak_pressure,
 };
 use super::tools::{FamilyTool, ToolScope};
-use super::PhotocraftApp;
 use crate::state::Tool;
 use serde_json::json;
 
@@ -66,19 +66,7 @@ pub(crate) struct PaintStroke {
 impl PaintStroke {
     /// A stroke of `tool` that began at `start` with `points`, pressed with `modifiers`.
     fn new(tool: Tool, start: [f64; 2], points: Vec<[f64; 3]>, modifiers: Mods, erase: bool) -> Self {
-        Self {
-            tool,
-            history_params: None,
-            start,
-            points,
-            modifiers,
-            live: modifiers,
-            released: Mods::NONE,
-            erase,
-            clear: false,
-            constrain: None,
-            line: false,
-        }
+        Self { tool, history_params: None, start, points, modifiers, live: modifiers, released: Mods::NONE, erase, clear: false, constrain: None, line: false }
     }
 
     /// Records the modifiers of a pointer of the gesture.
@@ -250,10 +238,7 @@ fn begin(app: &mut PhotocraftApp, state: &mut PaintState, pointer: &ToolPointer,
         let (id, p) = if app.session.tools.brush.mixer.solid_colors_only {
             ("paint.mixerLoad", json!({"x": at[0], "y": at[1]}))
         } else {
-            (
-                "brush.mixer.sample",
-                json!({"points": [[at[0], at[1], pressure, pen.tilt_x, pen.tilt_y, pen.rotation]], "target": paint_target(app)}),
-            )
+            ("brush.mixer.sample", json!({"points": [[at[0], at[1], pressure, pen.tilt_x, pen.tilt_y, pen.rotation]], "target": paint_target(app)}))
         };
         if let Err(e) = app.run(id, p) {
             app.ui.status = e;
@@ -330,9 +315,8 @@ impl CanvasTool for PaintTool<'_> {
             // The readout request lasts one pass: a pass without pointer input repeats it.
             app.brush_resize.hud(cx);
             let Some(stroke) = state.stroke.as_ref() else { return };
-            let stale_mixer = stroke.tool == Tool::MixerBrush
-                && app.live_stroke.is_some()
-                && app.session.active_index().is_none_or(|idx| live_stroke(app, idx).is_none());
+            let stale_mixer =
+                stroke.tool == Tool::MixerBrush && app.live_stroke.is_some() && app.session.active_index().is_none_or(|idx| live_stroke(app, idx).is_none());
             if stale_mixer {
                 drop_stroke(app, state);
                 return;
@@ -431,7 +415,11 @@ impl CanvasTool for PaintTool<'_> {
     }
 
     fn claims(&self) -> ToolClaims {
-        if self.scope.with_app(|app| crate::retouch_ui::bar::pending(app, Tool::Remove).is_some()) { ToolClaims::NONE.keys(PENDING_KEYS) } else { ToolClaims::NONE }
+        if self.scope.with_app(|app| crate::retouch_ui::bar::pending(app, Tool::Remove).is_some()) {
+            ToolClaims::NONE.keys(PENDING_KEYS)
+        } else {
+            ToolClaims::NONE
+        }
     }
 
     fn key(&mut self, key: &ToolKey, _cx: &mut ToolContext<'_>) -> bool {

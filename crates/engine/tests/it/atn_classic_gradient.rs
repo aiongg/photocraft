@@ -3,7 +3,11 @@ use craft_psd::{
     atn::{self, AtnAction, AtnEvent, AtnFile, AtnItem},
     descriptor::{Descriptor, Id, UnicodeString, Value as D},
 };
-use photocraft_engine::{Session, actions_cmds::{Action, ActionList, ActionsFile}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionList, ActionsFile},
+    atn_cmds,
+};
 use serde_json::json;
 
 fn enm(ty: &str, value: &str) -> D {

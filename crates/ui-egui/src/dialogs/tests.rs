@@ -96,7 +96,8 @@ fn a_color_row_opens_the_color_picker_as_a_child_and_its_ok_answers_the_row() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
     let tools = (app.session.tools.foreground, app.session.tools.background);
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).with_context(app.ctx().clone()).build_ui_state(|ui, app| run(app, ui), app);
+    let mut h =
+        egui_kittest::Harness::builder().with_size(egui::vec2(900.0, 700.0)).with_context(app.ctx().clone()).build_ui_state(|ui, app| run(app, ui), app);
     let red = FieldValue::Color([1.0, 0.0, 0.0]);
     let parent = params::open_param(h.state_mut(), "test.tint", DialogFields::from_pairs([("tint", red.clone())]), serde_json::Value::Null, tint);
     h.run_steps(4);

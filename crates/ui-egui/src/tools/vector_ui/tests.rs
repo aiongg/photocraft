@@ -1,14 +1,14 @@
 use craft::draw::geometry::ShapeGeometry;
 use craft::draw::ui::VectorMode;
 use craft::draw::ui::paths::{PathKind, PathsCommands, PathsEvent, PathsFooterButton};
+use craft::draw::ui::pen::{AnchorsShown, EditPath};
 use craft::draw::ui::shape_drag::ShapeKind;
 use craft::keymap::Mods;
-use craft::draw::ui::pen::{AnchorsShown, EditPath};
 use egui::Modifiers;
 
+use super::host;
 use super::overlay::overlay_paths;
 use super::paths_panel::{apply, command_params};
-use super::host;
 use super::shapes::{finish_drag, shape_preview};
 use super::*;
 use crate::canvas::testing;
@@ -586,7 +586,8 @@ fn a_short_shift_drag_line_keeps_its_45_degrees() {
         let p = |k: &str| [info["live"][k][0].as_f64().unwrap(), info["live"][k][1].as_f64().unwrap()];
         (p("from"), p("to"))
     };
-    let cases: [([f64; 2], [f64; 2]); 4] = [([10.1, 10.49], [11.3, 11.69]), ([20.4, 5.6], [17.1, 8.9]), ([3.3, 40.2], [9.8, 33.1]), ([50.5, 50.5], [44.2, 44.0])];
+    let cases: [([f64; 2], [f64; 2]); 4] =
+        [([10.1, 10.49], [11.3, 11.69]), ([20.4, 5.6], [17.1, 8.9]), ([3.3, 40.2], [9.8, 33.1]), ([50.5, 50.5], [44.2, 44.0])];
     for (start, end) in cases {
         // The tool's ⇧ snap puts the end on the 45° ray through the start at the mean extent.
         let (dx, dy) = (end[0] - start[0], end[1] - start[1]);

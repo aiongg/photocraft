@@ -1,11 +1,11 @@
 use super::appearance::{display_scale, selected_theme};
 use super::*;
 use crate::theme::{AppTheme, Tokens};
+use craft::draw::ui::transform::Interpolation;
 use craft::keymap::{Binding, CommandRef, Policy};
 use craft::menu::{Chord, ItemKind, Node, ThemeChoice, ThemeLabels};
 use craft::settings::testing::{MemoryFiles, retry_delay};
 use craft::settings::{Location, OpenOptions, Settings, SettingsFiles, SettingsStore};
-use craft::draw::ui::transform::Interpolation;
 use craft::theme::ThemeId;
 use craft::ui::patterns::preferences::{PrefValue, SettingsDraft};
 use egui::{Color32, vec2};
@@ -332,11 +332,9 @@ fn auto_appearance_follows_live_changes_without_saving_resolved_palettes() {
         let saved = saved_text(&store).unwrap();
         assert_eq!(stored(&store)["interface"]["appearanceMode"], "auto");
         let gpu_style = canvas_style(&app);
-        for (appearance, expected) in [
-            (Some(egui::Theme::Light), light.clone()),
-            (Some(egui::Theme::Dark), dark.clone()),
-            (Some(egui::Theme::Light), light.clone()),
-        ] {
+        for (appearance, expected) in
+            [(Some(egui::Theme::Light), light.clone()), (Some(egui::Theme::Dark), dark.clone()), (Some(egui::Theme::Light), light.clone())]
+        {
             appearance_frame(&mut app, &ctx, appearance);
             assert_palette(&ctx, &expected);
             assert_eq!(app.ui.theme, expected);
@@ -723,12 +721,7 @@ fn run_cases(cases: Vec<Case>) {
 
 /// A case that only seeds a file and checks what the app loads from it.
 fn loaded(name: &'static str, seed: Value, check: impl Fn(&PhotocraftApp) + 'static) -> Case {
-    Case {
-        name,
-        seed: Some(seed),
-        set: Box::new(|_, _| {}),
-        check: Box::new(move |app, _, _| check(app)),
-    }
+    Case { name, seed: Some(seed), set: Box::new(|_, _| {}), check: Box::new(move |app, _, _| check(app)) }
 }
 
 fn restart_cases() -> Vec<Case> {

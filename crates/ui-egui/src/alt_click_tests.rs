@@ -7,8 +7,8 @@ use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::app::framework::BuildApp as _;
-use craft::keymap::Mods;
 use crate::state::Tool;
+use craft::keymap::Mods;
 
 fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
     let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 600.0)).build_app(
@@ -230,7 +230,6 @@ fn mixer_raw_drag_commits_live_pixels_before_a_spring_tool_returns() {
     }
 }
 
-
 #[test]
 fn clone_stamp_paints_an_empty_layer_from_the_layers_below() {
     // The reported setup: a new empty layer on top, Sample: All Layers (or Current & Below).
@@ -320,5 +319,3 @@ fn leaving_the_window_without_a_grab_says_nothing() {
     assert_eq!(h.state().session.tools.foreground, [1.0, 0.0, 0.0, 1.0]);
     assert_ne!(h.state().ui.status, crate::alt_grab::message());
 }
-
-

@@ -290,7 +290,6 @@ impl OverlayPrep {
     }
 }
 
-
 impl RasterSource for ChannelOverlay<'_> {
     fn size(&self) -> PixelSize {
         self.picture.size()

@@ -15,7 +15,6 @@ use crate::PhotocraftApp;
 /// The levels of the contour editor's curve (it plots `0..=LEVELS` on both axes).
 const LEVELS: f32 = 255.0;
 
-
 fn from_doc(c: &DocContour) -> Contour {
     match c {
         DocContour::Linear => Contour::linear(),

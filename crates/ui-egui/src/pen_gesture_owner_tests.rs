@@ -16,7 +16,6 @@ fn app(tool: Tool) -> PhotocraftApp {
     app
 }
 
-
 fn down(app: &mut PhotocraftApp) {
     tool_event(app, ToolEvent::Down { x: 20.0, y: 20.0, pressure: 1.0 }, Modifiers::NONE);
     tool_event(app, ToolEvent::Move { x: 50.0, y: 35.0, pressure: 1.0 }, Modifiers::NONE);

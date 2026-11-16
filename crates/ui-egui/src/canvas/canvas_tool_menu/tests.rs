@@ -62,7 +62,13 @@ pub(super) fn hosted(app: &mut PhotocraftApp) -> &mut HostedParamDialog {
 /// Presses OK on the open hosted parameter dialog through the app's dialog path: a family that judges a held OK
 /// answers it, then its run takes the result.
 pub(super) fn confirm_hosted(app: &mut PhotocraftApp, ctx: &Context) {
-    let id = app.framework.dialogs.stack().ids().find(|id| app.framework.dialogs.get_by_id::<HostedParamDialog>(*id).is_some()).expect("a hosted parameter dialog is open");
+    let id = app
+        .framework
+        .dialogs
+        .stack()
+        .ids()
+        .find(|id| app.framework.dialogs.get_by_id::<HostedParamDialog>(*id).is_some())
+        .expect("a hosted parameter dialog is open");
     crate::dialogs::confirm(app, ctx, id).expect("OK was accepted");
 }
 
@@ -296,8 +302,16 @@ const ROWS: &[Case] = &[
     row("brush: a release in the press's frame still opens the picker", Tool::Brush, NO, Place::Image, Setup::Plain, Held::Nothing, Want::Picker)
         .by(Gesture::OneFrame),
     row("brush with Shift: Edit Brush opens the picker", Tool::Brush, Modifiers::SHIFT, Place::Image, Setup::Plain, Held::Nothing, Want::EditBrush),
-    row("hand: a right drag within a click's reach opens the view menu and pans nothing", Tool::Hand, NO, Place::Image, Setup::Zoomed, Held::Nothing, Want::Menu("View"))
-        .by(Gesture::Drag),
+    row(
+        "hand: a right drag within a click's reach opens the view menu and pans nothing",
+        Tool::Hand,
+        NO,
+        Place::Image,
+        Setup::Zoomed,
+        Held::Nothing,
+        Want::Menu("View"),
+    )
+    .by(Gesture::Drag),
     row("brush with Cmd: layer picker", Tool::Brush, Modifiers::COMMAND, Place::Image, Setup::Plain, Held::Nothing, Want::Menu("Layers")),
     row("move: layer picker", Tool::Move, NO, Place::Image, Setup::Plain, Held::Nothing, Want::Menu("Layers")),
     row("move on a guide: guide menu", Tool::Move, NO, Place::Guide, Setup::Guide, Held::Nothing, Want::Menu("Guide")),

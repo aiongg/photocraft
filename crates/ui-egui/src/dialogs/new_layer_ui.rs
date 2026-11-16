@@ -24,7 +24,6 @@ pub(crate) fn owns(key: &str) -> bool {
     key == COMMAND
 }
 
-
 /// The label colour row of New Layer and New Group.
 pub(crate) fn color_param() -> Param {
     let options = LabelColor::ALL.into_iter().map(|c| (c.id().to_string(), Label::from(crate::layer_menu_ui::color_name(c)))).collect();

@@ -17,7 +17,6 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 
-
 /// The most a canvas side can be, in pixels.
 const MAX_SIDE: f64 = 300_000.0;
 
@@ -65,7 +64,6 @@ pub const UNITS: &[(&str, &str)] = &[
     ("percent", "Percent"),
 ];
 
-
 /// The unit kind of a `unitsAndRulers.rulers` value.
 fn ruler_kind(name: &str) -> UnitKind {
     match name {
@@ -100,11 +98,8 @@ fn canvas_section(ui: &mut egui::Ui, run: &mut Vec<(String, Value)>, f: &Facts, 
     // The fields keep pixels and show the ruler unit, so showing commits nothing (#5661).
     let lengths = LengthUnits::new(UnitKind::Pixels, kind, f.ppi);
     let shown = extent.map(|px| Mixed::Same(Some(px)));
-    let out = LinkedFields::new(tl!("Canvas Size"), Bind::given(shown), Bind::kept())
-        .captions([tl!("W"), tl!("H")])
-        .lengths(lengths)
-        .range(1.0..=MAX_SIDE)
-        .show(ui);
+    let out =
+        LinkedFields::new(tl!("Canvas Size"), Bind::given(shown), Bind::kept()).captions([tl!("W"), tl!("H")]).lengths(lengths).range(1.0..=MAX_SIDE).show(ui);
     if let Some(parts) = out.edit.events.committed() {
         let pixels = |i: usize| match &parts[i] {
             Mixed::Same(Some(v)) => Some(v.round().clamp(1.0, MAX_SIDE)),
@@ -218,7 +213,10 @@ mod tests {
         app.run("file.new", json!({"width": 1, "height": 1, "resolution": 300, "background": "white"})).unwrap();
         app.session.prefs.edit(|p| p.units_and_rulers.rulers = photocraft_engine::prefs::Unit::Inches);
         let undo = app.session.active().unwrap().history.entries().len();
-        let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(320.0, 600.0)).build_ui_state(|ui, app: &mut PhotocraftApp| properties(app, ui), app);
+        let mut h = Harness::builder()
+            .with_context(app.ctx().clone())
+            .with_size(vec2(320.0, 600.0))
+            .build_ui_state(|ui, app: &mut PhotocraftApp| properties(app, ui), app);
         PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
         h.run_steps(3);
         let st = h.state().session.active().unwrap();

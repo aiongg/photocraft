@@ -53,11 +53,7 @@ pub(crate) fn panel_rows(_app: &PhotocraftApp) -> Vec<PanelRow> {
 /// Whether each item can run now.
 pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
     let snapshot = crate::panels::selected_snapshot(app);
-    ITEMS
-        .iter()
-        .flatten()
-        .map(|&id| (CommandRef::new(id), CommandState::new().enabled(command_state(app, resolve(id, snapshot).0))))
-        .collect()
+    ITEMS.iter().flatten().map(|&id| (CommandRef::new(id), CommandState::new().enabled(command_state(app, resolve(id, snapshot).0)))).collect()
 }
 
 /// Runs the item `command` and reports whether it is one of this menu's. History Options… opens its

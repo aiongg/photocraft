@@ -239,7 +239,6 @@ fn color_picker_samples_the_image_under_its_pipette() {
     assert_eq!(doc_at(&h, red)[0] < 200.0, doc_at(&h, green)[0] > 200.0);
     let foreground = h.state().session.tools.foreground;
 
-
     // A click samples; the press and release may land in one frame (`ui.click`).
     h.hover_at(red);
     h.run_steps(1);
@@ -763,15 +762,8 @@ fn type_tool_format_keys_survive_hostile_state() {
     assert!(h.state().ui.text_edit.is_none(), "an edit of a missing layer ends");
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     for ed in [None, Some(1u64)] {
-        app.ui.text_edit = ed.map(|layer| crate::state::TextEdit {
-            layer,
-            document: None,
-            caret: 4,
-            anchor: 0,
-            session: "x".into(),
-            created: false,
-            mask: false,
-        });
+        app.ui.text_edit =
+            ed.map(|layer| crate::state::TextEdit { layer, document: None, caret: 4, anchor: 0, session: "x".into(), created: false, mask: false });
         // PLAN: assumed these three keep their signatures (tools-w20); the literal lists the fields tools-w20 keeps
         crate::type_tool::toggle_char_style(&mut app, crate::type_tool::CharToggle::AllCaps);
         crate::type_tool::step_char_metric(&mut app, "leadingBy", 2.0);

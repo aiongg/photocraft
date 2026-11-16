@@ -13,21 +13,11 @@ pub(super) use craft::imaging::layer_style::{
     EffectId, EffectKind, EffectSpec, FieldKind, LayerStyle, LayerStyleDraft, LayerStylePage, StyleParams, StyleValue,
 };
 pub(super) use craft::imaging::ui::layer_style::HostedLayerStyle;
-pub(super) use craft::ui::dialog::DialogId;
 pub(super) use craft::theme::Srgba;
+pub(super) use craft::ui::dialog::DialogId;
 
-pub(super) const KIND_KEYS: [&str; 10] = [
-    "bevelEmboss",
-    "stroke",
-    "innerShadow",
-    "innerGlow",
-    "satin",
-    "colorOverlay",
-    "gradientOverlay",
-    "patternOverlay",
-    "outerGlow",
-    "dropShadow",
-];
+pub(super) const KIND_KEYS: [&str; 10] =
+    ["bevelEmboss", "stroke", "innerShadow", "innerGlow", "satin", "colorOverlay", "gradientOverlay", "patternOverlay", "outerGlow", "dropShadow"];
 
 /// The effect kind a command name uses.
 pub(super) fn kind(key: &str) -> EffectKind {
@@ -250,10 +240,8 @@ fn open_and_confirm_preserves_two_strokes() {
     assert!((b.shadow.opacity - 0.4).abs() < 0.001);
 
     // Percent fields.
-    let (_, style) = row(&[
-        ("layer.layerStyle.outerGlow", json!({"spread": 6, "range": 40})),
-        ("layer.layerStyle.dropShadow", json!({"spread": 12, "add": true})),
-    ]);
+    let (_, style) =
+        row(&[("layer.layerStyle.outerGlow", json!({"spread": 6, "range": 40})), ("layer.layerStyle.dropShadow", json!({"spread": 12, "add": true}))]);
     let glow = style.instances(EffectKind::OuterGlow).next().unwrap();
     let shadow = style.instances(EffectKind::DropShadow).next().unwrap();
     assert_eq!((num(&style, glow, "spread"), num(&style, glow, "range")), (Some(6.0), Some(40.0)));
@@ -418,12 +406,7 @@ fn contour_picker_and_editor_edit_the_effect_curve() {
     let shadow = first_of(&app, id, EffectKind::DropShadow);
     // PLAN: assumed the contour key `fxN/contour`, as colour keys are `fxN/<field>`; the editor child's own gestures are
     // craft-imaging's `ContourEditorDialog` trials.
-    let answered = app
-        .framework
-        .dialogs
-        .get_mut_by_id::<HostedLayerStyle>(id)
-        .unwrap()
-        .set_contour(&format!("{}/contour", shadow.key()), cone);
+    let answered = app.framework.dialogs.get_mut_by_id::<HostedLayerStyle>(id).unwrap().set_contour(&format!("{}/contour", shadow.key()), cone);
     assert!(answered, "the dialog takes the contour for its field");
     ok(&mut app, id);
     let Effect::DropShadow(sh) = &layer_effects(&app.session)[0] else { panic!("a drop shadow") };
@@ -431,9 +414,7 @@ fn contour_picker_and_editor_edit_the_effect_curve() {
 }
 
 fn shadow_angle(s: &photocraft_engine::Session) -> (f32, bool) {
-    let Some(Effect::DropShadow(sh)) = layer_effects(s).into_iter().find(|e| matches!(e, Effect::DropShadow(_))) else {
-        panic!("a drop shadow")
-    };
+    let Some(Effect::DropShadow(sh)) = layer_effects(s).into_iter().find(|e| matches!(e, Effect::DropShadow(_))) else { panic!("a drop shadow") };
     (sh.angle, sh.use_global_light)
 }
 
@@ -643,15 +624,7 @@ fn new_style_saves_pending_state_and_a_swatch_apply_restores_it() {
     h.run_steps(3);
     // The preset is saved at once under the default name "Style".
     assert_eq!(h.state().framework.dialogs.stack().top(), Some(id), "New Style… opens no other dialog");
-    let preset = h
-        .state()
-        .session
-        .presets
-        .styles
-        .iter()
-        .flat_map(|g| g.items.iter())
-        .find(|st| st.name == "Style")
-        .expect("the preset is created");
+    let preset = h.state().session.presets.styles.iter().flat_map(|g| g.items.iter()).find(|st| st.name == "Style").expect("the preset is created");
     assert_eq!(preset.effects.len(), 1, "only the enabled instance is saved");
     assert_eq!(preset.opacity, Some(0.4), "the pending opacity is saved");
 

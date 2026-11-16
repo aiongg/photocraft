@@ -111,7 +111,6 @@ fn a_lasso_that_selects_no_pixel_warns_and_changes_nothing() {
 
 /// An app whose preferences live in `files`, and the path of its settings file.
 fn app_over(files: &Arc<craft::settings::testing::MemoryFiles>) -> (PhotocraftApp, PathBuf) {
-
     let options = craft::settings::OpenOptions::new(craft::settings::Location::Dir("/preferences".into())).files(files.clone());
     let (store, report) = craft::settings::SettingsStore::open_with(options);
     let services = crate::Services { settings: Some((store, report)), ..Default::default() };

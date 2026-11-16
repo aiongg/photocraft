@@ -172,7 +172,11 @@ fn snap_targets_follow_the_document() {
         .edit("artboard", |doc, _| {
             let mut board = photocraft_doc::Layer::group("Artboard 1", vec![]);
             if let photocraft_doc::LayerContent::Group(g) = &mut board.content {
-                g.artboard = Some(photocraft_doc::Artboard { rect: photocraft_geom::Rect::new(20, 110, 120, 190), background: Default::default(), preset: String::new() });
+                g.artboard = Some(photocraft_doc::Artboard {
+                    rect: photocraft_geom::Rect::new(20, 110, 120, 190),
+                    background: Default::default(),
+                    preset: String::new(),
+                });
             }
             doc.insert_above(None, board);
             Ok(())

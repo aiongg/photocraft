@@ -34,7 +34,6 @@ fn ruler_unit(app: &PhotocraftApp) -> Unit {
     app.session.prefs().units_and_rulers.rulers
 }
 
-
 /// What the guide dialogs measure in: the active document's size and resolution and the ruler unit. With no document
 /// it is a 1 px page at 72 ppi, so a dialog still opens.
 pub(crate) fn guide_units(app: &PhotocraftApp) -> GuideUnits {
@@ -91,11 +90,7 @@ fn length_of(value: &Value, units: &GuideUnits, extent: f64) -> Option<GuideLeng
 
 /// A remembered length as the engine takes it: percent stays percent, anything else is the pixels it applied.
 fn length_json(length: GuideLength, units: &GuideUnits, extent: f64) -> Value {
-    if length.unit == UnitKind::Percent {
-        json!(format!("{}%", length.value))
-    } else {
-        units.to_pixels(length, extent).map_or(Value::Null, |px| json!(px))
-    }
+    if length.unit == UnitKind::Percent { json!(format!("{}%", length.value)) } else { units.to_pixels(length, extent).map_or(Value::Null, |px| json!(px)) }
 }
 
 fn read_group(group: &mut GuideGroup, m: &Map<String, Value>, [count, flag, size, gap]: [&str; 4], extent: f64, units: &GuideUnits) {

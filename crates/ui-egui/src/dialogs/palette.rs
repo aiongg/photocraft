@@ -24,11 +24,11 @@ pub struct PaletteState {
 /// select command.
 pub(crate) fn entries(app: &mut PhotocraftApp, ctx: &egui::Context) -> Vec<HelpEntry> {
     let mut entries = crate::menus::help_entries(app, ctx);
-    entries.extend(Tool::ALL.iter().map(|&tool| {
-        HelpEntry::new(CommandRef::new(crate::tool_shortcuts::id(tool)), tl!(tool.label()))
-            .with_english(tool.label())
-            .with_path([tl!("Tool")])
-    }));
+    entries.extend(
+        Tool::ALL.iter().map(|&tool| {
+            HelpEntry::new(CommandRef::new(crate::tool_shortcuts::id(tool)), tl!(tool.label())).with_english(tool.label()).with_path([tl!("Tool")])
+        }),
+    );
     entries
 }
 

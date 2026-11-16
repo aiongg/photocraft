@@ -3,10 +3,10 @@ use craft::text::ui::DocUnit;
 use craft::text::ui::character::{CharacterControls, ParagraphControls};
 use craft::text::ui::type_bar::TypeBarChange;
 use craft::text::ui::type_options::{TextAntiAlias, TextOrientation, TypeOptionWords};
-use craft::ui::runtime::env::Env;
 use craft::ui::choice::Segmented;
 use craft::ui::contract::{Bind, Entry, Show as _, ShowContainer as _};
 use craft::ui::pickers::Select;
+use craft::ui::runtime::env::Env;
 use craft::ui::sections::Section;
 
 use super::defaults::{apply_defaults, formatting_params, target, target_text};

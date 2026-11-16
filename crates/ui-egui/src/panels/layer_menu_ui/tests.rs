@@ -60,7 +60,14 @@ fn row_menu_entries_follow_the_target() {
             present: &["layer.layerMask.revealSelection"],
             absent: &["layer.layerMask.revealAll"],
         },
-        Case { case: "a plain multi-selection merges", setup: plain, multi: true, selection: false, present: &["layer.mergeLayers"], absent: &["layer.mergeDown"] },
+        Case {
+            case: "a plain multi-selection merges",
+            setup: plain,
+            multi: true,
+            selection: false,
+            present: &["layer.mergeLayers"],
+            absent: &["layer.mergeDown"],
+        },
         Case {
             case: "a masked layer offers its mask items",
             setup: masked,
@@ -98,7 +105,12 @@ fn row_menu_entries_follow_the_target() {
             multi: true,
             selection: false,
             present: &["layer.rasterize.layer"],
-            absent: &["layer.rasterize.smartObject", "layer.smartObjects.editContents", "layer.smartObjects.resetTransform", "layer.smartObjects.convertToLayers"],
+            absent: &[
+                "layer.rasterize.smartObject",
+                "layer.smartObjects.editContents",
+                "layer.smartObjects.resetTransform",
+                "layer.smartObjects.convertToLayers",
+            ],
         },
         Case {
             case: "a type layer converts to a shape",

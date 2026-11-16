@@ -10,7 +10,6 @@ use crate::PhotocraftApp;
 
 /// The options bar for the Eyedropper tool.
 pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-
     EyedropperBar::new(&mut app.ui.tool_options.eyedropper).show(ui);
 }
 

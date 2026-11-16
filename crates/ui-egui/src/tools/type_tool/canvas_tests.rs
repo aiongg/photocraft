@@ -20,8 +20,7 @@ use super::{PathClick, layout, path_target, text_layer};
 use crate::PhotocraftApp;
 use crate::canvas::testing::{ToolEvent, tool_event};
 
-const ANTI_ALIAS_METHODS: [TextAntiAlias; 5] =
-    [TextAntiAlias::None, TextAntiAlias::Sharp, TextAntiAlias::Crisp, TextAntiAlias::Strong, TextAntiAlias::Smooth];
+const ANTI_ALIAS_METHODS: [TextAntiAlias; 5] = [TextAntiAlias::None, TextAntiAlias::Sharp, TextAntiAlias::Crisp, TextAntiAlias::Strong, TextAntiAlias::Smooth];
 
 /// A text edit session on layer `layer` with the given selection, as the editor holds it.
 fn edit_of(layer: u64, caret: usize, anchor: usize, session: &str) -> crate::state::TextEdit {
@@ -178,7 +177,13 @@ pub(super) fn reveal(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
         }
         let list = h.query_all_by_role(egui::accesskit::Role::ListBox).last().expect("an open list").rect();
         h.hover_at(list.center());
-        h.event(egui::Event::MouseWheel { source: egui::MouseWheelSource::Unknown, unit: egui::MouseWheelUnit::Line, delta: vec2(0.0, -3.0), phase: egui::TouchPhase::Move, modifiers: Modifiers::NONE });
+        h.event(egui::Event::MouseWheel {
+            source: egui::MouseWheelSource::Unknown,
+            unit: egui::MouseWheelUnit::Line,
+            delta: vec2(0.0, -3.0),
+            phase: egui::TouchPhase::Move,
+            modifiers: Modifiers::NONE,
+        });
         h.run();
     }
     panic!("the row {label} never came into view");
@@ -1655,7 +1660,10 @@ mod multi_layer_formatting {
         assert_eq!((style(&app, id, 0).font_family.as_str(), style(&app, id, 5).font_family.as_str()), ("Inter", "JetBrains Mono"));
         let mut h = controls(app, false);
         let shown = |h: &Harness<'static, PhotocraftApp>| {
-            (h.get_by_role_and_label(Role::ComboBox, "Font family").value().unwrap_or_default(), h.get_by_role_and_label(Role::ComboBox, &field_name(h, Role::ComboBox, "Style")).value())
+            (
+                h.get_by_role_and_label(Role::ComboBox, "Font family").value().unwrap_or_default(),
+                h.get_by_role_and_label(Role::ComboBox, &field_name(h, Role::ComboBox, "Style")).value(),
+            )
         };
         let steps = history_len(&h);
         let (inter, mono) = (("Inter".to_string(), Some("Medium".to_string())), ("JetBrains Mono".to_string(), Some("Regular".to_string())));
@@ -1889,10 +1897,7 @@ mod multi_layer_formatting {
                 assert!(it.kind.checked().is_some(), "{id} is a check item");
             }
             rows.iter()
-                .filter(|i| {
-                    (i.command.id.starts_with("type.antiAlias.") || i.command.id.starts_with("type.orientation."))
-                        && i.kind.checked() == Some(true)
-                })
+                .filter(|i| (i.command.id.starts_with("type.antiAlias.") || i.command.id.starts_with("type.orientation.")) && i.kind.checked() == Some(true))
                 .map(|i| i.command.id.to_string())
                 .collect()
         };
@@ -1915,10 +1920,10 @@ mod multi_layer_formatting {
             let ctx = app.ctx().clone();
             crate::menus::invoke(&mut app, &ctx, "type.warpText", json!({})).unwrap();
             let dialog = app.framework.dialogs.stack().top().expect("the Warp dialog is open");
-            let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(900.0, 700.0)).build_app(
-                |ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui),
-                app,
-            );
+            let mut h = Harness::builder()
+                .with_context(app.ctx().clone())
+                .with_size(vec2(900.0, 700.0))
+                .build_app(|ui, app: &mut PhotocraftApp| crate::dialogs::run(app, ui), app);
             h.run_steps(4);
             h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Bend");
             assert!(h.query_all_by_label("Bend").count() >= 1, "the actual Warp form is visible");

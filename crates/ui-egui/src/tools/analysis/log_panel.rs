@@ -55,10 +55,8 @@ pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .filter(|c| *c != "histogram")
         .filter_map(|c| analysis_cmds::COLUMNS.iter().find(|x| x.0 == c).map(|x| (x.0, x.1)))
         .collect();
-    let rows: Vec<Row> = log
-        .iter()
-        .map(|r| Row { id: r.id, cells: columns.iter().map(|(key, _)| (ColumnKey::new(key), cell_text(r.values.get(*key)))).collect() })
-        .collect();
+    let rows: Vec<Row> =
+        log.iter().map(|r| Row { id: r.id, cells: columns.iter().map(|(key, _)| (ColumnKey::new(key), cell_text(r.values.get(*key)))).collect() }).collect();
     let ids: Vec<u64> = rows.iter().map(|r| r.id).collect();
 
     ui.horizontal(|ui| {
@@ -91,13 +89,17 @@ pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
     let specs: Vec<ColumnSpec> = columns.iter().map(|(key, name)| ColumnSpec::new(ColumnKey::new(key), tl!(name), ColumnWidth::Content).resizable()).collect();
     // PLAN: assumed `AnalysisUi::log_selected` is a `Selection<u64>`.
-    Table::<u64>::new("Measurement Log", specs).striped(true).selection(Bind::bound(&mut app.ui.analysis.log_selected)).show_items(ui, &Rows(&rows), &mut |key, icx| {
-        let mut row = ListRow::new(String::new()).cells(icx.cells()).striped(icx.row.striped);
-        if let Some(r) = rows.iter().find(|r| r.id == *key) {
-            for (column, text) in &r.cells {
-                row = row.cell(column.clone(), text.clone());
+    Table::<u64>::new("Measurement Log", specs).striped(true).selection(Bind::bound(&mut app.ui.analysis.log_selected)).show_items(
+        ui,
+        &Rows(&rows),
+        &mut |key, icx| {
+            let mut row = ListRow::new(String::new()).cells(icx.cells()).striped(icx.row.striped);
+            if let Some(r) = rows.iter().find(|r| r.id == *key) {
+                for (column, text) in &r.cells {
+                    row = row.cell(column.clone(), text.clone());
+                }
             }
-        }
-        row
-    });
+            row
+        },
+    );
 }

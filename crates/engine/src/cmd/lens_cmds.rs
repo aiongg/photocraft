@@ -418,8 +418,9 @@ fn camera_raw_cmd(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
     let t0 = Stopwatch::start();
-    let id =
-        run_filter(s, RAW, "RAW Develop Filter", p, p.clone(), false, &|surf, canvas| camera_raw_surface(surf, canvas.union(&surf.content_bounds()), &cr, &camera_raw::DevelopInputs::default()))?;
+    let id = run_filter(s, RAW, "RAW Develop Filter", p, p.clone(), false, &|surf, canvas| {
+        camera_raw_surface(surf, canvas.union(&surf.content_bounds()), &cr, &camera_raw::DevelopInputs::default())
+    })?;
     Ok(json!({"layer": id.0, "identity": cr.is_identity(), "ms": t0.ms()}))
 }
 

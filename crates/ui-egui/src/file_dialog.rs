@@ -14,9 +14,9 @@
 
 use std::path::{Path, PathBuf};
 
-use craft::host::{PickKind, PickRequest, Picked};
 #[cfg(not(target_arch = "wasm32"))]
 use craft::host::PickId;
+use craft::host::{PickKind, PickRequest, Picked};
 use photocraft_doc::DocId;
 use serde_json::{Value, json};
 

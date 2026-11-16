@@ -599,7 +599,9 @@ fn marquee_params(app: &PhotocraftApp, p: &Value) -> std::result::Result<(Option
         None => None,
         Some(v) => {
             let numbers = v.as_array().filter(|a| a.len() == 2).and_then(|a| Some([a[0].as_f64()?, a[1].as_f64()?]));
-            let Some([w, h]) = numbers.filter(|n| n.iter().all(f32_range)) else { return Err("marqueeSize must be [width, height] of two finite numbers".into()) };
+            let Some([w, h]) = numbers.filter(|n| n.iter().all(f32_range)) else {
+                return Err("marqueeSize must be [width, height] of two finite numbers".into());
+            };
             let range = crate::tool_memory::style_range(style.as_deref().unwrap_or(&app.ui.tool_options.marquee_style));
             if ![w, h].iter().all(|n| range.contains(&(*n as f32))) {
                 return Err(format!("marqueeSize must be within {} and {} for this style", range.start(), range.end()));
@@ -734,11 +736,8 @@ impl CropSet {
 fn panels_patch(app: &PhotocraftApp, patch: Option<&Value>) -> std::result::Result<(Option<Value>, Option<Value>), String> {
     let Some(patch) = patch else { return Ok((None, None)) };
     let Some(object) = patch.as_object() else { return Err("panels must be an object".into()) };
-    let own: Vec<String> = serde_json::to_value(&app.ui.panels)
-        .map_err(|e| e.to_string())?
-        .as_object()
-        .map(|o| o.keys().cloned().collect())
-        .unwrap_or_default();
+    let own: Vec<String> =
+        serde_json::to_value(&app.ui.panels).map_err(|e| e.to_string())?.as_object().map(|o| o.keys().cloned().collect()).unwrap_or_default();
     let groups = crate::panel_docking::legacy_view(app);
     let group_known = |key: &str| groups.get("panels").is_some_and(|panels| panels.get(key).is_some());
     let mut own_patch = serde_json::Map::new();
@@ -812,7 +811,11 @@ impl PanelSet {
             writes.push(Box::new(move |app| app.ui.chrome.home_recent_view = view));
         }
         if let Some(v) = p.get("statusInfo") {
-            let key = v.as_str().filter(|key| crate::chrome_ui::status_item_of(key).is_some()).ok_or_else(|| "statusInfo is not a status bar item".to_string())?.to_string();
+            let key = v
+                .as_str()
+                .filter(|key| crate::chrome_ui::status_item_of(key).is_some())
+                .ok_or_else(|| "statusInfo is not a status bar item".to_string())?
+                .to_string();
             writes.push(Box::new(move |app| app.ui.chrome.status_info = key));
         }
         let dock_tabs = if p.get("dockTabs").is_some() {

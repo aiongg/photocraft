@@ -4,7 +4,11 @@ use craft_psd::{
     descriptor::{Descriptor, UnicodeString, Value as D},
 };
 use photocraft_doc::{LayerContent, LayerId};
-use photocraft_engine::{Session, actions_cmds::{Action, ActionStep}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionStep},
+    atn_cmds,
+};
 use serde_json::json;
 use std::sync::Arc;
 

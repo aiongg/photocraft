@@ -25,7 +25,11 @@ pub const STYLUS_WHEEL: &str = "stylusWheel";
 pub const PRESSURE_WARNING: &str = "Control by pen pressure requires the use of a pressure sensitive tablet";
 
 fn pen_entries() -> [Entry<String>; 3] {
-    [Entry::new(OFF.to_string(), tl!("Off")), Entry::new(PEN_PRESSURE.to_string(), tl!("Pen Pressure")), Entry::new(STYLUS_WHEEL.to_string(), tl!("Stylus Wheel"))]
+    [
+        Entry::new(OFF.to_string(), tl!("Off")),
+        Entry::new(PEN_PRESSURE.to_string(), tl!("Pen Pressure")),
+        Entry::new(STYLUS_WHEEL.to_string(), tl!("Stylus Wheel")),
+    ]
 }
 
 /// What the brush's "Size:" control is: Pen Pressure is the brush's pressure-for-size switch,
@@ -81,4 +85,3 @@ pub fn rows(ui: &mut egui::Ui, brush: &mut BrushSettings, tolerance_control: &mu
 #[cfg(test)]
 #[path = "../background_eraser_brush_popup_tests.rs"]
 mod background_eraser_brush_popup_tests;
-

@@ -10,12 +10,11 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-
 use craft::behavior::kurbo::Point;
 use craft::imaging::ui::wide_angle::{PreviewDone, WideAngleGeometry, WideAngleOpen, WideAngleSource, WideAngleWorkspace};
 use craft::imaging::wide_angle::WideAngleSession;
-use craft::ui::dialog::HostedWorkspace;
 use craft::ui::canvas::RasterSource;
+use craft::ui::dialog::HostedWorkspace;
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::runtime::pending::Job;
 use photocraft_algo::transform::Interp;

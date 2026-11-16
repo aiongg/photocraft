@@ -115,13 +115,13 @@ fn move_selection_across_tab_copies_only_selected_pixels_and_keeps_source_histor
     h.run_steps(2);
     let before = h.state().session.documents()[0].doc.clone();
     let history = h.state().session.documents()[0].history.entries().len();
-    let grab = to_screen(&active_view(h.state()),8.0, 10.0);
+    let grab = to_screen(&active_view(h.state()), 8.0, 10.0);
     let over_tab = tab(&h, "dest-doc");
     let drop = h.state().last_canvas_rect.center();
     drag_along(&mut h, &[grab, over_tab, drop], Modifiers::NONE);
     let (_, r) = copy(&h);
     assert_eq!(r.size(), vec2(3.0, 4.0));
-    let at = to_doc(&active_view(h.state()),drop);
+    let at = to_doc(&active_view(h.state()), drop);
     assert!((r.min.x - (7.0 + at[0] - 8.0) as f32).abs() <= 1.0);
     assert_eq!(*h.state().session.documents()[0].doc, *before);
     assert_eq!(h.state().session.documents()[0].history.entries().len(), history);
@@ -137,7 +137,7 @@ fn a_selection_dropped_outside_documents_copies_nothing() {
     h.state_mut().run("select.rect", json!({"x": 7, "y": 8, "width": 3, "height": 4})).unwrap();
     h.run_steps(2);
     let before = h.state().session.documents()[0].doc.clone();
-    let grab = to_screen(&active_view(h.state()),8.0, 10.0);
+    let grab = to_screen(&active_view(h.state()), 8.0, 10.0);
     let dest = tab(&h, "dest-doc");
     drag_along(&mut h, &[grab, dest, Pos2::new(-10.0, -10.0)], Modifiers::NONE);
     assert_eq!(*h.state().session.documents()[0].doc, *before);
@@ -205,7 +205,7 @@ fn an_option_drag_of_a_moved_float_onto_a_tab_keeps_the_source_float() {
     let source = &h.state().session.documents()[0];
     let (before, history) = (source.doc.clone(), source.history.past_len());
     assert!(photocraft_engine::float_cmds::floating(source).is_some_and(|f| f.offset == (5, 0)));
-    let grab = to_screen(&active_view(h.state()),13.0, 10.0);
+    let grab = to_screen(&active_view(h.state()), 13.0, 10.0);
     let over_tab = tab(&h, "dest-doc");
     let drop = h.state().last_canvas_rect.center();
     drag_along_pressed(&mut h, &[grab, over_tab, drop], Modifiers::ALT, Modifiers::NONE);
@@ -226,7 +226,7 @@ fn option_drag_of_a_moved_float(h: &mut Harness<'_, PhotocraftApp>) -> Pos2 {
     h.state_mut().run("select.rect", json!({"x": 7, "y": 8, "width": 3, "height": 4})).unwrap();
     h.state_mut().run("select.float", json!({"dx": 5, "dy": 0})).unwrap();
     h.run_steps(2);
-    let grab = to_screen(&active_view(h.state()),13.0, 10.0);
+    let grab = to_screen(&active_view(h.state()), 13.0, 10.0);
     h.event(egui::Event::ModifiersChanged(Modifiers::ALT));
     h.event(egui::Event::PointerMoved(grab));
     h.run_steps(1);
@@ -309,7 +309,7 @@ fn a_layers_panel_drag_onto_a_tab_drops_the_layer_where_it_is_released() {
     let over_tab = tab(&h, "dest-doc");
     let drop = h.state().last_canvas_rect.center();
     drag_along(&mut h, &[row, over_tab, drop], Modifiers::NONE);
-    let at = to_doc(&active_view(h.state()),drop);
+    let at = to_doc(&active_view(h.state()), drop);
     let (name, r) = copy(&h);
     assert_eq!(name, "paint");
     assert!((r.center().x - at[0] as f32).abs() <= 1.0 && (r.center().y - at[1] as f32).abs() <= 1.0, "centred on the drop point {at:?}: {r:?}");
@@ -334,12 +334,12 @@ fn a_move_tool_drag_onto_a_tab_copies_the_layer_under_the_pointer_and_leaves_the
     h.run_steps(2);
     let before = source_square(&h, paint);
     let steps = h.state().session.documents()[0].history.entries().len();
-    let grab = to_screen(&active_view(h.state()),9.0, 11.0);
-    let grab_doc = to_doc(&active_view(h.state()),grab);
+    let grab = to_screen(&active_view(h.state()), 9.0, 11.0);
+    let grab_doc = to_doc(&active_view(h.state()), grab);
     let over_tab = tab(&h, "dest-doc");
     let drop = h.state().last_canvas_rect.center();
     drag_along(&mut h, &[grab, over_tab, drop], Modifiers::NONE);
-    let at = to_doc(&active_view(h.state()),drop);
+    let at = to_doc(&active_view(h.state()), drop);
     let (name, r) = copy(&h);
     assert_eq!(name, "paint");
     // The grabbed pixel lands under the pointer.

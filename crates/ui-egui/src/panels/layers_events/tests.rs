@@ -9,8 +9,8 @@ use craft::layers::ui::panel::{
     ActivateOn, LayerColumn, LayerDrop, LayerMove, LayerPosition, LayerSelect, LayerToggle, LayersEvent, LayersFooterAction, LayersFooterButton, MaskMove,
     MenuTarget, RowTransfer, SubRowMove,
 };
-use craft::ui::list::ThumbSize;
 use craft::layers::ui::tree::{LayerPart, LayerRowKey, LayerTree, SubRowGroup};
+use craft::ui::list::ThumbSize;
 use photocraft_doc::{LayerContent, LayerId};
 use photocraft_engine::Session;
 use serde_json::{Value, json};
@@ -399,38 +399,38 @@ fn footer_and_drop_events_follow_the_targets() {
     let (mut app, a, _, c) = fresh();
     assert_eq!(active(&app), Some(LayerId(c)));
     let ev = select_filter(&app, a, BLUR);
-    send(&mut app,vec![ev]);
+    send(&mut app, vec![ev]);
     assert_eq!(active(&app), Some(LayerId(a)), "the smart object becomes active");
     assert_eq!(picked(&app), Some((a, Some(0))), "Gaussian Blur is index 0");
     // Another layer: the filter is no longer picked.
-    send(&mut app,vec![select(&[c], None)]);
+    send(&mut app, vec![select(&[c], None)]);
     assert_eq!(picked(&app), None);
 
     // #4751: Delete with a filter picked removes that filter, not the smart object, and the pick does not
     // carry over to the filter now at its index.
     let (mut app, a, _, _) = fresh();
     let ev = select_filter(&app, a, BLUR);
-    send(&mut app,vec![ev]);
-    send(&mut app,vec![LayersEvent::Footer(LayersFooterAction::delete(true))]);
+    send(&mut app, vec![ev]);
+    send(&mut app, vec![LayersEvent::Footer(LayersFooterAction::delete(true))]);
     assert_eq!(filter_commands(&app, a), [OFFSET]);
     assert_eq!(app.session.active().unwrap().doc.layers.len(), 4, "no layer was deleted");
     assert_eq!(picked(&app), None);
-    send(&mut app,vec![LayersEvent::Footer(LayersFooterAction::delete(true))]);
+    send(&mut app, vec![LayersEvent::Footer(LayersFooterAction::delete(true))]);
     assert_eq!(filter_commands(&app, a), [OFFSET], "the second Delete takes no filter");
 
     // The smart object's own row leaves its filters: nothing is picked.
     let (mut app, a, _, _) = fresh();
     let ev = select_filter(&app, a, OFFSET);
-    send(&mut app,vec![ev, select(&[a], None)]);
+    send(&mut app, vec![ev, select(&[a], None)]);
     assert_eq!(picked(&app), None);
     assert_eq!(filter_commands(&app, a).len(), 2, "the filters stay");
 
     // Filters dropped on the footer's Delete: a filter's row removes it, the Smart Filters row clears them all.
     let (mut app, a, _, _) = fresh();
     let row = LayerRowKey::Filters(LayerId(a), Some(filter_row(&app, a, OFFSET)));
-    send(&mut app,vec![LayersEvent::footer_drop(LayersFooterButton::Delete, vec![row])]);
+    send(&mut app, vec![LayersEvent::footer_drop(LayersFooterButton::Delete, vec![row])]);
     assert_eq!(filter_commands(&app, a), [BLUR]);
-    send(&mut app,vec![LayersEvent::footer_drop(LayersFooterButton::Delete, vec![LayerRowKey::Filters(LayerId(a), None)])]);
+    send(&mut app, vec![LayersEvent::footer_drop(LayersFooterButton::Delete, vec![LayerRowKey::Filters(LayerId(a), None)])]);
     assert!(filter_commands(&app, a).is_empty());
 
     // A filter dropped on another smart object moves there; with ⌥ it is copied; on a pixel layer nothing happens.
@@ -446,7 +446,7 @@ fn footer_and_drop_events_follow_the_targets() {
         let steps = app.session.active().unwrap().history.past_len();
         let to = if onto_pixels { c } else { b };
         let row = LayerRowKey::Filters(LayerId(a), Some(filter_row(&app, a, filter)));
-        send(&mut app,vec![dropped(LayerDrop::Transfer(RowTransfer::new(vec![row], LayerId(to), copy)))]);
+        send(&mut app, vec![dropped(LayerDrop::Transfer(RowTransfer::new(vec![row], LayerId(to), copy)))]);
         assert_eq!(filter_commands(&app, a), on_a.to_vec(), "{case}: Smart A");
         assert_eq!(filter_commands(&app, b), on_b.to_vec(), "{case}: Smart B");
         let changed = !on_b.is_empty();
@@ -459,7 +459,7 @@ fn footer_and_drop_events_follow_the_targets() {
     let from = filter_row(&app, a, BLUR);
     assert_eq!(from, 1);
     let steps = app.session.active().unwrap().history.past_len();
-    send(&mut app,vec![dropped(LayerDrop::SubRows(SubRowMove::new(LayerId(a), SubRowGroup::SmartFilters, from, 0, false)))]);
+    send(&mut app, vec![dropped(LayerDrop::SubRows(SubRowMove::new(LayerId(a), SubRowGroup::SmartFilters, from, 0, false)))]);
     assert_eq!(filter_commands(&app, a), [OFFSET, BLUR]);
     assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1);
     assert_eq!(picked(&app), Some((a, Some(1))), "the moved filter stays picked");
@@ -467,17 +467,17 @@ fn footer_and_drop_events_follow_the_targets() {
     // The report's case: a Camera Raw Filter ⌥-dropped on another smart object keeps its settings, and
     // activating the copy opens Camera Raw on that smart object.
     let (mut app, a, b, _) = fresh();
-    send(&mut app,vec![select(&[a], None)]);
+    send(&mut app, vec![select(&[a], None)]);
     app.run("filter.cameraRaw", json!({"exposure": 1.0, "contrast": 20})).unwrap();
     let raw = |app: &PhotocraftApp, id: u64| match &layer(app, id).content {
         LayerContent::Smart(sm) => sm.smart_filters.iter().find(|f| f.command == "filter.cameraRaw").map(|f| f.params.clone()),
         _ => None,
     };
     let row = LayerRowKey::Filters(LayerId(a), Some(filter_row(&app, a, "filter.cameraRaw")));
-    send(&mut app,vec![dropped(LayerDrop::Transfer(RowTransfer::new(vec![row], LayerId(b), true)))]);
+    send(&mut app, vec![dropped(LayerDrop::Transfer(RowTransfer::new(vec![row], LayerId(b), true)))]);
     assert_eq!(raw(&app, b), raw(&app, a), "copied with its settings");
     assert_eq!(raw(&app, b).unwrap()["exposure"], 1.0);
-    send(&mut app,vec![LayersEvent::activate(LayerRowKey::Filters(LayerId(b), Some(0)), ActivateOn::Row)]);
+    send(&mut app, vec![LayersEvent::activate(LayerRowKey::Filters(LayerId(b), Some(0)), ActivateOn::Row)]);
     assert!(app.dialog_open(), "Camera Raw opened");
     assert_eq!(active(&app), Some(LayerId(b)), "on the copy's smart object");
 
@@ -488,7 +488,7 @@ fn footer_and_drop_events_follow_the_targets() {
         s.execute("layer.select", json!({"layer": masked})).unwrap();
         let mut app = app_of(s);
         let mv = MaskMove::new(LayerId(masked), LayerPart::LayerMask, LayerId(group), copy);
-        send(&mut app,vec![dropped(LayerDrop::Mask(mv))]);
+        send(&mut app, vec![dropped(LayerDrop::Mask(mv))]);
         assert!(layer(&app, group).mask.is_some(), "copy: {copy}: the group has the mask");
         assert_eq!(layer(&app, masked).mask.is_some(), copy, "copy: {copy}: the original stays only with ⌥");
     }
@@ -513,7 +513,7 @@ fn footer_and_drop_events_follow_the_targets() {
     let frame = s.execute("layer.new.frame", json!({"x": 4, "y": 4, "width": 40, "height": 30})).unwrap()["layer"].as_u64().unwrap();
     let mut app = app_of(s);
     let mv = LayerMove::new(vec![LayerId(pic)], LayerId(frame), LayerPosition::Into, false);
-    send(&mut app,vec![dropped(LayerDrop::Layers(mv))]);
+    send(&mut app, vec![dropped(LayerDrop::Layers(mv))]);
     let content = layer(&app, frame);
     assert_eq!(content.children().map(<[_]>::len), Some(1), "the frame holds the one layer");
 }
@@ -563,7 +563,7 @@ fn menu_pick_values_run_their_rules() {
 
     // As an event from the panel, Select Pixels loads the layer's pixels as the selection.
     assert!(app.session.active().unwrap().doc.selection.is_none());
-    send(&mut app,vec![LayersEvent::menu(MenuTarget::new(on), layers_tree::SELECT_PIXELS)]);
+    send(&mut app, vec![LayersEvent::menu(MenuTarget::new(on), layers_tree::SELECT_PIXELS)]);
     assert!(app.session.active().unwrap().doc.selection.is_some());
 }
 
@@ -582,15 +582,15 @@ fn activate_and_fx_events_open_the_right_editor() {
 
     // Blending Options opens the blending dialog and picks the smart object.
     let blur_row = LayerRowKey::Filters(LayerId(a), Some(filter_row(&app, a, BLUR)));
-    send(&mut app,vec![LayersEvent::activate(blur_row.clone(), ActivateOn::Options)]);
+    send(&mut app, vec![LayersEvent::activate(blur_row.clone(), ActivateOn::Options)]);
     assert_eq!(active(&app), Some(LayerId(a)), "the smart object becomes active");
     let dialog = top(&app);
     assert!(crate::smart_filter_dialog::owns(dialog.key.as_deref().unwrap_or_default()));
     crate::dialogs::testing::cancel(&mut app, dialog.id);
 
     // The row opens the filter's editor on the recorded values; OK edits it in place.
-    send(&mut app,vec![select(&[c], None)]);
-    send(&mut app,vec![LayersEvent::activate(blur_row, ActivateOn::Row)]);
+    send(&mut app, vec![select(&[c], None)]);
+    send(&mut app, vec![LayersEvent::activate(blur_row, ActivateOn::Row)]);
     assert_eq!(active(&app), Some(LayerId(a)), "an inactive smart object is selected before its editor opens");
     let dialog = top(&app);
     assert_eq!(dialog.fields.as_ref().unwrap()["radius"].as_f64(), Some(1.0), "the recorded radius");
@@ -607,7 +607,7 @@ fn activate_and_fx_events_open_the_right_editor() {
     app.run("filter.liquify", json!({"strokes": [stroke], "meshSize": 3.0})).unwrap();
     app.run("layer.select", json!({"layer": c})).unwrap();
     let row = LayerRowKey::Filters(LayerId(a), Some(filter_row(&app, a, photocraft_engine::distort_cmds::LIQUIFY)));
-    send(&mut app,vec![LayersEvent::activate(row, ActivateOn::Row)]);
+    send(&mut app, vec![LayersEvent::activate(row, ActivateOn::Row)]);
     assert!(app.liquify.is_some(), "the Liquify workspace opens");
     crate::liquify_ui::record_stroke(&mut app, &[[6.0, 4.0, 1.0], [10.0, 4.0, 1.0]]);
     let ctx = app.ctx().clone();
@@ -623,13 +623,13 @@ fn activate_and_fx_events_open_the_right_editor() {
     app.run("layer.layerStyle.dropShadow", json!({"layer": a})).unwrap();
     let doc = app.session.active().unwrap().doc.clone();
     let (revision, steps) = (app.session.active().unwrap().revision, app.session.active().unwrap().history.past_len());
-    send(&mut app,vec![LayersEvent::fx_open(LayerId(a), false, false)]);
+    send(&mut app, vec![LayersEvent::fx_open(LayerId(a), false, false)]);
     let st = app.session.active().unwrap();
     assert!(st.fx_collapsed.contains(&LayerId(a)));
     assert!(std::sync::Arc::ptr_eq(&doc, &st.doc), "no pixel changed");
     assert_eq!((st.revision, st.history.past_len()), (revision, steps), "no history step");
     assert_eq!(st.active_layer, Some(LayerId(c)), "the selection is the same");
-    send(&mut app,vec![LayersEvent::fx_open(LayerId(a), true, false)]);
+    send(&mut app, vec![LayersEvent::fx_open(LayerId(a), true, false)]);
     assert!(app.session.active().unwrap().fx_collapsed.is_empty());
 }
 
@@ -641,7 +641,7 @@ fn a_select_commits_an_open_text_edit_before_changing_the_selection() {
     for same in [true, false] {
         for thumbnail in [true, false] {
             let mut app = app_of(Session::new());
-    let ctx = app.ctx().clone();
+            let ctx = app.ctx().clone();
             app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
             let text = LayerId(app.run("type.create", json!({"text": "Before", "size": 24, "x": 20, "y": 80})).unwrap()["layer"].as_u64().unwrap());
             let other = LayerId(app.run("layer.new.layer", json!({"name": "Other pixels"})).unwrap()["layer"].as_u64().unwrap());
@@ -651,7 +651,7 @@ fn a_select_commits_an_open_text_edit_before_changing_the_selection() {
             let session = app.ui.text_edit.as_ref().unwrap().session.clone();
             app.run("type.edit", json!({"layer": text.0, "text": "Preserved edit", "coalesce": session})).unwrap();
             let target = if same { text } else { other };
-            send(&mut app,vec![select(&[target.0], thumbnail.then_some(LayerPart::Pixels))]);
+            send(&mut app, vec![select(&[target.0], thumbnail.then_some(LayerPart::Pixels))]);
             let case = format!("same={same}, thumbnail={thumbnail}");
             assert!(app.ui.text_edit.is_none(), "{case}: the edit committed");
             assert_eq!(active(&app), Some(target), "{case}");

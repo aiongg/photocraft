@@ -67,11 +67,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut Ui, at: Rect) -> Option<(La
     let Fill::Gradient { style, reverse, .. } = &fill else { return None };
     let value = LineGradient::new(GradientLine::new(point(start), point(end)), stops::of_fill(&fill));
     let sampler = stops::sampler(app.session.tools.foreground, app.session.tools.background);
-    let mut overlay = GradientOverlay::new("Gradient", Bind::given(value))
-        .style(style_of(*style))
-        .midpoints(true)
-        .rules(StopRules::new(StopRows::Split))
-        .sampler(&sampler);
+    let mut overlay =
+        GradientOverlay::new("Gradient", Bind::given(value)).style(style_of(*style)).midpoints(true).rules(StopRules::new(StopRows::Split)).sampler(&sampler);
     if *reverse {
         overlay = overlay.reverse();
     }

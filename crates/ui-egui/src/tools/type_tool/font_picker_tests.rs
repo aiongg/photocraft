@@ -108,15 +108,8 @@ fn hovering_a_font_previews_only_the_selected_characters() {
     app.run("type.create", json!({"text": "abcdef", "font": "Inter", "size": 18})).unwrap();
     let layer = app.session.active().unwrap().active_layer.unwrap();
     app.run("type.setStyle", json!({"layer": layer.0, "range": [0, 2], "font": "JetBrains Mono"})).unwrap();
-    app.ui.text_edit = Some(crate::state::TextEdit {
-        layer: layer.0,
-        document: None,
-        caret: 5,
-        anchor: 3,
-        session: "font-preview-test".into(),
-        created: false,
-        mask: false,
-    });
+    app.ui.text_edit =
+        Some(crate::state::TextEdit { layer: layer.0, document: None, caret: 5, anchor: 3, session: "font-preview-test".into(), created: false, mask: false });
 
     crate::type_font_preview::set(&mut app, "Inter".into());
     let (preview, _) = crate::type_font_preview::display_doc(&mut app, 0).expect("preview document");

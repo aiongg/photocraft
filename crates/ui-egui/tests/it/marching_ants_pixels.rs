@@ -95,7 +95,10 @@ fn render(h: &mut Harness) -> Image {
 
 /// Device pixel of document point `(x, y)`.
 fn device(h: &Harness, ppp: f32, x: f32, y: f32) -> (i64, i64) {
-    let p = photocraft_ui_egui::canvas::active_view(h.state()).expect("an active document view").to_screen(craft::behavior::kurbo::Point::new(f64::from(x), f64::from(y))) * ppp;
+    let p = photocraft_ui_egui::canvas::active_view(h.state())
+        .expect("an active document view")
+        .to_screen(craft::behavior::kurbo::Point::new(f64::from(x), f64::from(y)))
+        * ppp;
     (p.x.round() as i64, p.y.round() as i64)
 }
 

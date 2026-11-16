@@ -152,7 +152,17 @@ fn save_restart_select_create_and_delete_through_the_dialog() {
     restarted.load_prefs_json(&h.state().session.prefs_to_json()).unwrap();
     let mut h2 = harness(PhotocraftApp::new(restarted, crate::Services::default()));
     let id2 = open(&mut h2);
-    let library = h2.state().framework.dialogs.get_by_id::<HostedNewDocument>(id2).expect("the dialog is open").saved_presets().items().into_iter().map(|i| i.name.clone()).collect::<Vec<_>>();
+    let library = h2
+        .state()
+        .framework
+        .dialogs
+        .get_by_id::<HostedNewDocument>(id2)
+        .expect("the dialog is open")
+        .saved_presets()
+        .items()
+        .into_iter()
+        .map(|i| i.name.clone())
+        .collect::<Vec<_>>();
     assert_eq!(library, ["Wide"]);
     assert_eq!(fields(h2.state(), id2)["preset"], "Wide", "the dialog opens on the saved preset's card");
 

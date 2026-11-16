@@ -156,7 +156,10 @@ impl<'a> ChipLibrary<'a> {
     /// default gradient.
     pub(crate) fn gradient(&self, which: ShapePaint) -> photocraft_doc::Fill {
         let slot = slot(which);
-        self.edited[slot].clone().or_else(|| self.current[slot].clone().filter(|f| matches!(f, photocraft_doc::Fill::Gradient { .. }))).unwrap_or_else(|| self.default_gradient.clone())
+        self.edited[slot]
+            .clone()
+            .or_else(|| self.current[slot].clone().filter(|f| matches!(f, photocraft_doc::Fill::Gradient { .. })))
+            .unwrap_or_else(|| self.default_gradient.clone())
     }
 }
 

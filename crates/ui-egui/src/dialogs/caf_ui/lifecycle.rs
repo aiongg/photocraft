@@ -10,8 +10,8 @@ use photocraft_geom::Rect;
 use serde_json::{Value, json};
 
 use super::preview::{Base, compute_base, plan_params};
-use crate::dialogs::shared_picture::SharedPicture;
 use super::{CMD, CafApp, Hosted, PROXY_SIDE, PhotocraftApp, REMEMBERED};
+use crate::dialogs::shared_picture::SharedPicture;
 
 /// Opens the workspace on the active layer and its selection.
 pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
@@ -269,8 +269,7 @@ fn sync_document(app: &mut PhotocraftApp, replan: &mut bool) {
 /// (and `replan`) plan again. A plan that refuses a lasso edit (an empty fill area) is reported back to the
 /// workspace, which takes the edit out.
 fn reconcile(app: &mut PhotocraftApp, id: DialogId, replan: bool, committed: bool) {
-    let Some((session, command)) = app.framework.dialogs.get_by_id::<Hosted>(id).map(|h| (h.workspace().session().clone(), h.workspace().command()))
-    else {
+    let Some((session, command)) = app.framework.dialogs.get_by_id::<Hosted>(id).map(|h| (h.workspace().session().clone(), h.workspace().command())) else {
         return;
     };
     let Some(c) = app.caf.as_mut() else { return };

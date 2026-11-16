@@ -1,9 +1,9 @@
 use std::cell::RefCell;
 
+use craft::behavior::IconId;
 use craft::ui::buttons::IconButton;
 use craft::ui::contract::{Props as _, Show as _, TooltipSpec};
 use craft::ui::shell::{Title, TitleBar};
-use craft::behavior::IconId;
 
 use super::{PhotocraftApp, brand};
 

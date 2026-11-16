@@ -4,17 +4,17 @@
 //! Nothing is saved until OK.
 use craft::draw::ui::brush_presets::tip_thumb_scale;
 use craft::ui::contract::Bind;
-use craft::ui::primitives::textures::TextureCache;
-use craft::ui::runtime::env::Label;
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::{DialogFields, Param, ParamDialog, ParamKind, ParamResult};
+use craft::ui::primitives::textures::TextureCache;
+use craft::ui::runtime::env::Label;
 use egui::{Color32, pos2, vec2};
 use photocraft_paint::{BrushPreset, BrushSettings};
 use serde_json::{Value, json};
 
+use crate::PhotocraftApp;
 use crate::dialogs::params;
 use crate::theme::Tokens;
-use crate::PhotocraftApp;
 
 /// The key of the dialog.
 pub const KEY: &str = "brushPresets.new";
@@ -29,9 +29,7 @@ pub(crate) fn owns(key: &str) -> bool {
 /// ("Soft Round 1"), so OK never overwrites a preset; "Brush N" when the brush isn't a preset's.
 pub fn suggested_name(presets: &[BrushPreset], current: Option<&str>) -> String {
     match current.filter(|n| presets.iter().any(|p| p.name.eq_ignore_ascii_case(n))) {
-        Some(base) => {
-            (1..).map(|n| format!("{base} {n}")).find(|n| !taken(presets.iter().map(|p| p.name.as_str()), n)).unwrap_or_else(|| base.to_string())
-        }
+        Some(base) => (1..).map(|n| format!("{base} {n}")).find(|n| !taken(presets.iter().map(|p| p.name.as_str()), n)).unwrap_or_else(|| base.to_string()),
         None => crate::brush_panel::new_preset_name(presets),
     }
 }

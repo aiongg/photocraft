@@ -75,7 +75,6 @@ pub(crate) fn pattern_stamp_choices() -> Vec<((Option<BlendMode>, bool), &'stati
     choices().into_iter().filter(|c| c.0 != (None, false)).collect()
 }
 
-
 /// The blend modes in their menu groups (a separator before Darken, Lighten, Overlay, Difference
 /// and Hue), with Behind and/or Clear after Dissolve.
 fn blend_items(behind: bool, clear: bool) -> Vec<Item> {
@@ -187,7 +186,6 @@ pub(crate) fn opens_on(app: &PhotocraftApp, tool: Tool, mods: Mods) -> bool {
     let block = tool == Tool::Eraser && app.ui.tool_options.eraser_mode == "block";
     is_gesture(tool, mods) || (plain && block && !crate::paint_mouse::right_erases(app, tool))
 }
-
 
 /// The engine command a row runs, if any: a brush-based tool's mode goes through
 /// `tools.setBrush`, as its options-bar dropdown does. The Brush, Pencil and Pattern Stamp also

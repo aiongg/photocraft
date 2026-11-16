@@ -386,5 +386,4 @@ mod tests {
         app.run("file.new", json!({"width": 60, "height": 60})).unwrap();
         assert_eq!(line_preview_start(&app, Tool::Brush, true), None);
     }
-
 }

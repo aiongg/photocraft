@@ -373,8 +373,9 @@ fn press_rule(app: &mut PhotocraftApp, at: KPoint, clicks: u32, reach: f64, styl
     let zoom = f64::from(app.point_zoom());
     let active = selected(app).map(|l| (l.id, target(app, l)));
     // A handle of the selected image's bounds reaches outside the frame.
-    let content_control = active
-        .is_some_and(|(id, t)| t == Target::Content && child_box(app, id).is_some_and(|b| matches!(b.part_at(at, reach), BoxPart::Corner(_) | BoxPart::Edge(_))));
+    let content_control = active.is_some_and(|(id, t)| {
+        t == Target::Content && child_box(app, id).is_some_and(|b| matches!(b.part_at(at, reach), BoxPart::Corner(_) | BoxPart::Edge(_)))
+    });
     let Some(id) = content_control.then(|| active.map(|(id, _)| id)).flatten().or_else(|| frame_at(app, p)) else { return Pressed::Draw };
     let (frame, t) = {
         let Some(st) = app.session.active() else { return Pressed::Done };
@@ -674,7 +675,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect)
             if let Some(b) = child_box(app, id) {
                 let r = egui::Rect::from_two_pos(view.to_screen(b.quad[0]), view.to_screen(b.quad[2]));
                 painter.rect_stroke(r, 0., stroke, StrokeKind::Inside);
-                for p in [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()] {
+                for p in [r.left_top(), r.center_top(), r.right_top(), r.right_center(), r.right_bottom(), r.center_bottom(), r.left_bottom(), r.left_center()]
+                {
                     paint_handle(&painter, p, &t);
                 }
             }

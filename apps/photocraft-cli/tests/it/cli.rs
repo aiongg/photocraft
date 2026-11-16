@@ -1416,7 +1416,8 @@ fn batch_plays_a_photoshop_actions_file() {
     std::fs::create_dir_all(&input).unwrap();
     write_png(&input.join("a.png"), 8, 4, 3);
     let invert = Action::new("Negative", vec![ActionStep::new("image.adjustments.invert", json!({})), ActionStep::new("select.all", json!({}))]);
-    let odd = Action::new("Odd", vec![ActionStep::new(photocraft_engine::atn_cmds::PHOTOSHOP_STEP, json!({"event": "syntheticFill", "name": "Generative Fill"}))]);
+    let odd =
+        Action::new("Odd", vec![ActionStep::new(photocraft_engine::atn_cmds::PHOTOSHOP_STEP, json!({"event": "syntheticFill", "name": "Generative Fill"}))]);
     let (bytes, skipped) = photocraft_engine::atn_cmds::export("Set", &[&invert, &odd], &[], false).unwrap();
     assert!(skipped.is_empty());
     let atn = d.join("Set.atn");

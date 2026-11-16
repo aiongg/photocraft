@@ -18,7 +18,10 @@ fn only(name: &str, steps: Vec<(String, Value)>) -> ActionList {
 fn session() -> Session {
     let mut s = Session::new();
     s.execute("file.new", json!({"width":4,"height":4,"background":"#804020"})).unwrap();
-    s.actions.list.push(Action::new("Two layers", ["First", "Second"].into_iter().map(|name| ActionStep::new("layer.new.layer", json!({"name":name}))).collect())).unwrap();
+    s.actions
+        .list
+        .push(Action::new("Two layers", ["First", "Second"].into_iter().map(|name| ActionStep::new("layer.new.layer", json!({"name":name}))).collect()))
+        .unwrap();
     s
 }
 

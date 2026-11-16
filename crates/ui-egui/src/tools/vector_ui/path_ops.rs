@@ -143,7 +143,6 @@ pub(crate) fn work_path_shown_in(app: &PhotocraftApp, doc: &Document) -> bool {
 // ---------------------------------------------------------------------------------------------
 // Path Selection
 
-
 /// The work or saved path explicitly selected in the Paths panel, by name, and its geometry. Only
 /// such a selection overrides the active layer's path.
 pub(super) fn selected_document_geometry(app: &PhotocraftApp) -> Option<(String, &Path)> {

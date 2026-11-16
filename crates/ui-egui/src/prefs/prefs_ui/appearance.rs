@@ -1,13 +1,13 @@
 use super::{AppearanceMode, Color32, PhotocraftApp, json, prefs};
 use crate::theme::AppTheme;
-use craft::menu::{ThemeChoice, ThemeLabels, ThemeMenu, ThemeRow};
 use craft::keymap::CommandRef;
+use craft::menu::{ThemeChoice, ThemeLabels, ThemeMenu, ThemeRow};
 use craft::theme::{Mode, ThemeId};
-use craft::ui::runtime::env::system_appearance;
 use craft::ui::buttons::IconButton;
 use craft::ui::contract::{Props as _, Show as _, ShowContainer as _};
 use craft::ui::menu::Menu;
 use craft::ui::primitives::IconSpec;
+use craft::ui::runtime::env::system_appearance;
 
 /// The GPU canvas's gamut warning colours from Preferences › Transparency & Gamut.
 pub fn canvas_style(app: &PhotocraftApp) -> crate::gpu_canvas::CanvasStyle {

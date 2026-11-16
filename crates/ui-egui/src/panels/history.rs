@@ -18,10 +18,8 @@ pub(super) fn history(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let st = shown.session.active();
         let rows = st.map(rows).unwrap_or_default();
         let thumbs = st.map(|st| SnapshotThumbs::new(shown, st.doc.id));
-        let mut panel = HistoryPanel::new(&rows, current_key(shown))
-            .source(st.and_then(source_key))
-            .can_delete(|key| can_delete(shown, key))
-            .footer(footer(shown));
+        let mut panel =
+            HistoryPanel::new(&rows, current_key(shown)).source(st.and_then(source_key)).can_delete(|key| can_delete(shown, key)).footer(footer(shown));
         if let Some(key) = reveal {
             panel = panel.reveal(key);
         }

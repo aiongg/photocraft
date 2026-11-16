@@ -52,4 +52,3 @@ fn delete_and_backspace_on_a_subpaths_last_anchor_remove_the_subpath_not_the_lay
         assert_eq!(path1(&app), before, "{key:?}: Undo brings B back");
     }
 }
-

@@ -65,11 +65,7 @@ fn patched_reads_the_protocol_and_refuses_bad_values() {
             json!({"by": "smartObject", "smart": ["missing", "embedded", "missing"]}),
             filter(FilterBy::SmartObject, |f| f.smart = vec![SmartKind::Missing, SmartKind::Embedded]),
         ),
-        (
-            filter(FilterBy::SmartObject, |f| f.smart = vec![SmartKind::Linked]),
-            json!({"smart": []}),
-            filter(FilterBy::SmartObject, |_| {}),
-        ),
+        (filter(FilterBy::SmartObject, |f| f.smart = vec![SmartKind::Linked]), json!({"smart": []}), filter(FilterBy::SmartObject, |_| {})),
         (
             ink.clone(),
             json!({"by": "mode", "mode": "Multiply", "kinds": ["type", "pixel", "type"]}),

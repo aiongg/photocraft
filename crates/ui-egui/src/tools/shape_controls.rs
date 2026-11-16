@@ -101,7 +101,12 @@ fn selection(app: &PhotocraftApp) -> Option<(Vec<u64>, [f64; 4])> {
 fn bounds_of(state: &BoxState) -> [f64; 4] {
     let xs = state.quad.map(|p| p.x);
     let ys = state.quad.map(|p| p.y);
-    [xs.into_iter().fold(f64::INFINITY, f64::min), ys.into_iter().fold(f64::INFINITY, f64::min), xs.into_iter().fold(f64::NEG_INFINITY, f64::max), ys.into_iter().fold(f64::NEG_INFINITY, f64::max)]
+    [
+        xs.into_iter().fold(f64::INFINITY, f64::min),
+        ys.into_iter().fold(f64::INFINITY, f64::min),
+        xs.into_iter().fold(f64::NEG_INFINITY, f64::max),
+        ys.into_iter().fold(f64::NEG_INFINITY, f64::max),
+    ]
 }
 
 /// The scale per axis that takes the box `start` to `now`, and the point it scales about. The scale is

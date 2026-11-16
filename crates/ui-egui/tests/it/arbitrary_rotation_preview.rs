@@ -75,7 +75,13 @@ fn blue(h: &mut Harness, name: &str) -> (usize, u32, u32) {
     let rect = h.state().last_canvas_rect.shrink(3.0);
     // Everything above the canvas layer (the dialog and its popups) is excluded.
     let modals: Vec<_> = h.ctx.memory(|m| {
-        m.areas().visible_layer_ids().into_iter().filter(|l| l.order != egui::Order::Background).filter_map(|l| m.area_rect(l.id)).map(|r| r.expand(4.0)).collect()
+        m.areas()
+            .visible_layer_ids()
+            .into_iter()
+            .filter(|l| l.order != egui::Order::Background)
+            .filter_map(|l| m.area_rect(l.id))
+            .map(|r| r.expand(4.0))
+            .collect()
     });
     let img = h.render().expect("render");
     if let Some(dir) = std::env::var_os("PHOTOCRAFT_ROTATION_EVIDENCE_DIR") {

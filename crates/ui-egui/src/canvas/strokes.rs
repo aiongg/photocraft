@@ -5,11 +5,11 @@ use craft::ui::canvas::{PixelRect, RasterSource};
 use craft::ui::primitives::Revision;
 use egui::{Color32, ColorImage};
 
+use super::PhotocraftApp;
 use super::display::{canvas_display, display_image};
 use super::paint_thread::{PaintThread, Step};
 use super::paint_tool::PaintStroke;
 use super::textures::shown_as_document;
-use super::PhotocraftApp;
 use crate::state::Tool;
 use photocraft_geom::Rect as DRect;
 use serde_json::json;

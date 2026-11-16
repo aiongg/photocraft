@@ -574,7 +574,10 @@ mod tests {
             .list
             .push(Action::new(
                 "Caller",
-                vec![ActionStep::new("actions.conditional", json!({"if": "always", "then": "Bad"})), ActionStep::new("layer.new.layer", json!({"name": "after"}))],
+                vec![
+                    ActionStep::new("actions.conditional", json!({"if": "always", "then": "Bad"})),
+                    ActionStep::new("layer.new.layer", json!({"name": "after"})),
+                ],
             ))
             .unwrap();
         let played = s.execute("actions.play", json!({"action": "Caller"})).unwrap();

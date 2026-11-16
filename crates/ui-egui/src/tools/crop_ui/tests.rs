@@ -79,7 +79,14 @@ fn commit_maps_the_frame_and_options_to_image_crop() {
         Row { name: "turned 8-bit", depth: SampleType::U8, selection: None, frame: Some(turned), settings: |_| {}, expect: Some((Size::new(60, 40), 72.0)) },
         Row { name: "turned 16-bit", depth: SampleType::U16, selection: None, frame: Some(turned), settings: |_| {}, expect: Some((Size::new(60, 40), 72.0)) },
         Row { name: "turned 32-bit", depth: SampleType::F32, selection: None, frame: Some(turned), settings: |_| {}, expect: Some((Size::new(60, 40), 72.0)) },
-        Row { name: "moved 16-bit", depth: SampleType::U16, selection: None, frame: Some(boxed(20.0, 10.0, 120.0, 60.0, 0.0)), settings: |_| {}, expect: Some((Size::new(100, 50), 72.0)) },
+        Row {
+            name: "moved 16-bit",
+            depth: SampleType::U16,
+            selection: None,
+            frame: Some(boxed(20.0, 10.0, 120.0, 60.0, 0.0)),
+            settings: |_| {},
+            expect: Some((Size::new(100, 50), 72.0)),
+        },
         Row {
             name: "content-aware fill past the canvas",
             depth: SampleType::U8,
@@ -104,8 +111,22 @@ fn commit_maps_the_frame_and_options_to_image_crop() {
             settings: |s| size_target(s, 2.0, 1.0, ""),
             expect: Some((Size::new(144, 72), 72.0)),
         },
-        Row { name: "untouched selection frame", depth: SampleType::U16, selection: Some([10, 20, 30, 40]), frame: None, settings: |_| {}, expect: Some((Size::new(30, 40), 72.0)) },
-        Row { name: "refused at 20000 ppi", depth: SampleType::U8, selection: None, frame: Some(plain), settings: |s| size_target(s, 4.0, 2.0, "20000"), expect: None },
+        Row {
+            name: "untouched selection frame",
+            depth: SampleType::U16,
+            selection: Some([10, 20, 30, 40]),
+            frame: None,
+            settings: |_| {},
+            expect: Some((Size::new(30, 40), 72.0)),
+        },
+        Row {
+            name: "refused at 20000 ppi",
+            depth: SampleType::U8,
+            selection: None,
+            frame: Some(plain),
+            settings: |s| size_target(s, 4.0, 2.0, "20000"),
+            expect: None,
+        },
     ];
     for row in rows {
         let mut app = app(row.depth);
@@ -431,7 +452,6 @@ fn a_straighten_line_inside_the_frame_is_not_snapped_as_a_frame_move() {
 /// began with, not from the result of the first number.
 #[test]
 fn a_typed_crop_ratio_fits_from_the_frame_the_edit_started_with() {
-
     use egui_kittest::kittest::Queryable;
     let mut a = app(SampleType::U8);
     a.ui.tool_options.crop.ratio = CropRatio::sides(4.0, 3.0);

@@ -153,10 +153,9 @@ pub(crate) fn cursor(app: &PhotocraftApp, cx: &ToolContext<'_>) -> Cursor {
         return BrushCursor::new(&tip).centre(centre).painting(painting).icon(icon).cursor(cx, &options, &space.view);
     }
     let Some((_, tip)) = &app.brush_tip else { return arrow };
-    BrushCursor::new(tip)
-        .pose(pose(brush, cx.pointer.as_ref().map(|p| p.sample)))
-        .centre(centre)
-        .painting(painting)
-        .icon(icon)
-        .cursor(cx, &options, &space.view)
+    BrushCursor::new(tip).pose(pose(brush, cx.pointer.as_ref().map(|p| p.sample))).centre(centre).painting(painting).icon(icon).cursor(
+        cx,
+        &options,
+        &space.view,
+    )
 }

@@ -83,7 +83,13 @@ fn saved_bindings_decide_which_row_shows_the_system_keys() {
         shown_by: &'static [&'static str],
     }
     let cases = [
-        Case { case: "Settings saved on ⌘, gives way to Hide Layers", shortcuts: &[("edit.preferences.general", "Cmd+,")], alternates: &[], key: "Cmd+,", shown_by: &["layer.hideLayers"] },
+        Case {
+            case: "Settings saved on ⌘, gives way to Hide Layers",
+            shortcuts: &[("edit.preferences.general", "Cmd+,")],
+            alternates: &[],
+            key: "Cmd+,",
+            shown_by: &["layer.hideLayers"],
+        },
         Case {
             case: "a command without a row takes ⌘,",
             shortcuts: &[("edit.fillForeground", "Cmd+,"), ("layer.hideLayers", "")],
@@ -93,8 +99,20 @@ fn saved_bindings_decide_which_row_shows_the_system_keys() {
         },
         Case { case: "a command without a row takes ⌘H", shortcuts: &[("edit.fillForeground", "Cmd+H")], alternates: &[], key: "Cmd+H", shown_by: &[] },
         Case { case: "a command without a row takes ⌘M", shortcuts: &[("edit.fillForeground", "Cmd+M")], alternates: &[], key: "Cmd+M", shown_by: &[] },
-        Case { case: "an alternate on a visible command removes Settings' ⌘,", shortcuts: &[], alternates: &[("view.extras", "Cmd+,")], key: "Cmd+,", shown_by: &[] },
-        Case { case: "About saved on ⌘, takes it from Settings", shortcuts: &[("help.about", "Cmd+,"), ("layer.hideLayers", "")], alternates: &[], key: "Cmd+,", shown_by: &["help.about"] },
+        Case {
+            case: "an alternate on a visible command removes Settings' ⌘,",
+            shortcuts: &[],
+            alternates: &[("view.extras", "Cmd+,")],
+            key: "Cmd+,",
+            shown_by: &[],
+        },
+        Case {
+            case: "About saved on ⌘, takes it from Settings",
+            shortcuts: &[("help.about", "Cmd+,"), ("layer.hideLayers", "")],
+            alternates: &[],
+            key: "Cmd+,",
+            shown_by: &["help.about"],
+        },
     ];
     for c in cases {
         let mut a = app(true);

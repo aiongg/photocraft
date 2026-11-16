@@ -189,7 +189,11 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
     let setup = EditorSetup {
         channels: values::tone_channels(space, gray, None),
-        histograms: if has_histogram(kind) { values::panel_histograms(&tone::histograms(app, HistSource::BelowLayer(id), space), space, gray, None) } else { Vec::new() },
+        histograms: if has_histogram(kind) {
+            values::panel_histograms(&tone::histograms(app, HistSource::BelowLayer(id), space), space, gray, None)
+        } else {
+            Vec::new()
+        },
         gradients: if kind == "gradientMap" { gradient_presets(app) } else { Vec::new() },
         swatches: swatches(app),
         tone: record.tone.take(),

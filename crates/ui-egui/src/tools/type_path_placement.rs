@@ -151,7 +151,14 @@ fn cached_geometries(app: &PhotocraftApp, text: &TextLayer) -> Option<(Arc<PathG
     }
     let geometry = Arc::new(PathGeometry::new(path, *flip)?);
     let reversed = Arc::new(geometry.flipped());
-    *guard = Some(CachedGeometry { doc: Arc::downgrade(&st.doc), layer, path: path.clone(), flip: *flip, geometry: Arc::clone(&geometry), reversed: Arc::clone(&reversed) });
+    *guard = Some(CachedGeometry {
+        doc: Arc::downgrade(&st.doc),
+        layer,
+        path: path.clone(),
+        flip: *flip,
+        geometry: Arc::clone(&geometry),
+        reversed: Arc::clone(&reversed),
+    });
     Some((geometry, reversed))
 }
 
@@ -267,7 +274,11 @@ impl Markers {
         let track = Track::new(app, text)?;
         let TextShape::Path { flip, .. } = &text.shape else { return None };
         let original = effective_range(text, &track.geometry)?;
-        let shown = valid_proposal(app).map_or(PathRange { start: original[0], end: original[1], flip: *flip }, |p| PathRange { start: p.range[0], end: p.range[1], flip: p.flip });
+        let shown = valid_proposal(app).map_or(PathRange { start: original[0], end: original[1], flip: *flip }, |p| PathRange {
+            start: p.range[0],
+            end: p.range[1],
+            flip: p.flip,
+        });
         // The text is measured with the range it is shown with, so the plus follows the drag.
         let mut preview = text.clone();
         if let TextShape::Path { start, end, flip, .. } = &mut preview.shape {
@@ -332,13 +343,20 @@ pub(crate) fn propose(app: &mut PhotocraftApp, range: Option<PathRange>) {
         app.type_path_preview = None;
         return;
     };
-    let Some((document, source, revision, layer)) = app.session.active().and_then(|st| Some((st.doc.id, Arc::downgrade(&st.doc), st.revision, st.active_layer?))) else {
+    let Some((document, source, revision, layer)) =
+        app.session.active().and_then(|st| Some((st.doc.id, Arc::downgrade(&st.doc), st.revision, st.active_layer?)))
+    else {
         app.type_path_preview = None;
         return;
     };
     // The same proposal keeps its built document, so a repeated pass shows the same picture.
     let same = app.type_path_preview.as_ref().is_some_and(|p| {
-        p.document == document && p.source.ptr_eq(&source) && p.revision == revision && p.layer == layer && p.range == [range.start, range.end] && p.flip == range.flip
+        p.document == document
+            && p.source.ptr_eq(&source)
+            && p.revision == revision
+            && p.layer == layer
+            && p.range == [range.start, range.end]
+            && p.flip == range.flip
     });
     if !same {
         app.type_path_preview = Some(Preview { document, source, revision, layer, range: [range.start, range.end], flip: range.flip, built: None });

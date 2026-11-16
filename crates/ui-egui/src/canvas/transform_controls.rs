@@ -1,5 +1,5 @@
-use super::tools::selection::floating_outline;
 use super::PhotocraftApp;
+use super::tools::selection::floating_outline;
 use crate::state::Tool;
 use craft::behavior::EditEvent;
 use craft::behavior::geometry::quad::{BoxRules, BoxState, TransformMode};

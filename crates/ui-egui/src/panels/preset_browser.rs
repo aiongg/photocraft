@@ -600,7 +600,10 @@ pub fn tool_presets_panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) enum Act {
     Run(String, Value),
-    MoveFolder { from: String, before: Option<String> },
+    MoveFolder {
+        from: String,
+        before: Option<String>,
+    },
     /// Picking a shape switches to the Custom Shape tool.
     CustomShapeTool,
     /// Apply the tool preset of this name.

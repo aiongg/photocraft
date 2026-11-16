@@ -360,16 +360,13 @@ fn glow_color_keeps_exact_floats_until_a_new_pick_and_stores_linear() {
     ui(&mut app, json!({"filter": "neonGlow"})).unwrap();
     ui(&mut app, json!({"params": {"glowColor": [0.123456, 0.234567, 0.345678]}})).unwrap();
     let ctx = app.ctx().clone();
-    let mut h = egui_kittest::Harness::builder()
-        .with_context(ctx.clone())
-        .with_size(egui::vec2(1200.0, 800.0))
-        .build_ui_state(
-            |ui, app: &mut PhotocraftApp| {
-                app.framework.dialogs.run(ui);
-                take(app, ui.ctx());
-            },
-            app,
-        );
+    let mut h = egui_kittest::Harness::builder().with_context(ctx.clone()).with_size(egui::vec2(1200.0, 800.0)).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            app.framework.dialogs.run(ui);
+            take(app, ui.ctx());
+        },
+        app,
+    );
     let glow = |app: &PhotocraftApp| -> Vec<f64> {
         describe(app).unwrap()["effects"][0]["params"]["glowColor"].as_array().unwrap().iter().filter_map(Value::as_f64).collect()
     };

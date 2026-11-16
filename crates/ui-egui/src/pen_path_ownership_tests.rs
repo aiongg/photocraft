@@ -7,8 +7,8 @@ use serde_json::{Value, json};
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, testing, tool_event};
 use crate::state::Tool;
-use craft::draw::ui::VectorMode;
 use crate::vector_ui;
+use craft::draw::ui::VectorMode;
 
 fn app(tool: Tool) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());

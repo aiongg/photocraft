@@ -13,15 +13,14 @@ use std::sync::atomic::{AtomicU64, Ordering};
 use std::sync::{Arc, Mutex};
 use std::time::Duration;
 
-
 use craft::behavior::PixelSize;
 use craft::imaging::ui::filter_gallery::{
     EffectLayer, FilterCatalog, FilterCategory, FilterGalleryEvent, FilterGalleryOpen, FilterGallerySession, FilterGallerySource, FilterGalleryWorkspace,
     GalleryFilter as CatalogFilter, GalleryThumb,
 };
 use craft::imaging::ui::wide_angle::PreviewDone;
-use craft::ui::dialog::HostedWorkspace;
 use craft::ui::canvas::{PixelRect, RasterSource};
+use craft::ui::dialog::HostedWorkspace;
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::patterns::form_dialogs::{Param, ParamKind};
 use craft::ui::primitives::textures::{Revision, ThumbRender, ThumbRequest, ThumbSource};

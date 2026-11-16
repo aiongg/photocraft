@@ -376,7 +376,12 @@ pub(super) fn params_for(app: &mut PhotocraftApp, id: &str) -> Option<(Vec<Param
             choice(
                 "edge",
                 tl!("Edge"),
-                opts(&[("transparency", tl!("Transparency")), ("edgeExtension", tl!("Edge Extension")), ("black", tl!("Black Color")), ("white", tl!("White Color"))]),
+                opts(&[
+                    ("transparency", tl!("Transparency")),
+                    ("edgeExtension", tl!("Edge Extension")),
+                    ("black", tl!("Black Color")),
+                    ("white", tl!("White Color")),
+                ]),
                 "transparency",
             ),
         ]),
@@ -471,7 +476,14 @@ fn batch_form(app: &PhotocraftApp, dir: &str) -> Option<(Vec<Param>, DialogField
         choice(
             "format",
             tl!("File Type"),
-            opts(&[("same", tl!("Same as Source")), ("png", tl!("PNG")), ("jpg", tl!("JPEG")), ("psd", tl!("PSD")), ("tiff", tl!("TIFF")), ("webp", tl!("WebP"))]),
+            opts(&[
+                ("same", tl!("Same as Source")),
+                ("png", tl!("PNG")),
+                ("jpg", tl!("JPEG")),
+                ("psd", tl!("PSD")),
+                ("tiff", tl!("TIFF")),
+                ("webp", tl!("WebP")),
+            ]),
             "same",
         ),
         Param::new("naming", tl!("File Naming"), ParamKind::text("")).hint("{name}").tooltip("{name} · {serial} · {date} (UTC)"),
@@ -559,7 +571,12 @@ fn channel_form(app: &PhotocraftApp, id: &str) -> Option<(Vec<Param>, DialogFiel
             Param::new("source2Invert", tl!("Invert Source 2"), ParamKind::bool(false)),
             choice("blending", tl!("Blending"), blend_modes(), "multiply"),
             Param::new("opacity", tl!("Opacity"), ParamKind::number(Some(0.0), Some(100.0), 100.0, 1.0, 0)),
-            choice("result", tl!("Result"), opts(&[("newChannel", tl!("New Channel")), ("newDocument", tl!("New Document")), ("selection", tl!("Selection"))]), "newChannel"),
+            choice(
+                "result",
+                tl!("Result"),
+                opts(&[("newChannel", tl!("New Channel")), ("newDocument", tl!("New Document")), ("selection", tl!("Selection"))]),
+                "newChannel",
+            ),
         ],
     };
     Some((rows, DialogFields::new()))

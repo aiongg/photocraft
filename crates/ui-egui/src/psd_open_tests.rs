@@ -5,8 +5,8 @@
 #[path = "../../io/tests/support/recovery_psd.rs"]
 mod recovery_psd;
 
-use crate::open_prompt::{DamageTag, MemoryTag};
 use crate::dialogs::alerts;
+use crate::open_prompt::{DamageTag, MemoryTag};
 use crate::{PhotocraftApp, Services, control};
 use craft::color::ui::ProfileMismatchDialog;
 use photocraft_engine::Session;

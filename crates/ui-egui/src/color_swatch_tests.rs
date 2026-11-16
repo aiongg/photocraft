@@ -119,5 +119,3 @@ fn note_and_count_colours_open_the_color_picker() {
     let g = &m.count_groups[m.active_count_group];
     assert!(close(g.color.to_rgb(), PICKED_RGB), "count group colour {:?}", g.color.to_rgb());
 }
-
-

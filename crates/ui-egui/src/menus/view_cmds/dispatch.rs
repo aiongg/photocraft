@@ -80,7 +80,6 @@ pub(super) fn is_enabled_with_engine(app: &PhotocraftApp, id: &str, engine_enabl
         }),
         // Embedded placement reads the picker's bytes on every platform. Linked placement keeps
         // the engine's native filesystem guard because its source must remain reachable.
-
         "file.placeEmbedded" => doc && app.services.files.is_some(),
         // Batch's dialog is built from an Actions-panel action. Keep it disabled until one
         // exists instead of opening a menu item that can only report "record an action".

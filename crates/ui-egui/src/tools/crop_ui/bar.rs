@@ -114,4 +114,3 @@ pub(crate) fn committed(app: &mut PhotocraftApp, apply: bool) {
         super::discard(app);
     }
 }
-

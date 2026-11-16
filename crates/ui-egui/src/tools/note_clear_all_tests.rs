@@ -25,7 +25,6 @@ fn steps(app: &PhotocraftApp) -> usize {
     app.session.active().unwrap().history.past_len()
 }
 
-
 fn prompt(app: &PhotocraftApp) -> Option<egui::Id> {
     crate::dialogs::alerts::prompt_tagged::<NoteQuestion>(app)
 }

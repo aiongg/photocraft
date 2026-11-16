@@ -19,14 +19,14 @@ use crate::PhotocraftApp;
 
 use host::PhotoActions;
 
-pub(crate) mod menu;
 pub(crate) mod dialogs;
-pub(crate) mod runner;
 mod files;
 mod host;
+pub(crate) mod menu;
 pub(crate) mod menu_item;
 pub(crate) mod playback;
 pub(crate) mod record_again;
+pub(crate) mod runner;
 
 pub(crate) use runner::{
     Gate, PausedPlayback, PausedPlaybacks, abandoned, authorize_owned, authorize_panel_preview, journal_view, open_recorded_editor, play, play_targets,
@@ -34,23 +34,23 @@ pub(crate) use runner::{
 };
 
 #[cfg(test)]
-mod tests;
-#[cfg(test)]
 mod drag_drop_tests;
-#[cfg(test)]
-mod runner_tests;
 #[cfg(test)]
 mod files_tests;
 #[cfg(test)]
 mod menu_tests;
 #[cfg(test)]
-mod stop_tests;
+mod panel_menu_tests;
 #[cfg(test)]
 mod playback_tests;
 #[cfg(test)]
-mod panel_menu_tests;
-#[cfg(test)]
 mod record_again_tests;
+#[cfg(test)]
+mod runner_tests;
+#[cfg(test)]
+mod stop_tests;
+#[cfg(test)]
+mod tests;
 
 /// The Actions panel's state: the framework panel's selection, expansion and settings. The action
 /// list itself is [`photocraft_engine::Session::actions`]. Only Button Mode and the collapsed sets

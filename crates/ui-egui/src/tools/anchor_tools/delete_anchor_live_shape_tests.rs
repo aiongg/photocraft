@@ -52,7 +52,8 @@ fn a_click_on_a_live_shape_anchor_asks_with_yes_no_and_an_unticked_box() {
     assert_eq!(fields["skip"], json!(false));
     let ctx = app.ctx().clone();
     // PLAN: assumed `HarnessBuilder::with_context` (R58)
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1000.0, 700.0)).with_context(ctx).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let mut h =
+        egui_kittest::Harness::builder().with_size(egui::vec2(1000.0, 700.0)).with_context(ctx).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
     h.run_steps(5);
     // Enter is Yes.
     h.key_press(egui::Key::Enter);

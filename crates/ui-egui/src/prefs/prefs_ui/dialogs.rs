@@ -96,7 +96,6 @@ pub fn window_open(app: &PhotocraftApp) -> bool {
     app.prefs_rt.window.is_some()
 }
 
-
 /// Opens Edit › Preferences on `section` (`general` for an unknown one). With the window open only its page changes.
 pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
     let section = if SECTIONS.iter().any(|(id, _)| *id == section) { section } else { "general" };
@@ -122,11 +121,11 @@ pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
 
 /// The language the draft's `interface.language` names, as the code stored in the draft.
 fn draft_language(doc: &Doc) -> Option<String> {
-    doc.pages().iter().filter(|page| page.id == "interface").flat_map(|page| page.groups.iter()).flat_map(|group| group.rows.iter()).find_map(|row| {
-        match &row.kind {
-            RowKind::Choice { value, .. } if row.key == "interface.language" => Some((*value).to_string()),
-            _ => None,
-        }
+    doc.pages().iter().filter(|page| page.id == "interface").flat_map(|page| page.groups.iter()).flat_map(|group| group.rows.iter()).find_map(|row| match &row
+        .kind
+    {
+        RowKind::Choice { value, .. } if row.key == "interface.language" => Some((*value).to_string()),
+        _ => None,
     })
 }
 
@@ -225,4 +224,3 @@ pub(crate) fn set_draft(app: &mut PhotocraftApp, key: &str, value: PrefValue) ->
         None => false,
     }
 }
-

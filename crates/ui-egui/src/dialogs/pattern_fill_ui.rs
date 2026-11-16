@@ -32,7 +32,9 @@ pub(crate) struct State {
 enum Target {
     Edit(LayerId),
     /// `insert` is the active layer when the dialog opened (`None` with none, which the command allows).
-    Create { insert: Option<LayerId> },
+    Create {
+        insert: Option<LayerId>,
+    },
 }
 
 /// The open dialog's context. The hosted dialog's id is fixed, so `serial` tells one opening from the next.

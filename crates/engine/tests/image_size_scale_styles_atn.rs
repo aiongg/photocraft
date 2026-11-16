@@ -6,7 +6,11 @@ use craft_psd::{
 };
 use photocraft_color::{BlendMode, Color};
 use photocraft_doc::{Effect, Effects, FxCommon, FxPaint, LayerId, StrokeFx, StrokePosition};
-use photocraft_engine::{Session, actions_cmds::{Action, ActionList, ActionStep, ActionsFile}, atn_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionList, ActionStep, ActionsFile},
+    atn_cmds,
+};
 use serde_json::{Value, json};
 
 fn recorded(event: &str, descriptor: Option<Descriptor>) -> Vec<u8> {

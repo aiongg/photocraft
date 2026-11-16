@@ -10,8 +10,8 @@ use photocraft_doc::DocId;
 use photocraft_engine::jobs::JobId;
 
 use super::{PhotocraftApp, fmt_zoom, mode_label};
-use serde_json::json;
 use crate::file_open::DropTo;
+use serde_json::json;
 
 /// A tab of the document strip.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -62,13 +62,9 @@ pub(super) fn tabs(app: &PhotocraftApp, ui: &mut egui::Ui) -> DocumentTabsOutput
             .into_iter()
             .map(|(job, name, fraction)| DocumentTab::new(DocTab::Opening(job), name).progress(fraction).close_label(tl!("Cancel opening"))),
     );
-    let selected =
-        app.jobs.focus.map(DocTab::Opening).or_else(|| main_canvas_document(app).and_then(|i| docs.get(i)).map(|st| DocTab::Doc(st.doc.id)));
-    let mut strip = DocumentTabs::new(tl!("Documents"), &tabs)
-        .reorderable(true)
-        .tear_off(true)
-        .large(app.session.prefs().workspace.large_tabs)
-        .takes_files(true);
+    let selected = app.jobs.focus.map(DocTab::Opening).or_else(|| main_canvas_document(app).and_then(|i| docs.get(i)).map(|st| DocTab::Doc(st.doc.id)));
+    let mut strip =
+        DocumentTabs::new(tl!("Documents"), &tabs).reorderable(true).tear_off(true).large(app.session.prefs().workspace.large_tabs).takes_files(true);
     if let Some(tab) = selected {
         strip = strip.selected(tab);
     }
@@ -186,12 +182,8 @@ fn tab_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui, cx: &mut BodyCx<'_>, str
         }
     }
     let mut open = true;
-    let picked = Menu::new(tl!("Document Tab"))
-        .opened_by(strip, Trigger::Manual)
-        .anchor(Anchor::Point(at))
-        .open(Bind::bound(&mut open))
-        .pick(ui, &entries)
-        .picked;
+    let picked =
+        Menu::new(tl!("Document Tab")).opened_by(strip, Trigger::Manual).anchor(Anchor::Point(at)).open(Bind::bound(&mut open)).pick(ui, &entries).picked;
     if !open || picked.is_some() {
         cx.keep::<TabMenu>().0 = None;
     }

@@ -443,7 +443,6 @@ impl PhotocraftApp {
         let uncovered = at.is_some_and(|p| ctx.layer_id_at(p).is_none_or(|l| l.order == egui::Order::Background));
         match target_at(at, uncovered, self.drop_canvas_rect, self.session.active().is_some()) {
             DropTo::Canvas { .. } => DropTo::Canvas {
-
                 at: at.and_then(|p| {
                     crate::canvas::document_display::active_view(self).map(|view| {
                         let d = view.to_doc(p);

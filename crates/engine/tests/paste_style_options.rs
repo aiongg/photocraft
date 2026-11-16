@@ -6,7 +6,11 @@ use craft_psd::{
 };
 use photocraft_color::{BlendMode, Color, ColorMode, SampleType};
 use photocraft_doc::{BlendRange, Document, Effect, Layer, LayerId};
-use photocraft_engine::{Session, actions_cmds::{Action, ActionList, ActionStep, ActionsFile}, atn_cmds, layer_multi_cmds};
+use photocraft_engine::{
+    Session,
+    actions_cmds::{Action, ActionList, ActionStep, ActionsFile},
+    atn_cmds, layer_multi_cmds,
+};
 use photocraft_geom::Size;
 use serde_json::{Value, json};
 

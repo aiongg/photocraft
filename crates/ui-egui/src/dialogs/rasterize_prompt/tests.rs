@@ -296,10 +296,8 @@ fn filters_stay_grey_where_rasterizing_would_not_help() {
 fn the_filter_prompt_offers_convert_rasterize_and_cancel() {
     // (filter, offers Convert to Smart Object, what shows the filter opened)
     type Opened = fn(&PhotocraftApp) -> bool;
-    let table: [(&str, bool, Opened); 2] = [
-        (BLUR, true, |app| filter_dialog(app, BLUR).is_some()),
-        ("filter.vanishingPoint", false, |app| crate::distort_ui::modal_workspace(app).is_some()),
-    ];
+    let table: [(&str, bool, Opened); 2] =
+        [(BLUR, true, |app| filter_dialog(app, BLUR).is_some()), ("filter.vanishingPoint", false, |app| crate::distort_ui::modal_workspace(app).is_some())];
     for (filter, convert, opened) in table {
         let mut app = app_with(Kind::Type);
         menu(&mut app, filter).unwrap();

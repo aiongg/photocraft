@@ -15,7 +15,8 @@ const KEY: &str = "actionsPanel.insertMenuItem";
 
 /// The chooser's result handler. Its refusals (a changed action list, changed permissions) are checked before OK
 /// closes the dialog; a Cancel releases the held target.
-pub(crate) const FAMILY: ParamFamily = ParamFamily { check: Some(check), cancel: Some(|app, _ctx, dialog| cancel(app, dialog)), ..ParamFamily::new(|key| key == KEY, run) };
+pub(crate) const FAMILY: ParamFamily =
+    ParamFamily { check: Some(check), cancel: Some(|app, _ctx, dialog| cancel(app, dialog)), ..ParamFamily::new(|key| key == KEY, run) };
 
 /// Keep a chooser tied to its original action, library and caller.
 pub(crate) struct Held {
@@ -41,8 +42,10 @@ pub(super) fn open(app: &mut PhotocraftApp, action: usize, at: Option<usize>) ->
     let gate = app.session.authorize.or(if app.automation_input { app.services.automation_authorize } else { None });
     let automated = app.automation_input || gate.is_some();
     // Only menu identities the existing ATN event table can encode unambiguously.
-    let options: Vec<(String, Label)> =
-        photocraft_engine::atn_cmds::menu_item_commands().into_iter().map(|command| (command.to_string(), Label::from(super::label_of(command).to_string()))).collect();
+    let options: Vec<(String, Label)> = photocraft_engine::atn_cmds::menu_item_commands()
+        .into_iter()
+        .map(|command| (command.to_string(), Label::from(super::label_of(command).to_string())))
+        .collect();
     let dialog = params::open_param(app, KEY, DialogFields::new(), Value::Null, move |fields: &mut DialogFields| {
         let rows = vec![Param::new("id", tl!("Command"), ParamKind::choice(options.clone(), Some("image.imageSize".into()))).searchable()];
         ParamDialog::command(KEY, tl!("Insert Menu Item"), rows).values(Bind::bound(fields))

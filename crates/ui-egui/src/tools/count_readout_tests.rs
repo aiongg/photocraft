@@ -17,7 +17,6 @@ fn session(groups: &[usize]) -> photocraft_engine::Session {
     s
 }
 
-
 /// The readout by groups' markers, the `count.setGroup` edits applied in order and a stale current
 /// index: "N" for one group or none (a hidden single group still counts), "V (C)" for two or more.
 #[test]

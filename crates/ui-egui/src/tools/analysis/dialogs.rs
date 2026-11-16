@@ -110,7 +110,9 @@ pub(crate) fn command(kind: Kind, f: &DialogFields) -> Option<(&'static str, Val
             }
         }
         Kind::DataPoints => {
-            let chosen = |source: &str| -> Vec<&'static str> { analysis_cmds::available(source).into_iter().filter(|c| f.bool(&point_key(source, c)) == Some(true)).collect() };
+            let chosen = |source: &str| -> Vec<&'static str> {
+                analysis_cmds::available(source).into_iter().filter(|c| f.bool(&point_key(source, c)) == Some(true)).collect()
+            };
             (id, json!({"selection": chosen("selection"), "ruler": chosen("ruler"), "count": chosen("count")}))
         }
         Kind::ScaleMarker => (
@@ -143,7 +145,12 @@ fn form(kind: Kind, fields: &mut DialogFields) -> ParamDialog<'_> {
         Kind::Scale => {
             let custom = |p: Param| p.not_remembered().enabled_when("preset", "custom");
             let rows = vec![
-                Param::new("preset", tl!("Presets:"), ParamKind::choice(options(&[("custom", tl!("Custom")), ("default", tl!("Default"))]), Some("custom".into()))).not_remembered(),
+                Param::new(
+                    "preset",
+                    tl!("Presets:"),
+                    ParamKind::choice(options(&[("custom", tl!("Custom")), ("default", tl!("Default"))]), Some("custom".into())),
+                )
+                .not_remembered(),
                 custom(Param::new("pixelLength", tl!("Pixel Length:"), ParamKind::number(Some(0.001), Some(1e7), 1.0, 1.0, 4))),
                 custom(Param::new("logicalLength", tl!("Logical Length:"), ParamKind::number(Some(0.0001), Some(1e7), 1.0, 1.0, 4))),
                 custom(Param::new("units", tl!("Logical Units:"), ParamKind::text("pixels"))),
@@ -152,7 +159,12 @@ fn form(kind: Kind, fields: &mut DialogFields) -> ParamDialog<'_> {
                 let text = if f.text("preset") == Some("default") {
                     "1 pixels = 1.0000 pixels".to_owned()
                 } else {
-                    format!("{} pixels = {:.4} {}", f.number("pixelLength").unwrap_or(1.0), f.number("logicalLength").unwrap_or(1.0), f.text("units").unwrap_or("pixels"))
+                    format!(
+                        "{} pixels = {:.4} {}",
+                        f.number("pixelLength").unwrap_or(1.0),
+                        f.number("logicalLength").unwrap_or(1.0),
+                        f.text("units").unwrap_or("pixels")
+                    )
                 };
                 Text::new(Label::from(text)).show(ui);
             })
@@ -185,8 +197,14 @@ fn form(kind: Kind, fields: &mut DialogFields) -> ParamDialog<'_> {
                 Param::new("length", tl!("Length:"), ParamKind::number(Some(0.0001), Some(1e7), 1.0, 1.0, 4)).not_remembered(),
                 Param::new("fontSize", tl!("Font Size:"), ParamKind::number(Some(1.0), Some(1000.0), 12.0, 1.0, 1)).unit(UnitKind::Points).not_remembered(),
                 Param::new("displayText", tl!("Display Text"), ParamKind::bool(true)).not_remembered(),
-                Param::new("textPosition", tl!("Text Position:"), ParamKind::choice(options(&[("bottom", tl!("Bottom")), ("top", tl!("Top"))]), Some("bottom".into()))).not_remembered(),
-                Param::new("color", tl!("Color:"), ParamKind::choice(options(&[("black", tl!("Black")), ("white", tl!("White"))]), Some("black".into()))).not_remembered(),
+                Param::new(
+                    "textPosition",
+                    tl!("Text Position:"),
+                    ParamKind::choice(options(&[("bottom", tl!("Bottom")), ("top", tl!("Top"))]), Some("bottom".into())),
+                )
+                .not_remembered(),
+                Param::new("color", tl!("Color:"), ParamKind::choice(options(&[("black", tl!("Black")), ("white", tl!("White"))]), Some("black".into())))
+                    .not_remembered(),
             ];
             ParamDialog::command(key, tl!("Measurement Scale Marker"), rows)
         }

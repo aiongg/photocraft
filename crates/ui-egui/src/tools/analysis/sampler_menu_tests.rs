@@ -20,7 +20,8 @@ fn app() -> (PhotocraftApp, egui::Context) {
 /// An agent's right-click at document point (x, y), as `ui.pointer` sends it. The tool host takes
 /// the queued input on a later pass, so frames run until the reply arrives.
 fn right_click(app: &mut PhotocraftApp, ctx: &egui::Context, x: f64, y: f64) {
-    let (req, reply) = ControlRequest::new("ui.pointer", json!({"button": "secondary", "events": [{"kind": "down", "x": x, "y": y}, {"kind": "up", "x": x, "y": y}]}));
+    let (req, reply) =
+        ControlRequest::new("ui.pointer", json!({"button": "secondary", "events": [{"kind": "down", "x": x, "y": y}, {"kind": "up", "x": x, "y": y}]}));
     let _ = handle(app, ctx, &req);
 
     let mut answer = None;

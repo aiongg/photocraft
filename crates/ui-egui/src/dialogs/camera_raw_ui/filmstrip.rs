@@ -144,7 +144,8 @@ pub(super) fn keep(app: &mut PhotocraftApp, settings: &CameraRaw, demosaic: phot
         return;
     }
     // The preview may not have caught up with the last edit: the thumbnail shows what was kept.
-    let developed = source.developed().filter(|d| &d.settings == settings).map(|d| d.processed.clone()).unwrap_or_else(|| source.proxy_job(settings, 0).run().px);
+    let developed =
+        source.developed().filter(|d| &d.settings == settings).map(|d| d.processed.clone()).unwrap_or_else(|| source.proxy_job(settings, 0).run().px);
     if !developed.is_empty() {
         let (px, w, h) = shrink(&developed, source.pw, source.ph);
         held.thumb = Some(image(&px, w, h, &source.display));

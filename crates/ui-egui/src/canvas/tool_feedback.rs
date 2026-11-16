@@ -152,11 +152,7 @@ mod tests {
         for (tool, bar, mods, selected, op) in rows {
             assert_eq!(selection_op(tool, bar, mods, selected), op, "{tool:?} bar={bar} {mods:?} selected={selected}");
         }
-        assert_eq!(
-            [New, Add, Subtract, Intersect].map(mode_name),
-            ["replace", "add", "subtract", "intersect"],
-            "the engine's words"
-        );
+        assert_eq!([New, Add, Subtract, Intersect].map(mode_name), ["replace", "add", "subtract", "intersect"], "the engine's words");
     }
 }
 

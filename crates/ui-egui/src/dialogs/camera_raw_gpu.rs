@@ -11,8 +11,8 @@
 use std::sync::atomic::{AtomicBool, AtomicU64, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
-use eframe::wgpu;
 use craft::imaging::raw::RawDevelopSettings as CameraRaw;
+use eframe::wgpu;
 use photocraft_algo::camera_raw::DevelopInputs;
 use photocraft_gpu::{CameraRawDevelop, DeviceHealth};
 
@@ -124,7 +124,16 @@ impl CameraRawGpu {
     /// `key` names the pixels when they are the dialog's unchanged proxy ([`source_key`]), so they
     /// upload once. Neutral settings are `None` too: the CPU develop returns them at once, a GPU
     /// round trip would only cost. `inputs` are the develop's seed, pixel scale and encoding gamma.
-    pub(crate) fn develop(&self, px: &[[f32; 4]], key: Option<u64>, w: usize, h: usize, p: &CameraRaw, inputs: &DevelopInputs, float: bool) -> Option<Vec<[f32; 4]>> {
+    pub(crate) fn develop(
+        &self,
+        px: &[[f32; 4]],
+        key: Option<u64>,
+        w: usize,
+        h: usize,
+        p: &CameraRaw,
+        inputs: &DevelopInputs,
+        float: bool,
+    ) -> Option<Vec<[f32; 4]>> {
         if p.is_identity() || self.failed.load(Ordering::Relaxed) || !self.health.is_ok() {
             return None;
         }

@@ -137,7 +137,13 @@ fn set_field(app: &mut PhotocraftApp, value: u64, field: &str, to: Value) -> Res
     let ctx = app.ctx().clone();
     let (request, _reply) = crate::control::ControlRequest::new("ui.dialog.set", json!({"dialog": id, "field": field, "value": to}));
     match crate::control::handle(app, &ctx, &request) {
-        crate::control::Reply::Done(reply) => if reply["ok"] == true { Ok(()) } else { Err(reply["error"].as_str().unwrap_or("refused").to_string()) },
+        crate::control::Reply::Done(reply) => {
+            if reply["ok"] == true {
+                Ok(())
+            } else {
+                Err(reply["error"].as_str().unwrap_or("refused").to_string())
+            }
+        }
         _ => Err("ui.dialog.set answers at once".into()),
     }
 }
@@ -161,7 +167,7 @@ fn single_history_dialog_confirmation_and_cancel() {
             ],
         );
         action.dialogs.insert(1);
-        add_action(&mut app,action);
+        add_action(&mut app, action);
         let paused = play(&mut app, &json!({"action":"Dialog"})).unwrap();
         let dialog = paused["paused"]["dialog"].as_u64().unwrap();
         assert_eq!(app.session.active().unwrap().history.past_len(), count + 1);
@@ -207,7 +213,7 @@ fn single_history_dialog_refuses_intervening_edit_or_document_switch() {
         let mut action =
             new_action("Bound", vec![("layer.renameLayer".into(), json!({"name":"Prefix"})), ("filter.blur.gaussianBlur".into(), json!({"radius":1}))]);
         action.dialogs.insert(1);
-        add_action(&mut app,action);
+        add_action(&mut app, action);
         let paused = play(&mut app, &json!({"action":0})).unwrap();
         let dialog = paused["paused"]["dialog"].as_u64().unwrap();
         if switch {
@@ -243,7 +249,7 @@ fn paused_history_spelling(single: bool, gate: Option<Gate>) -> (PhotocraftApp, 
         ],
     );
     action.dialogs.insert(1);
-    add_action(&mut app,action);
+    add_action(&mut app, action);
     app.session.authorize = gate;
     let paused = play(&mut app, &json!({"action":"Spell"})).unwrap();
     assert_eq!(paused["paused"]["dialog"], crate::type_panels_ui::SPELLING, "{paused}");
@@ -414,7 +420,7 @@ fn nested_shell_actions_include_view_steps_and_propagate_failures() {
         let batch = json!({"input": inputs, "output": output, "steps": [], "format": "png"});
         let index = app.session.actions.list.actions().len();
         let name = if mixed { "Mixed Batch" } else { "Successful Batch" };
-        add_action(&mut app,new_action(name, vec![("file.automate.batch".into(), batch), ("file.new".into(), json!({"width": 2, "height": 2}))]));
+        add_action(&mut app, new_action(name, vec![("file.automate.batch".into(), batch), ("file.new".into(), json!({"width": 2, "height": 2}))]));
         let result = app.run("actions.play", json!({"action": index})).unwrap();
         if mixed {
             assert_eq!(result["ran"], 0, "{result}");
@@ -543,7 +549,10 @@ fn recorded_save_as_and_save_replay_and_write_the_file() {
     crate::menus::invoke(&mut app, &ctx, "file.saveAs", json!({"path": "out/result.psd"})).unwrap();
     crate::menus::invoke(&mut app, &ctx, "file.save", json!({})).unwrap();
     app.run("actions.stop", json!({})).unwrap();
-    assert_eq!(pairs(&app, 0), [("layer.new.layer".into(), json!({})), ("file.saveAs".into(), json!({"path": "out/result.psd"})), ("file.save".into(), json!({}))]);
+    assert_eq!(
+        pairs(&app, 0),
+        [("layer.new.layer".into(), json!({})), ("file.saveAs".into(), json!({"path": "out/result.psd"})), ("file.save".into(), json!({}))]
+    );
     written.borrow_mut().clear();
     app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
     let played = app.run("actions.play", json!({"action": 0})).unwrap();
@@ -573,7 +582,7 @@ pub(super) fn disk_app(files: std::sync::Arc<craft::host::ScriptedFiles>) -> Pho
 /// new layer first when `layered`). Returns the played result and whether `b` / `a`
 /// changed on disk.
 fn record_save_on_a_play_on_b(ext: &str, layered: bool) -> (Value, bool, bool) {
-    use craft::host::{ScriptedFiles, Picked};
+    use craft::host::{Picked, ScriptedFiles};
     let dir = std::env::temp_dir().join(format!("photocraft-rec-save-{ext}-{layered}-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let path = |n: &str| dir.join(format!("{n}.{ext}")).to_string_lossy().into_owned();
@@ -741,7 +750,10 @@ fn recorded_save_as_with_the_suggested_name_saves_each_document_under_its_own() 
     crate::menus::invoke(&mut app, &ctx, "file.saveAs", json!({"path": "out/first.psd"})).unwrap();
     crate::menus::invoke(&mut app, &ctx, "file.saveAs", json!({"path": "out/renamed.psd"})).unwrap();
     app.run("actions.stop", json!({})).unwrap();
-    assert_eq!(pairs(&app, 0), [("file.saveAs".into(), json!({"folder": "out", "extension": "psd"})), ("file.saveAs".into(), json!({"path": "out/renamed.psd"}))]);
+    assert_eq!(
+        pairs(&app, 0),
+        [("file.saveAs".into(), json!({"folder": "out", "extension": "psd"})), ("file.saveAs".into(), json!({"path": "out/renamed.psd"}))]
+    );
     // Played on two other documents: each under its own name in the recorded folder.
     app.session.actions.list.delete_step(0, 1).unwrap();
     written.borrow_mut().clear();
@@ -911,7 +923,7 @@ fn dialog_worker_failure_stops_action_before_following_steps() {
             ],
         );
         action.dialogs.insert(1);
-        add_action(&mut app,action);
+        add_action(&mut app, action);
         app.background_jobs = background;
         let paused = play(&mut app, &json!({"action": "Worker Result"})).unwrap();
         let dialog = paused["paused"]["dialog"].as_u64().unwrap();
@@ -941,7 +953,7 @@ fn a_check_spelling_step_with_its_dialog_opens_it_and_done_continues() {
     app.run("type.create", json!({"x": 10, "y": 50, "text": "Teh cat"})).unwrap();
     let mut a = new_action("Spell", vec![("edit.checkSpelling".into(), json!({"allLayers": false})), ("layer.new.layer".into(), json!({"name": "after"}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     let v = play(&mut app, &json!({"action": "Spell"})).unwrap();
     assert_eq!((v["ran"].as_u64(), v["paused"]["step"].as_u64()), (Some(0), Some(0)), "{v}");
     assert_eq!(v["paused"]["dialog"], crate::type_panels_ui::SPELLING);
@@ -979,7 +991,7 @@ fn a_check_spelling_step_fails_while_the_dialog_is_open_by_hand() {
     app.run("type.create", json!({"x": 10, "y": 50, "text": "Teh cat"})).unwrap();
     let mut a = new_action("Spell", vec![("edit.checkSpelling".into(), json!({"allLayers": false})), ("layer.new.layer".into(), json!({"name": "after"}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     crate::type_panels_ui::open_spelling(&mut app, true).unwrap();
     let v = play(&mut app, &json!({"action": "Spell"})).unwrap();
     assert_eq!(v["failed"]["error"], "Check Spelling is already open", "{v}");
@@ -998,7 +1010,7 @@ fn a_check_spelling_correction_with_its_dialog_on_runs_without_opening_it() {
     let change = json!({"action": "change", "start": 0, "end": 3, "word": "Teh", "replace": "The"});
     let mut a = new_action("Fix", vec![("edit.checkSpelling".into(), change), ("layer.new.layer".into(), json!({"name": "after"}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     let v = play(&mut app, &json!({"action": "Fix"})).unwrap();
     assert_eq!(v["ran"], 2, "{v}");
     assert!(app.ui.type_panels.spell.is_none(), "no dialog opened");
@@ -1024,7 +1036,7 @@ fn check_spelling_done_on_another_document_ends_the_waiting_action() {
     app.run("type.create", json!({"x": 10, "y": 50, "text": "Teh cat"})).unwrap();
     let mut a = new_action("Spell", vec![("edit.checkSpelling".into(), json!({"allLayers": false})), ("layer.new.layer".into(), json!({"name": "after"}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     let v = play(&mut app, &json!({"action": "Spell"})).unwrap();
     assert_eq!(v["paused"]["dialog"], crate::type_panels_ui::SPELLING, "{v}");
     app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
@@ -1050,7 +1062,7 @@ fn check_spelling_done_keeps_a_recording_error_beside_the_playback_status() {
     app.run("type.create", json!({"x": 10, "y": 50, "text": "Teh cat"})).unwrap();
     let mut a = new_action("Spell", vec![("edit.checkSpelling".into(), json!({"allLayers": false})), ("layer.new.layer".into(), json!({"name": "after"}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     let v = play(&mut app, &json!({"action": "Spell"})).unwrap();
     assert_eq!(v["paused"]["dialog"], crate::type_panels_ui::SPELLING, "{v}");
     app.run("actions.record", json!({"name": "Rec"})).unwrap();
@@ -1070,7 +1082,7 @@ fn check_spelling_opened_again_while_an_action_waits_keeps_its_continuation() {
     app.run("type.create", json!({"x": 10, "y": 50, "text": "Teh cat"})).unwrap();
     let mut a = new_action("Spell", vec![("edit.checkSpelling".into(), json!({"allLayers": false})), ("layer.new.layer".into(), json!({"name": "after"}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     let v = play(&mut app, &json!({"action": "Spell"})).unwrap();
     assert_eq!(v["paused"]["dialog"], crate::type_panels_ui::SPELLING, "{v}");
     let token = app.ui.type_panels.spell.as_ref().and_then(|d| d.resume);
@@ -1098,7 +1110,7 @@ fn a_dialog_toggled_step_pauses_playback_and_resumes_on_ok() {
         vec![("layer.new.layer".into(), json!({})), ("filter.blur.gaussianBlur".into(), json!({"radius": 3})), ("select.all".into(), json!({}))],
     );
     a.dialogs.insert(1);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     let v = play(&mut app, &json!({"action": "Blur"})).unwrap();
     assert_eq!(v["ran"], 1, "{v}");
     assert_eq!(v["paused"]["step"], 1);
@@ -1149,7 +1161,7 @@ fn equalize_step_with_a_selection_opens_its_choices() {
     app.run("select.rect", json!({"x": 0, "y": 0, "width": 8, "height": 16})).unwrap();
     let mut action = new_action("Equalize", vec![(crate::equalize_ui::COMMAND.into(), json!({}))]);
     action.dialogs.insert(0);
-    add_action(&mut app,action);
+    add_action(&mut app, action);
     let gray = |app: &PhotocraftApp, x: i32, y: i32| {
         let st = app.session.active().unwrap();
         st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().pixel(x, y)[0]
@@ -1174,7 +1186,7 @@ fn recording_with_dialog_child() -> PhotocraftApp {
     let mut child =
         new_action("Child", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1.5})), ("layer.new.layer".into(), json!({"name": "Suffix"}))]);
     child.dialogs.insert(0);
-    add_action(&mut app,child);
+    add_action(&mut app, child);
     app.run("actions.record", json!({"name": "Owner"})).unwrap();
     app
 }
@@ -1293,7 +1305,10 @@ fn a_suspended_call_is_recorded_into_its_action_after_the_list_changes() {
 #[test]
 fn escape_on_a_step_dialog_ends_the_recorded_call_once() {
     let app = recording_with_dialog_child();
-    let mut h = egui_kittest::Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(900.0, 700.0)).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let mut h = egui_kittest::Harness::builder()
+        .with_context(app.ctx().clone())
+        .with_size(egui::vec2(900.0, 700.0))
+        .build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(2);
     pause_child(h.state_mut());
@@ -1320,7 +1335,7 @@ fn a_step_dialog_keeps_its_continuation_token() {
     ] {
         let mut action = new_action(name, steps);
         action.dialogs.insert(0);
-        add_action(&mut app,action);
+        add_action(&mut app, action);
     }
     let first = play(&mut app, &json!({"action": "First"})).unwrap()["paused"]["dialog"].as_u64().unwrap();
     let second = play(&mut app, &json!({"action": "Second"})).unwrap()["paused"]["dialog"].as_u64().unwrap();
@@ -1417,7 +1432,7 @@ fn a_step_dialog_takes_only_the_steps_values() {
         params[key] = json!(value);
         let mut a = new_action("Step", vec![(command.into(), params)]);
         a.dialogs.insert(0);
-        add_action(&mut app,a);
+        add_action(&mut app, a);
         let v = play(&mut app, &json!({"action": "Step"})).unwrap();
         let id = v["paused"]["dialog"].as_u64().unwrap();
         // The dialog holds the step's own values; its command and the playback it belongs to are
@@ -1458,7 +1473,7 @@ fn gated_blur_fixture(single: bool, background: bool) -> PhotocraftApp {
     app.background_jobs = background;
     let mut action = new_action("Gated blur", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1}))]);
     action.dialogs.insert(0);
-    add_action(&mut app,action);
+    add_action(&mut app, action);
     app
 }
 
@@ -1762,7 +1777,11 @@ fn paused_adjustments_bind_implicit_pixel_and_mask_receivers() {
         let a = app.session.active().unwrap().active_layer.unwrap();
         let b = photocraft_doc::LayerId(app.run("layer.new.layer", json!({"name":"B"})).unwrap()["layer"].as_u64().unwrap());
         app.session.select_layer(a).unwrap();
-        app.session.actions.list.replace_step(0, 0, ActionStep::new("image.adjustments.brightnessContrast", json!({"brightness":40,"target":{"channel":0}}))).unwrap();
+        app.session
+            .actions
+            .list
+            .replace_step(0, 0, ActionStep::new("image.adjustments.brightnessContrast", json!({"brightness":40,"target":{"channel":0}})))
+            .unwrap();
         let dialog = pause_gated_blur(&mut app, None);
         set_field(&mut app, dialog, "target", json!("pixels")).unwrap();
         app.session.select_layer(b).unwrap();
@@ -1802,7 +1821,11 @@ fn a_document_channel_adjustment_survives_an_active_layer_change() {
     app.run("channel.new", json!({"name":"Alpha","fill":"black"})).unwrap();
     app.run("edit.fill", json!({"color":"#808080","target":{"channel":0}})).unwrap();
     app.session.select_layer(a).unwrap();
-    app.session.actions.list.replace_step(0, 0, ActionStep::new("image.adjustments.brightnessContrast", json!({"brightness":40,"target":{"channel":0}}))).unwrap();
+    app.session
+        .actions
+        .list
+        .replace_step(0, 0, ActionStep::new("image.adjustments.brightnessContrast", json!({"brightness":40,"target":{"channel":0}})))
+        .unwrap();
     let dialog = pause_gated_blur(&mut app, None);
     app.session.select_layer(b).unwrap();
     let before = app.session.active().unwrap().doc.clone();
@@ -1903,7 +1926,7 @@ fn a_step_the_gate_denies_opens_no_dialog() {
     app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
     let mut a = new_action("Blur", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     app.session.authorize = Some(deny_blur);
     let v = play(&mut app, &json!({"action": "Blur"})).unwrap();
     app.session.authorize = None;
@@ -1925,7 +1948,7 @@ fn a_paused_playback_keeps_its_automation_gate_when_the_dialog_is_confirmed() {
     app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
     let mut a = new_action("Seeded", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1})), ("select.all".into(), json!({}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
+    add_action(&mut app, a);
     app.session.authorize = Some(deny_select_all);
     let v = play(&mut app, &json!({"action": "Seeded"})).unwrap();
     app.session.authorize = None;
@@ -1949,7 +1972,7 @@ fn a_users_key_plays_an_action_automation_wrote_under_its_gate() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
     let mut planted = new_action("Backup", vec![("file.openAs".into(), json!({"path": "/outside/secret.png"}))]);
     planted.automation = true;
-    add_action(&mut app,planted);
+    add_action(&mut app, planted);
     assign_shortcut(&mut app, "Backup", "F9").unwrap();
     let ctx = app.ctx().clone();
     crate::shortcut_dispatch::dispatch(&mut app, &ctx, &shortcut_id("Backup"));
@@ -2018,8 +2041,8 @@ fn a_step_dialog_resumes_only_the_playback_that_paused_it() {
     app.run("file.new", json!({"width": 16, "height": 16})).unwrap();
     let mut a = new_action("Blur", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1}))]);
     a.dialogs.insert(0);
-    add_action(&mut app,a);
-    add_action(&mut app,new_action("Seeded", vec![("select.all".into(), json!({}))]));
+    add_action(&mut app, a);
+    add_action(&mut app, new_action("Seeded", vec![("select.all".into(), json!({}))]));
     let v = play(&mut app, &json!({"action": "Blur"})).unwrap();
     let id = v["paused"]["dialog"].as_u64().unwrap();
     assert!(set_field(&mut app, id, "resume", json!({"action": "Seeded", "from": 0})).is_err(), "no dialog field names a playback");
@@ -2068,7 +2091,7 @@ fn save_hook_closing_the_target_stops_an_imported_close_with_save() {
         app.run("layer.new.layer", json!({"name": "KeepB"})).unwrap();
         assert!(app.session.set_active(1));
         app.session.active_mut().unwrap().path = Some("A.psd".into());
-        add_action(&mut app,close_with_save.clone());
+        add_action(&mut app, close_with_save.clone());
         let steps = match hook {
             "activate" => json!([["document.activate", {"document": 0}]]),
             "close" => json!([["file.close", {}]]),
@@ -2094,4 +2117,3 @@ fn save_hook_closing_the_target_stops_an_imported_close_with_save() {
         assert!(app.session.actions.playback_stack.is_empty());
     }
 }
-

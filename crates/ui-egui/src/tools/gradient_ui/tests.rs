@@ -101,7 +101,11 @@ fn gradient_blend_mode_reaches_classic_drags_not_the_live_fill_layer() {
         drag(&mut live, [20.0, 60.0], [180.0, 60.0]);
         let layer = live.session.active().unwrap().doc.layers.last().unwrap();
         assert!(matches!(layer.content, photocraft_doc::LayerContent::Fill(_)), "a fill layer");
-        assert_eq!((layer.blend, layer.opacity), (BlendMode::Normal, 1.0), "the live fill layer is Normal at 100 % whatever the Classic mode and opacity hold ({mode:?})");
+        assert_eq!(
+            (layer.blend, layer.opacity),
+            (BlendMode::Normal, 1.0),
+            "the live fill layer is Normal at 100 % whatever the Classic mode and opacity hold ({mode:?})"
+        );
 
         let mut classic = app_with_gradient("linear");
         classic.ui.tool_options.gradient_classic = true;

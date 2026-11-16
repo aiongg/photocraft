@@ -198,7 +198,8 @@ fn two_coloured_boards(app: &mut PhotocraftApp) -> (u64, u64) {
 /// Open the Color Picker from the swatch (as the bar does) and OK it with `color`, or as opened.
 fn pick_from_swatch(app: &mut PhotocraftApp, color: Option<&str>) {
     let hex = bar::shown_background(app).1;
-    let id = crate::color_picker_ui::open_for_target(app, "artboardBackground", "Color Picker (Color)", crate::color_picker_ui::parse_hex(&hex).unwrap()).unwrap();
+    let id =
+        crate::color_picker_ui::open_for_target(app, "artboardBackground", "Color Picker (Color)", crate::color_picker_ui::parse_hex(&hex).unwrap()).unwrap();
     if let Some(c) = color {
         crate::color_picker_ui::testing::set_color(app, id, c);
     }

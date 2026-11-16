@@ -20,8 +20,8 @@ mod state;
 pub mod view_cmds;
 pub mod workspace_ui;
 
-pub use bar::menu_bar;
 pub(crate) use bar::help_entries;
+pub use bar::menu_bar;
 pub use invoke::invoke;
 pub(crate) use invoke::{invoke_unguarded, panel_alias};
 pub use items::{MenuModel, base_rows, is_live, menu_rows, model, row};
@@ -219,10 +219,7 @@ mod window_documents_tests {
         if at > 0 && at < window.len() {
             assert_eq!(window[at - 1].label, "---", "a separator comes before the documents");
         }
-        window[at..]
-            .iter()
-            .map(|r| (r.command.id.clone(), r.label.clone(), matches!(r.kind, craft::menu::ItemKind::Check(true))))
-            .collect()
+        window[at..].iter().map(|r| (r.command.id.clone(), r.label.clone(), matches!(r.kind, craft::menu::ItemKind::Check(true)))).collect()
     }
 
     /// #2991: Window ends with the open documents in tab order, the front one checked, as in

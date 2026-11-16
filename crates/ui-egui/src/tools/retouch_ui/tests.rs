@@ -298,7 +298,9 @@ fn dab_tools_send_their_bar_values() {
         stripes(&mut app, 4, "pixels");
         app.run("layer.new.layer", json!({})).unwrap();
         let mut others = crate::state::SampleAllLayers::default();
-        for t in [Tool::MagicWand, Tool::QuickSelection, Tool::ObjectSelection, Tool::PaintBucket, Tool::MagicEraser, Tool::SpotHealing, Tool::Patch, Tool::Remove] {
+        for t in
+            [Tool::MagicWand, Tool::QuickSelection, Tool::ObjectSelection, Tool::PaintBucket, Tool::MagicEraser, Tool::SpotHealing, Tool::Patch, Tool::Remove]
+        {
             *others.slot(t).unwrap() = true;
         }
         app.ui.tool_options.sample_all = others;

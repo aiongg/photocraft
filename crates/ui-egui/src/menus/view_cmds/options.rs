@@ -154,4 +154,3 @@ pub fn restore(app: &mut PhotocraftApp) {
         }
     }
 }
-

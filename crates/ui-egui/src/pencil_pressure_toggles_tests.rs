@@ -17,7 +17,8 @@ fn bar(theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     app.run("file.new", json!({"width": 200, "height": 100, "background": "white"})).unwrap();
     app.ui.tool = Tool::Pencil;
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1600.0, 300.0)).build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
+    let mut h =
+        Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1600.0, 300.0)).build_ui_state(|ui, app| crate::panels::options_bar(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, theme);
     h.run_steps(4);
     h

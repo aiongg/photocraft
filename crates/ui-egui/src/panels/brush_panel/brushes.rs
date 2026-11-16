@@ -148,7 +148,8 @@ pub(crate) fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let current = app.session.tools.current_preset.as_deref().and_then(|c| app.session.tools.presets.iter().find(|p| p.name.eq_ignore_ascii_case(c)));
     let current = current.map(|p| BrushKey::Preset(p.name.clone()));
     let mut diameter = f64::from(app.session.tools.brush.size);
-    let mut panel = BrushesPanel::new(tl!("Brushes"), &rows, Bind::bound(&mut app.ui.brushes_panel), Bind::bound(&mut diameter), f64::from(MAX_BRUSH_SIZE)).import(true);
+    let mut panel =
+        BrushesPanel::new(tl!("Brushes"), &rows, Bind::bound(&mut app.ui.brushes_panel), Bind::bound(&mut diameter), f64::from(MAX_BRUSH_SIZE)).import(true);
     if let Some(current) = current {
         panel = panel.selected(current);
     }

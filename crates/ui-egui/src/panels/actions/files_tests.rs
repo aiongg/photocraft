@@ -3,8 +3,8 @@ use std::sync::Arc;
 use craft::host::{PickKind, Picked, ScriptedFiles};
 use serde_json::json;
 
-use super::files;
 use super::ActionSelection;
+use super::files;
 use crate::PhotocraftApp;
 
 /// A small valid Photoshop set, generated without external action files.

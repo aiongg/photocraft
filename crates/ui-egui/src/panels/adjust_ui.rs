@@ -17,7 +17,6 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 
-
 /// The choice a built-in look id stands for; `none` is no LUT.
 fn builtin_choice(id: &str) -> LutChoice {
     photocraft_engine::adjust_cmds::LOOKS.iter().find(|(known, _)| *known == id).map_or(LutChoice::None, |(known, _)| LutChoice::Builtin(known))

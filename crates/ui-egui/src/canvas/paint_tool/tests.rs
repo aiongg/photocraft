@@ -2,11 +2,11 @@
 //! commits, the Mixer Brush's cancel and release rules, and the presses the tool refuses.
 
 use super::*;
+use crate::app::framework::BuildApp as _;
 use craft::ui::canvas::RasterSource;
 use craft::ui::primitives::Revision;
 use egui::{Pos2, vec2};
 use egui_kittest::Harness;
-use crate::app::framework::BuildApp as _;
 use photocraft_doc::Document;
 use serde_json::json;
 
@@ -36,7 +36,6 @@ fn errors(app: &PhotocraftApp) -> Vec<String> {
 
 /// The stroke the live paint gesture holds, as the points the engine's commit gets.
 fn stroke_points(app: &PhotocraftApp) -> Vec<photocraft_paint::StrokePoint> {
-
     super::stroking(app).expect("a live gesture").points.iter().map(|p| photocraft_paint::StrokePoint::new(p[0], p[1], p[2] as f32)).collect()
 }
 

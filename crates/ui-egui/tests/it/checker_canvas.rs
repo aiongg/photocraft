@@ -117,7 +117,8 @@ fn render_on(h: &mut Harness, gpu: bool, zoom: f32, doc: u32, black: bool, grid:
     let img = Shot { w: width, px: rendered.into_raw() };
     if black {
         // View geometry also works on scaled displays, independently of grid colour.
-        let origin = photocraft_ui_egui::canvas::active_view(h.state()).expect("view").to_screen(craft::behavior::kurbo::Point::ZERO) * h.ctx.pixels_per_point();
+        let origin =
+            photocraft_ui_egui::canvas::active_view(h.state()).expect("view").to_screen(craft::behavior::kurbo::Point::ZERO) * h.ctx.pixels_per_point();
         return (img, origin.x.round() as u32, origin.y.round() as u32, (doc as f32 * zoom).round() as u32);
     }
     let r = h.state().last_canvas_rect;

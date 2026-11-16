@@ -30,24 +30,26 @@ mod preview;
 mod warp;
 
 pub(crate) use begin::begin_content_aware;
-pub(crate) use preview::read_surface;
 pub(crate) use begin::moving_layers;
 #[cfg(test)]
 pub(crate) use begin::moving_texel;
-pub use begin::{WARP_ONE_LAYER, begin, begin_copy, begin_from_frame, begin_placed, begin_selection, begin_warp, enter_warp, leave_warp, warps_active_layer, warps_type};
+pub use begin::{
+    WARP_ONE_LAYER, begin, begin_copy, begin_from_frame, begin_placed, begin_selection, begin_warp, enter_warp, leave_warp, warps_active_layer, warps_type,
+};
 pub(crate) use commit::{SAVE_FOR_WEB, committing};
 pub use commit::{apply_click, auto_commit, cancel, commit, end_if_left, follow_edits, intercept, is_enabled, on_job_event};
-pub(crate) use draw::{carries_selection_of, moves_selection, selection_map};
-pub use draw::{SessionShown, show_in_canvas};
 #[cfg(test)]
 pub(crate) use draw::styled_composite;
+pub use draw::{SessionShown, show_in_canvas};
+pub(crate) use draw::{carries_selection_of, moves_selection, selection_map};
 pub use options_bar::{options_bar, reset_warp};
+pub(crate) use preview::read_surface;
 pub(crate) use preview::solo_layer;
 use preview::{Above, composite_image, show_only};
 #[cfg(test)]
 use preview::{covering, preview_image};
-pub use warp::{edit_session_warp, split};
 pub(crate) use warp::{cylinder_edit, grid_edit};
+pub use warp::{edit_session_warp, split};
 
 /// Opens a prepared box once its job has landed (see [`Preparing`]).
 type FinishPrepared = Box<dyn FnOnce(&mut PhotocraftApp, begin::Prepared) -> Result<(), String>>;

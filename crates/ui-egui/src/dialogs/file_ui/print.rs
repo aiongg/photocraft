@@ -22,11 +22,7 @@ const NUMERIC_KEYS: [&str; 4] = ["top", "left", "scale", "bleed"];
 pub(super) fn printer_list(list: Option<&Value>) -> Vec<Printer> {
     let named: Vec<(String, bool)> = list
         .and_then(Value::as_array)
-        .map(|a| {
-            a.iter()
-                .filter_map(|p| Some((p.get("name")?.as_str()?.to_string(), p.get("default").and_then(Value::as_bool).unwrap_or(false))))
-                .collect()
-        })
+        .map(|a| a.iter().filter_map(|p| Some((p.get("name")?.as_str()?.to_string(), p.get("default").and_then(Value::as_bool).unwrap_or(false)))).collect())
         .unwrap_or_default();
     default_first(named)
 }
@@ -203,9 +199,7 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
             .visible_when("paper", FieldValue::Text("custom".into()))
     };
     let position = |key: &str, label: &'static str| {
-        Param::number_in_units(key, label, 0.0, 0.1, 2, "units", lengths(1.0))
-            .bounds(Some(-limit), Some(limit))
-            .enabled_when("center", FieldValue::Bool(false))
+        Param::number_in_units(key, label, 0.0, 0.1, 2, "units", lengths(1.0)).bounds(Some(-limit), Some(limit)).enabled_when("center", FieldValue::Bool(false))
     };
     let on = |key: &str| (key.to_string(), FieldValue::Text("photocraftManages".into()));
     let (on_key, on_value) = on("colorHandling");
@@ -249,11 +243,7 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
         PrintSection {
             title: tl!("Position and Size").into(),
             params: vec![
-                Param::new(
-                    "units",
-                    tl!("Units"),
-                    choice(&[("cm", tl!("Centimeters")), ("mm", tl!("Millimeters")), ("in", tl!("Inches"))], "cm"),
-                ),
+                Param::new("units", tl!("Units"), choice(&[("cm", tl!("Centimeters")), ("mm", tl!("Millimeters")), ("in", tl!("Inches"))], "cm")),
                 Param::new("paper", tl!("Paper"), ParamKind::choice(papers, Some("letter".into()))),
                 pt("paperWidth", tl!("Paper Width")),
                 pt("paperHeight", tl!("Paper Height")),

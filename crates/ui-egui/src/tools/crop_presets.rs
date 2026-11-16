@@ -85,9 +85,7 @@ fn valid_name(name: &str) -> Option<String> {
 /// The New Crop Preset dialog over its values: one Name; OK waits for a valid one.
 fn new_dialog(fields: &mut DialogFields) -> ParamDialog<'_> {
     let ok = valid_name(fields.text("name").unwrap_or_default()).is_some();
-    ParamDialog::new(NEW_KEY, tl!("New Crop Preset"), vec![Param::new("name", tl!("Name"), ParamKind::text(""))])
-        .ok_enabled(ok)
-        .values(Bind::bound(fields))
+    ParamDialog::new(NEW_KEY, tl!("New Crop Preset"), vec![Param::new("name", tl!("Name"), ParamKind::text(""))]).ok_enabled(ok).values(Bind::bound(fields))
 }
 
 /// Open New Crop Preset with the name made from the current options. `None` (nothing opens) when
@@ -155,16 +153,18 @@ impl StackDialog for DeleteCropPreset {
 
     fn show(&mut self, ui: &mut egui::Ui, _stack: &DialogStack) -> Option<DialogResult<Vec<String>>> {
         let DeleteCropPreset { names, selected } = self;
-        let shown = FormDialog::new(label(tl!("Delete Crop Preset")), Bind::bound(selected))
-            .ok_reason(label(tl!("Select the crop presets to delete")))
-            .show(ui, |ui, _form, selected| {
+        let shown = FormDialog::new(label(tl!("Delete Crop Preset")), Bind::bound(selected)).ok_reason(label(tl!("Select the crop presets to delete"))).show(
+            ui,
+            |ui, _form, selected| {
                 Text::new(label(tl!("Select the crop presets to delete:"))).show(ui);
-                List::<String>::new(label(tl!("Crop presets")))
-                    .max_rows(8)
-                    .selection(Bind::bound(&mut *selected))
-                    .show_items(ui, &Names(names), &mut |key, _| ListRow::new(key.clone()));
+                List::<String>::new(label(tl!("Crop presets"))).max_rows(8).selection(Bind::bound(&mut *selected)).show_items(
+                    ui,
+                    &Names(names),
+                    &mut |key, _| ListRow::new(key.clone()),
+                );
                 !selected.items.is_empty()
-            });
+            },
+        );
         match (shown.accepted, shown.closed) {
             (Some(picked), _) => Some(DialogResult::Ok(picked.items)),
             (None, Some(_)) => Some(DialogResult::Cancel),
@@ -295,11 +295,7 @@ mod tests {
         assert_eq!(names(&app), ["Poster", "3 : 2"]);
 
         // An old-format preset lists and applies; junk options are not listed.
-        app.session.presets.tool_presets.push(ToolPreset {
-            name: "Old".into(),
-            tool: "crop".into(),
-            options: json!({"toolOptions": {"crop_ratio": "2:5"}}),
-        });
+        app.session.presets.tool_presets.push(ToolPreset { name: "Old".into(), tool: "crop".into(), options: json!({"toolOptions": {"crop_ratio": "2:5"}}) });
         app.session.presets.tool_presets.push(ToolPreset { name: "Junk".into(), tool: "crop".into(), options: json!({"toolOptions": {"crop": {"ratio": 5}}}) });
         assert_eq!(names(&app), ["Poster", "3 : 2", "Old"]);
         crate::prefs_ui::save_preferences(&mut app).unwrap();
@@ -311,7 +307,10 @@ mod tests {
         select(&mut fresh, "Poster");
         let o = &fresh.ui.tool_options.crop;
         assert_eq!(o.ratio, CropRatio::Size);
-        assert_eq!((o.size.width, o.size.height, o.size.resolution.as_str()), (Some(CropLength::new(6.0, UnitKind::Inches)), Some(CropLength::new(9.0, UnitKind::Inches)), "240"));
+        assert_eq!(
+            (o.size.width, o.size.height, o.size.resolution.as_str()),
+            (Some(CropLength::new(6.0, UnitKind::Inches)), Some(CropLength::new(9.0, UnitKind::Inches)), "240")
+        );
         select(&mut fresh, "Old");
         assert_eq!(fresh.ui.tool_options.crop.ratio, CropRatio::sides(2.0, 5.0));
 

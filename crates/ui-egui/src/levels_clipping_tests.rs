@@ -347,7 +347,7 @@ fn paint_shows_the_target_clipping_for_the_view() {
         [(ColorMode::Rgb, SampleType::U8), (ColorMode::Rgb, SampleType::U16), (ColorMode::Rgb, SampleType::F32), (ColorMode::Grayscale, SampleType::U8)]
     {
         let mut app = ramp_app(mode, depth);
-    let ctx = app.ctx().clone();
+        let ctx = app.ctx().clone();
         let id = open_levels(&mut app, json!({"inBlack": 100, "inWhite": 200}), Some(LevelsClip::Shadows));
         let px = paint_view(&mut app, &ctx, &view(10.0)).unwrap_or_else(|| panic!("{mode:?} {depth:?}"));
         assert_eq!(app.levels_clipping.as_ref().unwrap().stats.size, [16, 8]);
@@ -481,7 +481,11 @@ fn smart_filter_levels_show_no_display() {
 }
 
 fn dialog_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 900.0)).with_step_dt(1.0 / 60.0).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+    let h = Harness::builder()
+        .with_context(app.ctx().clone())
+        .with_size(egui::vec2(1200.0, 900.0))
+        .with_step_dt(1.0 / 60.0)
+        .build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h
 }

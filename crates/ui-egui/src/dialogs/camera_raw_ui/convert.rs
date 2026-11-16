@@ -217,7 +217,12 @@ fn open_session(
         surf,
         area,
         match coverage {
-            Coverage::Selection => st.doc.selection.clone().map(crate::dialogs::camera_raw_detail_ui::Coverage::Selection).unwrap_or(crate::dialogs::camera_raw_detail_ui::Coverage::None),
+            Coverage::Selection => st
+                .doc
+                .selection
+                .clone()
+                .map(crate::dialogs::camera_raw_detail_ui::Coverage::Selection)
+                .unwrap_or(crate::dialogs::camera_raw_detail_ui::Coverage::None),
             Coverage::Mask(mask) => crate::dialogs::camera_raw_detail_ui::Coverage::Mask(mask),
             Coverage::None => crate::dialogs::camera_raw_detail_ui::Coverage::None,
         },

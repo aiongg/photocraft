@@ -159,7 +159,10 @@ fn verify_minimized_capture(fixture: &mut ActualCallbackFixture, size: egui::Vec
     for _ in 0..8 {
         let output = actual_capture_frame(&mut fixture.app, &fixture.ctx, size, scale, false);
         if let Some(callback) = actual_callback(&output) {
-            callback.complete(Arc::new(ColorImage::filled(captures(&fixture.app).last_geometry(ViewportId::ROOT).unwrap().expected_pixels().unwrap(), Color32::BLUE)));
+            callback.complete(Arc::new(ColorImage::filled(
+                captures(&fixture.app).last_geometry(ViewportId::ROOT).unwrap().expected_pixels().unwrap(),
+                Color32::BLUE,
+            )));
             break;
         }
     }

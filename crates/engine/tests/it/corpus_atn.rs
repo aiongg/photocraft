@@ -77,7 +77,10 @@ fn exported_action(action: &Action) -> Action {
 fn compound_roundtrip_expectation_keeps_properties_targets_flags_and_action_metadata() {
     let mut source = Action::new(
         "Properties",
-        vec![ActionStep::new("layer.setProps", json!({"layer": "Before", "name": "After", "opacity": 0.5, "blend": "Normal"})), ActionStep::new("select.inverse", json!({}))],
+        vec![
+            ActionStep::new("layer.setProps", json!({"layer": "Before", "name": "After", "opacity": 0.5, "blend": "Normal"})),
+            ActionStep::new("select.inverse", json!({})),
+        ],
     );
     source.set = Some("Set".into());
     source.color = ActionColor::from_name("blue");

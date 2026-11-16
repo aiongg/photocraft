@@ -16,8 +16,8 @@ use craft::behavior::{EditEvent, EditEvents, Mixed};
 use craft::color::ui::gradient::{ColorStop, GradientStops};
 use craft::draw::ui::gradient::{GradientGroup, GradientItem, GradientMap, GradientMapEditor, GradientMapOutput};
 use craft::imaging::ui::adjust::{
-    AdjustDialogCx, AdjustField, AdjustSliders, AdjustWords, BlackWhite, BlackWhiteEditor, BrightnessContrast, BrightnessContrastEditor,
-    ChannelMixer, ChannelMixerEditor, ColorBalance, ColorBalanceEditor, ColorBalanceTone, CurvesPanel, HueSaturation, HueSaturationEditor, Levels, LevelsPanel, PhotoFilter,
+    AdjustDialogCx, AdjustField, AdjustSliders, AdjustWords, BlackWhite, BlackWhiteEditor, BrightnessContrast, BrightnessContrastEditor, ChannelMixer,
+    ChannelMixerEditor, ColorBalance, ColorBalanceEditor, ColorBalanceTone, CurvesPanel, HueSaturation, HueSaturationEditor, Levels, LevelsPanel, PhotoFilter,
     PhotoFilterEditor, SelectiveColor, SelectiveColorEditor, ThresholdEditor, ToneChannels, ToneCurves, ToneSpace,
 };
 use craft::imaging::ui::histogram::{ChannelColor, HistogramData};
@@ -37,8 +37,8 @@ use crate::PhotocraftApp;
 mod session;
 pub mod values;
 
-pub use session::{layer_editor, layer_reset};
 pub(crate) use session::PropertiesAdjust;
+pub use session::{layer_editor, layer_reset};
 
 /// Kinds edited here (Color Lookup has its own editor in `adjust_ui`; Invert has none).
 pub const KINDS: [&str; 14] = [
@@ -199,7 +199,16 @@ pub struct EditorSetup {
 
 impl Default for EditorSetup {
     fn default() -> Self {
-        Self { channels: ToneChannels::of(ToneSpace::Rgb, false), histograms: Vec::new(), pickers_unavailable: false, gradients: Vec::new(), swatches: [[0.0; 3], [1.0; 3]], tone: None, stale: false, reported_clipping: Default::default() }
+        Self {
+            channels: ToneChannels::of(ToneSpace::Rgb, false),
+            histograms: Vec::new(),
+            pickers_unavailable: false,
+            gradients: Vec::new(),
+            swatches: [[0.0; 3], [1.0; 3]],
+            tone: None,
+            stale: false,
+            reported_clipping: Default::default(),
+        }
     }
 }
 

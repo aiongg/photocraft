@@ -128,5 +128,3 @@ fn one_size_scrub_is_one_history_step() {
     assert!(back < size, "the second scrub moved it back: {size} -> {back}");
     assert_eq!(steps(&h), before + 2, "a second scrub is a step of its own");
 }
-
-

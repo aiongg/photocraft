@@ -181,7 +181,8 @@ fn batch_and_droplets_use_the_named_actions_enabled_steps() {
     let inputs = images(&dir, 1, 2, 1);
     let mut s = Session::new();
     let invert = crate::actions_cmds::Action::new("Invert", vec![ActionStep::new("image.adjustments.invert", json!({}))]);
-    let mut rotate = crate::actions_cmds::Action::new("Rotate", vec![ActionStep::new("image.imageRotation.90cw", json!({})), ActionStep::new("file.close", json!({}))]);
+    let mut rotate =
+        crate::actions_cmds::Action::new("Rotate", vec![ActionStep::new("image.imageRotation.90cw", json!({})), ActionStep::new("file.close", json!({}))]);
     rotate.disabled.insert(1);
     s.actions.list = list_of(vec![invert, rotate]);
     for command in ["file.automate.batch", "file.automate.createDroplet"] {
@@ -707,7 +708,10 @@ fn a_failed_step_inside_a_called_action_fails_scripts_and_batch() {
     assert!(r["errors"][0]["error"].as_str().unwrap().contains("no such layer"), "{r}");
     // An action that batches itself stops as a recursive call instead of overflowing the stack.
     let inner = json!({"steps": [["actions.play", {"action": "Loop"}]], "input": dir.clone(), "output": format!("{dir}/inner"), "format": "png"});
-    s.actions.list.push(Action { name: "Loop".into(), steps: vec![ActionStep::new("file.automate.batch", inner)], disabled: Default::default(), ..Default::default() }).unwrap();
+    s.actions
+        .list
+        .push(Action { name: "Loop".into(), steps: vec![ActionStep::new("file.automate.batch", inner)], disabled: Default::default(), ..Default::default() })
+        .unwrap();
     batch(&mut s, "Loop");
 }
 

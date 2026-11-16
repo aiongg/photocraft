@@ -697,7 +697,9 @@ impl ThumbSource<LayerThumb<LayerId>> for PhotoThumbs<'_> {
                     let rgba = crate::solid_fill_ui::thumbnail_color(self.app, self.doc.id, l.id, *color).to_rgba8();
                     ThumbRender::Ready(thumb_image(size(canvas), request.side, |_, _| rgba))
                 }
-                LayerContent::Fill(f @ Fill::Gradient { .. }) => crate::gradient_ui::thumbnail_image(f, request.side).map_or(ThumbRender::Blank, ThumbRender::Ready),
+                LayerContent::Fill(f @ Fill::Gradient { .. }) => {
+                    crate::gradient_ui::thumbnail_image(f, request.side).map_or(ThumbRender::Blank, ThumbRender::Ready)
+                }
                 LayerContent::Fill(_) => ThumbRender::Ready(thumb_image(size(canvas), request.side, |_, _| [128, 128, 128, 255])),
                 _ => {
                     let Some(surface) = l.surface() else { return ThumbRender::Blank };

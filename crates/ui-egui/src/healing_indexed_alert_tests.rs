@@ -21,7 +21,6 @@ fn click(app: &mut PhotocraftApp, x: f64, mods: Modifiers) {
     tool_event(app, ToolEvent::Up { x, y: 30.0 }, mods);
 }
 
-
 /// The clone source (the options bar's and the engine's), the layer's pixels and the History length.
 type State = (Option<[f64; 2]>, Option<[f64; 2]>, Vec<f32>, usize);
 

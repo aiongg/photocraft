@@ -374,11 +374,7 @@ impl CanvasTool for MoveRun<'_> {
 
     fn cursor(&self, cx: &ToolContext<'_>) -> Cursor {
         let alt = cx.mods.alt;
-        if self.scope.with_app(|app| crate::move_mods::copying(app, alt)) {
-            Cursor::System(CursorIcon::Copy)
-        } else {
-            Cursor::System(CursorIcon::Default)
-        }
+        if self.scope.with_app(|app| crate::move_mods::copying(app, alt)) { Cursor::System(CursorIcon::Copy) } else { Cursor::System(CursorIcon::Default) }
     }
 
     /// A layer or pixel move takes every move from the press, so a move of a few pixels moves; its click is decided by

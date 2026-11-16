@@ -464,7 +464,8 @@ fn dialog_previews_through_the_layer() {
     for confirm in [false, true] {
         let (doc, target) = document(ColorMode::Rgb, SampleType::U16, true);
         let app = app_with(doc, target);
-        let mut harness = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).with_context(app.ctx().clone()).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
+        let mut harness =
+            Harness::builder().with_size(egui::vec2(1200.0, 900.0)).with_context(app.ctx().clone()).build_ui_state(|ui, app| crate::dialogs::run(app, ui), app);
         let id = crate::adjust_dialog::open(harness.state_mut(), "image.adjustments.levels").unwrap();
         harness.run_steps(2);
         let committed = harness.state().session.active().unwrap().doc.clone();

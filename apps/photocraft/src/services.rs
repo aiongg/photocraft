@@ -50,10 +50,7 @@ pub fn prefs_file() -> Option<PathBuf> {
 /// [`prefs_file`] on the first run.
 fn settings_store() -> (craft::settings::SettingsStore<photocraft_engine::prefs::SavedPrefs>, craft::settings::LoadReport) {
     let location = config_dir().map_or(craft::settings::Location::Memory, craft::settings::Location::Dir);
-    let legacy = prefs_file()
-        .map(|path| craft::settings::LegacyFile { path, parse: photocraft_engine::prefs::parse_legacy_prefs })
-        .into_iter()
-        .collect();
+    let legacy = prefs_file().map(|path| craft::settings::LegacyFile { path, parse: photocraft_engine::prefs::parse_legacy_prefs }).into_iter().collect();
     craft::settings::SettingsStore::open_with(craft::settings::OpenOptions::new(location).legacy(legacy))
 }
 

@@ -30,14 +30,7 @@ pub(super) fn check(ui: &mut egui::Ui, label: &str, value: &mut bool, enabled: b
 }
 
 /// A select over `entries` captioned by a field label, with an optional tooltip.
-pub(super) fn choose<T: Value + Clone + 'static>(
-    ui: &mut egui::Ui,
-    caption: &str,
-    value: &mut T,
-    entries: &[Entry<T>],
-    enabled: bool,
-    tip: Option<&str>,
-) {
+pub(super) fn choose<T: Value + Clone + 'static>(ui: &mut egui::Ui, caption: &str, value: &mut T, entries: &[Entry<T>], enabled: bool, tip: Option<&str>) {
     let picked = Field::new(caption.to_owned())
         .show(ui, |ui, _| {
             let mut cell = Select::new(caption.to_owned(), Bind::given(value.clone()), entries).enabled(enabled);

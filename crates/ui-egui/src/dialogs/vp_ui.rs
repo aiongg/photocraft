@@ -9,9 +9,9 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 use std::time::Instant;
 
-use craft::behavior::{EditEvent, PixelSize};
 use craft::behavior::geometry::quad::Homography;
 use craft::behavior::kurbo::Point;
+use craft::behavior::{EditEvent, PixelSize};
 use craft::imaging::ui::vanishing_point::{
     PlaneCheck, PlaneEdge, StampLimits, StampStroke, TornPlane, VanishingPlane, VanishingPointCommand, VanishingPointEvent, VanishingPointOpen,
     VanishingPointSession, VanishingPointSettings, VanishingPointSource, VanishingPointWorkspace, VanishingPreviewRequest, VanishingScene,
@@ -32,7 +32,6 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::distort_ui::surface_image;
-
 
 #[cfg(test)]
 mod tests;
@@ -188,7 +187,11 @@ fn extends(painted: &[StampStroke], strokes: &[StampStroke]) -> bool {
         return false;
     }
     let next = &strokes[before.len()];
-    next.source == last.source && next.size == last.size && next.hardness == last.hardness && next.opacity == last.opacity && next.points.starts_with(&last.points)
+    next.source == last.source
+        && next.size == last.size
+        && next.hardness == last.hardness
+        && next.opacity == last.opacity
+        && next.points.starts_with(&last.points)
 }
 
 fn union(a: Rect, b: Rect) -> Rect {
