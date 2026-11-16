@@ -121,10 +121,13 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
     // the normal pointer.
     let a_doc = [70.0, 230.0];
     let a = screen(&h, a_doc);
+    // The cursor a pass shows follows the hover the pass before registered: one more pass after the move.
     move_to(&mut h, a);
+    h.run_steps(2);
     let locator = Some(Cursor::Painted(PaintedCursor::Locator));
     assert_eq!(craft::ui::runtime::cursor::current(&h.ctx), locator, "the locator replaces the pointer");
     move_to(&mut h, pos2(600.0, 400.0));
+    h.run_steps(2);
     assert_ne!(craft::ui::runtime::cursor::current(&h.ctx), locator, "over the dialog it is the normal pointer");
 
     // A click centres the preview on the document point under it, through the canvas transform.
