@@ -270,8 +270,11 @@ fn component_selection_matches(app: &PhotocraftApp, ds: &DirectSelection) -> boo
 /// Clear stale anchors and gestures. True when a gesture was running and is cancelled with them.
 pub(crate) fn cancel_stale(app: &mut PhotocraftApp) -> bool {
     let ds = &app.ui.direct_selection;
-    let empty = ds.target.is_none() && ds.anchors.is_empty() && ds.segment.is_none() && ds.editing.is_none();
-    if (ds.owner.is_none() && empty) || still_valid(app, ds) {
+    // A running gesture is held to the owner it began on, a selection to its own: a marquee begun with nothing
+    // selected has a gesture and no selection yet.
+    let gesture_valid = ds.editing.as_ref().is_none_or(|began| began.valid(app));
+    let empty = ds.target.is_none() && ds.anchors.is_empty() && ds.segment.is_none();
+    if gesture_valid && ((ds.owner.is_none() && empty) || still_valid(app, ds)) {
         return false;
     }
     let was_editing = ds.editing.is_some();

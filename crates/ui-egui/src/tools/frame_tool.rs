@@ -8,7 +8,7 @@ use crate::{
         document_display::CanvasHost,
         tools::{FamilyTool, ToolScope},
     },
-    state::{FreeTransform, SessionWarp, Tool},
+    state::{FreeTransform, Tool},
     theme::Tokens,
 };
 use craft::behavior::{
@@ -434,11 +434,17 @@ fn drag_content(app: &mut PhotocraftApp, c: &mut ContentPress, to: KPoint, mods:
 
 /// The release of a content press: the box's Commit (when it moved) and the automatic commit of the session.
 fn release_content(app: &mut PhotocraftApp, c: &ContentPress, to: KPoint, mods: Mods) {
-    let mut edits: Vec<TransformEdit<SessionWarp>> = Vec::new();
-    if c.begun {
-        let after = box_drag(&c.origin, &c.last, c.part, c.start, to, mods, &BoxRules::default());
-        edits.push(TransformEdit::Box(EditEvent::commit(c.id, Mixed::Same(c.origin), after)));
+    if !c.begun {
+        // A click moved nothing: the session its press opened ends with the press, as the release of any press that
+        // opened one. The untouched box closes without a step.
+        if app.ui.frame_tool.auto_transform {
+            app.ui.frame_tool.auto_transform = false;
+            crate::transform_tool::commit(app);
+        }
+        return;
     }
+    let after = box_drag(&c.origin, &c.last, c.part, c.start, to, mods, &BoxRules::default());
+    let edits = [TransformEdit::Box(EditEvent::commit(c.id, Mixed::Same(c.origin), after))];
     crate::transform_tool::auto_commit(app, &edits);
 }
 

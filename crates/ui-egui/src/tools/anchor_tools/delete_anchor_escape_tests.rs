@@ -58,6 +58,21 @@ fn two_escapes_deselect_path_1_and_a_click_then_deletes_nothing() {
     assert_eq!(steps(&app), n, "the click adds no History step");
 }
 
+/// #12769: a Delete Anchor click on empty canvas hides the anchors of Path 1; its outline stays and it stays targeted.
+/// With ⌘ the press is Direct Selection's and hides nothing.
+#[test]
+fn a_click_on_empty_canvas_hides_the_anchors_and_keeps_the_path() {
+    let mut app = app();
+    let n = steps(&app);
+    click(&mut app, [600.0, 100.0], Modifiers::COMMAND);
+    assert_eq!(app.ui.direct_selection.shown, None, "a ⌘ click is Direct Selection's");
+    click(&mut app, [600.0, 100.0], Modifiers::NONE);
+    assert_eq!((app.ui.direct_selection.target, app.ui.direct_selection.shown.clone()), (Some(PathRef::Saved(0)), Some(Vec::new())));
+    assert_eq!(app.ui.selected_path.as_deref(), Some("Path 1"));
+    assert!(!active_paths(&app).is_empty(), "its outline stays");
+    assert_eq!(steps(&app), n);
+}
+
 #[test]
 fn the_first_escape_clears_the_selected_anchor_and_the_second_deselects_the_path() {
     let mut app = app();

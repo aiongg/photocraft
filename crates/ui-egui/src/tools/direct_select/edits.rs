@@ -60,7 +60,8 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
     if let Some((hit, at)) = &output.context {
         context(app, hit, *at, tool, mods);
     }
-    if output.pressed_empty && tool == Tool::DeleteAnchorPoint {
+    // With ⌘ the press is Direct Selection's marquee, which hides nothing.
+    if output.pressed_empty && tool == Tool::DeleteAnchorPoint && !mods.cmd {
         hide_anchors(app);
     }
     if output.pressed_empty && mods.cmd && app.ui.pen.is_some() {
