@@ -439,15 +439,17 @@ fn drawing_a_new_crop_snaps_its_corner_not_the_default_frame() {
     }
 }
 
-/// A Straighten line is measured on the raw pointer, never snapped like a frame move.
+/// A Straighten line inside an edited frame levels the frame on the line as drawn: its ends snap as points, never by
+/// the offset that would snap the frame if the press moved it. Moved by the line's (277, 30), the frame's left edge
+/// would land 3 px from the target layer's (x = 300); both ends are clear of every target.
 #[test]
 fn a_straighten_line_inside_the_frame_is_not_snapped_as_a_frame_move() {
     let mut app = board();
     app.ui.tool_options.crop.shield.classic_mode = true;
     tool(&mut app).crop_to(boxed(20.0, 20.0, 390.0, 290.0, 0.0));
     tool(&mut app).toggle_straighten();
-    drag(&mut app, &[[60.0, 100.0], [297.0, 130.0]], NONE);
-    let raw = CropBox::level_angle(Point::new(60.0, 100.0), Point::new(297.0, 130.0)).unwrap();
+    drag(&mut app, &[[60.0, 100.0], [337.0, 130.0]], NONE);
+    let raw = CropBox::level_angle(Point::new(60.0, 100.0), Point::new(337.0, 130.0)).unwrap();
     let angle = crop_ui::frame(&app).unwrap().angle;
     assert!((angle - raw).abs() < 1e-6, "{angle} vs {raw}: the line end stayed where the pointer was");
 }
