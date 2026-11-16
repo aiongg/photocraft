@@ -204,7 +204,17 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
     // Live menu items whose command has no row yet carry the catalogue's key.
     for &(_, label, shortcut, id) in crate::menu_catalog::CATALOG {
         // A Window panel item runs its shell command (`menus::panel_alias`), which has the row.
-        if label == "---" || !crate::menus::is_live(id) || seen.contains(id) || crate::menus::panel_alias(id).is_some_and(|alias| seen.contains(alias)) {
+        let owner = crate::menus::panel_alias(id).filter(|alias| seen.contains(*alias)).unwrap_or(id);
+        if label == "---" || !crate::menus::is_live(id) {
+            continue;
+        }
+        if seen.contains(owner) {
+            // An engine row that names no key takes the catalogue's.
+            if let Some(key) = shortcut.and_then(binding)
+                && let Some(row) = rows.iter_mut().find(|row| row.command.id == owner && row.defaults.is_empty())
+            {
+                row.defaults.push(key);
+            }
             continue;
         }
         let mut def = app_row(id, label.trim_end_matches('…'));
@@ -561,6 +571,7 @@ fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
         }
     }
     if crate::app::framework::run_command(app, ctx, &f.command) {
+        record(ctx, id, Outcome::Ran);
         return;
     }
     // The Delete key is Edit › Clear, or deletes the layers when nothing is selected (`delete_key_command`).
