@@ -250,6 +250,22 @@ pub(crate) fn keymap_command(id: &str) -> CommandRef {
     CommandRef::new(crate::menus::panel_alias(id).unwrap_or(id))
 }
 
+/// The rows of the commands the runtime defines ([`RUNTIME_COMMANDS`]) under their PhotoCraft ids, as the engine's
+/// catalog gives them with their default keys. The Keyboard Shortcuts dialog and a `.kys` import edit them with the
+/// rows of [`command_rows`]; the runtime's own catalog holds them under the framework commands.
+pub(crate) fn bridged_rows() -> Vec<CommandDef> {
+    photocraft_engine::keymap_defs::command_defs()
+        .into_iter()
+        .map(|mut def| {
+            if def.paths.is_empty() {
+                def.paths.extend(menu_path(&def.command.id));
+            }
+            def
+        })
+        .filter(|def| is_bridged(&def.command.id))
+        .collect()
+}
+
 /// The app's command catalog over `rows` ([`command_rows`]). The runtime rebuilds its keymap when `generation`
 /// changes, so the holder takes a new one only when [`same_rows`] says the rows differ from the held ones. It
 /// compares where the menu model rebuilds, which covers a new action and a tool list change.

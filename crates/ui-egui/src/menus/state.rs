@@ -90,7 +90,7 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
         "select.transformSelection" => app.ui.transform.is_none() && app.session.is_enabled("select.transformSelection"),
         // ⇧[ / ⇧] only step the hardness of a tool that paints with the brush tip, as in Photoshop.
         "tools.decreaseBrushHardness" | "tools.increaseBrushHardness" => app.ui.tool.is_brushlike(),
-        i if (i.starts_with("view.zoom") || i == "view.fitOnScreen" || i == "view.actualPixels") || i == "window.newWindowForDocument" => {
+        i if (i.starts_with("view.zoom") || (i.starts_with("view.") && crate::shortcut_dispatch::is_bridged(i))) || i == "window.newWindowForDocument" => {
             app.session.active().is_some()
         }
         "edit.freeTransformCopy" => app.ui.transform.is_none() && app.session.active().and_then(|s| s.active_layer).is_some(),

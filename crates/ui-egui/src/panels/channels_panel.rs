@@ -441,10 +441,20 @@ pub(crate) fn panel_rows(_app: &PhotocraftApp) -> Vec<PanelRow> {
 /// enough grayscale documents of one size.
 pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
     let merge = crate::menus::is_enabled(app, "channel.merge");
-    channels::states(&rows(app))
+    let rows = rows(app);
+    // A composite of several colour channels, or several targeted rows, have nothing to duplicate; the gray composite
+    // is its one channel.
+    let composite_of_several = channels::targeted_row(&rows).is_some_and(|row| row.kind == ChannelKind::Composite)
+        && app.session.active().is_some_and(|st| st.doc.pixel_format().mode.color_channels() > 1);
+    let several_targeted = rows.iter().filter(|row| row.targeted).count() > 1;
+    channels::states(&rows)
         .into_iter()
         .map(|(command, state)| {
-            let state = if command == ChannelsCommands::MergeChannels { CommandState::new().enabled(merge) } else { state };
+            let state = match command {
+                ChannelsCommands::MergeChannels => CommandState::new().enabled(merge),
+                ChannelsCommands::Duplicate if composite_of_several || several_targeted => CommandState::new().enabled(false),
+                _ => state,
+            };
             (CommandRef::from(command), state)
         })
         .collect()

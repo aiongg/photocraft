@@ -506,6 +506,10 @@ fn footer_and_drop_events_follow_the_targets() {
     let mut s = Session::new();
     s.execute("file.new", json!({"width": 64, "height": 64})).unwrap();
     let pic = s.execute("layer.new.layer", json!({"name": "pic"})).unwrap()["layer"].as_u64().unwrap();
+    // A frame takes a layer with pixels: an empty one has nothing to convert.
+    s.execute("select.rect", json!({"x": 0, "y": 0, "width": 20, "height": 20})).unwrap();
+    s.execute("edit.fill", json!({"color": "#ff0000"})).unwrap();
+    s.execute("select.deselect", json!({})).unwrap();
     let frame = s.execute("layer.new.frame", json!({"x": 4, "y": 4, "width": 40, "height": 30})).unwrap()["layer"].as_u64().unwrap();
     let mut app = app_of(s);
     let mv = LayerMove::new(vec![LayerId(pic)], LayerId(frame), LayerPosition::Into, false);

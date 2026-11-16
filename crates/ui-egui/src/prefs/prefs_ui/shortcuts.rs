@@ -79,7 +79,7 @@ pub(crate) fn profiles_of(prefs: &Preferences) -> Profiles {
 /// runtime's keymap is built for, and the preferences' bindings as overrides.
 pub(crate) fn draft_keymap(app: &PhotocraftApp) -> Keymap {
     let platform = windows::os_of(app.ctx());
-    Keymap::new(crate::shortcut_dispatch::command_rows(app), Scopes::new(), platform)
+    Keymap::new(crate::shortcut_dispatch::command_rows(app).into_iter().chain(crate::shortcut_dispatch::bridged_rows()).collect(), Scopes::new(), platform)
         .with_reserved(reserved::system(platform))
         .with_overrides(keymap_defs::prefs_overrides(app.session.prefs()))
 }
