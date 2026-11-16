@@ -609,9 +609,7 @@ fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
             return;
         }
         // A selected smart filter row: ⌫/Delete removes the filter, not its smart object (#4751).
-        // PLAN: `smart_ui::keys` (panels-w25) reads the key from egui's input, where a fired Delete no longer is; it
-        // takes the fired command here.
-        if crate::smart_ui::keys(app, ctx) {
+        if crate::smart_ui::keys(app) {
             return;
         }
     }
