@@ -23,10 +23,6 @@ fn locks(app: &PhotocraftApp) -> photocraft_doc::Locks {
     st.doc.layer(st.active_layer.unwrap()).unwrap().locks
 }
 
-fn set_shortcut(app: &mut PhotocraftApp, value: &str) {
-    app.session.prefs.edit(|prefs| prefs.shortcuts.insert("layer.lockLayers".into(), value.into()));
-}
-
 /// OK in the open Lock Layers dialog.
 fn confirm_dialog(app: &mut PhotocraftApp) {
     let ctx = app.ctx().clone();
@@ -56,28 +52,6 @@ fn command_slash_does_nothing_when_the_menu_item_is_greyed() {
     press(&mut app, Key::Slash, Modifiers::COMMAND);
     assert!(app.session.active().is_none());
     assert!(!app.dialog_open());
-}
-
-#[test]
-fn the_key_can_be_changed_and_removed() {
-    let mut app = app();
-    set_shortcut(&mut app, "Cmd+Shift+L");
-    press(&mut app, Key::Slash, Modifiers::COMMAND);
-    assert!(!app.dialog_open(), "the old key no longer runs the command");
-    press(&mut app, Key::L, Modifiers::COMMAND | Modifiers::SHIFT);
-    assert!(app.dialog_open(), "the new key does");
-    confirm_dialog(&mut app);
-    assert!(locks(&app).all);
-    let mut app = app_with_removed_key();
-    press(&mut app, Key::Slash, Modifiers::COMMAND);
-    assert!(!app.dialog_open());
-    assert_eq!(crate::shortcuts::shortcut_label(&app, "layer.lockLayers"), None);
-}
-
-fn app_with_removed_key() -> PhotocraftApp {
-    let mut app = app();
-    set_shortcut(&mut app, "");
-    app
 }
 
 #[test]

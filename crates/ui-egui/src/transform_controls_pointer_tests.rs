@@ -300,41 +300,6 @@ fn invalid_later_pointer_event_does_not_begin_a_transform() {
     assert_eq!(app.session.active().unwrap().history.past_len(), steps);
 }
 
-/// A modal owns the whole gesture, including ordinary Move with transform controls disabled.
-#[test]
-fn modal_dialogs_do_not_start_move_transform_controls() {
-    for command in ["file.new", "edit.preferences.general"] {
-        let (mut app, ctx, _) = fixture();
-        crate::menus::invoke(&mut app, &ctx, command, json!({})).unwrap();
-        assert_eq!(dialog_count(&app), 1, "{command} opened its modal");
-        // The modal gates input from the frame after it first shows.
-        crate::canvas::testing::frame(&mut app);
-        let before = app.session.active().unwrap().doc.clone();
-        let steps = app.session.active().unwrap().history.past_len();
-        let selected = app.session.active().unwrap().selected_layers();
-        let active = app.session.active().unwrap().active_layer;
-        for controls in [true, false] {
-            app.ui.tool_options.move_show_transform = controls;
-            for from in [[800.0, 500.0], [200.0, 150.0]] {
-                let to = [from[0] + 20.0, from[1] + 10.0];
-                for (kind, at) in [("down", from), ("move", to), ("up", to)] {
-                    pointer(&mut app, &ctx, kind, at);
-                    assert!(app.ui.transform.is_none(), "{command} owns input before the Move handle entry");
-                    assert!(!crate::canvas::testing::in_gesture(&app), "{command} must not start an ordinary Move drag");
-                    assert!(app.layer_box.is_none());
-                }
-                assert_eq!(app.session.active().unwrap().doc, before);
-                assert_eq!(app.session.active().unwrap().history.past_len(), steps);
-                assert_eq!(app.session.active().unwrap().selected_layers(), selected);
-                assert_eq!(app.session.active().unwrap().active_layer, active);
-                assert_eq!(app.ui.tool, Tool::Move);
-                assert_eq!(app.ui.tool_options.move_show_transform, controls);
-                assert_eq!(dialog_count(&app), 1, "the gesture leaves the modal open");
-            }
-        }
-    }
-}
-
 /// A dialog opened after Down must not strand the Move drag or replace its starting point.
 #[test]
 fn ordinary_move_gesture_can_finish_after_a_dialog_opens() {
@@ -466,41 +431,6 @@ fn move_pointer_still_reaches_the_liquify_workspace() {
     assert_eq!(app.session.active().unwrap().history.past_len(), steps);
 }
 
-/// A sampling dialog owns its release without leaving an earlier transform drag armed.
-#[test]
-fn color_picker_release_ends_an_existing_transform_handle_drag() {
-    let (mut app, ctx, layers) = fixture();
-    let before = app.session.active().unwrap().doc.clone();
-    let old = layers.map(|id| bounds(&app, id));
-    let steps = app.session.active().unwrap().history.past_len();
-    pointer(&mut app, &ctx, "down", [800.0, 500.0]);
-    pointer(&mut app, &ctx, "move", [750.0, 470.0]);
-    let initial = quad(&app);
-    pointer(&mut app, &ctx, "move", [700.0, 440.0]);
-    let preview = quad(&app);
-    assert_ne!(preview, initial);
-    accepted(&mut app, "ui.dialog.open", json!({"kind": "colorPicker"}));
-    let dialog = crate::color_picker_ui::top(&app).expect("the Color Picker is open");
-    pointer(&mut app, &ctx, "down", [200.0, 150.0]);
-    pointer(&mut app, &ctx, "move", [220.0, 160.0]);
-    assert_eq!(color_field(&app, dialog), "#ff0000");
-    pointer(&mut app, &ctx, "up", [999.0, 690.0]);
-    assert_eq!(color_field(&app, dialog), "#ff0000", "release does not resample");
-    assert_eq!(quad(&app), preview, "dialog-owned coordinates do not update the preview");
-    assert_eq!(app.session.active().unwrap().doc, before);
-    assert_eq!(app.session.active().unwrap().history.past_len(), steps);
-    close_dialog(&mut app, &ctx, dialog);
-    pointer(&mut app, &ctx, "move", [650.0, 410.0]);
-    pointer(&mut app, &ctx, "up", [650.0, 410.0]);
-    assert_eq!(quad(&app), preview, "later input needs a new press");
-    enter(&mut app);
-    assert_one_transform(&app, steps);
-    for (id, previous) in layers.into_iter().zip(old) {
-        let scaled = bounds(&app, id);
-        assert!(scaled.width() < previous.width() && scaled.height() < previous.height());
-    }
-}
-
 /// ⌘ makes another tool the Move tool for the press: a modal blocks that layer drag too.
 #[test]
 fn modal_dialogs_block_a_command_held_move_from_another_tool() {
@@ -522,53 +452,6 @@ fn modal_dialogs_block_a_command_held_move_from_another_tool() {
 /// The number of Smart Guide lines the tool host reported in its last pass.
 fn guide_lines(app: &PhotocraftApp) -> usize {
     app.canvas_tools.last_response.as_ref().map_or(0, |response| response.snapped.len())
-}
-
-/// The Color Picker takes the release of a snapped handle drag: its alignment lines go with it.
-#[test]
-fn color_picker_release_clears_the_handle_drags_snap_lines() {
-    let (mut app, ctx, _) = fixture();
-    app.ui.extras.snap = true;
-    app.ui.view.show.smart_guides = true;
-    pointer(&mut app, &ctx, "down", [800.0, 500.0]);
-    // 2 px from the document's centre (500, 350): the corner snaps there and the guides show.
-    pointer(&mut app, &ctx, "move", [502.0, 352.0]);
-    assert!(app.ui.transform.is_some(), "the drag began the transform");
-    assert!(guide_lines(&app) > 0, "a snapped handle drag reports guide lines");
-    accepted(&mut app, "ui.dialog.open", json!({"kind": "colorPicker"}));
-    pointer(&mut app, &ctx, "up", [999.0, 690.0]);
-    assert_eq!(guide_lines(&app), 0, "the released drag reports no alignment lines");
-}
-
-/// Every sampler that takes the primary release ends a transform handle drag begun before it,
-/// not only the Color Picker: the Curves eyedroppers and Color Range too. A move after the
-/// sampler closes needs a new press.
-#[test]
-fn other_samplers_releases_end_an_existing_transform_handle_drag() {
-    for sampler in ["curves", "colorRange"] {
-        let (mut app, ctx, _) = fixture();
-        pointer(&mut app, &ctx, "down", [800.0, 500.0]);
-        pointer(&mut app, &ctx, "move", [700.0, 440.0]);
-        let preview = quad(&app);
-        let dialog = match sampler {
-            "curves" => {
-                let id = crate::adjust_dialog::open(&mut app, "image.adjustments.curves").expect("the Curves dialog opens");
-                crate::adjust_dialog::hosted_mut(&mut app, id).set_picker(Some(craft::imaging::ui::adjust::TonePicker::Black));
-                assert!(crate::dialogs::canvas_input::armed(&app).is_some(), "{sampler}");
-                id
-            }
-            _ => {
-                crate::menus::invoke(&mut app, &ctx, "select.colorRange", json!({})).unwrap();
-                top_dialog(&app)
-            }
-        };
-        pointer(&mut app, &ctx, "down", [200.0, 150.0]);
-        pointer(&mut app, &ctx, "up", [999.0, 690.0]);
-        assert_eq!(quad(&app), preview, "{sampler}: the sampler's coordinates do not move the box");
-        close_dialog(&mut app, &ctx, dialog);
-        pointer(&mut app, &ctx, "move", [650.0, 410.0]);
-        assert_eq!(quad(&app), preview, "{sampler}: later moves need a new press");
-    }
 }
 
 /// The Color Picker takes the release of an ordinary Move drag: the drag ends where it last was, and

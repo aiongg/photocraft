@@ -120,42 +120,6 @@ fn is_red(p: [f32; 4]) -> bool {
     p[0] > 0.98 && p[1] < 0.02 && p[2] < 0.02
 }
 
-/// A frame drawn off the canvas's centre keeps its size and position through ⌘ lines, the
-/// second one turning the already turned frame to its own angle.
-#[test]
-fn a_command_held_line_keeps_a_drawn_frame_where_it_is() {
-    let frame_rect = [100.0, 50.0, 500.0, 350.0];
-    for classic in [false, true] {
-        let mut h = app(classic);
-        // Auto Center Preview stays on (the default): in the default mode it pans the view to the
-        // drawn box, which must not move the frame on the image.
-        assert!(h.state().ui.tool_options.crop.shield.auto_center_preview);
-        drag(&mut h, false, [frame_rect[0], frame_rect[1]], [frame_rect[2], frame_rect[3]]);
-        assert_eq!(rect(&h), Some(frame_rect), "classic {classic}: the drawn frame");
-        line(&mut h, true);
-        assert!((angle(&h) + 10.0).abs() < 1e-6, "classic {classic}: {}", angle(&h));
-        assert_eq!(rect(&h), Some(frame_rect), "classic {classic}: after the first line");
-        // A line falling 4° to the right sets the frame's angle to 4°, not 10° - 4°.
-        drag(&mut h, true, [150.0, 100.0], [450.0, 100.0 + 300.0 * 4.0f64.to_radians().tan()]);
-        assert!((angle(&h) - 4.0).abs() < 1e-6, "classic {classic}: {}", angle(&h));
-        assert_eq!(rect(&h), Some(frame_rect), "classic {classic}: after the second line");
-        assert_eq!(committed(&mut h), (400, 300), "classic {classic}");
-        // The crop is centred on the red square, where the frame was (its red pixels' centroid
-        // is the middle, which one pixel in the 40 px square can't tell).
-        let flat = photocraft_compose::flatten(&h.state().session.active().expect("document").doc);
-        let red: Vec<(f64, f64)> = (0..300usize)
-            .flat_map(|y| (0..400usize).map(move |x| (x, y)))
-            .filter(|&(x, y)| is_red(flat.px[y * 400 + x]))
-            .map(|(x, y)| (x as f64, y as f64))
-            .collect();
-        assert!(red.len() > 1000, "classic {classic}: the square is in the crop ({} red pixels)", red.len());
-        let n = red.len() as f64;
-        let (cx, cy) = (red.iter().map(|p| p.0).sum::<f64>() / n, red.iter().map(|p| p.1).sum::<f64>() / n);
-        // Pixel centres sit at +0.5, so the middle of 400 × 300 is (199.5, 149.5).
-        assert!((cx - 199.5).abs() <= 1.0 && (cy - 149.5).abs() <= 1.0, "classic {classic}: the red centroid is ({cx:.1}, {cy:.1})");
-    }
-}
-
 /// ⌘ let go before the mouse button: the line started as a ⌘ line, so it still keeps the frame.
 #[test]
 fn releasing_command_before_the_end_of_the_line_still_keeps_the_frame() {

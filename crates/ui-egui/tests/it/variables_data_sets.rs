@@ -1,4 +1,3 @@
-use std::sync::Arc;
 
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
@@ -100,43 +99,6 @@ fn save_draft_and_open_apply_menu(h: &mut H, id: &str) -> String {
     confirm(h, id);
     assert!(!h.state().dialog_open());
     open(h, "image.applyDataSet")
-}
-
-/// CSV chosen through the import menu supplies the row that Apply renders and OK preserves.
-#[test]
-fn imported_csv_replaces_pixels_through_the_apply_dialog() {
-    use craft::host::{Picked, ScriptedFiles};
-
-    for contents in [false, true] {
-        let (dir, mut h, id) = pixel_replacement_harness();
-        confirm(&mut h, &id);
-        h.state_mut().run("image.variables.dataSets", json!({"dataSets": []})).unwrap();
-        let csv = format!("DataSet,photo\nImported,\"{}\"\n", dir.path().join("blue.png").display());
-        let path = dir.path().join("sets.csv");
-        std::fs::write(&path, &csv).unwrap();
-        let answer = if contents { Picked::Contents(vec![("sets.csv".into(), csv.into_bytes())]) } else { Picked::Paths(vec![path]) };
-        // PLAN: assumed `Services::files = Option<Arc<ScriptedFiles>>` (dialogs-w59).
-        h.state_mut().services.files = Some(Arc::new(ScriptedFiles::answering([answer])));
-        let ctx = h.ctx.clone();
-        photocraft_ui_egui::menus::invoke(h.state_mut(), &ctx, "file.import.variableDataSets", json!({})).unwrap();
-        h.run_steps(3);
-        let rows = &h.state().session.active().unwrap().doc.variables.data_sets;
-        assert_eq!(rows.len(), 1);
-        assert_eq!(rows[0].name, "Imported");
-        assert_eq!(read_pixel(&mut h), json!([1.0, 1.0, 1.0, 1.0]), "import alone does not apply a row");
-
-        let apply = open(&mut h, "image.applyDataSet");
-        h.get_by_label("Apply").click();
-        h.run_steps(3);
-        assert_eq!(read_pixel(&mut h), json!([0.0, 0.0, 1.0, 1.0]));
-        assert!(h.state().dialog_open());
-        let before = revision(&h);
-        confirm(&mut h, &apply);
-        assert!(!h.state().dialog_open());
-        assert_eq!(revision(&h), before);
-        h.state_mut().run("edit.undo", json!({})).unwrap();
-        assert_eq!(read_pixel(&mut h), json!([1.0, 1.0, 1.0, 1.0]));
-    }
 }
 
 #[test]

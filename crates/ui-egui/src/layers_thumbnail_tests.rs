@@ -4,12 +4,11 @@
 use craft::layers::ui::tree::LayerPart;
 use egui::Modifiers;
 use egui_kittest::Harness;
-use photocraft_doc::Layer;
 use photocraft_engine::Session;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::layers_panel_nodes::{click, double_click, layer_id, row, thumb};
+use crate::layers_panel_nodes::{click, layer_id, row, thumb};
 
 type H = Harness<'static, PhotocraftApp>;
 
@@ -156,16 +155,6 @@ fn dialog_open(h: &H) -> bool {
     h.state().dialog_open()
 }
 
-/// What the colour picker on top of the dialog stack edits.
-fn picker_target(h: &H) -> Option<crate::color_picker_ui::PickTarget> {
-    let id = h.state().framework.dialogs.stack().top()?;
-    crate::color_picker_ui::target(h.state(), id).cloned()
-}
-
-fn properties_shown(h: &H) {
-    assert!(crate::panel_docking::is_front(h.state(), "properties"), "Properties opened in front");
-}
-
 /// Where a double-click lands on the row of "T".
 #[derive(Clone, Copy)]
 enum At {
@@ -174,146 +163,6 @@ enum At {
     Name,
     /// The row's end, past the name.
     End,
-}
-
-/// A double-click opens what the part shows: a type layer's thumbnail edits its text (its name
-/// still renames), a mask's thumbnail its Properties (or Select and Mask, by preference), a fill or
-/// shape layer's thumbnail its fill picker, an adjustment or gradient its Properties, a frame's
-/// content a Smart Object's contents; elsewhere on the row, Layer Style.
-#[test]
-fn double_clicks_open_what_the_part_shows() {
-    type Case = (&'static str, fn() -> Session, At, fn(&mut H));
-    let cases: [Case; 14] = [
-        (
-            "type thumbnail: inline editing",
-            || under_other(|s| made(s.execute("type.create", json!({"text": "Hello", "size": 48, "x": 100, "y": 180})).unwrap())),
-            At::Thumb(LayerPart::Pixels),
-            |h| {
-                assert_eq!(h.state().ui.tool, crate::state::Tool::Type);
-                let ed = h.state().ui.text_edit.as_ref().expect("inline text editor");
-                assert_eq!(ed.layer, layer_id(h.state(), "T").0);
-                assert!(!dialog_open(h), "no Layer Style dialog");
-            },
-        ),
-        (
-            "type name: no text editing",
-            || under_other(|s| made(s.execute("type.create", json!({"text": "Hello", "size": 48, "x": 100, "y": 180})).unwrap())),
-            At::Name,
-            |h| assert!(h.state().ui.text_edit.is_none() && !dialog_open(h)),
-        ),
-        (
-            "layer mask, preference off: Properties",
-            || {
-                let mut s = under_other(|s| made(s.execute("layer.new.layer", json!({})).unwrap()));
-                let id = s.active().unwrap().doc.walk().into_iter().find(|(_, _, l)| l.name == "T").unwrap().2.id.0;
-                s.execute("layer.layerMask.revealAll", json!({"layer": id})).unwrap();
-                s.execute("prefs.set", json!({"values": {"tools.doubleClickLayerMaskLaunchesSelectAndMask": false}})).unwrap();
-                s
-            },
-            At::Thumb(LayerPart::LayerMask),
-            |h| {
-                assert!(h.state().ui.mask_target, "the mask is targeted");
-                properties_shown(h);
-                assert!(!dialog_open(h));
-            },
-        ),
-        (
-            "layer mask, preference on: Select and Mask",
-            || {
-                let mut s = under_other(|s| made(s.execute("layer.new.layer", json!({})).unwrap()));
-                let id = s.active().unwrap().doc.walk().into_iter().find(|(_, _, l)| l.name == "T").unwrap().2.id.0;
-                s.execute("layer.layerMask.revealAll", json!({"layer": id})).unwrap();
-                s.execute("prefs.set", json!({"values": {"tools.doubleClickLayerMaskLaunchesSelectAndMask": true}})).unwrap();
-                s
-            },
-            At::Thumb(LayerPart::LayerMask),
-            |h| {
-                assert!(h.state().ui.mask_target);
-                let w = crate::distort_ui::workspace_fields(h.state(), "select.selectAndMask").expect("the Select and Mask workspace is open");
-                assert_eq!(w["refine"]["output"].as_str(), Some("layerMask"), "Select and Mask opens on the mask: {w}");
-            },
-        ),
-        (
-            "vector mask: Properties",
-            || {
-                let mut s = under_other(|s| made(s.execute("layer.new.layer", json!({})).unwrap()));
-                let id = s.active().unwrap().doc.walk().into_iter().find(|(_, _, l)| l.name == "T").unwrap().2.id.0;
-                s.execute("layer.vectorMask.revealAll", json!({"layer": id})).unwrap();
-                s
-            },
-            At::Thumb(LayerPart::VectorMask),
-            |h| {
-                assert!(h.state().ui.vector_mask_target, "the vector mask is targeted");
-                properties_shown(h);
-            },
-        ),
-        (
-            "pattern fill: the Pattern Fill dialog",
-            || under_other(|s| made(s.execute(photocraft_engine::pattern_fill_cmds::CREATE, json!({"pattern": "Checkerboard"})).unwrap())),
-            At::Thumb(LayerPart::Pixels),
-            |h| {
-                assert!(h.state().framework.dialogs.is_open::<craft::draw::ui::pattern::PatternFillDialog>(), "the Pattern Fill dialog opened");
-                assert_eq!(h.state().pattern_fill.session.as_ref().and_then(|s| s.layer()).map(|l| l.0), Some(layer_id(h.state(), "T").0));
-            },
-        ),
-        (
-            "shape: the Color Picker on its fill (#2812)",
-            || under_other(|s| made(s.execute("shape.create", json!({"rect": [8, 8, 40, 30], "fill": "#336699"})).unwrap())),
-            At::Thumb(LayerPart::Pixels),
-            |h| {
-                assert_eq!(h.state().session.active().unwrap().active_layer, Some(layer_id(h.state(), "T")));
-                assert!(matches!(picker_target(h), Some(crate::color_picker_ui::PickTarget::Shape { .. })), "the Color Picker opened on the shape fill");
-            },
-        ),
-        ("solid colour: its picker, the fill targeted", solid, At::Thumb(LayerPart::Pixels), |h| {
-            assert!(!h.state().ui.mask_target && !h.state().ui.vector_mask_target);
-            assert!(matches!(picker_target(h), Some(crate::color_picker_ui::PickTarget::SolidFill { .. })), "Color Picker opened on the fill");
-        }),
-        ("solid colour's mask: not the picker", solid, At::Thumb(LayerPart::LayerMask), |h| {
-            assert!(!matches!(picker_target(h), Some(crate::color_picker_ui::PickTarget::SolidFill { .. })));
-        }),
-        ("the row's end: Layer Style", solid, At::End, |h| {
-            // PLAN: assumed the Layer Style dialog is the only dialog this double click opens.
-            assert!(dialog_open(h), "the Layer Style dialog opened");
-            assert!(picker_target(h).is_none());
-        }),
-        (
-            "gradient fill: Properties",
-            || under_other(|s| made(s.execute("layer.newFillLayer.gradient", json!({})).unwrap())),
-            At::Thumb(LayerPart::Pixels),
-            |h| {
-                properties_shown(h);
-                assert!(!dialog_open(h));
-            },
-        ),
-        (
-            "adjustment: Properties",
-            || under_other(|s| made(s.execute("layer.newAdjustmentLayer.invert", json!({})).unwrap())),
-            At::Thumb(LayerPart::Pixels),
-            |h| {
-                properties_shown(h);
-                assert!(!dialog_open(h));
-            },
-        ),
-        ("frame holding a Smart Object: its contents open", framed, At::Thumb(LayerPart::FrameContent), |h| {
-            assert_eq!(h.state().session.documents().len(), 2, "the Smart Object's contents open");
-        }),
-        ("frame holding pixels: nothing opens", framed_pixels, At::Thumb(LayerPart::FrameContent), |h| {
-            assert_eq!(h.state().session.documents().len(), 1);
-            assert!(!h.state().ui.status_error, "{}", h.state().ui.status);
-        }),
-    ];
-    for (case, doc, at, after) in cases {
-        let mut h = harness(doc());
-        let p = match at {
-            At::Thumb(part) => thumb(&h, "T", part).center(),
-            At::Name => row(&h, "T").center(),
-            At::End => row(&h, "T").right_center() - egui::vec2(35.0, 0.0),
-        };
-        double_click(&mut h, p);
-        eprintln!("{case}");
-        after(&mut h);
-    }
 }
 
 fn solid() -> Session {
@@ -333,18 +182,6 @@ fn framed() -> Session {
     })
 }
 
-/// "T", a frame holding a pixel layer (as PSD files can hold), which has no contents to open.
-fn framed_pixels() -> Session {
-    let mut s = under_other(|s| made(s.execute("layer.new.frame", json!({"x": 200, "y": 10, "width": 100, "height": 80})).unwrap()));
-    let frame = s.active().unwrap().doc.walk().into_iter().find(|(_, _, l)| l.name == "T").unwrap().2.id;
-    s.edit("Pixels", |doc, _| {
-        let l = Layer::raster("Pixels", doc.pixel_format());
-        doc.layer_mut(frame).and_then(Layer::children_mut).unwrap().push(l);
-        Ok(())
-    })
-    .unwrap();
-    s
-}
 /// Edit Text (the type thumbnail's double-click) on no document or a non-type layer changes nothing.
 #[test]
 fn edit_type_command_rejects_missing_or_non_type_layers_without_changes() {

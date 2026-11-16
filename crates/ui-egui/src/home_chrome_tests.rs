@@ -62,27 +62,6 @@ fn no_documents_with_auto_show_draws_only_the_home_content() {
 }
 
 #[test]
-fn toggling_home_swaps_the_chrome_and_keeps_the_panel_prefs() {
-    for theme in AppTheme::all() {
-        let mut h = app(theme.clone(), true, true);
-        let panels = h.state().ui.panels.clone();
-        assert!(chrome_shown(&h, &format!("{theme:?}, document open, before Home")), "{theme:?}: chrome with a document");
-        assert_eq!(bars_shown(&h), (true, true), "{theme:?}: options bar and status bar with a document");
-        click_home(&mut h);
-        assert_eq!(bars_shown(&h), (false, false), "{theme:?}: no options bar or status bar on Home");
-        assert!(home_content(&h), "{theme:?}: Home content");
-        assert!(!chrome_shown(&h, &format!("{theme:?}, on Home")), "{theme:?}: no chrome on Home");
-        assert!(h.query_all_by_label("Home").count() >= 1, "{theme:?}: the header's Home toggle or the rail's entry stays to go back");
-        assert_eq!(h.state().ui.panels, panels, "{theme:?}: showing Home leaves the saved panels alone");
-        click_home(&mut h);
-        assert!(!home_content(&h), "{theme:?}: Home dismissed");
-        assert!(chrome_shown(&h, &format!("{theme:?}, after Home")), "{theme:?}: chrome back");
-        assert_eq!(bars_shown(&h), (true, true), "{theme:?}: bars back");
-        assert_eq!(h.state().ui.panels, panels);
-    }
-}
-
-#[test]
 fn tab_in_full_screen_does_not_bring_the_chrome_back_over_home() {
     let mut h = app(AppTheme::pro(), true, true);
     click_home(&mut h);

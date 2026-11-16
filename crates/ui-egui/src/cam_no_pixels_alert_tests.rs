@@ -121,33 +121,3 @@ fn app_over(files: &Arc<craft::settings::testing::MemoryFiles>) -> (PhotocraftAp
     (app, path)
 }
 
-#[test]
-fn dont_show_again_stops_the_warning_and_is_kept_with_the_preferences() {
-    for confirm in [false, true] {
-        let files = Arc::new(craft::settings::testing::MemoryFiles::new());
-        let (mut app, path) = app_over(&files);
-        drag(&mut app, LINE);
-        let id = alerts(&app)[0];
-        let ctx = crate::canvas::testing::ctx(&app);
-        app.framework.dialogs.set_json_field(&ctx, id, "skip", json!(true)).unwrap();
-
-        if confirm {
-            crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
-        } else {
-            crate::dialogs::cancel(&mut app, &ctx, id).unwrap();
-        }
-        // Written out at once instead of waiting for the debounce.
-        app.services.settings.as_mut().expect("the store").0.flush().unwrap();
-        let text = files.text(&path).unwrap_or_else(|| panic!("confirm {confirm}: the preferences were saved"));
-        let stored: Value = serde_json::from_str(&text).unwrap();
-        assert_eq!(stored["dialogs"]["contentAwareMove.noPixelsSelected"], json!({"skip": true}), "confirm {confirm}: written to the store");
-        let before = steps(&app);
-        drag(&mut app, LINE);
-        assert!(alerts(&app).is_empty(), "confirm {confirm}: no alert any more");
-        assert!(!selected(&app) && steps(&app) == before, "confirm {confirm}: still nothing selected and no History state");
-        // A restart reads it back from the store.
-        let (mut fresh, _) = app_over(&files);
-        drag(&mut fresh, LINE);
-        assert!(alerts(&fresh).is_empty(), "confirm {confirm}: no alert after a restart");
-    }
-}

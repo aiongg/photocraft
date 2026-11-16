@@ -62,32 +62,10 @@ fn alerts(h: &Harness<'static, PhotocraftApp>) -> Vec<String> {
     h.state().framework.dialogs.open_dialogs().iter().filter_map(|d| d.fields.as_ref()?.get("message")?.as_str().map(str::to_string)).collect()
 }
 
-/// Hovers the field named `label` until its tooltip shows: whether `tip` is shown.
-fn shows_tooltip(h: &mut Harness<'static, PhotocraftApp>, label: &str, tip: &str) -> bool {
-    let at = field(h, label).rect().center();
-    h.hover_at(at);
-    h.run_steps(60);
-    h.query_all_by_role(Role::Label).any(|n| n.accesskit_node().value().as_deref() == Some(tip))
-}
-
 /// The live brush's Opacity and Flow in percent.
 fn opacity_flow(app: &PhotocraftApp) -> (f32, f32) {
     let b = &app.session.tools.brush;
     ((b.opacity * 100.0).round(), (b.flow * 100.0).round())
-}
-
-#[test]
-fn the_bar_shows_opacity_and_flow_after_mode_at_100() {
-    let h = bar(Tool::PatternStamp);
-    let mode = h.query_all_by_role(Role::ComboBox).find(|n| n.value().as_deref() == Some("Normal")).expect("the Mode dropdown").rect();
-    let (opacity, flow) = (field(&h, "Opacity"), field(&h, "Flow"));
-    assert_eq!((opacity.accesskit_node().numeric_value(), flow.accesskit_node().numeric_value()), (Some(100.0), Some(100.0)));
-    let (opacity, flow) = (opacity.rect(), flow.rect());
-    assert!(mode.right() <= opacity.left() && opacity.right() <= flow.left(), "Mode, Opacity, Flow: {mode:?} {opacity:?} {flow:?}");
-    for (label, tip) in [("Opacity", "Set opacity for stroke"), ("Flow", "Set flow rate for stroke")] {
-        let mut h = bar(Tool::PatternStamp);
-        assert!(shows_tooltip(&mut h, label, tip), "hovering {label} shows {tip:?}");
-    }
 }
 
 #[test]

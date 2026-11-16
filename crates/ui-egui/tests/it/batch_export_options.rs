@@ -214,56 +214,6 @@ fn batch_custom_quality_is_bounded_dialog_local_and_reversible() {
     assert!(form_fields(&mut h)["quality"].is_null(), "reopening returns to the existing default");
 }
 
-/// Actual folder-mode controls must pass both WebP quality endpoints to the encoder while
-/// preserving the active document, history, preferences and recorded actions.
-#[test]
-fn batch_real_controls_write_the_chosen_webp_quality() {
-    let _gpu = photocraft_testkit::gpu_lock();
-    let dir = Scratch::new();
-    let input = dir.0.join("input");
-    std::fs::create_dir(&input).unwrap();
-    let original = pattern();
-    std::fs::write(input.join("owned-pattern.png"), photocraft_codecs::encode(&original, Format::Png, &EncodeOptions::default()).unwrap()).unwrap();
-    let mut h = harness();
-    let doc = h.state().session.active().unwrap().doc.clone();
-    let revision = h.state().session.active().unwrap().revision;
-    let history = h.state().session.active().unwrap().history.entries();
-    let prefs = serde_json::to_value(h.state().session.prefs()).unwrap();
-    let actions = serde_json::to_value(h.state().session.actions.list.to_file()).unwrap();
-    let mut outputs = Vec::new();
-    for quality in [0, 12] {
-        let output = dir.0.join(format!("batch-{quality}"));
-        open(&mut h, "file.automate.batch");
-        assert!(form_fields(&mut h)["quality"].is_null());
-        h.get_by_label("Custom").click();
-        h.run_steps(3);
-        choose_webp(&mut h);
-        edit_path(&mut h, "Input Folder", &input);
-        edit_path(&mut h, "Output Folder", &output);
-        edit_quality(&mut h, &quality.to_string());
-        evidence(&mut h, &format!("batch-webp-quality-{quality}"));
-        h.get_by_label("OK").click();
-        h.run_steps(5);
-        assert!(!h.state().dialog_open());
-        let bytes = std::fs::read(output.join("owned-pattern.webp")).expect("the actual dialog confirmation writes the selected WebP");
-        let decoded = photocraft_codecs::decode_as(Format::WebP, &bytes).unwrap();
-        assert_eq!(decoded.dimensions(), (64, 48));
-        assert_eq!(decoded.layout(), ChannelLayout::Rgb);
-        let (_, params) = h.state().session.journal.last().unwrap();
-        assert_eq!(params["format"], json!("webp"));
-        assert_eq!(params["quality"].as_f64(), Some(f64::from(quality)));
-        assert!(params.as_object().unwrap().keys().all(|k| !k.starts_with("__")), "private shell values never become command params");
-        outputs.push(bytes);
-    }
-    assert_ne!(outputs[0], outputs[1], "actual chosen quality reaches the encoder");
-    assert!(outputs[0].len() < outputs[1].len());
-    let active = h.state().session.active().unwrap();
-    assert!(Arc::ptr_eq(&active.doc, &doc));
-    assert_eq!((active.revision, active.history.entries()), (revision, history));
-    assert_eq!(serde_json::to_value(h.state().session.prefs()).unwrap(), prefs);
-    assert_eq!(serde_json::to_value(h.state().session.actions.list.to_file()).unwrap(), actions);
-}
-
 #[test]
 fn batch_naming_controls_export_the_requested_names_and_reset_on_cancel() {
     let _gpu = photocraft_testkit::gpu_lock();

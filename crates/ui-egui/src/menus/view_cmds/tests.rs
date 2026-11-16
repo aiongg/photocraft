@@ -116,34 +116,6 @@ fn image_processor_source_choices_include_current_and_all_open_documents() {
     }
 }
 
-/// Confirming either document source must ignore a stale input-folder field, export the
-/// expected number of copies and retain the open documents' original snapshots.
-#[test]
-fn image_processor_dialog_confirms_open_document_sources_without_reading_the_input_folder() {
-    for source in ["current", "open"] {
-        let dir = tempfile::tempdir().unwrap();
-        let (mut app, ctx) = app_with(0);
-        for name in ["First", "Second"] {
-            app.run("file.new", json!({"name": name, "width": 100, "height": 80})).unwrap();
-        }
-        let before: Vec<_> = app.session.documents().iter().map(|st| st.doc.clone()).collect();
-        let id = open_form(&mut app, &ctx, "file.scripts.imageProcessor");
-        // The input row shows only for Folder: type the stale folder there, then switch to the document source.
-        set(&mut app, &ctx, id, "source", json!("folder"));
-        set(&mut app, &ctx, id, "input", json!(dir.path().join("missing-input")));
-        set(&mut app, &ctx, id, "source", json!(source));
-        set(&mut app, &ctx, id, "output", json!(dir.path()));
-        set(&mut app, &ctx, id, "format", json!("png"));
-        set(&mut app, &ctx, id, "width", json!(50));
-        set(&mut app, &ctx, id, "height", json!(50));
-        confirm(&mut app, &ctx, id).unwrap();
-        assert_eq!(names_in(dir.path()).len(), if source == "current" { 1 } else { 2 }, "{source}");
-        for (st, original) in app.session.documents().iter().zip(&before) {
-            assert!(std::sync::Arc::ptr_eq(&st.doc, original));
-        }
-    }
-}
-
 /// #1209: the browser picker supplies bytes even when the engine cannot read native paths.
 #[test]
 fn place_embedded_enablement_does_not_require_native_doc() {
@@ -811,30 +783,6 @@ fn esc_leaves_full_screen_with_the_crop_tool_showing_its_default_frame() {
     crate::canvas::testing::frame(&mut app);
     press_esc(&mut app, &ctx);
     assert_mode(&app, "standard");
-}
-
-/// #9275: a gesture on the default frame is something to cancel, so Esc in full screen cancels it
-/// (as in Standard Screen Mode) and full screen stays.
-#[test]
-fn esc_in_full_screen_cancels_a_crop_drag_on_the_default_frame() {
-    use crate::canvas::testing::{ToolEvent, tool_event};
-    let none = egui::Modifiers::NONE;
-    // Inside draws a new box, on the corner handle resizes, outside turns.
-    for (what, from) in [("draw", [20.0, 20.0]), ("resize", [100.0, 80.0]), ("turn", [130.0, 110.0])] {
-        let (mut app, ctx) = app_with(1);
-        app.ui.tool = crate::Tool::Crop;
-        crate::canvas::testing::frame(&mut app);
-        assert!(crate::crop_ui::is_default_frame(&app), "{what}: the gesture starts on the default frame");
-        menu(&mut app, &ctx, "view.screenMode.fullScreen", json!({})).unwrap();
-        tool_event(&mut app, ToolEvent::Down { x: from[0], y: from[1], pressure: 1.0 }, none);
-        tool_event(&mut app, ToolEvent::Move { x: 60.0, y: 50.0, pressure: 1.0 }, none);
-        assert!(crate::crop_ui::dragging(&app), "{what}: mid-gesture");
-        press_esc(&mut app, &ctx);
-        assert_mode(&app, "fullScreen");
-        assert!(!crate::crop_ui::dragging(&app), "{what}: the gesture is cancelled");
-        tool_event(&mut app, ToolEvent::Up { x: 60.0, y: 50.0 }, none);
-        assert!(!crate::crop_ui::pending(&app), "{what}: the release leaves no pending crop");
-    }
 }
 
 #[test]

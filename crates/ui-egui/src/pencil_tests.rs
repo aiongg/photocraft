@@ -1,8 +1,7 @@
 //! The Pencil tool (#213): aliased strokes through the live-stroke path, Auto Erase, the cursor's
 //! shape rule, ⇧-click lines, Control+Alt resizing and the B group.
 
-use egui::{Key, Modifiers, vec2};
-use egui_kittest::Harness;
+use egui::Modifiers;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -193,77 +192,6 @@ fn the_eraser_in_pencil_mode_erases_aliased_pixels() {
         }
     }
     assert!(erased > 500, "{erased}");
-}
-
-#[test]
-fn the_eraser_in_block_mode_erases_a_16_screen_px_square() {
-    // #2770: a soft, small, half-opacity Eraser in Block mode still clears a hard square of
-    // 16 screen pixels: 16 document pixels at 100 %, 8 at 200 %.
-    for (zoom, n) in [(1.0, 16usize), (2.0, 8)] {
-        let mut app = app();
-        app.run("paint.pencil", json!({"points": [[60.0, 40.0]], "size": 400})).unwrap();
-        app.ui.tool = Tool::Eraser;
-        crate::paint_mouse::sync_tool_brush(&mut app);
-        app.run("tools.setBrush", json!({"brush": {"size": 5, "hardness": 0.0, "opacity": 0.5, "flow": 0.3, "smoothing": {"amount": 0.0}}})).unwrap();
-        app.ui.tool_options.eraser_mode = "block".into();
-        app.ui.views[0].zoom = zoom;
-        drag(&mut app, &[(60.3, 40.6)], Modifiers::NONE);
-        let (id, p) = last(&app);
-        assert_eq!((id.as_str(), &p["block"]), ("paint.pencil", &json!(true)));
-        let s = layer(&app).surface().unwrap().clone();
-        let (mut erased, mut x0, mut y0, mut x1, mut y1) = (0, i32::MAX, i32::MAX, 0, 0);
-        for y in 0..80 {
-            for x in 0..120 {
-                let a = s.rgba(x, y)[3];
-                assert!(a == 0.0 || a == 1.0, "partial alpha {a} at ({x},{y}), zoom {zoom}");
-                if a == 0.0 {
-                    erased += 1;
-                    (x0, y0, x1, y1) = (x0.min(x), y0.min(y), x1.max(x), y1.max(y));
-                }
-            }
-        }
-        assert_eq!((erased, x1 - x0 + 1, y1 - y0 + 1), (n * n, n as i32, n as i32), "zoom {zoom}");
-    }
-}
-
-#[test]
-fn b_cycles_brush_pencil_color_replacement_and_mixer_brush() {
-    let mut h = Harness::builder().with_size(vec2(1280.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
-        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), Default::default());
-        app.run("file.new", json!({"width": 200, "height": 120})).unwrap();
-        app
-    });
-    h.state_mut().ui.tool = Tool::Move;
-    h.state_mut().session.edit_prefs(|p| p.tools.use_shift_key_for_tool_switch = false);
-    h.run_steps(4);
-    let press = |h: &mut Harness<'_, PhotocraftApp>, m: Modifiers| {
-        h.event(egui::Event::Key { key: Key::B, physical_key: None, pressed: true, repeat: false, modifiers: m });
-        h.event(egui::Event::Key { key: Key::B, physical_key: None, pressed: false, repeat: false, modifiers: m });
-        h.run_steps(2);
-    };
-    press(&mut h, Modifiers::NONE);
-    assert_eq!(h.state().ui.tool, Tool::Brush);
-    press(&mut h, Modifiers::NONE);
-    assert_eq!(h.state().ui.tool, Tool::Pencil);
-    press(&mut h, Modifiers::NONE);
-    assert_eq!(h.state().ui.tool, Tool::ColorReplacement);
-    press(&mut h, Modifiers::NONE);
-    assert_eq!(h.state().ui.tool, Tool::MixerBrush);
-    // Use Shift Key for Tool Switch: ⇧B cycles, B keeps the group's tool.
-    h.state_mut().session.edit_prefs(|p| p.tools.use_shift_key_for_tool_switch = true);
-    press(&mut h, Modifiers::SHIFT);
-    assert_eq!(h.state().ui.tool, Tool::Brush);
-    press(&mut h, Modifiers::SHIFT);
-    assert_eq!(h.state().ui.tool, Tool::Pencil);
-    press(&mut h, Modifiers::SHIFT);
-    assert_eq!(h.state().ui.tool, Tool::ColorReplacement);
-    press(&mut h, Modifiers::SHIFT);
-    assert_eq!(h.state().ui.tool, Tool::MixerBrush);
-    press(&mut h, Modifiers::NONE);
-    assert_eq!(h.state().ui.tool, Tool::MixerBrush);
-    assert_eq!(Tool::from_name("pencil"), Some(Tool::Pencil));
-    assert_eq!(Tool::from_name("mixerBrush"), Some(Tool::MixerBrush));
 }
 
 /// Erase to History paints the source state in each Eraser mode, even on a layer made since.

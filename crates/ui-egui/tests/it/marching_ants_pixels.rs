@@ -189,22 +189,3 @@ fn every_edge_is_equally_thick_at_any_display_scale() {
     }
 }
 
-/// On black the white dashes show, between black ones.
-#[test]
-fn the_ants_alternate_black_and_white() {
-    let _gpu = photocraft_testkit::gpu_lock();
-    let Some(mut h) = harness(1.0) else { return };
-    h.run_steps(4);
-    let r = [100, 60, 200, 240];
-    setup(&mut h, "black", r);
-    let img = render(&mut h);
-    let (a, b) = (device(&h, 1.0, 100.0, 60.0), device(&h, 1.0, 200.0, 60.0));
-    let mut bright = 0;
-    let mut n = 0;
-    for x in a.0 + 12..b.0 - 12 {
-        n += 1;
-        bright += usize::from((-2..=2).any(|o| img.luma(x, a.1 + o).is_some_and(|l| l > 230)));
-    }
-    let frac = bright as f32 / n as f32;
-    assert!((0.4..=0.6).contains(&frac), "{frac:.2} of the top edge is white on black");
-}

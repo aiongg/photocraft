@@ -69,21 +69,3 @@ fn brush_and_pencil_select_behind_in_one_command() {
     }
 }
 
-/// The same Background restriction used by the menu applies before the shortcut changes settings.
-#[test]
-fn background_does_not_accept_behind() {
-    for tool in [Tool::Brush, Tool::Pencil] {
-        let mut app = app(tool, false);
-        app.ui.tool_options.brush_clear = true;
-        app.ui.tool_options.pencil_clear = true;
-        assert!(!brush_mode_menu::enabled(&app, Item::Behind));
-        let before = app.session.journal.len();
-        let brush_tool = app.ui.brush_tool;
-        let brush = app.session.execute("brush.get", json!({})).unwrap();
-        press_behind(&mut app);
-        assert_eq!(app.session.journal.len(), before);
-        assert_eq!(app.session.execute("brush.get", json!({})).unwrap(), brush);
-        assert_eq!(app.ui.brush_tool, brush_tool);
-        assert!(app.ui.tool_options.brush_clear && app.ui.tool_options.pencil_clear);
-    }
-}

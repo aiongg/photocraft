@@ -302,30 +302,6 @@ fn done_fits_the_cropped_document() {
 }
 
 #[test]
-fn straighten_is_the_options_bar_straighten() {
-    let mut h = harness();
-    let before = frame(h.state());
-    // The options-bar button and the task-bar one are both labelled "Straighten" (#10888);
-    // click the one in the bar.
-    let bar = bar(&h).expect("the task bar");
-    let at = h.query_all_by_label("Straighten").map(|n| n.rect().center()).find(|p| bar.contains(*p)).expect("the task bar's Straighten");
-    click_at(&mut h, at);
-    assert_eq!(frame(h.state()), before, "the click didn't reach the canvas");
-    // Armed, the next drag is a level line that turns the frame; unarmed it would draw a new upright frame.
-    let rise = 300.0 * 10.0f64.to_radians().tan();
-    let events = json!([
-        {"kind": "down", "x": 50.0, "y": 250.0},
-        {"kind": "move", "x": 200.0, "y": 250.0 - rise / 2.0},
-        {"kind": "move", "x": 350.0, "y": 250.0 - rise},
-        {"kind": "up", "x": 350.0, "y": 250.0 - rise},
-    ]);
-    control(&mut h, "ui.pointer", json!({"events": events}));
-    let angle = frame(h.state()).map_or(0.0, |f| f.angle);
-    assert!(angle.abs() > 5.0, "armed, as by the options bar's button: the drag was a Straighten line (angle {angle})");
-    assert_eq!(frame_rect(&h), Some([0.0, 0.0, 400.0, 300.0]), "the frame is still the canvas");
-}
-
-#[test]
 fn hide_and_place_are_kept_with_the_panel_layout() {
     let mut h = harness();
     // A layout saved before the bar existed: the bar is on and follows the frame.

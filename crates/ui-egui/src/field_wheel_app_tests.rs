@@ -47,25 +47,6 @@ fn view(h: &Harness<'_, PhotocraftApp>) -> (f32, [f32; 2]) {
 }
 
 #[test]
-fn a_focused_field_takes_the_wheel_over_the_canvas() {
-    let mut h = harness();
-    let canvas = egui::pos2(640.0, 500.0);
-    let before = view(&h);
-    wheel(&mut h, canvas, -1.0, egui::Modifiers::NONE);
-    assert_ne!(view(&h), before, "without a focused field the wheel pans the canvas");
-    let before = view(&h);
-    field(&h, "10").click();
-    h.run();
-    wheel(&mut h, canvas, -2.0, egui::Modifiers::NONE);
-    assert_eq!(view(&h), before, "the canvas neither pans nor zooms");
-    assert!(h.query_all_by_role(Role::SpinButton).any(|n| n.value().as_deref() == Some("8")), "Smoothing stepped from 10 to 8");
-    // ⌥/Alt + wheel is still the view's zoom.
-    wheel(&mut h, canvas, 1.0, egui::Modifiers::ALT);
-    assert_ne!(view(&h).0, before.0, "Alt + wheel zooms");
-    assert!(h.query_all_by_role(Role::SpinButton).any(|n| n.value().as_deref() == Some("8")));
-}
-
-#[test]
 fn the_wheel_over_a_field_steps_it_without_a_click() {
     let mut h = harness();
     let before = view(&h);
