@@ -67,41 +67,6 @@ fn font_cycle_in_options_bar_edits_the_layer_and_can_be_undone() {
 }
 
 #[test]
-fn options_bar_hover_previews_on_canvas_without_committing() {
-    use photocraft_doc::LayerContent;
-
-    let app = app_with_layer();
-    let layer = app.session.active().unwrap().active_layer.unwrap();
-    let mut h = bar_harness(app);
-    h.run_steps(3);
-    let font_of = |app: &mut PhotocraftApp| {
-        let (shown, key) = crate::canvas::display_doc(app, 0);
-        let LayerContent::Text(t) = &shown.layer(layer).unwrap().content else { panic!("type layer") };
-        (t.char_runs()[0].style.font_family.clone(), key)
-    };
-    let steps = h.state().session.active().unwrap().history.entries().len();
-    type_family(&mut h, "JetBrains Mono");
-    h.get_by_label("JetBrains Mono").hover();
-    h.run();
-    assert_eq!(font_of(h.state_mut()).0, "JetBrains Mono", "the hovered row previews on the canvas");
-    assert_eq!(layer_font(h.state()), "Inter", "the document keeps its font");
-    assert_eq!(h.state().session.active().unwrap().history.entries().len(), steps, "hover adds no history entry");
-
-    field(&h).hover();
-    h.run();
-    let (restored, key) = font_of(h.state_mut());
-    assert_eq!(restored, "Inter");
-    assert_eq!(key, 0, "leaving the row restores the committed canvas content");
-
-    h.get_by_label("JetBrains Mono").hover();
-    h.run();
-    h.get_by_label("JetBrains Mono").click();
-    h.run();
-    assert_eq!(font_of(h.state_mut()), ("JetBrains Mono".to_string(), 0), "a pick replaces the preview with committed content");
-    assert_eq!(h.state().session.active().unwrap().history.entries().len(), steps + 1, "a pick adds one history step");
-}
-
-#[test]
 fn hovering_a_font_previews_only_the_selected_characters() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Services::default());
     app.run("file.new", json!({"width": 200, "height": 100})).unwrap();

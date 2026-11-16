@@ -51,14 +51,16 @@ fn select(h: &mut H, range: [usize; 2]) {
     e.caret = range[1];
 }
 
-/// Takes the keyboard off the family field and gives it to the session's editor, as the field's Enter does in the app.
-fn surrender_focus(h: &H) {
+/// Takes the keyboard off the family field and gives it to the session's editor, as the field's Enter does in the app:
+/// the pass that shows the editor asks for the focus and the next one applies it, so input sent after this reaches it.
+fn surrender_focus(h: &mut H) {
     h.ctx.memory_mut(|m| {
         if let Some(id) = m.focused() {
             m.surrender_focus(id);
         }
     });
     super::editing::focus_editor(&h.ctx);
+    h.run();
 }
 
 /// A text layer `content` in an edit session in `FONTS[pattern % 2]`; patterns 2 and 3 style characters 2..4 in the other font.
@@ -125,7 +127,7 @@ fn caret_font_choices_style_only_subsequent_typing_including_ime() {
                 crate::type_font_preview::set(h.state_mut(), font.into());
                 assert!(crate::type_font_preview::display_doc(h.state_mut(), 0).is_none());
                 // Two preedit replacements and the final commit keep the pending font.
-                surrender_focus(&h);
+                surrender_focus(&mut h);
                 ime(h.state_mut(), egui::ImeEvent::Preedit { text: "é".into(), active_range_chars: None });
                 h.run();
                 ime(h.state_mut(), egui::ImeEvent::Preedit { text: "éX".into(), active_range_chars: None });
@@ -169,7 +171,7 @@ fn caret_style_is_discarded_by_navigation_cancel_undo_and_document_switch() {
         choose(&mut h, FONTS[1], "enter");
         match action {
             "navigation" => {
-                surrender_focus(&h);
+                surrender_focus(&mut h);
                 key(h.state_mut(), Key::ArrowLeft);
                 h.run();
                 key(h.state_mut(), Key::ArrowRight);
@@ -208,7 +210,7 @@ fn returning_focus_to_the_same_canvas_caret_keeps_the_chosen_typing_font() {
     h.run();
     assert_eq!(h.state().ui.text_edit.as_ref().unwrap().caret, 6);
     assert!(super::insertion_style::pending(h.state()).is_some());
-    surrender_focus(&h);
+    surrender_focus(&mut h);
     super::host::type_text(h.state_mut(), "XYZ");
     h.run();
     assert_eq!(families(&saved(&h, id)), [FONTS[0], FONTS[0], FONTS[0], FONTS[0], FONTS[0], FONTS[0], FONTS[1], FONTS[1], FONTS[1]]);
@@ -222,7 +224,7 @@ fn backspace_and_delete_preserve_pending_caret_font() {
         select(&mut h, [3, 3]);
         h.run();
         choose(&mut h, FONTS[1], "enter");
-        surrender_focus(&h);
+        surrender_focus(&mut h);
         self::key(h.state_mut(), key);
         h.run();
         assert!(super::insertion_style::pending(h.state()).is_some());
@@ -240,7 +242,7 @@ fn backspace_and_delete_preserve_pending_caret_font() {
     select(&mut h, [3, 3]);
     h.run();
     choose(&mut h, FONTS[1], "enter");
-    surrender_focus(&h);
+    surrender_focus(&mut h);
     key(h.state_mut(), Key::Backspace);
     h.run();
     key(h.state_mut(), Key::Backspace);
@@ -288,7 +290,7 @@ fn caret_font_and_face_persist_across_more_font_choices_and_paste() {
     choose(&mut h, FONTS[1], "enter");
     super::apply(h.state_mut(), json!({"fontStyle": "Bold"}), None);
     choose(&mut h, FONTS[0], "enter");
-    surrender_focus(&h);
+    surrender_focus(&mut h);
     h.event(egui::Event::Paste("éX".into()));
     h.run();
     let t = saved(&h, id);
