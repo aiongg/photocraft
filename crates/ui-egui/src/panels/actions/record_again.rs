@@ -1,6 +1,5 @@
 //! One editor owns one original step; previews and confirmation retain its authority.
 use craft::ui::dialog::DialogId;
-use craft::ui::patterns::form_dialogs::ParamResult;
 use photocraft_engine::{
     actions_edit_cmds,
     doc::{DocId, LayerId},
@@ -85,18 +84,17 @@ pub(crate) fn authorize_preview(app: &PhotocraftApp, dialog: DialogId, command: 
     authorize(app, held, command, params)
 }
 
-/// Apply through the registered engine command, retaining flags and replacing only after success. `result` is the
-/// editor's answer; its params come from the one conversion of dialog fields into command params.
-pub(crate) fn confirm(app: &mut PhotocraftApp, dialog: DialogId, result: &ParamResult) -> Result<Value, String> {
+/// Apply through the registered engine command, retaining flags and replacing only after success. `command` and
+/// `params` are the editor's answer, from the one conversion of its values into command params.
+pub(crate) fn confirm(app: &mut PhotocraftApp, dialog: DialogId, command: &str, params: Value) -> Result<Value, String> {
     if !owns_dialog(app, dialog) {
         return Err(tl!("No recorded step belongs to this editor.").into());
     }
     let held = app.held_record_again.take().ok_or(tl!("No step is waiting."))?;
     unchanged(app, &held)?;
-    if result.key != held.command {
+    if command != held.command {
         return Err(tl!("The Record Again command changed.").into());
     }
-    let params = crate::dialogs::filter_dialog::command_params(&held.command, &result.fields);
     let mut request = held.selection.clone();
     request["params"] = params.clone();
     authorize(app, &held, COMMAND, &request)?;

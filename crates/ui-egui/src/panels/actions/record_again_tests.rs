@@ -192,6 +192,13 @@ fn another_dialog_cannot_consume_the_selected_step() {
     assert_eq!(h.state().session.active().unwrap().doc.size, photocraft_engine::doc::Size::new(4, 3));
 }
 
+/// One pass of the preview routes the canvas draws: the filter route, then the adjustment route. The canvas asks them
+/// both before it draws, and each checks the retained caller itself.
+fn preview_routes(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    crate::canvas::ensure_filter_preview(app, 0, ctx);
+    crate::dialogs::adjust_preview::display_doc(app, 0);
+}
+
 static PREVIEW_CHECKS: AtomicUsize = AtomicUsize::new(0);
 
 /// Count actual preview authorization and refuse LUT paths or edited blur and gamma settings.
@@ -223,7 +230,7 @@ fn filter_and_adjustment_previews_retain_permissions_before_evaluation() {
         h.state_mut().session.authorize = None;
         let context = h.ctx.clone();
         PREVIEW_CHECKS.store(0, Ordering::SeqCst);
-        crate::canvas::navigator_texture(h.state_mut(), &context, 0);
+        preview_routes(h.state_mut(), &context);
         assert!(PREVIEW_CHECKS.load(Ordering::SeqCst) > 0, "the permitted real preview request is authorized: {command}");
         if command == "image.adjustments.levels" {
             assert!(crate::dialogs::adjust_preview::display_doc(h.state_mut(), 0).is_some(), "the permitted adjustment preview is evaluated");
@@ -240,7 +247,7 @@ fn filter_and_adjustment_previews_retain_permissions_before_evaluation() {
             set_field(&mut h, dialog, "file", json!("/outside/forbidden.cube"));
         }
         PREVIEW_CHECKS.store(0, Ordering::SeqCst);
-        crate::canvas::navigator_texture(h.state_mut(), &context, 0);
+        preview_routes(h.state_mut(), &context);
         assert!(PREVIEW_CHECKS.load(Ordering::SeqCst) > 0, "the changed actual request was refused before evaluation: {command}");
         assert_eq!(h.state().session.actions.list, original);
         assert_eq!(h.state().session.active().unwrap().revision, revision);

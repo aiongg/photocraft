@@ -167,6 +167,13 @@ fn control_playback_opens_menu_settings_only_for_menu_invocation() {
     assert!(app.session.active().unwrap().doc.selection.is_some(), "cancel must not run the following step");
 }
 
+/// One pass of the preview routes the canvas draws: the filter route, then the adjustment route. The canvas asks them
+/// both before it draws, and each checks the retained caller itself.
+fn preview_routes(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    crate::canvas::ensure_filter_preview(app, 0, ctx);
+    crate::dialogs::adjust_preview::display_doc(app, 0);
+}
+
 static MENU_PREVIEW_CHECKS: AtomicUsize = AtomicUsize::new(0);
 static MENU_PREVIEW_DENIALS: AtomicUsize = AtomicUsize::new(0);
 
@@ -194,14 +201,14 @@ fn paused_menu_preview_keeps_the_requesting_gate_and_rejects_retargeting() {
 
     let context = h.ctx.clone();
     let checks = MENU_PREVIEW_CHECKS.load(Ordering::SeqCst);
-    crate::canvas::navigator_texture(h.state_mut(), &context, 0);
+    preview_routes(h.state_mut(), &context);
     assert!(MENU_PREVIEW_CHECKS.load(Ordering::SeqCst) > checks, "the retained gate authorizes the real preview");
 
     let revision = h.state().session.active().unwrap().revision;
     let before = steps(h.state());
     set_field(&mut h, dialog, "mapPath", json!("/outside/map.psd"));
     let denials = MENU_PREVIEW_DENIALS.load(Ordering::SeqCst);
-    crate::canvas::navigator_texture(h.state_mut(), &context, 0);
+    preview_routes(h.state_mut(), &context);
     assert!(MENU_PREVIEW_DENIALS.load(Ordering::SeqCst) > denials, "the retained gate denies the edited path");
 
     // The stored step now names another command than the editor opened for.

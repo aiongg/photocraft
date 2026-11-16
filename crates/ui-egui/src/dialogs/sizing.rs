@@ -244,6 +244,19 @@ fn canvas_params(r: &CanvasSizeResult) -> Value {
 /// Runs `command` with `params` (`None`: the dialog was cancelled), then continues or abandons the
 /// paused playback that opened the dialog.
 fn finish(app: &mut PhotocraftApp, id: DialogId, command: &str, params: Option<Value>) {
+    // The editor Record Again opened answers the step it was opened for, not a new run of the command.
+    if crate::actions::record_again::owns_dialog(app, id) {
+        match params {
+            Some(params) => {
+                if let Err(e) = crate::actions::record_again::confirm(app, id, command, params) {
+                    app.ui.status = e;
+                    app.ui.status_error = true;
+                }
+            }
+            None => crate::actions::record_again::cancel(app, id),
+        }
+        return;
+    }
     let token = crate::actions::token_of(app, id);
     let abandon = |app: &mut PhotocraftApp| {
         if let Some(token) = token {
