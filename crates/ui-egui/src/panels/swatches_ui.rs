@@ -106,28 +106,28 @@ fn color_param(color: &SwatchColor, converter: Option<&CmykConverter>) -> Value 
 /// Runs one edit the panel resolved.
 pub(crate) fn apply_edit(app: &mut PhotocraftApp, edit: SwatchEdit) {
     match edit {
-        SwatchEdit::Add { group, name, color } => new_swatch(app, group, name, &color),
-        SwatchEdit::NewGroup { name } => new_group(app, name),
-        SwatchEdit::Rename { swatch, name } => {
+        SwatchEdit::Add { group, name, color, .. } => new_swatch(app, group, name, &color),
+        SwatchEdit::NewGroup { name, .. } => new_group(app, name),
+        SwatchEdit::Rename { swatch, name, .. } => {
             if run(app, "swatches.rename", json!({"swatch": swatch, "name": name})).is_some() && app.ui.swatches.selected == Some(SwatchKey::Swatch(swatch)) {
                 app.ui.swatches.selected = Some(SwatchKey::Swatch(name));
             }
         }
-        SwatchEdit::RenameGroup { group, name } => {
+        SwatchEdit::RenameGroup { group, name, .. } => {
             run(app, "swatches.renameGroup", json!({"group": group, "name": name}));
         }
-        SwatchEdit::Delete { swatch } => {
+        SwatchEdit::Delete { swatch, .. } => {
             if run(app, "swatches.delete", json!({"swatch": swatch})).is_some() && app.ui.swatches.selected == Some(SwatchKey::Swatch(swatch)) {
                 app.ui.swatches.selected = None;
             }
         }
-        SwatchEdit::DeleteGroup { group } => {
+        SwatchEdit::DeleteGroup { group, .. } => {
             run(app, "swatches.deleteGroup", json!({"group": group}));
         }
-        SwatchEdit::MoveTo { swatch, group, at } => {
+        SwatchEdit::MoveTo { swatch, group, at, .. } => {
             run(app, "swatches.move", json!({"swatch": swatch, "to": group, "position": at}));
         }
-        SwatchEdit::MoveGroup { group, to } => {
+        SwatchEdit::MoveGroup { group, to, .. } => {
             run(app, "swatches.moveGroup", json!({"group": group, "to": to}));
         }
         SwatchEdit::Reset => {
@@ -376,7 +376,7 @@ mod tests {
         assert_eq!(app.ui.swatches.selected, Some(SwatchKey::Swatch("Black".into())));
         // The footer's trash deletes the selection.
         let n = app.session.presets.swatches[0].entries.len();
-        apply_edit(&mut app, SwatchEdit::Delete { swatch: "Black".into() });
+        apply_edit(&mut app, SwatchEdit::delete("Black".into()));
         assert_eq!(app.session.presets.swatches[0].entries.len(), n - 1);
         assert_eq!(app.ui.swatches.selected, None);
     }
@@ -386,7 +386,7 @@ mod tests {
         let mut app = app();
         app.session.tools.foreground = [0.5, 0.25, 1.0, 1.0];
         let color = SwatchColor::Rgb([0.5, 0.25, 1.0]);
-        apply_edit(&mut app, SwatchEdit::Add { group: Some("Dark".into()), name: "Color Swatch 1".into(), color });
+        apply_edit(&mut app, SwatchEdit::add(Some("Dark".into()), "Color Swatch 1".into(), color));
         let dark = app.session.presets.swatches.iter().find(|g| g.name == "Dark").unwrap();
         assert_eq!(dark.entries.last().unwrap().name, "Color Swatch 1", "into the selected swatch's group");
         assert_eq!(app.ui.swatches.rename, Some(SwatchKey::Swatch("Color Swatch 1".into())), "renamed in place");
@@ -436,7 +436,7 @@ mod tests {
         assert!(names.len() >= 2, "the default library has folders: {names:?}");
         let last = names.last().unwrap().clone();
         let rev = app.session.presets.rev;
-        apply_edit(&mut app, SwatchEdit::MoveGroup { group: last.clone(), to: 0 });
+        apply_edit(&mut app, SwatchEdit::move_group(last.clone(), 0));
         let order: Vec<String> = app.session.presets.swatches.iter().map(|g| g.name.clone()).collect();
         assert_eq!(order[0], last, "the dragged folder moved to the front: {order:?}");
         assert_eq!(order[1], names[0]);

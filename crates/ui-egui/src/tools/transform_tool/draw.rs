@@ -75,7 +75,7 @@ pub fn show_in_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Re
     }
     match apply {
         Some(ApplyBy::Key | ApplyBy::DoubleClick) => commit(app),
-        Some(ApplyBy::ClickOutside { at }) => commit::apply_click(app, at),
+        Some(ApplyBy::ClickOutside { at, .. }) => commit::apply_click(app, at),
         _ => {}
     }
     if discard {

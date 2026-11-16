@@ -25,8 +25,8 @@ fn app() -> PhotocraftApp {
 fn measure(rows: &RulerRows) -> Vec<String> {
     let text = |label: &Label| label.as_str().to_owned();
     match &rows.measure {
-        InfoMeasure::Line { angle, length } => vec![text(angle), text(length)],
-        InfoMeasure::Protractor { angle, first, second } => vec![text(angle), text(first), text(second)],
+        InfoMeasure::Line { angle, length, .. } => vec![text(angle), text(length)],
+        InfoMeasure::Protractor { angle, first, second, .. } => vec![text(angle), text(first), text(second)],
         _ => Vec::new(),
     }
 }

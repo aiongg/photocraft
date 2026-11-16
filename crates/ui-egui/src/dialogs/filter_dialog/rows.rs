@@ -524,7 +524,11 @@ fn points_at(fields: &DialogFields, key: &str) -> Vec<[f64; 2]> {
 fn samples_of(fields: &DialogFields) -> ColorSamples {
     let order: Vec<SampleSign> =
         fields.get("order").and_then(|v| serde_json::to_value(v).ok()).and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
-    ColorSamples { add: points_at(fields, "points"), subtract: points_at(fields, "subtractPoints"), order }
+    let mut samples = ColorSamples::default();
+    samples.add = points_at(fields, "points");
+    samples.subtract = points_at(fields, "subtractPoints");
+    samples.order = order;
+    samples
 }
 
 /// Sample the merged image at document point `at` into Replace Color's "From" colour.

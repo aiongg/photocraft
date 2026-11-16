@@ -77,17 +77,17 @@ pub(crate) fn can_delete(app: &PhotocraftApp, key: &HistoryKey) -> bool {
             Some(row) if row > st.history.past_len() => st.history.non_linear && app.session.is_enabled("history.deleteState"),
             Some(_) => true,
         },
+        _ => false,
     }
 }
 
 /// The footer buttons: with a snapshot selected the trash deletes it; otherwise it needs a past state.
 fn footer(app: &PhotocraftApp) -> HistoryFooter {
     let Some(st) = app.session.active() else { return HistoryFooter::default() };
-    HistoryFooter {
-        delete: selected_snapshot(app).is_some() || st.history.past_len() > 0,
-        new_snapshot: app.session.is_enabled("history.newSnapshot"),
-        new_document: app.session.is_enabled("history.newDocument"),
-    }
+    HistoryFooter::default()
+        .delete(selected_snapshot(app).is_some() || st.history.past_len() > 0)
+        .new_snapshot(app.session.is_enabled("history.newSnapshot"))
+        .new_document(app.session.is_enabled("history.newDocument"))
 }
 
 /// The active document and where its history stands at one moment: what [`file`] compares across a
@@ -157,7 +157,7 @@ pub(crate) fn apply(app: &mut PhotocraftApp, event: HistoryEvent) {
             ("history.setSource", json!({"state": row}))
         }
         HistoryEvent::SetSource(HistoryKey::Snapshot(id)) => ("history.setSource", json!({"snapshot": id})),
-        HistoryEvent::Rename { snapshot, text } => ("history.renameSnapshot", json!({"snapshot": snapshot, "name": text})),
+        HistoryEvent::Rename { snapshot, text, .. } => ("history.renameSnapshot", json!({"snapshot": snapshot, "name": text})),
         // With a snapshot selected the trash deletes it, as in Photoshop (#5324); otherwise it deletes
         // the current state, never the oldest.
         HistoryEvent::Delete(None) => {
@@ -180,11 +180,12 @@ pub(crate) fn apply(app: &mut PhotocraftApp, event: HistoryEvent) {
                     let Some(row) = st.history.row_of(id) else { return };
                     ("history.deleteState", json!({"state": row}))
                 }
+                _ => return,
             }
         }
         // ⌥-click opens New Snapshot (name, From) instead, as in Photoshop; with History Options ›
         // Show New Snapshot Dialog by Default a plain click does too.
-        HistoryEvent::NewSnapshot { mods } => {
+        HistoryEvent::NewSnapshot { mods, .. } => {
             if waits {
                 return;
             }

@@ -231,7 +231,7 @@ fn apply(app: &mut PhotocraftApp, paragraph: bool, style: &Value, change: &Style
                 run(app, &format!("{prefix}.rename"), json!({ "id": id, "name": name }));
             }
         }
-        StyleOptionsChange::Include { attribute, on } => {
+        StyleOptionsChange::Include { attribute, on, .. } => {
             let key = attribute_key(*attribute);
             if key.is_empty() {
                 return;

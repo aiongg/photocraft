@@ -274,11 +274,7 @@ impl Markers {
         let track = Track::new(app, text)?;
         let TextShape::Path { flip, .. } = &text.shape else { return None };
         let original = effective_range(text, &track.geometry)?;
-        let shown = valid_proposal(app).map_or(PathRange { start: original[0], end: original[1], flip: *flip }, |p| PathRange {
-            start: p.range[0],
-            end: p.range[1],
-            flip: p.flip,
-        });
+        let shown = valid_proposal(app).map_or(PathRange::new(original[0], original[1], *flip), |p| PathRange::new(p.range[0], p.range[1], p.flip));
         // The text is measured with the range it is shown with, so the plus follows the drag.
         let mut preview = text.clone();
         if let TextShape::Path { start, end, flip, .. } = &mut preview.shape {
@@ -489,7 +485,7 @@ mod tests {
 
     /// A range that sits on the layer's own side of the path.
     fn range(start: f64, end: f64) -> PathRange {
-        PathRange { start, end, flip: false }
+        PathRange::new(start, end, false)
     }
 
     /// Returns the text shape of the active text layer in test assertions.
@@ -709,7 +705,7 @@ mod tests {
     fn a_flipped_range_commits_with_its_side() {
         let mut app = app(Tool::PathSelection);
         let id = layer(&app);
-        place(&mut app, id, PathRange { start: 60.0, end: 140.0, flip: true });
+        place(&mut app, id, PathRange::new(60.0, 140.0, true));
         assert_eq!(placement(&app), (60.0, Some(140.0), true));
     }
 

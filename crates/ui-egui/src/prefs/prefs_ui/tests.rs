@@ -412,7 +412,7 @@ fn system_theme_menu_choice_stays_checked_as_the_appearance_changes() {
         assert_eq!(app.session.prefs.rev(), revision);
         assert_eq!(saved_text(&store), Some(saved.clone()));
     }
-    let solarized = ThemeChoice::Theme { id: AppTheme::solarized_dark().id().clone(), dark: true };
+    let solarized = ThemeChoice::theme(AppTheme::solarized_dark().id().clone(), true);
     pick_theme(&mut app, &ctx, &solarized);
     for appearance in [Some(egui::Theme::Light), Some(egui::Theme::Dark)] {
         appearance_frame(&mut app, &ctx, appearance);
@@ -471,7 +471,7 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
     assert!(h.query_by_label("Remove from Favorites: Classic").is_some());
     let nodes = theme_menu(h.state()).favorite_items(&ThemeLabels::default(), CommandRef::new("edit.preferences.interface"));
     let listed: Vec<_> = nodes.iter().filter_map(|node| if let Node::Item(item) = node { Some(item.command.clone()) } else { None }).collect();
-    let classic = ThemeChoice::Theme { id: ThemeId::parse("craft.classic").unwrap(), dark: false };
+    let classic = ThemeChoice::theme(ThemeId::parse("craft.classic").unwrap(), false);
     assert!(listed.contains(&classic.command()), "{listed:?}");
     assert_eq!(listed.len(), 2, "the settings row and the one favourite: {listed:?}");
 }
@@ -573,7 +573,7 @@ fn preferences_persist_through_services_and_theme_follows() {
     assert_eq!(app2.session.prefs().performance.history_states, 12);
     assert_eq!(app2.ui.theme, AppTheme::studio_light());
     // Picking a theme from the Window menu becomes the preference.
-    pick_theme(&mut app2, &ctx, &ThemeChoice::Theme { id: AppTheme::classic().id().clone(), dark: false });
+    pick_theme(&mut app2, &ctx, &ThemeChoice::theme(AppTheme::classic().id().clone(), false));
     tick(&mut app2, &ctx);
     assert_eq!(app2.session.prefs().interface.light_theme, "craft.classic");
     assert_eq!(stored(&store)["interface"]["lightTheme"], "craft.classic");

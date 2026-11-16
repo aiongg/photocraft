@@ -167,7 +167,7 @@ fn snapshot_rows_select_rename_and_delete() {
     assert_eq!(selected_snapshot(&app), None);
     assert_eq!(state(&app).2, revision, "and runs no command");
 
-    apply(&mut app, HistoryEvent::Rename { snapshot: id, text: "Lesson start".into() });
+    apply(&mut app, HistoryEvent::rename(id, "Lesson start"));
     assert_eq!(app.perf.last_command, "history.renameSnapshot");
     let names: Vec<String> = app.session.active().unwrap().snapshots.iter().skip(1).map(|s| s.name.clone()).collect();
     assert_eq!(names, ["Lesson start"]);
@@ -360,7 +360,7 @@ fn alt_click_on_the_camera_opens_new_snapshot() {
     app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
-    apply(&mut app, HistoryEvent::NewSnapshot { mods: Mods::ALT });
+    apply(&mut app, HistoryEvent::new_snapshot(Mods::ALT));
     assert_eq!(snapshots(&app), 1, "⌥-click opens the dialog instead");
     assert!(snapshot_dialog_open(&app));
 }
@@ -374,7 +374,7 @@ fn show_new_snapshot_dialog_by_default_makes_a_click_open_the_dialog() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
         app.run("history.options", json!({"showNewSnapshotDialogByDefault": dialog_by_default})).unwrap();
-        apply(&mut app, HistoryEvent::NewSnapshot { mods });
+        apply(&mut app, HistoryEvent::new_snapshot(mods));
         let dialog = snapshot_dialog_open(&app);
         if dialog_by_default {
             assert!(dialog, "{mods:?}: the dialog opens");

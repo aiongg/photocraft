@@ -104,7 +104,7 @@ pub(crate) fn readings<'a>(app: &mut PhotocraftApp, samplers: &'a [(SamplerReado
         // Colour-managed CMYK in percent like Photoshop's readout, through the same conversion as the Color
         // Picker (#8101) and the Color Sampler readout (`sampler_cmds::device_cmyk`).
         let cmyk = photocraft_color::convert::with_cmyk_space(cmyk_space.as_ref(), || photocraft_engine::sampler_cmds::device_cmyk(c[0], c[1], c[2]));
-        InfoColor { rgb: [byte(c[0]), byte(c[1]), byte(c[2])], cmyk: cmyk.map(|v| v.clamp(0, 100) as u8) }
+        InfoColor::from_parts([byte(c[0]), byte(c[1]), byte(c[2])], cmyk.map(|v| v.clamp(0, 100) as u8))
     });
     // Measured from the rulers' zero point (#2955).
     let at = |axis: usize, px: f64| Label::from(units.format(px - origin[axis], dpi, extent[axis]));

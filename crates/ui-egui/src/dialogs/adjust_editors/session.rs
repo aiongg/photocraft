@@ -203,15 +203,7 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
     let mut picker: Option<TonePicker> = armed;
     let out = {
         let run = editor(kind, setup);
-        let mut cx = AdjustDialogCx {
-            context: AdjustContext::properties(dynamic).gray(gray),
-            canvas: None,
-            picker: &mut picker,
-            channel: &mut record.channel,
-            select_point: None,
-            clipping: &mut record.clipping,
-            edit: None,
-        };
+        let mut cx = AdjustDialogCx::new(AdjustContext::properties(dynamic).gray(gray), &mut picker, &mut record.channel, &mut record.clipping);
         run(ui, &mut value, &mut cx)
     };
     if picker != armed {

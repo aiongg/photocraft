@@ -163,7 +163,7 @@ fn ui_set_changes_only_the_place_fields_it_names() {
     assert_eq!(bar(&h).expect("bar").left_top(), dropped.left_top());
     // Placing it keeps the pin.
     control(&mut h, "ui.set", json!({"panels": {"task_bar": {"at": [12.0, 34.0]}}}));
-    assert_eq!(h.state().ui.panels.task_bar, photocraft_ui_egui::state::TaskBarPlace { pinned: true, at: Some([12.0, 34.0]) });
+    assert_eq!(h.state().ui.panels.task_bar, photocraft_ui_egui::state::TaskBarPlace::new(true, Some([12.0, 34.0])));
     // A field the bar doesn't have is refused, and nothing changes.
     let v = request(&mut h, "ui.set", json!({"panels": {"task_bar": {"pinned": false, "nope": 1}}}));
     assert_eq!(v["ok"], false, "{v}");

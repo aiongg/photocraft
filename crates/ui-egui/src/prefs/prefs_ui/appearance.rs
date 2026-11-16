@@ -91,7 +91,7 @@ pub fn theme_menu(app: &PhotocraftApp) -> ThemeMenu {
         AppearanceMode::Auto => ThemeChoice::System,
         _ => {
             let (id, dark) = selected_theme(interface, None);
-            ThemeChoice::Theme { id, dark }
+            ThemeChoice::theme(id, dark)
         }
     };
     let favorites: Vec<ThemeId> = interface.favorite_themes.iter().filter_map(|f| ThemeId::parse(f).ok()).collect();

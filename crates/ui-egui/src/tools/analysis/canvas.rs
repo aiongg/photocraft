@@ -112,9 +112,9 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut AnalysisTools, _respons
     }
     for event in state.sampler.take_events() {
         let result = match event {
-            SamplerEvent::Add { at } => app.run("view.colorSamplers.add", json!({"x": at[0], "y": at[1]})),
-            SamplerEvent::Move { index, to } => app.run("view.colorSamplers.move", json!({"index": index, "x": to[0], "y": to[1]})),
-            SamplerEvent::Remove { index } => app.run("view.colorSamplers.delete", json!({"index": index})),
+            SamplerEvent::Add { at, .. } => app.run("view.colorSamplers.add", json!({"x": at[0], "y": at[1]})),
+            SamplerEvent::Move { index, to, .. } => app.run("view.colorSamplers.move", json!({"index": index, "x": to[0], "y": to[1]})),
+            SamplerEvent::Remove { index, .. } => app.run("view.colorSamplers.delete", json!({"index": index})),
             _ => continue,
         };
         status_on_err(app, result);
