@@ -84,7 +84,7 @@ fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3
         let response = photocraft_ui_egui::control::handle(harness.state_mut(), &ctx, &request);
         let photocraft_ui_egui::control::Reply::Done(opened) = response else { panic!("the filter dialog did not open") };
         let filter_dialog = opened["result"]["dialog"].clone();
-        assert!(filter_dialog.is_u64(), "the menu reply names the dialog: {opened}");
+        assert!(filter_dialog.as_str().is_some_and(|id| id.parse::<u64>().is_ok()), "the menu reply names the dialog: {opened}");
         harness.run_steps(6);
         let preview = id.0 ^ (1u64 << 61);
         assert!(observer.has(preview, [512, 512]), "filter preview uploaded");
@@ -106,7 +106,7 @@ fn render(profile: &str, rgb: [f32; 3], reopen: bool) -> Option<([u8; 3], [u8; 3
             panic!("the adjustment dialog did not open")
         };
         let adjustment_dialog = opened["result"]["dialog"].clone();
-        assert!(adjustment_dialog.is_u64(), "the menu reply names the dialog: {opened}");
+        assert!(adjustment_dialog.as_str().is_some_and(|id| id.parse::<u64>().is_ok()), "the menu reply names the dialog: {opened}");
         photocraft_ui_egui::adjust_preview::display_doc(harness.state_mut(), 0).expect("adjustment preview");
         harness.state_mut().run("file.close", json!({})).expect("close adjustment owner");
         assert!(photocraft_ui_egui::adjust_preview::shown_key(harness.state()).is_none(), "close drops adjustment preview state before same-ID reopen");

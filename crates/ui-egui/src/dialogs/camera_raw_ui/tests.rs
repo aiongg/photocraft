@@ -81,8 +81,15 @@ fn settle(app: &mut PhotocraftApp) {
 /// result pump of that frame left.
 fn done(app: &mut PhotocraftApp, ctx: &egui::Context) -> Result<Value, String> {
     menu(app, ctx, "filter.cameraRaw", &json!({"ui": {"done": true}})).unwrap()?;
-    frame(app);
-    app.raw_reply.take().expect("the frame answered Done")
+    // The workspace reports the request on a pass of its own, and the pump answers it in the frame after.
+    for _ in 0..50 {
+        frame(app);
+        if let Some(reply) = app.raw_reply.take() {
+            return reply;
+        }
+        craft::ui::runtime::pending::finish_jobs(app.ctx(), std::time::Duration::from_secs(30));
+    }
+    panic!("the frame answered Done")
 }
 
 /// A `menu` request followed by the develop it asks for. The reply describes the open dialog
