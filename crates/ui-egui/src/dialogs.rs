@@ -90,6 +90,7 @@ pub(crate) mod params {
             ..ParamFamily::new(crate::canvas_tool_menu::pen_dialogs::owns, crate::canvas_tool_menu::pen_dialogs::run)
         },
         ParamFamily::new(crate::analysis::dialogs::owns, crate::analysis::dialogs::run),
+        ParamFamily::new(crate::layers_panel_ui::owns, crate::layers_panel_ui::run),
         ParamFamily {
             check: Some(image_processor_ui::check),
             cancel: Some(filter_dialog::cancel),
