@@ -1700,17 +1700,17 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
 /// one a request asks for (a secondary press the tool did not take, the Menu key, or a guide's
 /// context request, or a secondary press on the Crop frame's overlay), and shows the open menu on the framework's menu layer at its press point, then
 /// the Brush Preset picker. A pass applies only its own requests: `host.context`,
-/// `guides.context` and `crop_context` are this pass's, so a second pass in a frame opens nothing twice.
+/// `guides.context` and `overlay_context` are this pass's, so a second pass in a frame opens nothing twice.
 pub(crate) fn run(
     ui: &mut egui::Ui,
     app: &mut PhotocraftApp,
     canvas: &CanvasOutput,
     host: &ToolHostResponse,
     guides: Option<&GuidesOutput>,
-    crop_context: Option<(Pos2, Mods)>,
+    overlay_context: Option<(Pos2, Mods)>,
 ) {
     close_stale(app);
-    if let Some((at, mods)) = crop_context
+    if let Some((at, mods)) = overlay_context
         && let Some(view) = crate::canvas::document_display::active_view(app)
     {
         // The overlay takes the press the tool host would have reported, so the Space-held Hand's menu is picked here

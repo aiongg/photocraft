@@ -37,6 +37,15 @@ pub(crate) struct TypeState {
     /// The press of this pass ended an open session (the editor commits on a background press): it starts no new
     /// text, as in Photoshop. Set by the canvas controls before the tool runs, taken by the press, cleared by `drain`.
     pub(super) began_with_session: bool,
+    /// Where a secondary press on the text editor was released and the modifiers held then, taken once by the canvas
+    /// body for the canvas menu (the editor's part takes the press, so the host never reports it).
+    pub(super) context: Option<(egui::Pos2, Mods)>,
+}
+
+impl TypeState {
+    pub(crate) fn take_context(&mut self) -> Option<(egui::Pos2, Mods)> {
+        self.context.take()
+    }
 }
 
 /// The Type tool for a pass (`tools::run`), for the four type tools.
