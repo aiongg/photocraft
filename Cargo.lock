@@ -1366,7 +1366,6 @@ dependencies = [
 name = "craft"
 version = "0.1.0"
 dependencies = [
- "craft-ai-agents",
  "craft-automation",
  "craft-behavior",
  "craft-browse",
@@ -1374,7 +1373,6 @@ dependencies = [
  "craft-color",
  "craft-dialogs",
  "craft-draw",
- "craft-flags",
  "craft-font-catalog",
  "craft-font-manager",
  "craft-host",
