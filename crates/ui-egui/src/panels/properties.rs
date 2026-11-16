@@ -78,9 +78,13 @@ pub(super) fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         _ => Body::Layer,
     };
     let mut inspector = inspector.target(target);
-    if let (Some(l), true) = (layer, shown != Body::Document) {
-        inspector = inspector.header(l.name.clone()).icon(IconSpec::svg(IconId::new(kind_icon(&l.content)))).kind(tl!(&kind_label(l)).to_string());
-    }
+    // The Document properties are headed by the document, as production's panel is.
+    inspector = match layer {
+        Some(l) if shown != Body::Document => {
+            inspector.header(l.name.clone()).icon(IconSpec::svg(IconId::new(kind_icon(&l.content)))).kind(tl!(&kind_label(l)).to_string())
+        }
+        _ => inspector.header(tl!("Document")).icon(IconSpec::svg(IconId::new("file"))),
+    };
     inspector.show(ui, |ui, _| {
         let Some(layer) = layer else {
             if shown == Body::Document {
