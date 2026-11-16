@@ -115,7 +115,7 @@ pub struct SelectionPreview {
 /// dialog's sample points are clamped to the document's size.
 
 pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
-    let label = photocraft_engine::commands::find(COMMAND).map_or(tl!("Color Range…"), |c| c.label);
+    let label = crate::dialogs::filter_dialog::title_of(photocraft_engine::commands::find(COMMAND).map_or(tl!("Color Range…"), |c| c.label));
     let idx = app.session.active_index().ok_or("no document")?;
     let size = app.session.active().map(|st| [st.doc.size.width, st.doc.size.height]).ok_or("no document")?;
     app.color_range = None;

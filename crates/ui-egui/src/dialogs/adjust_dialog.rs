@@ -604,7 +604,7 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, recorded: Value, smart: O
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
     let value = DialogValue { value: seeded.value, cx: seeded.cx };
     let mut dialog =
-        HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), crate::i18n::t(spec.label).to_string(), value, shared_editor(kind.clone(), setup.clone()))
+        HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), super::filter_dialog::title_of(spec.label), value, shared_editor(kind.clone(), setup.clone()))
             .context(dynamic, gray)
             .reset_with(reset_target(kind.clone()))
             .json_form(json_form)

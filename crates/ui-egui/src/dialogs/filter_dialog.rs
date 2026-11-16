@@ -489,7 +489,7 @@ fn reset_values(params: &[Param], opening: &DialogFields) -> DialogFields {
 }
 
 /// The dialog's title: the command's label without its ellipsis.
-fn title_of(label: &str) -> Label {
+pub(crate) fn title_of(label: &str) -> Label {
     Label::from(crate::i18n::t(label).trim_end_matches('…').to_string())
 }
 
