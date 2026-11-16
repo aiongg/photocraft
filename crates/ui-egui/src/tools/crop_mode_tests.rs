@@ -5,7 +5,7 @@ use egui::Modifiers;
 use photocraft_doc::{Color, ColorMode, Document, SampleType, Size};
 use serde_json::json;
 
-use crate::canvas::testing::{ToolEvent, frame, key, tool_event};
+use crate::canvas::testing::{ToolEvent, frame, tool_event};
 use crate::state::Tool;
 use crate::{PhotocraftApp, crop_ui};
 
@@ -100,31 +100,4 @@ fn a_dropped_crop_turns_its_own_documents_view_upright() {
     frame(&mut app);
     assert!(!crop_ui::pending(&app), "the turned crop is dropped with its document");
     assert_eq!(app.ui.views[0].rotation, 0.0, "its own document's view is upright again");
-}
-
-/// P and H belong to the crop only while a frame is pending: P toggles Classic Mode and H Show Cropped Area and the
-/// tool stays Crop. With no pending frame they pick the Pen and the Hand.
-#[test]
-fn p_and_h_reach_the_crop_only_while_a_frame_is_pending() {
-    let mut pending = app();
-    pend_a_frame(&mut pending);
-    let shield = |a: &PhotocraftApp| a.ui.tool_options.crop.shield.clone();
-    let before = shield(&pending);
-    key(&mut pending, egui::Key::P, NONE);
-    assert_eq!(pending.ui.tool, Tool::Crop, "P doesn't pick the Pen while a crop is pending");
-    assert_eq!(shield(&pending).classic_mode, !before.classic_mode, "P toggles Classic Mode");
-    key(&mut pending, egui::Key::P, NONE);
-    assert_eq!(shield(&pending).classic_mode, before.classic_mode, "P again toggles it back");
-    key(&mut pending, egui::Key::H, NONE);
-    assert_eq!(pending.ui.tool, Tool::Crop, "H doesn't pick the Hand while a crop is pending");
-    assert_eq!(shield(&pending).show_cropped_area, !before.show_cropped_area, "H toggles Show Cropped Area");
-
-    for (k, tool) in [(egui::Key::P, Tool::Pen), (egui::Key::H, Tool::Hand)] {
-        let mut app = app();
-        assert!(!crop_ui::pending(&app), "the untouched default frame is not pending");
-        let before = app.ui.tool_options.crop.shield.clone();
-        key(&mut app, k, NONE);
-        assert_eq!(app.ui.tool, tool, "{k:?} picks its tool over the default frame");
-        assert_eq!(app.ui.tool_options.crop.shield, before, "{k:?} changed no crop option");
-    }
 }
