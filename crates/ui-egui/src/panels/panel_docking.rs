@@ -178,19 +178,12 @@ impl DockPanels<String> for Panels<'_> {
     }
 }
 
-/// Draws panel `id`'s body in `ui`: in a vertical scroll area, unless the panel lays out its own scrolling list or
-/// sizes itself to the group.
+/// Draws panel `id`'s body in `ui`, the group's body room. Each body fills that room and scrolls itself.
 pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
     let Some(entry) = registry::entry(id) else { return };
     #[cfg(test)]
     probe::record(ui.ctx(), id, ui.max_rect(), false);
-    if entry.scrolls_itself {
-        (entry.body)(app, ui);
-    } else {
-        // No scroll fade: it darkens real colours, swatches and previews at the edge (#2726).
-        ui.spacing_mut().scroll.fade.strength = 0.0;
-        egui::ScrollArea::vertical().id_salt(("panel body", id)).auto_shrink([false, false]).show(ui, |ui| (entry.body)(app, ui));
-    }
+    (entry.body)(app, ui);
 }
 
 /// Draws the workspace, the canvas included, in the room `ui` has left.
