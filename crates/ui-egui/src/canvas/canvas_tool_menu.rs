@@ -1,13 +1,8 @@
-<<<<<<< HEAD
-//! Canvas context menus for the selection tools, the Pen, the Zoom and Hand tools, text being edited
-//! with a Type tool, committed type under a Type tool, the pasteboard (outside the image), a guide, a
-//! pending crop, the layer list and the painting tools' mode list. The menu is state in
-//! `UiState::canvas_tool_menu`; [`run`] shows it on the framework's menu layer every pass.
-=======
-//! Canvas context menus for the selection tools, the Pen, the Line tool in Shape mode, the Zoom
-//! and Hand tools, an active Free Transform box, text being edited with a Type tool, committed type
-//! under a Type tool, the pasteboard (outside the image), a guide and a pending crop.
->>>>>>> upstream/main
+//! Canvas context menus for the selection tools, the Pen, the Line tool in Shape mode, the Zoom and
+//! Hand tools, text being edited with a Type tool, committed type under a Type tool, the pasteboard
+//! (outside the image), a guide, a pending crop, the layer list and the painting tools' mode list.
+//! The menu is state in `UiState::canvas_tool_menu`; [`run`] shows it on the framework's menu layer
+//! every pass.
 
 use craft::behavior::IconId;
 use craft::draw::ui::crop::{CROP_RATIOS, CROP_SIZES, CropBarWords, CropPresetChoice, CropRatio, CropSettings, CropSizeFields};
@@ -727,11 +722,11 @@ pub const PEN_MENU: &[Row] = &[
     Some(("Disable Symmetry Path", "paint.symmetryDisable")),
 ];
 
-<<<<<<< HEAD
 /// Is a path with at least two points being drawn with the Pen?
 pub(crate) fn pen_pending(app: &PhotocraftApp) -> bool {
     app.ui.pen.as_ref().is_some_and(|p| p.draft.knots.len() >= 2)
-=======
+}
+
 /// The shape tools' canvas menu in Shape mode (#13249), measured with the Line tool: the Pen's
 /// path rows without Create Vector Mask, Delete Path, Clipping Path… or the Symmetry rows, plus
 /// Blending Options… and the Rasterize rows. `$transform` is the transform row: Free Transform with
@@ -798,11 +793,10 @@ pub fn shape_tool_menu(tool: Tool) -> bool {
 /// Does a right-click with a shape tool open its menu? Only where measured: Shape mode, over
 /// a pixel or shape layer. Path and Pixels mode, and other layer kinds, keep opening nothing.
 fn shape_menu_measured(app: &PhotocraftApp) -> bool {
-    app.ui.tool_options.shape_mode == "shape"
+    app.ui.tool_options.shape_mode == craft::draw::ui::VectorMode::Shape
         && app.session.active().is_some_and(|st| {
             st.active_layer.and_then(|id| st.doc.layer(id)).is_some_and(|l| matches!(l.content, LayerContent::Raster(_) | LayerContent::Shape(_)))
         })
->>>>>>> upstream/main
 }
 
 /// The label a row shows, untranslated. The Pen's transform row names what it acts on, as in
@@ -901,7 +895,7 @@ fn red_eye_measured(app: &PhotocraftApp, doc: Option<[f64; 2]>) -> bool {
 
 /// Tools whose plain canvas right-click opens a menu: the selection tools' actions, the
 /// Content-Aware Move menu, the path menu, the Color Sampler's, the Red Eye tool's and the shape
-/// tools' (in Shape mode only: [`open_at`] checks it).
+/// tools' (in Shape mode only: [`open`] checks it).
 pub fn applies(tool: Tool) -> bool {
     matches!(
         tool,
@@ -1001,7 +995,6 @@ pub fn selection_rows(has_selection: bool) -> &'static [Row] {
 
 /// The rows of an open menu. The crop, layer and brush-mode menus build theirs per menu: empty here.
 pub fn rows(menu: &CanvasToolMenu) -> &'static [Row] {
-<<<<<<< HEAD
     match &menu.kind {
         MenuKind::Crop { .. } | MenuKind::Layers { .. } | MenuKind::BrushMode => &[],
         MenuKind::Guide => GUIDE_MENU,
@@ -1018,11 +1011,13 @@ pub fn rows(menu: &CanvasToolMenu) -> &'static [Row] {
         MenuKind::Tool => {
             if path_menu(menu.tool) {
                 PEN_MENU
+            } else if shape_tool_menu(menu.tool) {
+                if menu.has_path { SHAPE_MENU } else { SHAPE_MENU_NO_PATH }
             } else if sampler_menu(menu) {
                 SAMPLER_MENU
             } else if menu.tool == Tool::Count {
                 COUNT_MENU
-            } else if menu.tool == Tool::RedEye {
+            } else if matches!(menu.tool, Tool::RedEye | Tool::ObjectSelection) {
                 if menu.has_selection { MEASURED_SELECTION_MENU } else { COUNT_MENU }
             } else if menu.tool == Tool::Eyedropper {
                 EYEDROPPER_MENU
@@ -1032,39 +1027,6 @@ pub fn rows(menu: &CanvasToolMenu) -> &'static [Row] {
                 selection_rows(menu.has_selection)
             }
         }
-=======
-    if menu.crop.is_some() {
-        // Built per menu: [`crop_rows`].
-        &[]
-    } else if menu.guide {
-        GUIDE_MENU
-    } else if menu.pasteboard {
-        PASTEBOARD_MENU
-    } else if menu.transform {
-        TRANSFORM_MENU
-    } else if menu.anchor.is_some() {
-        if menu.tool == Tool::Hand { HAND_MENU } else { VIEW_MENU }
-    } else if menu.text {
-        TYPE_EDIT_MENU
-    } else if menu.type_layer {
-        type_layer_rows(menu)
-    } else if path_menu(menu.tool) {
-        PEN_MENU
-    } else if shape_tool_menu(menu.tool) {
-        if menu.has_path { SHAPE_MENU } else { SHAPE_MENU_NO_PATH }
-    } else if sampler_menu(menu) {
-        SAMPLER_MENU
-    } else if menu.tool == Tool::Count {
-        COUNT_MENU
-    } else if matches!(menu.tool, Tool::RedEye | Tool::ObjectSelection) {
-        if menu.has_selection { MEASURED_SELECTION_MENU } else { COUNT_MENU }
-    } else if menu.tool == Tool::Eyedropper {
-        EYEDROPPER_MENU
-    } else if inside_selection(menu) {
-        CAM_INSIDE_SELECTION_MENU
-    } else {
-        selection_rows(menu.has_selection)
->>>>>>> upstream/main
     }
 }
 
@@ -1259,82 +1221,6 @@ pub fn pasteboard_at(app: &PhotocraftApp, tool: Tool, doc: [f64; 2]) -> bool {
     outside && !path_menu(tool) && !crate::paint_mouse::has_brush_picker(tool) && !crate::paint_mouse::right_erases(app, tool) && !editing_text(app, tool)
 }
 
-<<<<<<< HEAD
-=======
-/// Right-click on the pasteboard: its colour menu at screen point `pos`.
-pub fn open_pasteboard(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, pos: [f32; 2]) -> bool {
-    if !pos.iter().all(|v| v.is_finite()) {
-        return false;
-    }
-    app.ui.brush_picker = None;
-    app.ui.layer_menu = None;
-    app.ui.canvas_tool_menu = Some(CanvasToolMenu {
-        pos,
-        tool,
-        has_selection: false,
-        has_path: false,
-        path_name: None,
-        transform: false,
-        pasteboard: true,
-        anchor: None,
-        // Space's Hand keeps the menu over the selected tool (#11271); a held zoom key's goes with
-        // the key, as before.
-        under: (tool == Tool::Hand && tool != app.ui.tool).then_some(app.ui.tool),
-        text: false,
-        type_layer: false,
-        type_shape: None,
-        guide: false,
-        spelling: None,
-        crop: None,
-        sampler: None,
-        sampler_at: None,
-        color: None,
-        inside_selection: false,
-        point: None,
-    });
-    crate::canvas_popup::mark_open(ctx, menu_id());
-    true
-}
-
-/// Right-click at document point `doc` on a guide that `tool` could drag (the Move tool, or ⌘ with
-/// a tool on which ⌘ moves guides, `canvas::command_guide_at`): select the guide and open the guide
-/// menu at screen point `pos`.
-pub fn open_guide(app: &mut PhotocraftApp, ctx: &Context, tool: Tool, mods: egui::Modifiers, pos: [f32; 2], doc: [f64; 2]) -> bool {
-    if !pos.iter().all(|v| v.is_finite()) || !doc.iter().all(|v| v.is_finite()) {
-        return false;
-    }
-    let hit = if tool == Tool::Move { crate::rulers::guide_at(app, doc[0], doc[1]) } else { crate::canvas::command_guide_at(app, tool, doc, mods) };
-    let Some((vertical, index)) = hit else { return false };
-    crate::guide_select::select(app, vertical, index);
-    app.ui.brush_picker = None;
-    app.ui.layer_menu = None;
-    app.ui.canvas_tool_menu = Some(CanvasToolMenu {
-        pos,
-        tool,
-        has_selection: false,
-        has_path: false,
-        path_name: None,
-        transform: false,
-        pasteboard: false,
-        anchor: None,
-        under: None,
-        text: false,
-        type_layer: false,
-        type_shape: None,
-        guide: true,
-        spelling: None,
-        crop: None,
-        sampler: None,
-        sampler_at: None,
-        color: None,
-        inside_selection: false,
-        point: None,
-    });
-    crate::canvas_popup::mark_open(ctx, menu_id());
-    true
-}
-
->>>>>>> upstream/main
 /// A guide row: every row is a View › Guides command, the two Selected Guides ones included.
 fn choose_guide(app: &mut PhotocraftApp, ctx: &Context, command: &str) -> Result<(), String> {
     crate::menus::invoke(app, ctx, command, json!({})).map(|_| ())
@@ -1395,11 +1281,7 @@ pub fn entry_enabled(app: &PhotocraftApp, menu: &CanvasToolMenu, command: &str) 
     if inside_selection(menu) && command == "select.loadSelection" {
         return app.session.active().is_some_and(|st| st.doc.channels.iter().any(|c| c.spot.is_none())) && crate::menus::is_enabled(app, command);
     }
-<<<<<<< HEAD
-    if !path_menu(menu.tool) {
-=======
-    if menu.transform || !(path_menu(menu.tool) || shape_tool_menu(menu.tool)) {
->>>>>>> upstream/main
+    if !(path_menu(menu.tool) || shape_tool_menu(menu.tool)) {
         return crate::menus::is_enabled(app, command);
     }
     if shape_tool_menu(menu.tool) {
@@ -1462,58 +1344,6 @@ pub fn open_at(app: &mut PhotocraftApp, tool: Tool, mods: Mods, at: Pos2, doc: [
         }
         None => false,
     }
-<<<<<<< HEAD
-=======
-    // Without an active document or in Bitmap/Duotone/Multichannel modes, Content-Aware Move opens
-    // no menu (#12194); release any non-held control-channel HUD that would otherwise stay open.
-    if tool == Tool::ContentAwareMove && !cam_allowed(app) {
-        crate::color_hud::release(&mut app.ui);
-        return false;
-    }
-    if tool == Tool::RedEye && !red_eye_measured(app, doc) {
-        return false;
-    }
-    if shape_tool_menu(tool) && !text && !type_layer && !shape_menu_measured(app) {
-        return false;
-    }
-    app.ui.brush_picker = None;
-    app.ui.layer_menu = None;
-    let has_selection = app.session.active().is_some_and(|s| s.doc.selection.is_some());
-    let has_path = crate::vector_ui::active_path_name(app).is_some() || app.ui.pen.as_ref().is_some_and(|p| p.knots.len() >= 2);
-    let path_name = crate::vector_ui::active_path_name(app);
-    let spelling = if text { doc.and_then(|d| spelling_at(app, d)) } else { None };
-    let point = if point_menu(tool) && has_path { doc.filter(|d| d.iter().all(|v| v.is_finite())).and_then(|d| point_at(app, d)) } else { None };
-    let inside_selection = tool == Tool::ContentAwareMove && doc.is_some_and(|d| selected_at(app, d));
-    let sampler = if tool == Tool::ColorSampler { doc.and_then(|d| crate::analysis_ui::sampler_at(app, d)) } else { None };
-    let sampler_at = sampler.and_then(|i| Some((app.session.active_index()?, *app.session.active()?.color_samplers.get(i)?)));
-    // The Eyedropper reads the colour now, under the right-click: all layers, with the Sample
-    // Size, whatever its Sample setting (#11747). Picking a row later copies this colour.
-    let color = if tool == Tool::Eyedropper && !text && !type_layer { doc.and_then(|d| crate::canvas::composite_color(app, d[0], d[1])) } else { None };
-    app.ui.canvas_tool_menu = Some(CanvasToolMenu {
-        pos,
-        tool,
-        has_selection,
-        has_path,
-        path_name,
-        transform: false,
-        pasteboard: false,
-        anchor: None,
-        under: None,
-        text,
-        type_layer,
-        type_shape,
-        guide: false,
-        spelling,
-        crop: None,
-        sampler,
-        sampler_at,
-        color,
-        inside_selection,
-        point,
-    });
-    crate::canvas_popup::mark_open(ctx, menu_id());
-    true
->>>>>>> upstream/main
 }
 
 /// Opens the menu of `kind` for `tool` at screen point `at`, over document point `doc`, gathering
@@ -1544,7 +1374,14 @@ pub fn open(app: &mut PhotocraftApp, tool: Tool, kind: MenuKind, at: Pos2, doc: 
         MenuKind::Pasteboard | MenuKind::Guide | MenuKind::BrushMode if kind == MenuKind::BrushMode && crate::brush_mode_menu::items(tool).is_empty() => {
             return false;
         }
-        MenuKind::Pasteboard | MenuKind::Guide => menu.kind = kind,
+        MenuKind::Pasteboard | MenuKind::Guide => {
+            // Space's Hand keeps the menu over the selected tool (#11271); a held zoom key's goes with
+            // the key, as before.
+            if kind == MenuKind::Pasteboard {
+                menu.under = (tool == Tool::Hand && tool != app.ui.tool).then_some(app.ui.tool);
+            }
+            menu.kind = kind;
+        }
         MenuKind::BrushMode => {
             // The checked row reads the tool's own brush.
             crate::paint_mouse::sync_tool_brush(app);
@@ -1599,6 +1436,9 @@ pub fn open(app: &mut PhotocraftApp, tool: Tool, kind: MenuKind, at: Pos2, doc: 
                 return false;
             }
             if tool == Tool::RedEye && !red_eye_measured(app, Some(doc)) {
+                return false;
+            }
+            if shape_tool_menu(tool) && !shape_menu_measured(app) {
                 return false;
             }
             capture(app, &mut menu, doc, point);
@@ -1665,33 +1505,6 @@ pub fn choose(app: &mut PhotocraftApp, ctx: &Context, command: &str) {
     }
     let result = if is_point(&menu, command) {
         menu.point.as_ref().map_or(Ok(()), |(id, params, _)| app.run(id, params.clone()).map(|_| ()))
-<<<<<<< HEAD
-=======
-    } else if menu.crop.is_some() {
-        choose_crop(app, &menu, command)
-    } else if menu.guide {
-        choose_guide(app, ctx, command)
-    } else if menu.pasteboard {
-        choose_pasteboard(app, &menu, command)
-    } else if menu.anchor.is_some() {
-        choose_view(app, ctx, &menu, command)
-    } else if menu.text && is_spelling(&menu, command) {
-        choose_spelling(app, &menu, command)
-    } else if menu.text || menu.type_layer {
-        choose_type(app, ctx, command)
-    } else if !menu.transform && (path_menu(menu.tool) || (shape_tool_menu(menu.tool) && !shape_layer_row(command))) {
-        // The shape menu's path rows run as the Pen's; its layer rows as the menu bar's, below.
-        choose_pen(app, ctx, &menu, command)
-    } else if sampler_menu(&menu) {
-        let (id, params) = engine_call(app, &menu, command);
-        app.run(&id, params).map(|_| ())
-    } else if is_eyedropper(&menu) {
-        choose_eyedropper(app, ctx, &menu, command)
-    } else if command == "select.toWorkPath" {
-        // Photoshop's Make Work Path… asks for the tolerance first.
-        spec_dialog(app, command, "Make Work Path", r##"{"tolerance":0.5..10=2}"##, serde_json::Map::new());
-        Ok(())
->>>>>>> upstream/main
     } else {
         match &menu.kind {
             MenuKind::Crop { .. } => choose_crop(app, &menu, command),
@@ -1701,7 +1514,8 @@ pub fn choose(app: &mut PhotocraftApp, ctx: &Context, command: &str) {
             MenuKind::TypeEdit { .. } if is_spelling(&menu, command) => choose_spelling(app, &menu, command),
             MenuKind::TypeEdit { .. } | MenuKind::TypeLayer { .. } => choose_type(app, ctx, command),
             MenuKind::Layers { .. } | MenuKind::BrushMode => Ok(()),
-            MenuKind::Tool if path_menu(menu.tool) => choose_pen(app, ctx, &menu, command),
+            // The shape menu's path rows run as the Pen's; its layer rows as the menu bar's, below.
+            MenuKind::Tool if path_menu(menu.tool) || (shape_tool_menu(menu.tool) && !shape_layer_row(command)) => choose_pen(app, ctx, &menu, command),
             MenuKind::Tool if sampler_menu(&menu) => {
                 let (id, params) = engine_call(app, &menu, command);
                 app.run(&id, params).map(|_| ())
@@ -1828,92 +1642,6 @@ pub fn close_stale(app: &mut PhotocraftApp) {
             *shape = fresh;
         }
     }
-<<<<<<< HEAD
-=======
-    let id = menu_id();
-    let screen = ctx.content_rect();
-    let size = ctx.memory(|m| m.area_rect(id)).map_or(egui::vec2(210.0, 140.0), |r| r.size());
-    let pos = egui::pos2(menu.pos[0].min(screen.right() - size.x).max(screen.left()), menu.pos[1].min(screen.bottom() - size.y).max(screen.top()));
-    let mut selected = None;
-    let area = egui::Area::new(id).order(egui::Order::Foreground).fixed_pos(pos).show(ctx, |ui| {
-        egui::Frame::menu(ui.style()).show(ui, |ui| {
-            let t = crate::theme::Tokens::get(ui.ctx());
-            let v = &mut ui.style_mut().visuals;
-            v.widgets.inactive.weak_bg_fill = egui::Color32::TRANSPARENT;
-            v.widgets.inactive.bg_stroke = egui::Stroke::NONE;
-            v.widgets.hovered.weak_bg_fill = t.accent;
-            v.widgets.hovered.bg_fill = t.accent;
-            v.widgets.hovered.bg_stroke = egui::Stroke::NONE;
-            v.widgets.hovered.fg_stroke = egui::Stroke::new(1.0, egui::Color32::WHITE);
-            v.widgets.hovered.corner_radius = egui::CornerRadius::same(3);
-            ui.spacing_mut().item_spacing.y = 0.0;
-            ui.set_width(200.0);
-            crate::widgets::menu_scroll(ui, |ui| {
-                let spelling = spelling_rows(&menu);
-                for (label, command) in &spelling {
-                    let text = if spelling_label_is_ui(command) { tl!(label).to_string() } else { label.clone() };
-                    let item = egui::Button::new(text).min_size(egui::vec2(200.0, 20.0));
-                    if ui.add_enabled(entry_enabled(app, &menu, command), item).clicked() {
-                        selected = Some(command.clone());
-                    }
-                }
-                if !spelling.is_empty() {
-                    ui.separator();
-                }
-                for row in crop_rows(&menu) {
-                    let Some((label, command)) = row else {
-                        ui.separator();
-                        continue;
-                    };
-                    let text = if crop_label_is_ui(&command) { tl!(&label).to_string() } else { label };
-                    // The overlay rows carry their own glyph (#10889); the rest stay text-only.
-                    let mut atoms = egui::Atoms::default();
-                    if let Some(kind) = command.strip_prefix(CROP_OVERLAY).and_then(crate::crop_overlay::CropOverlay::from_id) {
-                        atoms.push_right(crate::icons::image(kind.icon(), 14.0, t.icon));
-                    }
-                    atoms.push_right(text);
-                    let item = egui::Button::selectable(mode_checked(app, &menu, &command), atoms).min_size(egui::vec2(200.0, 20.0));
-                    if ui.add_enabled(entry_enabled(app, &menu, &command), item).clicked() {
-                        selected = Some(command);
-                    }
-                }
-                if let Some((command, ..)) = &menu.point {
-                    let item = egui::Button::new(point_label(command)).min_size(egui::vec2(200.0, 20.0));
-                    if ui.add_enabled(available(app, &menu, command), item).clicked() {
-                        selected = Some(command.clone());
-                    }
-                    ui.separator();
-                }
-                for row in rows(&menu) {
-                    let Some((label, command)) = *row else {
-                        ui.separator();
-                        continue;
-                    };
-                    let text = match row_label(app, &menu, label, command) {
-                        // Spelled out so `cargo xtask i18n-coverage` lists the new label.
-                        "Free Transform Points" => tl!("Free Transform Points"),
-                        "Rasterize Vector Mask" => tl!("Rasterize Vector Mask"),
-                        key => tl!(key),
-                    };
-                    let item = egui::Button::selectable(mode_checked(app, &menu, command), text).min_size(egui::vec2(200.0, 20.0));
-                    if ui.add_enabled(entry_enabled(app, &menu, command), item).clicked() {
-                        selected = Some((*command).to_string());
-                    }
-                }
-            });
-        });
-    });
-    if let Some(command) = selected {
-        choose(app, ctx, &command);
-    } else if crate::canvas_popup::outside_pressed(ctx, id, area.response.rect) {
-        app.ui.canvas_tool_menu = None;
-        // A fast click can press and release in one frame: the canvas input above already
-        // suppressed its action through the open-menu hit test, and the deferred release clear
-        // (in `canvas_view`, below the click handling) would never fire after this frame. Don't
-        // arm the flag then, or it would eat the next ordinary click (CodeRabbit, #9841).
-        app.ui.canvas_tool_menu_dismissed = !ctx.input(|i| i.pointer.any_released());
-    }
->>>>>>> upstream/main
 }
 
 /// The rows of `menu` for the framework menu, each row's id the command [`choose`] takes: the
@@ -1960,6 +1688,7 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
         let text = match row_label(app, menu, label, command) {
             // Spelled out so `cargo xtask i18n-coverage` lists the new label.
             "Free Transform Points" => tl!("Free Transform Points"),
+            "Rasterize Vector Mask" => tl!("Rasterize Vector Mask"),
             key => tl!(key),
         };
         out.push(Entry::new(command.to_string(), text.to_string()).enabled(entry_enabled(app, menu, command)).checked(mode_checked(app, menu, command)));
