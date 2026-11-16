@@ -233,16 +233,16 @@ mod tests {
     /// at the heavy end (Size and Opacity on Pen Pressure); a mouse paints full strength.
     fn pressure_stroke(mut next: impl FnMut(f32) -> Option<Sample>) -> (f64, f64, f64, f64) {
         use egui_kittest::Harness;
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        let feed = app.stylus.feed.clone();
-        let sink = sink(feed);
-        app.session.execute("file.new", json!({"width": 240, "height": 80, "background": "white"})).unwrap();
-        // PLAN: assumed `PhotocraftApp::sync_views`, `last_canvas_rect` and `ui.views[..]` are public, as the app's own tests read them.
-        app.sync_views();
+        let mut session = photocraft_engine::Session::new();
+        session.execute("file.new", json!({"width": 240, "height": 80, "background": "white"})).unwrap();
+        // The app shares the harness's context, which is where the window's pointer input arrives.
         let mut h = Harness::builder().with_size(egui::vec2(1280.0, 800.0)).with_max_steps(64).build_eframe(move |cc| {
             PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-            app
+            PhotocraftApp::with_context(cc.egui_ctx.clone(), session, Default::default())
         });
+        let sink = sink(h.state().stylus.feed.clone());
+        // PLAN: assumed `PhotocraftApp::sync_views`, `last_canvas_rect` and `ui.views[..]` are public, as the app's own tests read them.
+        h.state_mut().sync_views();
         h.run_steps(4);
         // The tool first: each tool keeps its own brush, so the brush below is the Brush's.
         h.state_mut().ui.tool = Tool::Brush;
