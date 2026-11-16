@@ -142,7 +142,6 @@ fn attach_decode(raw: &mut RawOpen) {
         raw.decoded = photocraft_io::raw::take_kept_decode(&b).or_else(|| photocraft_io::raw::RawDecode::new(&b).ok().map(std::sync::Arc::new));
     }
 }
-}
 
 pub(super) fn document_index(app: &PhotocraftApp, id: photocraft_doc::DocId) -> Option<usize> {
     app.session.documents().iter().position(|st| st.doc.id == id)
