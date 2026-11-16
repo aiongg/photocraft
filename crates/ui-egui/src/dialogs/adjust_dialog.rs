@@ -764,8 +764,9 @@ fn answer_asks(app: &mut PhotocraftApp, id: DialogId) {
 fn follow_target(app: &mut PhotocraftApp, id: DialogId) {
     let Some(open) = app.adjust_open.as_ref().filter(|open| open.id == id) else { return };
     let resolved = target_context(app, open.smart_filter.as_ref(), &open.recorded);
-    // A Smart Filter dialog whose target another document took the front from shows no controls until it returns.
-    let stale = open.smart_filter.is_some() && resolved.is_err();
+    // A Smart Filter dialog whose target another document took the front from, or an Action's dialog whose recorded
+    // target does not resolve, shows no controls until the target returns.
+    let stale = (open.smart_filter.is_some() || open.unresolved) && resolved.is_err();
     if let Ok(mut shared) = open.setup.lock()
         && shared.stale != stale
     {
