@@ -1,6 +1,6 @@
 //! The document canvas on the framework's `Canvas`: the view binding, the navigation options from Preferences, the
 //! pasteboard, the canvas controls of the body in their order, the document's picture (a GPU picture or the CPU
-//! composite, and the Channels panel's view over it), and the tool host that runs after the canvas.
+//! composite, and the Channels panel's view over it), and the tool host that runs between the controls and the picture.
 
 use craft::behavior::geometry::crop::normalized_angle;
 use craft::behavior::geometry::quad::Homography;
@@ -9,7 +9,7 @@ use craft::behavior::{CanvasView, PixelSize};
 use craft::imaging::ui::SelectionOverlay;
 use craft::ui::canvas::{
     Canvas, CanvasOutput, CanvasScrollbars, CanvasSpace, Extent, NavigationOptions, PageBorder, PageFrame, Pasteboard, PasteboardColor, PixelRect,
-    RasterDisplay, RasterSource, RotateView, ToolHost, ToolHostResponse, ViewTarget, canvas_space, easing_view,
+    RasterDisplay, RasterSource, RotateView, ToolHost, ToolHostResponse, ViewTarget, canvas_space, easing_view, tool_pass,
 };
 use craft::ui::canvas_controls::{GuidesOutput, SelectionOutline};
 use craft::ui::contract::{Bind, Props, Show, ShowContainer};
@@ -210,8 +210,9 @@ fn pasteboard_color(app: &PhotocraftApp) -> PasteboardColor {
 
 /// Shows document `pass.host.idx` in a framework `Canvas` over `pass.rect` through `view`: the canvas folds the wheel,
 /// pinch, page keys, view commands and the Overscroll clamp into the view, eases PhotoCraft's own eased zooms, and its
-/// body shows the pasteboard, the canvas controls and, last, the document's picture into the slot the canvas reserved
-/// under the controls. The tool host then runs on the canvas's output. `view` is the view after the canvas's pass.
+/// body shows the pasteboard and the canvas controls, runs the tool host on the canvas's tool input, and last shows
+/// the document's picture into the slot the canvas reserved under the controls, so the picture shows what this pass's
+/// press and moves did. `view` is the view after the canvas's pass.
 pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, pass: &CanvasPass<'_>) -> Shown {
     let (ctx, host, idx, doc, output, rect, ppp) = (pass.ctx, pass.host, pass.host.idx, pass.doc, pass.output, pass.rect, pass.ppp);
     let given = view.canvas_view(rect, ppp, pass.flip, pass.aspect);
@@ -228,7 +229,6 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         eased
     });
 
-    let size = PixelSize::new(doc.size.width, doc.size.height);
     let border = match app.session.prefs().interface.canvas_border {
         photocraft_engine::prefs::CanvasBorder::DropShadow => PageBorder::DropShadow,
         photocraft_engine::prefs::CanvasBorder::Line => PageBorder::Line,
@@ -275,8 +275,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let mut turned = None;
     // What the CPU display read from the composite this pass, and how long its pass took.
     let mut cpu_read: Option<(PixelRect, f64)> = None;
-    // What the body's controls reported for the host's pass of the same frame.
-    let mut body_shown = tools::BodyShown::default();
+    // What the tool host did; none in a measuring run, where it does not run.
+    let mut hosted: Option<ToolHostResponse> = None;
     let shown = canvas.show_at(ui, rect, |ui, body| {
         let Some(space) = canvas_space(&body.env) else { return };
         pasteboards(app, ui, body.rect, idx, border, label.clone());
@@ -301,7 +301,23 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         if app.ui.view.tile_grid {
             super::tile_overlay::show(ui, app, idx);
         }
+        // What the controls report for the host's pass.
+        let mut body_shown = tools::BodyShown::default();
         let live = canvas_controls(app, ui, body.rect, host, &space, &mut turned, &mut body_shown);
+        // The tools run after the controls, which take a press first, and before the picture, which shows the stroke
+        // or edit they made from this pass's input.
+        if let Some(input) = tool_pass(&body.env) {
+            // An ⌥-click the window manager took never arrives; say so (alt_grab.rs). Tools run in the main window only.
+            if primary {
+                let (tool, active) = (app.ui.tool, !app.dialog_open());
+                crate::alt_grab::watch(app, ui.ctx(), egui::Id::unique(("pc-alt-grab", host.idx)), input.rect, tool, active);
+            }
+            hosted = Some(tools::run(app, ui, host, &input, body_shown));
+        }
+        // The picture shows the document as the tools left it: a commit (a crop) can replace it.
+        let current = app.session.documents().get(idx).map(|state| std::sync::Arc::clone(&state.doc));
+        let doc = current.as_ref().unwrap_or(doc);
+        let size = PixelSize::new(doc.size.width, doc.size.height);
         // The picture is prepared after the controls, so a gradient's live proposal shows in the pass that made it.
         let picture = gpu_ok
             .then(|| {
@@ -345,14 +361,14 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         let mapping = (bounds != doc.bounds()).then(|| placement(bounds));
         let frame = Frame { checker: checker.as_ref(), edge, mapping, pattern, region };
         if let Some(picture) = &gpu {
-            frame.apply(RasterDisplay::painted(label.clone(), size, picture.clone().into_paint())).show_at(ui, body.rect);
+            frame.apply(RasterDisplay::painted(label.clone(), size, picture.clone().into_paint())).picture().show_at(ui, body.rect);
         } else if let Some(composite) = &composite {
             let started = crate::gpu_canvas::now_ms();
-            let out = frame.apply(RasterDisplay::new(label.clone(), composite as &dyn RasterSource)).show_at(ui, body.rect);
+            let out = frame.apply(RasterDisplay::new(label.clone(), composite as &dyn RasterSource)).picture().show_at(ui, body.rect);
             cpu_read = out.read.map(|read| (read, crate::gpu_canvas::now_ms() - started));
         }
         if let Some(overlay) = &overlay {
-            let display = RasterDisplay::new(Label::Empty, overlay as &dyn RasterSource).id_salt("pc-channel-view");
+            let display = RasterDisplay::new(Label::Empty, overlay as &dyn RasterSource).id_salt("pc-channel-view").picture();
             let display = match mapping {
                 Some(frame) => display.mapped(frame, 1),
                 None => display,
@@ -382,13 +398,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     if let Some(next) = turned.as_ref() {
         view.set_from(next, ppp);
     }
-    // An ⌥-click the window manager took never arrives; say so (alt_grab.rs). Tools run in the main window only.
-    if host.window.is_none() && host.viewport == egui::ViewportId::ROOT {
-        let tool = app.ui.tool;
-        let active = !app.dialog_open();
-        crate::alt_grab::watch(app, ui.ctx(), egui::Id::unique(("pc-alt-grab", host.idx)), canvas_output.response.rect, tool, active);
-    }
-    let response = tools::run(app, ui, host, &canvas_output, body_shown);
+    let response = hosted.unwrap_or_default();
     // A view a tool set (the Crop tool's slide) is the one the app keeps; the canvas's own otherwise.
     if let Some(next) = response.view.as_ref() {
         view.set_from(next, ppp);
