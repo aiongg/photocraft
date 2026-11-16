@@ -136,10 +136,6 @@ fn toolbar(s: &mut Session, p: &Value) -> Result<Value> {
         if let Some(h) = ids("hidden") {
             pr.toolbar.hidden = h;
         }
-        // A slot that doesn't read as one (a hand-written script) is skipped, like an unknown tool name.
-        if let Some(slots) = p.get("slots").and_then(Value::as_array) {
-            pr.toolbar.slots = slots.iter().filter_map(|slot| serde_json::from_value(slot.clone()).ok()).collect();
-        }
         if toolbar.is_some() || extras.is_some() {
             let current = pr.toolbar.layout();
             // Tools a new extras list names leave the current toolbar for it.
@@ -241,11 +237,7 @@ pub fn specs() -> Vec<CommandSpec> {
             "Toolbar…",
             ["Edit"],
             None,
-<<<<<<< HEAD
-            r##"{"hidden":["<tool>",…]?,"slots":[{"id":u32,"tools":["<tool>",…],"groupEnd":bool},…]?,"reset":bool=false}"##,
-=======
-            r##"{"toolbar":[["<tool>",…],…]?,"extras":[["<tool>",…],…]?,"hidden":["<tool>",…]?,"order":["<tool>",…]?,"reset":bool=false}"##,
->>>>>>> upstream/main
+            r##"{"toolbar":[["<tool>",…],…]?,"extras":[["<tool>",…],…]?,"hidden":["<tool>",…]?,"reset":bool=false}"##,
             toolbar,
             true
         ),

@@ -227,20 +227,12 @@ pub(crate) fn step_icon(step: &str) -> IconId {
         s if s.contains("Layer") => "layers",
         s if s.contains("Select") || s.contains("Marquee") || s.contains("Deselect") || s.contains("Lasso") => "rect_dashed",
         // The selections the Patch tool draws (select.lasso's historyName).
-<<<<<<< HEAD
         "Patch Tool" => "rect_dashed",
         s if s.contains("Fill") => "paint_bucket",
-        "Open" => "image",
-        _ => "adjustments",
-    })
-=======
-        "Patch Tool" => "square-dashed",
-        s if s.contains("Fill") => "paint-bucket",
         // The opening state: "Open" for a file, "New" for a document from File › New (#14029).
         "Open" | "New" => "image",
-        _ => "sliders-horizontal",
-    }
->>>>>>> upstream/main
+        _ => "adjustments",
+    })
 }
 
 /// Where the history stood after a snapshot click: the number of past states, the current state's

@@ -515,12 +515,13 @@ fn tool_step(app: &PhotocraftApp, fired: &Fired) -> PickStep {
     if app.session.prefs().tools.use_shift_key_for_tool_switch { PickStep::Last } else { PickStep::of(fired) }
 }
 
-/// Selects the tool the key `letter` picks. The group is the tools of that letter the user has not remapped, in
-/// toolbar order; the rail's last-used memory is `app.ui.group_tools`, with the group's index among the letters as
+/// Selects the tool the key `letter` picks. The group is the tools of that letter the user has not remapped, in the
+/// toolbar layout's order across slots (Edit › Toolbar); the rail's last-used memory is `app.ui.group_tools`, with the group's index among the letters as
 /// the slot. `plain` is a letter press with no Shift step: only those spring (#2672).
 fn pick_tool(app: &mut PhotocraftApp, ctx: &egui::Context, letter: char, step: PickStep, plain: bool) {
     let mut group: Vec<Tool> = Tool::ALL.iter().copied().filter(|t| t.key() == letter && crate::tool_shortcuts::uses_default(app, *t)).collect();
-    group.sort_by_key(|t| crate::panels::toolbar::toolbar_position(*t));
+    let order = crate::panels::toolbar::layout_order(&app.session.prefs().toolbar);
+    group.sort_by_key(|t| order.iter().position(|x| x == t).unwrap_or(usize::MAX));
     let tools: Vec<RailTool<Tool>> = group.iter().map(|t| RailTool::new(*t, crate::panels::tool_commands::command_of(*t))).collect();
     let refs: Vec<&RailTool<Tool>> = tools.iter().collect();
     let slot = 0;

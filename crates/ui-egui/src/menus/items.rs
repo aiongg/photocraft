@@ -226,16 +226,12 @@ pub fn base_rows(app: &PhotocraftApp) -> Vec<Row> {
     if let Some(item) = find(&mut rows, "layer.smartObjects.revealInFinder") {
         item.label = reveal_label().into();
     }
-    // File › Open Recent: a dynamic submenu of recently opened files (inserted after "Open As…").
-<<<<<<< HEAD
-    if let Some(after) = rows.iter().position(|i| i.command.id == "file.openAs") {
+    // File › Open Recent: a dynamic submenu of recently opened files, after Open as Smart Object… (#14053).
+    if let Some(after) =
+        rows.iter().position(|i| i.command.id == "file.openAsSmartObject").or_else(|| rows.iter().position(|i| i.command.id == "file.openAs"))
+    {
         let rp = ["File", "Open Recent"];
         let mut recent: Vec<Row> = app
-=======
-    if let Some(after) = items.iter().position(|i| i.id == "file.openAsSmartObject").or_else(|| items.iter().position(|i| i.id == "file.openAs")) {
-        let rp: Vec<String> = vec!["File".into(), "Open Recent".into()];
-        let mut recent: Vec<MenuItem> = app
->>>>>>> upstream/main
             .ui
             .recent_files
             .iter()
@@ -302,7 +298,12 @@ pub fn base_rows(app: &PhotocraftApp) -> Vec<Row> {
         item.label = "Release Clipping Mask".into();
         item.enabled = is_enabled(app, "layer.releaseClippingMask");
     }
-<<<<<<< HEAD
+    // Edit › Undo names the most recent change, a document's or the Actions library's.
+    if let Some(label) = crate::actions::library::edit_undo_label(app)
+        && let Some(row) = rows.iter_mut().find(|row| row.command.id == "edit.undo")
+    {
+        row.label = label.into();
+    }
     for row in &mut rows {
         decorate(row);
     }
@@ -321,14 +322,6 @@ pub fn menu_rows(app: &PhotocraftApp) -> Vec<Row> {
         .unwrap_or_default();
     Customization::new(hidden, colors).apply(&mut rows);
     rows
-=======
-    if let Some(label) = crate::actions::library::edit_undo_label(app)
-        && let Some(item) = items.iter_mut().find(|item| item.id == "edit.undo")
-    {
-        item.label = label.into();
-    }
-    items
->>>>>>> upstream/main
 }
 
 /// Background tint of an Edit › Menus colour name.
