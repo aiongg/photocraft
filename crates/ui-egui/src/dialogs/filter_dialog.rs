@@ -13,7 +13,7 @@ use std::sync::Arc;
 use craft::host::{PickRequest, Picked};
 use craft::ui::contract::Bind;
 use craft::ui::dialog::DialogId;
-use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, Param, ParamDialog, ParamKind, ParamResult};
+use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, Param, ParamDialog, ParamKind, ParamLayout, ParamResult};
 use craft::ui::runtime::env::{Label, UnitKind};
 use craft::ui::runtime::requests::PathKind;
 use photocraft_doc::Document;
@@ -508,6 +508,7 @@ fn builder(
         let mut dialog = ParamDialog::command(key.clone(), title.clone(), params.clone())
             .values(Bind::bound(fields))
             .reset_to(reset.clone())
+            .layout(ParamLayout::Stacked)
             .previews(previews(&key))
             .alert_title(tl!("PhotoCraft"));
         if let Some(canvas) = canvas {
