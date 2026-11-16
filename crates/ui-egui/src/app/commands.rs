@@ -28,16 +28,8 @@ impl PhotocraftApp {
         if gate.is_some() {
             self.session.authorize = None;
         }
-        if let Ok(reply) = &result {
-            if library_change {
-                actions::library_selection_changed(self);
-            } else if id == "actions.load" {
-                actions::library_slots_changed(self);
-            } else if id == "actions.duplicate"
-                && let Some(slot) = reply["setSlot"].as_u64().and_then(|slot| usize::try_from(slot).ok())
-            {
-                actions::library_slot_inserted(self, slot);
-            }
+        if library_change && result.is_ok() {
+            actions::library_changed(self);
         }
         // An explicit channel target (⌘2, ⌘\, ⌘3…) decides what the Layers panel targets too:
         // ⌘2 after the mask was targeted goes back to the layer's pixels.

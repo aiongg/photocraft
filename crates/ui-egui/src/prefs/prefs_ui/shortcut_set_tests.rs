@@ -91,7 +91,6 @@ fn the_set_dropdown_keeps_action_function_keys_like_use_set() {
         p.shortcut_sets.insert("B".into(), b);
     });
     h.state_mut().run("edit.keyboardShortcuts", json!({"useSet": ""})).unwrap();
-<<<<<<< HEAD
     crate::actions::assign_shortcut(h.state_mut(), "Sepia", "F2").unwrap();
     assert!(!modified(h.state().session.prefs()), "an action key doesn't modify the defaults");
 
@@ -114,21 +113,6 @@ fn the_set_dropdown_keeps_action_function_keys_like_use_set() {
     assert_eq!(p.shortcuts.iter().map(|(k, v)| (k.as_str(), v.as_str())).collect::<Vec<_>>(), [("actions.play:Sepia", "F2")]);
 
     // B: what wins is what `useSet` gives: the action keeps F2, B's old action key is dropped and
-=======
-    h.state_mut().run("edit.keyboardShortcuts", json!({"set":{"actions.play:Sepia":"F2"},"allowUnknown":true,"removeConflicts":false})).unwrap();
-    let ctx = h.ctx.clone();
-    let id = crate::menus::invoke(h.state_mut(), &ctx, "edit.keyboardShortcuts", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    h.run_steps(4);
-    assert_eq!(shown_set(&h), "PhotoCraft Defaults", "an action key doesn't modify the defaults");
-    pick_set(&mut h, "A");
-    assert_eq!(field(&h, id, "activeSet"), json!("A"));
-    assert_eq!(field(&h, id, "overrides"), json!({"edit.copy": "F9", "actions.play:Sepia": "F2"}), "A's keys, and the action's");
-    assert_eq!(shown_set(&h), "A");
-    pick_set(&mut h, "PhotoCraft Defaults");
-    assert_eq!(field(&h, id, "overrides"), json!({"actions.play:Sepia": "F2"}), "kept switching to the defaults");
-    pick_set(&mut h, "B");
-    // What wins is what `useSet` gives: the action keeps F2, B's old action key is dropped and
->>>>>>> upstream/main
     // its own F2 binding stays.
     open(&mut h);
     choose(h.state_mut(), "B");
@@ -149,7 +133,6 @@ fn the_set_dropdown_keeps_action_function_keys_like_use_set() {
 fn an_edit_still_marks_the_set_modified_and_sets_save_no_action_keys() {
     let mut h = harness();
     h.state_mut().run("edit.keyboardShortcuts", json!({"set": {"edit.copy": "F9"}, "saveSet": "A"})).unwrap();
-<<<<<<< HEAD
     crate::actions::assign_shortcut(h.state_mut(), "Sepia", "F2").unwrap();
     assert!(!modified(h.state().session.prefs()), "A's keys are the bindings");
     open(&mut h);
@@ -162,21 +145,4 @@ fn an_edit_still_marks_the_set_modified_and_sets_save_no_action_keys() {
     // An edit made through the engine, outside the set, is a modification.
     h.state_mut().run("edit.keyboardShortcuts", json!({"set": {"edit.cut": "F7"}})).unwrap();
     assert!(modified(h.state().session.prefs()));
-=======
-    h.state_mut().run("edit.keyboardShortcuts", json!({"set":{"actions.play:Sepia":"F2"},"allowUnknown":true,"removeConflicts":false})).unwrap();
-    let ctx = h.ctx.clone();
-    let id = crate::menus::invoke(h.state_mut(), &ctx, "edit.keyboardShortcuts", json!({})).unwrap()["dialog"].as_u64().unwrap();
-    h.run_steps(4);
-    assert_eq!(shown_set(&h), "A");
-    set_field(&mut h, id, "overrides", json!({"edit.copy": "F8", "actions.play:Sepia": "F2"}));
-    assert_eq!(shown_set(&h), "A (modified)");
-    click(&mut h, "Save");
-    assert_eq!(field(&h, id, "sets")["A"]["shortcuts"], json!({"edit.copy": "F8"}));
-    assert_eq!(shown_set(&h), "A");
-    click(&mut h, "New Set…");
-    set_field(&mut h, id, "newSetName", json!("C"));
-    click(&mut h, "Create");
-    assert_eq!(field(&h, id, "sets")["C"]["shortcuts"], json!({"edit.copy": "F8"}));
-    assert_eq!(shown_set(&h), "C");
->>>>>>> upstream/main
 }

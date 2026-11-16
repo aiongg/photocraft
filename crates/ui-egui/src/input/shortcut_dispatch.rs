@@ -10,7 +10,6 @@
 //! shortcut whose command is disabled in the current state reports why on the status bar instead
 //! of doing nothing silently, as the greyed menu item shows.
 
-<<<<<<< HEAD
 use std::collections::HashSet;
 
 use craft::keymap::{Binding, Chord, CommandDef, CommandKind, Overrides, Scope};
@@ -18,10 +17,6 @@ use craft::layers::ui::panel::LayersPanelCommands;
 use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
 use craft::ui::rails::{LastUsed, RailTool};
 use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, CommandSet, EditCommands, FirePhase, FireSource, Fired};
-=======
-use egui::{Key, KeyboardShortcut};
-use photocraft_engine::actions_cmds;
->>>>>>> upstream/main
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -104,6 +99,8 @@ pub(crate) const RUNTIME_COMMANDS: &[(&str, Bridged)] = &[
     ("view.fitArtboardOnScreen", Bridged::View(ViewCommands::FitArtboard)),
     ("view.fitLayersOnScreen", Bridged::View(ViewCommands::FitLayers)),
     ("view.fillScreen", Bridged::View(ViewCommands::FillScreen)),
+    ("view.rotateLeft", Bridged::View(ViewCommands::RotateCounterclockwise)),
+    ("view.rotateRight", Bridged::View(ViewCommands::RotateClockwise)),
     ("view.resetView", Bridged::View(ViewCommands::ResetRotation)),
     ("tools.temporary.hand", Bridged::Momentary(MomentaryCommands::Hand)),
     ("tools.temporary.zoomIn", Bridged::Momentary(MomentaryCommands::ZoomIn)),
@@ -301,7 +298,6 @@ pub(crate) fn same_rows(a: &[CommandDef], b: &[CommandDef]) -> bool {
 /// (`app::framework`: PhotoCraft binds F6 and Shift+F6).
 pub(crate) fn overrides(app: &PhotocraftApp) -> Overrides {
     let prefs = app.session.prefs();
-<<<<<<< HEAD
     // PLAN: `keymap_defs::prefs_overrides` is top-w20's tp.PT25 row, assumed as `prefs_overrides(&Preferences) -> Overrides`.
     let mut overrides = photocraft_engine::keymap_defs::prefs_overrides(prefs);
     // The Keyboard Shortcuts dialog lists Photoshop's Window › <panel> item (`window.panel.*`) in place of the
@@ -329,75 +325,6 @@ pub(crate) fn overrides(app: &PhotocraftApp) -> Overrides {
         keys.extend(prefs.alternates(id, main.as_deref()));
         keys.retain(|key| !held_by_action(&taken, key));
         overrides.insert(bridged.command().key(), keys);
-=======
-    let action_key = |key: &str, alternate| {
-        let Some(row) = action_shortcut_row(app, key) else { return false };
-        if !key.starts_with(actions_cmds::PLAY_SHORTCUT_PREFIX) {
-            return true;
-        }
-        let list = &app.session.actions.list;
-        let explicit = list[row].action_id.as_deref().map(actions_cmds::occurrence_key);
-        !explicit.is_some_and(|id| {
-            actions_cmds::shortcut_row(list, &id) == Some(row)
-                && if alternate { prefs.alternate_shortcuts.contains_key(&id) } else { prefs.shortcuts.contains_key(&id) }
-        })
-    };
-    let actions = prefs.shortcuts.keys().filter(|id| action_key(id.as_str(), false)).map(|id| (id.as_str(), prefs.shortcut(id, None).map(str::to_string)));
-    // The Keyboard Shortcuts dialog lists Photoshop's Window › <panel> item (`window.panel.*`)
-    // in place of the shell command it runs (`window.toggle.*`, see `menus::panel_alias`), so an
-    // edit to that row reassigns or removes the shell command's default too (#1272).
-    let aliased = |id: &str, sc: Option<&str>| {
-        !prefs.shortcuts.contains_key(id)
-            && prefs.shortcuts.keys().any(|k| {
-                crate::menus::panel_alias(k) == Some(id) && crate::menu_catalog::CATALOG.iter().any(|c| c.3 == k.as_str() && c.2.is_some() && c.2 == sc)
-            })
-    };
-    let ui = crate::menus::UI_COMMANDS.iter().map(|(id, _, _, sc)| (*id, if aliased(id, *sc) { None } else { prefs.shortcut(id, *sc).map(str::to_string) }));
-    let engine = photocraft_engine::command_specs().iter().map(|c| (c.id, prefs.shortcut(c.id, c.shortcut).map(str::to_string)));
-    let own: std::collections::HashSet<&str> = crate::menus::UI_COMMANDS
-        .iter()
-        .map(|c| c.0)
-        .chain(photocraft_engine::command_specs().iter().filter(|c| c.shortcut.is_some() || prefs.shortcuts.contains_key(c.id)).map(|c| c.id))
-        .collect();
-    let catalog = crate::menu_catalog::CATALOG
-        .iter()
-        .filter(|(_, _, sc, id)| sc.is_some() && !own.contains(id) && crate::menus::is_live(id))
-        .map(|&(_, _, sc, id)| (id, prefs.shortcut(id, sc).map(str::to_string)));
-    let overrides = prefs
-        .shortcuts
-        .iter()
-        .filter(|(id, sc)| {
-            !sc.is_empty()
-                && !actions_cmds::is_action_key(id)
-                && photocraft_engine::commands::find(id).is_none()
-                && !crate::menus::UI_COMMANDS.iter().any(|c| c.0 == id.as_str())
-                && !crate::hold_keys::is_temporary(id)
-        })
-        .map(|(id, sc)| (id.as_str(), Some(sc.clone())));
-    // A key the user assigned in Edit › Keyboard Shortcuts belongs to that command, ahead of any
-    // default that still names it (#1272): OK clears the old owner's row, but that row can be
-    // another id for the same item, or a default the dialog doesn't list.
-    let mut candidates: Vec<(&str, Option<String>, bool)> = actions
-        .chain(ui)
-        .chain(engine)
-        .chain(catalog)
-        .chain(overrides)
-        .map(|(id, sc)| {
-            let user = sc.is_some() && prefs.shortcuts.get(id) == sc.as_ref();
-            (id, sc, user)
-        })
-        .collect();
-    // Each command's alternates after every main key, the user's ahead of the defaults.
-    let alternate_ids: std::collections::BTreeSet<&str> =
-        photocraft_engine::prefs::ALTERNATE_SHORTCUTS.iter().map(|(id, _)| *id).chain(prefs.alternate_shortcuts.keys().map(String::as_str)).collect();
-    for id in alternate_ids {
-        if actions_cmds::is_action_key(id) && !action_key(id, true) {
-            continue;
-        }
-        let main = prefs.shortcut(id, crate::shortcuts::default_shortcut(id).as_deref()).map(str::to_string);
-        let user = prefs.alternate_shortcuts.contains_key(id);
-        candidates.extend(prefs.alternates(id, main.as_deref()).into_iter().map(|k| (id, Some(k), user)));
->>>>>>> upstream/main
     }
     // A key an action holds is the action's alone (it is checked before every command's key, as in Photoshop): the
     // command that has it by default keeps its other keys.
@@ -641,10 +568,10 @@ fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
         }
     }
     if id == EditCommands::Delete.id() {
-        // A finished work path shown by the Pen or Path Selection: ⌫/Delete deletes it, as in Photoshop (#5702), never
-        // Edit › Clear on the pixels under it.
-        if crate::vector_ui::delete_key_deletes_work_path(app) {
-            if let Err(e) = app.run("path.delete", json!({"name": "work"})) {
+        // A finished work path shown by the Pen or Path Selection, or the path or segment Direct Selection targets:
+        // ⌫/Delete edits the path, as in Photoshop (#5702, #13203), never Edit › Clear on the pixels under it.
+        if let Some((command, params)) = crate::vector_ui::delete_key_edits_path(app) {
+            if let Err(e) = app.run(command, params) {
                 app.ui.status = e;
                 app.ui.status_error = true;
             }
@@ -672,24 +599,13 @@ pub fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str) {
     dispatch_as(app, ctx, id, false);
 }
 
-<<<<<<< HEAD
 /// [`dispatch`]; with `last`, an adjustment dialog opens at its last confirmed settings and New Layer makes the
 /// layer without its dialog.
-=======
-fn action_shortcut_row(app: &PhotocraftApp, key: &str) -> Option<usize> {
-    if key.starts_with(actions_cmds::PLAY_SHORTCUT_PREFIX) && app.services.preset_store.is_some() && app.session.preset_store.is_none() {
-        return None;
-    }
-    actions_cmds::shortcut_row(&app.session.actions.list, key)
-}
-
-/// [`dispatch`]; with `last`, an adjustment dialog opens at its last confirmed settings.
->>>>>>> upstream/main
 fn dispatch_as(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, last: bool) {
-    let is_action = actions_cmds::is_action_key(id);
-    let action = action_shortcut_row(app, id);
-    let command_id = if is_action { "actions.play" } else { id };
-    let missing = is_action && action.is_none();
+    let action = id.strip_prefix(crate::actions::SHORTCUT_PREFIX);
+    let command_id = if action.is_some() { "actions.play" } else { id };
+    // A key saved for an action that was since deleted or renamed names no action.
+    let missing = action.is_some_and(|name| !app.session.actions.list.actions().iter().any(|a| a.name == name));
     let outcome = if missing || !crate::menus::is_enabled(app, command_id) {
         let why = if missing { "The Action no longer exists".into() } else { disabled_reason(app, command_id) };
         let template = "{label} is not available: {reason}";
@@ -699,15 +615,10 @@ fn dispatch_as(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, last: boo
     } else if ctx.data(|d| d.get_temp::<bool>(dry_run_id())).unwrap_or(false) {
         Outcome::Ran
     } else {
-        let r = if let Some(row) = action {
-            let list = &app.session.actions.list;
-            let target = match id.strip_prefix(actions_cmds::PLAY_SHORTCUT_PREFIX) {
-                Some(name) if list.iter().position(|action| action.name == name) == Some(row) => json!({"action": name}),
-                Some(_) => json!({"action": row}),
-                None => json!({"actionId": list[row].action_id}),
-            };
-            // Synthetic input and every nested action still pass the automation authorizer.
-            crate::menus::invoke(app, ctx, "actions.play", target).and_then(|v| {
+        let r = if let Some(name) = action {
+            // Use the normal command path: synthetic input and every nested action
+            // step must still pass the automation authorizer.
+            crate::menus::invoke(app, ctx, "actions.play", json!({"action": name})).and_then(|v| {
                 crate::actions::report_play(app, &v);
                 if v.get("failed").is_some_and(|f| f.is_object()) { Err(app.ui.status.clone()) } else { Ok(v) }
             })

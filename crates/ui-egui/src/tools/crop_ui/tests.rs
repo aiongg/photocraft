@@ -170,8 +170,9 @@ fn commit_maps_the_frame_and_options_to_image_crop() {
 #[test]
 fn edit_undo_steps_the_crop_box_not_the_document() {
     let mut app = app(SampleType::U8);
-<<<<<<< HEAD
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
+    // A library change older than the box: Edit › Undo steps the box and leaves the library edit to undo.
+    app.run("actions.reset", json!({"confirm": true, "mode": "append"})).unwrap();
     let before = boxed(40.0, 30.0, 100.0, 70.0, 0.0);
     tool(&mut app).crop_to(before);
     let doc_steps = app.session.active().unwrap().history.past_len();
@@ -180,21 +181,10 @@ fn edit_undo_steps_the_crop_box_not_the_document() {
     assert!((moved.rect.x0 - 60.0).abs() < 1e-3, "{moved:?}");
     assert_eq!(crop_ui::is_enabled(&app, "edit.undo"), Some(true));
     assert_eq!(crop_ui::is_enabled(&app, "edit.redo"), Some(false), "no box step to redo");
-    app.run("edit.undo", json!({})).unwrap();
+    let ctx = crate::canvas::testing::ctx(&app);
+    crate::menus::invoke(&mut app, &ctx, "edit.undo", json!({})).unwrap();
+    assert!(app.session.actions.list.library_undo().is_some(), "the library edit remains available");
     assert_eq!(crop_ui::frame(&app), Some(before), "undo restores the box");
-=======
-    app.run("actions.reset", json!({"confirm":true,"mode":"append"})).unwrap();
-    app.ui.crop_rect = Some([40.0, 30.0, 100.0, 70.0]);
-    app.crop.default_frame = false;
-    let before = app.ui.crop_rect.unwrap();
-    let doc_steps = app.session.active().unwrap().history.past_len();
-    drag(&mut app, &[[70.0, 50.0], [90.0, 50.0]], NONE); // move the frame right 20
-    let moved = app.ui.crop_rect.unwrap();
-    assert!((moved[0] - 60.0).abs() < 1e-3, "{moved:?}");
-    crate::menus::invoke(&mut app, &egui::Context::default(), "edit.undo", json!({})).unwrap();
-    assert_eq!(app.session.actions.set_rows.len(), 1, "the library edit remains available");
-    assert_eq!(app.ui.crop_rect, Some(before), "undo restores the box");
->>>>>>> upstream/main
     assert_eq!(app.session.active().unwrap().history.past_len(), doc_steps, "the document is untouched");
     app.run("edit.redo", json!({})).unwrap();
     assert!((crop_ui::frame(&app).unwrap().rect.x0 - 60.0).abs() < 1e-3, "redo re-applies the move");
