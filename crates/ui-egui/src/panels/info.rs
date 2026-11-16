@@ -1,4 +1,4 @@
-use craft::color::ui::{InfoColor, InfoPanel, InfoReadings, SamplerReadout};
+use craft::color::ui::{InfoColor, InfoMeasure, InfoPanel, InfoReadings, SamplerReadout};
 use craft::ui::runtime::env::Label;
 
 use super::{PhotocraftApp, Value, json};
@@ -41,8 +41,9 @@ pub(crate) fn wh_readout(ur: &photocraft_engine::prefs::UnitsAndRulers, dpi: f64
 /// the pointer's and the selection's.
 #[derive(Clone, Debug, PartialEq)]
 pub(crate) struct RulerRows {
-    /// "A:" and then "L:" (a plain ruler) or "L1:" and "L2:" (a protractor), with their values.
-    pub(crate) measure: Vec<(&'static str, String)>,
+    /// The angle and length (a plain ruler) or the angle and both arms' lengths (a protractor), as value strings;
+    /// the panel words their names.
+    pub(crate) measure: InfoMeasure,
     /// The start point (a plain ruler) or the second arm's end (a protractor), in document pixels.
     pub(crate) point: [f64; 2],
     /// End minus start, signed and y down, for a plain ruler. A protractor's is not measured, so
@@ -70,8 +71,8 @@ pub(crate) fn ruler_rows(app: &PhotocraftApp) -> Option<RulerRows> {
     };
     let angle = format!("{:.1}°", g("angle")?);
     match r.protractor {
-        None => Some(RulerRows { measure: vec![("A:", angle), ("L:", length(g("l1")?))], point: r.start, size: Some([g("w")?, g("h")?]) }),
-        Some(q) => Some(RulerRows { measure: vec![("A:", angle), ("L1:", length(g("l1")?)), ("L2:", length(g("l2")?))], point: q, size: None }),
+        None => Some(RulerRows { measure: InfoMeasure::line(angle, length(g("l1")?)), point: r.start, size: Some([g("w")?, g("h")?]) }),
+        Some(q) => Some(RulerRows { measure: InfoMeasure::protractor(angle, length(g("l1")?), length(g("l2")?)), point: q, size: None }),
     }
 }
 
@@ -114,7 +115,12 @@ pub(crate) fn readings<'a>(app: &mut PhotocraftApp, samplers: &'a [(SamplerReado
         (None, None) => pointer.map(|p| [at(0, f64::from(p.0)), at(1, f64::from(p.1))]),
     };
     let extent_labels = wh.map(|s| wh_readout(&units, dpi, extent, s).map(Label::from));
-    InfoReadings::new().color(color).position(position).extent(extent_labels).document(Some([size.width, size.height])).samplers(samplers)
+    InfoReadings::new()
+        .color(color)
+        .position(position)
+        .extent(extent_labels)
+        .measure(ruler.as_ref().map(|r| r.measure.clone()))
+        .document(Some([size.width, size.height])).samplers(samplers)
 }
 
 /// The first `N` entries of the JSON array `v` as bytes; `None` when one is missing or not a byte.

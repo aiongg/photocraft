@@ -7,12 +7,11 @@
 use craft::behavior::kurbo::Point;
 use craft::behavior::{CancelReason, CountMark, Cursor, CursorBadge, CursorIcon, EditEvent, Input, Metrics, Mixed, PaintedCursor};
 use craft::color::ui::{ColorSamplerMarks, ColorSamplerTool, ColorSamplers, SamplerEvent};
-use craft::draw::ui::{RulerLine, RulerTool, RulerWords};
-use craft::ui::canvas_controls::StraightLinePreview;
+use craft::draw::ui::{RulerLine, RulerTool};
 use craft::ui::canvas::{CanvasTool, NoTool, ToolAction, ToolClaims, ToolContext, ToolHostResponse, ToolKey, ToolPath, ToolPointer, canvas_space};
 use craft::ui::contract::{Access, Common, Component, Cx, MeasureCx, PaintUi, Props as _, Role, Show as _};
 use craft::ui::primitives::{Draw, PaintShape, StrokeWidth, TextRun};
-use craft::ui::runtime::env::{Env, Label};
+use craft::ui::runtime::env::Label;
 use craft::ui::style::{ComponentStyle, DataColor, StyleColor, StyleCx};
 use egui::{Color32, CornerRadius, Pos2, Rect, Response, Vec2, vec2};
 use serde_json::json;
@@ -214,11 +213,7 @@ pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect) {
         tools.ruler.pass(line).show_line(ui, rect);
     } else if let Some(line) = line {
         // The line and its arm stay drawn under every tool (#11987); only the Ruler tool has handles on them.
-        let words = Env::of(ui).words::<RulerWords>();
-        StraightLinePreview::new(words.group.clone(), line.start, line.end).show_at(ui, rect);
-        if let Some(arm) = line.protractor {
-            StraightLinePreview::new(words.protractor.clone(), line.start, arm).show_at(ui, rect);
-        }
+        craft::draw::ui::show_ruler(ui, rect, line);
     }
     if let Some(samplers) = &samplers {
         let mut marks = ColorSamplerMarks::new(tl!("Color samplers"), samplers);
