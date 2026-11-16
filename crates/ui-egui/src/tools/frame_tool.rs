@@ -364,8 +364,10 @@ fn press_rule(app: &mut PhotocraftApp, at: KPoint, clicks: u32, reach: f64, styl
         return Pressed::Done;
     }
     let p = [at.x, at.y];
-    if clicks >= 2 {
-        let Some(id) = frame_at(app, p) else { return Pressed::Done };
+    // A repeated press with no frame under it is an ordinary press: a drag from where the last click was still draws.
+    if clicks >= 2
+        && let Some(id) = frame_at(app, p)
+    {
         let next = if selected(app).is_some_and(|l| l.id == id && target(app, l) == Target::Content) { Target::Both } else { Target::Content };
         select(app, id, next);
         return Pressed::Done;

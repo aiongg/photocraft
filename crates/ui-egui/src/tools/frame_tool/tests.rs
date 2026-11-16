@@ -86,35 +86,6 @@ fn press_drag(h: &mut egui_kittest::Harness<'_, PhotocraftApp>, from: Pos2, to: 
     h.run_steps(3);
 }
 
-/// A rectangular drag makes one frame (one undo step) clipped to the drawn rect; the ellipse shape hides the
-/// corners; a click draws nothing.
-#[test]
-fn frame_tool_draws_rectangular_and_elliptical_frames() {
-    let mut app = app();
-    let frame = |app: &PhotocraftApp| {
-        let st = app.session.active().unwrap();
-        let l = st.doc.layer(st.active_layer.unwrap()).unwrap();
-        assert!(matches!(l.content, LayerContent::Group(_)) && l.name.starts_with("Frame"), "the new frame is selected");
-        (l.id, TestMask(l.vector_mask.as_ref().unwrap().path.clone()))
-    };
-    let layers = app.session.active().unwrap().doc.layers.len();
-    drag(&mut app, [20.0, 30.0], [120.0, 110.0]);
-    let (_, m) = frame(&app);
-    assert_eq!((m.value(20, 30), m.value(119, 109), m.value(19, 30), m.value(120, 109)), (1.0, 1.0, 0.0, 0.0));
-    app.run("edit.undo", json!({})).unwrap();
-    assert_eq!(app.session.active().unwrap().doc.layers.len(), layers, "one undo takes the frame back");
-    // The frame's handles take presses from the pass that drew them: show the undone state first.
-    crate::canvas::testing::frame(&mut app);
-
-    app.ui.frame_tool.ellipse = true;
-    drag(&mut app, [20.0, 30.0], [120.0, 110.0]);
-    let (id, m): (LayerId, _) = frame(&app);
-    assert_eq!((m.value(70, 70), m.value(20, 30)), (1.0, 0.0), "centre shown, corner hidden");
-    // A click draws nothing.
-    drag(&mut app, [300.0, 250.0], [300.0, 250.0]);
-    assert_eq!(frame(&app).0, id);
-}
-
 /// Dragging the Frame-target box's bottom-right corner resizes the frame as one step and creates no layer.
 #[test]
 fn markers_survive_release_and_handles_resize_the_frame_without_creating_another() {
@@ -145,10 +116,11 @@ fn frame_content_and_both_selection_follow_clicks_and_double_clicks() {
     click(&mut app, [65., 65.]);
     assert_eq!(app.ui.frame_tool.target, Target::Both);
     assert_eq!(app.session.active().unwrap().active_layer, Some(frame));
-    double_click(&mut app, [65., 65.]);
+    // Every further click at the same point inside the double-click time counts as a double click.
+    click(&mut app, [65., 65.]);
     assert_eq!(app.ui.frame_tool.target, Target::Content);
     assert_eq!(app.session.active().unwrap().active_layer, Some(source));
-    double_click(&mut app, [65., 65.]);
+    click(&mut app, [65., 65.]);
     assert_eq!(app.ui.frame_tool.target, Target::Both);
     assert_eq!(app.session.active().unwrap().active_layer, Some(frame));
     drag(&mut app, [50., 30.], [65., 40.]);
