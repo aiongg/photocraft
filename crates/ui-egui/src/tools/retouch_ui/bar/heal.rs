@@ -76,9 +76,10 @@ fn first(a: Option<RangeAlert>, b: Option<RangeAlert>) -> Option<RangeAlert> {
 pub(super) fn remove(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<RangeAlert> {
     let composite = crate::canvas::paint_target(app).as_str() == Some("pixels");
     let o = &mut app.ui.tool_options;
-    check(ui, tl!("Sample All Layers"), &mut o.sample_all.remove, true, None);
-    check(ui, tl!("Create a new layer"), &mut o.remove_new_layer, composite, None);
-    check(ui, tl!("Remove after each stroke"), &mut o.remove_after_each_stroke, true, None);
+    // The reference's options bar, in its order and words (#12546).
+    check(ui, tl!("Sample all layers"), &mut o.sample_all.remove, true, Some(tl!("Sample content from all visible layers")));
+    check(ui, tl!("Remove after each stroke"), &mut o.remove_after_each_stroke, true, Some(tl!("Remove area after a single stroke")));
+    check(ui, tl!("Create new layer"), &mut o.remove_new_layer, composite, Some(tl!("Create new layer with results")));
     None
 }
 
@@ -137,13 +138,17 @@ pub(super) fn spot_healing(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option
     None
 }
 
-/// The options of Clone Stamp and Healing Brush.
+/// The options of Clone Stamp and Healing Brush. In an Indexed Color document the Clone Stamp's
+/// Sample greys at Current Layer and keeps the stored choice for other documents (#12613).
 pub(super) fn clone(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<RangeAlert> {
-    let source_unset = app.ui.clone_source.is_none();
+    let source_unset = app.session.presets.clone.active().source.is_none();
+    let indexed = crate::retouch_ui::clone_stamp_indexed(app);
     let o = &mut app.ui.tool_options;
     check(ui, tl!("Aligned"), &mut o.clone_aligned, true, None);
     let samples = string_entries(&[("current", tl!("Current Layer")), ("currentAndBelow", tl!("Current & Below")), ("all", tl!("All Layers"))]);
-    choose(ui, tl!("Sample"), &mut o.clone_sample, &samples, true, None);
+    let mut greyed = "current".to_owned();
+    let sample = if indexed { &mut greyed } else { &mut o.clone_sample };
+    choose(ui, tl!("Sample"), sample, &samples, !indexed, None);
     if source_unset {
         Divider::vertical().show(ui);
         hint(ui, crate::i18n::fmt(tl!("{key}-click to set the source"), &[("key", &crate::shortcuts::pretty("Alt"))]));

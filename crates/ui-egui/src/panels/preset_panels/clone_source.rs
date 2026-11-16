@@ -14,7 +14,6 @@ use serde_json::{Value, json};
 
 use super::run;
 use crate::PhotocraftApp;
-use crate::state::Tool;
 
 /// Runs `command`; a value edit of one gesture shares one undo step through the gesture's id.
 fn edit(app: &mut PhotocraftApp, command: &str, mut params: Value, gesture: Option<GestureId>) {
@@ -56,23 +55,33 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some(index) = select {
         run(app, "cloneSource.select", json!({"index": index}));
     }
-    let layer_name = slot.layer.and_then(|l| app.session.active().and_then(|d| d.doc.layer(photocraft_doc::LayerId(l)).map(|x| x.name.clone())));
-    let source_line = match (slot.source, layer_name) {
-        (Some(_), Some(l)) => format!("Source: {} : {l}", app.session.active().map(|d| d.doc.name.clone()).unwrap_or_default()),
-        (Some(_), None) => "Source: set".to_string(),
+    // The document the source was set in (the active one for slots set before slots remembered it).
+    let source_doc = match slot.document {
+        Some(id) => slot.open_document().and_then(|_| app.session.documents().iter().find(|d| d.doc.id == id)),
+        None => app.session.active(),
+    };
+    let source_line = match (slot.source, source_doc) {
+        (Some(_), None) => tl!("Source: document closed").to_string(),
+        (Some(_), Some(d)) => match slot.layer.and_then(|l| d.doc.layer(photocraft_doc::LayerId(l))) {
+            Some(l) => format!("Source: {} : {}", d.doc.name, l.name),
+            None => "Source: set".to_string(),
+        },
         _ => crate::i18n::fmt(tl!("Source: not set ({key}-click with Clone Stamp)"), &[("key", &crate::shortcuts::pretty("Alt"))]),
     };
     Text::new(source_line).show(ui);
 
     let mut set: Option<(Value, Option<GestureId>)> = None;
-    let off = slot.offset().unwrap_or([0.0, 0.0]);
+    // X/Y show the pairing at the last hover point (or the last committed one), in document pixels;
+    // an edit moves exactly that pairing, before the first stroke or with Aligned off too (#13124).
+    let off = super::clone_offset_readout(app).unwrap_or([0.0, 0.0]);
+    let mut offset_edit = None;
     FieldGroup::new(tl!("Transform")).show(ui, |ui, _| {
         if slot.source.is_some() {
             if let Some((x, id)) = number(ui, "X", off[0], -30000.0..=30000.0, UnitKind::Pixels) {
-                set = Some((json!({"offset": [x, off[1]]}), id));
+                offset_edit = Some(([x, off[1]], id));
             }
             if let Some((y, id)) = number(ui, "Y", off[1], -30000.0..=30000.0, UnitKind::Pixels) {
-                set = Some((json!({"offset": [off[0], y]}), id));
+                offset_edit = Some(([off[0], y], id));
             }
         }
         // The W/H chain: with it on, a new W or H scales the other by the same factor.
@@ -100,6 +109,9 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             set = Some((json!({"flipV": now}), None));
         }
     });
+    if let Some((offset, gesture)) = offset_edit {
+        set = super::clone_offset_edit(app, offset).map(|params| (params, gesture));
+    }
     if let Some((params, gesture)) = set {
         edit(app, "cloneSource.set", params, gesture);
     }
@@ -127,47 +139,5 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if o != before {
         let params = json!({"show": o.show, "opacity": o.opacity, "clipped": o.clipped, "autoHide": o.auto_hide, "invert": o.invert, "blend": o.blend});
         edit(app, "cloneSource.overlay", params, gesture);
-    }
-}
-
-/// Where the active clone source samples for document point `at` (for the canvas marker).
-/// The first stroke anchors at its press, so the marker follows before the stroke commits.
-pub fn clone_sample_point(app: &PhotocraftApp, at: Option<[f64; 2]>) -> Option<[f64; 2]> {
-    use photocraft_engine::presets::clone_source::{Mapping, transform_matrix};
-    let s = app.session.presets.clone.active();
-    let src = s.source?;
-    // PLAN: assumed `paint_tool::stroking(app) -> Option<&PaintStroke>` (cw.P9) with `PaintStroke { tool: Tool, start: [f64; 2], .. }`.
-    let stroking = crate::canvas::paint_tool::stroking(app).filter(|stroke| matches!(stroke.tool, Tool::CloneStamp | Tool::Healing)).map(|stroke| stroke.start);
-    let anchor = if app.ui.tool_options.clone_aligned { s.anchor.or(stroking) } else { stroking };
-    match (anchor, at) {
-        (Some(a), Some(h)) => {
-            let m = Mapping { source: (src[0], src[1]), anchor: (a[0], a[1]), m: transform_matrix(s.scale, s.rotation, s.flip_h, s.flip_v) };
-            let (x, y) = m.map(h[0], h[1]);
-            Some([x, y])
-        }
-        _ => Some(src),
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use crate::canvas::testing;
-
-    #[test]
-    fn clone_marker_follows_the_engine_slot() {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
-        app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
-        app.sync_views();
-        assert_eq!(clone_sample_point(&app, Some([5.0, 5.0])), None);
-        app.run("cloneSource.set", json!({"source": [10, 10]})).unwrap();
-        assert_eq!(clone_sample_point(&app, Some([30.0, 30.0])), Some([10.0, 10.0]));
-        app.ui.tool = Tool::CloneStamp;
-        testing::frame(&mut app);
-        testing::press(&mut app, [40.0, 40.0], egui::Modifiers::NONE);
-        assert_eq!(clone_sample_point(&app, Some([50.0, 30.0])), Some([20.0, 0.0]));
-        testing::release(&mut app, [40.0, 40.0], egui::Modifiers::NONE);
-        app.session.presets.clone.active_mut().anchor = Some([20.0, 20.0]);
-        assert_eq!(clone_sample_point(&app, Some([30.0, 30.0])), Some([20.0, 20.0]));
     }
 }
