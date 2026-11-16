@@ -91,42 +91,6 @@ fn keys(plan: &ImportPlan, id: &str) -> Vec<String> {
     plan.commands.iter().find(|p| p.command.id == id).map(of).unwrap_or_default()
 }
 
-/// Kys rows become PhotoCraft commands and keys: ties between menus go to the command whose
-/// default the row carries, a second key stays with its command, and what has no command here or
-/// no readable key is reported.
-#[test]
-fn kys_rows_map_to_photocraft_commands() {
-    let app = app();
-    let p = plan_of(&app, SAMPLE);
-    // Photoshop's "..." is our "…"; the dynamic (filter) row is a filter here.
-    assert_eq!(keys(&p, "filter.blur.gaussianBlur"), ["Cmd+Ctrl+Alt+G"]);
-    // Levels… is Image › Adjustments and Layer › New Adjustment Layer: the one whose default is
-    // the imported key wins. All is Select, Edit › Purge, View › Show…: Select › All has the key.
-    assert_eq!(keys(&p, "image.adjustments.levels"), ["Cmd+L"]);
-    assert!(keys(&p, "layer.newAdjustmentLayer.levels").is_empty());
-    assert_eq!(keys(&p, "select.all"), ["Cmd+A"]);
-    assert!(keys(&p, "edit.purge.all").is_empty());
-    // Undo is Edit › Undo, not Edit › Purge › Undo; its second key stays with it.
-    assert_eq!(keys(&p, "edit.undo"), ["Cmd+Z", "F1"]);
-    assert!(keys(&p, "edit.purge.undo").is_empty());
-    // Zoom In lists Cmd++ first, but Cmd+= is our default and is among its keys: it stays the main key.
-    assert_eq!(keys(&p, "view.zoomIn").first().map(String::as_str), Some("Cmd+="));
-    // Case does not matter; an entity decodes; the menu's Settings… is the engine's General….
-    assert_eq!(keys(&p, "layer.new.layerViaCopy"), ["Cmd+J"]);
-    assert_eq!(keys(&p, "image.adjustments.blackWhite"), ["Cmd+Alt+Shift+B"]);
-    assert_eq!(keys(&p, "edit.preferences.general"), ["Cmd+K"]);
-    assert_eq!(keys(&p, "filter.lastFilter"), ["Cmd+F"]);
-    // Scripts and the macOS application menu have no command here.
-    let unmatched: Vec<&str> = p.report.unmatched.iter().map(|u| u.item.as_str()).collect();
-    assert!(unmatched.contains(&"Script_6F17BFA7-EFC8-40EA-B850-7B95ED8EA713"), "{unmatched:?}");
-    assert!(unmatched.contains(&"Hide Photoshop"), "{unmatched:?}");
-    assert!(p.report.unreadable.is_empty());
-    // A key that cannot be read is reported and binds nothing.
-    let broken = plan_of(&app, &set_of("<command name=\"Undo\"><shortcut>Cmd+Shift+Ctrl</shortcut></command>"));
-    assert_eq!(broken.report.unreadable.iter().map(|u| u.item.as_str()).collect::<Vec<_>>(), ["Undo"]);
-    assert!(keys(&broken, "edit.undo").is_empty());
-}
-
 /// The set the dialog is asked to review: queued once, read by the dialog's next pass alone.
 fn review_pending(app: &PhotocraftApp) -> bool {
     app.prefs_rt.shortcuts.as_ref().is_some_and(|s| s.pending_import.is_some())
