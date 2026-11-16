@@ -122,6 +122,23 @@ pub fn human_bytes(b: f64) -> String {
     }
 }
 
+/// The bytes a pixel of the flat image takes, for Image Size's "Image Size:" readout (#14768): the mode's colour
+/// channels at the document's depth, no alpha, whatever the layers store. An Indexed image is one index channel and a
+/// Bitmap one 1-bit channel, though both are stored expanded for editing. A Multichannel image counts its inks; with
+/// none it counts the mode's channels.
+fn flat_bytes_per_pixel(d: &photocraft_doc::Document) -> f64 {
+    use photocraft_color::ColorMode;
+    match d.mode {
+        ColorMode::Bitmap => 1.0 / 8.0,
+        ColorMode::Indexed => 1.0,
+        ColorMode::Multichannel => {
+            let inks = d.channels.iter().filter(|c| c.spot.is_some()).count();
+            (if inks == 0 { d.mode.color_channels() } else { inks } * d.depth.bytes()) as f64
+        }
+        mode => (mode.color_channels() * d.depth.bytes()) as f64,
+    }
+}
+
 /// Opens Image Size or Canvas Size for the active document; `None` without one.
 pub(crate) fn open(app: &mut PhotocraftApp, command: &str) -> Option<DialogId> {
     open_with(app, command, &Value::Null)
@@ -135,12 +152,13 @@ pub(crate) fn open_with(app: &mut PhotocraftApp, command: &str, params: &Value) 
     // A recorded size is in pixels, whatever the ruler unit.
     let unit = if seeded { UnitKind::Pixels } else { pref_unit(ur.rulers) };
     let points = f64::from(ur.point_size.per_inch());
-    let columns = ColumnSize { width: f64::from(ur.column_width), gutter: f64::from(ur.gutter) };
+    let columns = ColumnSize::new(f64::from(ur.column_width), f64::from(ur.gutter));
     let interpolation = prefs.general.image_interpolation;
     let d = &app.session.active()?.doc;
     let size = PixelSize::new(d.size.width, d.size.height);
     let dpi = f64::from(d.resolution_dpi);
     let bytes_per_pixel = d.layers.first().and_then(|l| l.surface()).map_or(4, |s| s.format().bytes_per_pixel()) as f64;
+    let image_bytes_per_pixel = flat_bytes_per_pixel(d);
     let id = if command == IMAGE_COMMAND {
         // Indexed Color resamples with Nearest Neighbor only, as the command does (#6019).
         let indexed = d.mode == photocraft_color::ColorMode::Indexed;
@@ -151,7 +169,7 @@ pub(crate) fn open_with(app: &mut PhotocraftApp, command: &str, params: &Value) 
         let methods = if indexed { vec![Resample::Automatic, Resample::NearestNeighbor] } else { Vec::new() };
         let values = ImageSizeValues::new(size).pixels_per_inch(dpi).points_per_inch(points).unit(unit).method(method).column_size(columns);
         app.framework.dialogs.open(HostedImageSize::new(values, move |values: Bind<'_, ImageSizeValues>| {
-            ImageSize::new(values).methods(methods.clone()).bytes_per_pixel(bytes_per_pixel)
+            ImageSize::new(values).methods(methods.clone()).bytes_per_pixel(image_bytes_per_pixel)
         }))
     } else {
         let values =

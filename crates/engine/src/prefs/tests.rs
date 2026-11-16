@@ -522,39 +522,24 @@ fn menus_and_toolbar_customisation_persist() {
     assert_eq!(back.toolbar.hidden, vec!["Sponge".to_string()]);
 }
 
-// PLAN: the sheet has an old `order` key read into `slots` by alias; the set's decision (pn.PC4)
-// drops the flat field, so an old key reads as the default (empty) slots and the test asserts that.
-/// The Edit Toolbar drawer's arrangement saved as `toolbar.slots` reads back as saved; a file with
-/// the old flat `toolbar.order` loads cleanly with the default arrangement and keeps its hidden tools.
+/// A file with the old flat `toolbar.order` loads cleanly with the default layout and keeps its
+/// hidden tools.
 #[test]
-fn toolbar_slots_round_trip_and_an_old_order_key_reads_as_slots() {
-    let mut s = session();
-    let slots = json!([
-        {"id": 3, "tools": ["Brush", "Pencil"], "groupEnd": false},
-        {"id": 0, "tools": ["Move"], "groupEnd": true},
-    ]);
-    s.execute("edit.toolbar", json!({"slots": slots})).unwrap();
-    let mut back = Session::new();
-    assert!(back.load_prefs_json(&s.prefs_to_json()).unwrap().is_empty());
-    let expected = vec![
-        SavedSlot { id: 3, tools: vec!["Brush".into(), "Pencil".into()], group_end: false },
-        SavedSlot { id: 0, tools: vec!["Move".into()], group_end: true },
-    ];
-    assert_eq!(back.prefs().toolbar.slots, expected);
-
+fn an_old_toolbar_order_key_loads_with_the_default_layout() {
     let mut old = Session::new();
     let invalid = old.load_prefs_json(&json!({"toolbar": {"hidden": ["Sponge"], "order": ["Move", "Brush"]}}).to_string()).unwrap();
     assert!(invalid.is_empty(), "{invalid:?}");
-    assert!(old.prefs().toolbar.slots.is_empty());
+    assert_eq!(old.prefs().toolbar.toolbar, None);
     assert_eq!(old.prefs().toolbar.hidden, ["Sponge"]);
     assert!(old.prefs().get("toolbar.order").is_none());
 }
 
-/// #5096: Edit › Menus can't hide the way back into itself, Preferences, Save or Exit.
+/// #5096, measured in #14335: Edit › Menus can't hide the way back into itself or File's Close,
+/// Save, Save As, Save a Copy, Clear Recent File List and Exit.
 #[test]
 fn menus_refuse_to_hide_essential_items() {
     let mut s = session();
-    for id in ["edit.menus", "edit.keyboardShortcuts", "edit.preferences.general", "file.save", "file.saveAs", "file.exit"] {
+    for id in ["edit.menus", "file.close", "file.save", "file.saveAs", "file.saveACopy", "file.clearRecent", "file.exit"] {
         assert!(s.execute("edit.menus", json!({"hide": ["edit.fade", id]})).is_err(), "{id}");
         assert!(s.prefs().menus.hidden.is_empty(), "{id}: a refused call changes nothing");
     }
@@ -1296,4 +1281,22 @@ fn an_effect_cache_above_the_cap_loads_clamped_and_does_not_block_apply() {
         s.execute("prefs.set", json!({"path": "", "value": values})).unwrap();
         assert_eq!(s.execute("prefs.get", json!({"path": "fileHandling.recentFileCount"})).unwrap(), json!(7), "{saved} MB");
     }
+}
+
+/// A file from before the agents switch whose Control Port started the control server keeps
+/// it on; one without a port, or that already says, is left as it is.
+#[test]
+fn a_saved_control_port_turns_the_agent_connection_on() {
+    let load = |text: &str| {
+        let mut session = Session::new();
+        session.load_prefs_json(text).unwrap();
+        session.prefs().integrations.clone()
+    };
+    let legacy = load(r#"{"integrations":{"allowAgentControl":true,"controlPort":7878}}"#);
+    assert!(legacy.connect_agents);
+    assert_eq!(legacy.agents.control_port, 7878);
+    assert!(!load(r#"{"integrations":{"controlPort":0}}"#).connect_agents);
+    assert!(!load(r#"{"integrations":{"controlPort":70000}}"#).connect_agents, "not a usable port");
+    assert!(!load(r#"{"integrations":{"controlPort":7878,"connectAgents":false}}"#).connect_agents, "an explicit choice wins");
+    assert!(!load("{}").connect_agents, "off by default");
 }

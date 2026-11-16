@@ -12,18 +12,24 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 
+pub(crate) mod clone_offsets;
 pub(crate) mod clone_source;
 pub(crate) mod tool_presets;
 
 pub(crate) use super::preset_browser::pattern_picker;
 pub use super::preset_browser::{finish_custom_shape, gradients_panel, patterns_panel, shape_picker, shapes_panel, styles_panel, tool_presets_panel};
-pub use clone_source::{clone_sample_point, panel as clone_source_panel};
+pub use clone_offsets::{clone_mapping_at, clone_sample_point};
+pub(crate) use clone_offsets::{clone_offset_edit, clone_offset_readout, remember_clone_cursor};
+pub use clone_source::panel as clone_source_panel;
 pub use tool_presets::select as select_tool_preset;
 
 /// Panel state (serde, so the control channel can read and drive it).
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default)]
 pub struct PresetUi {
+    /// Last clone preview position in its destination document; never restored into another session.
+    #[serde(skip)]
+    pub clone_cursor: Option<(photocraft_doc::DocId, [f64; 2])>,
     /// Selected preset per panel (by name / pattern id).
     pub selected: BTreeMap<String, String>,
     /// Tool Presets: Current Tool Only.

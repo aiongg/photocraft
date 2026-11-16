@@ -43,16 +43,8 @@ pub fn selection_op(tool: Tool, bar: u8, mods: Mods, has_selection: bool) -> Sel
                 SelectionOperation::Add
             }
         }
-        // Object Selection: ⌥ subtracts, ⇧ adds (see `retouch_ui::finish_object_selection`).
-        Tool::ObjectSelection => {
-            if mods.alt {
-                SelectionOperation::Subtract
-            } else if mods.shift {
-                SelectionOperation::Add
-            } else {
-                SelectionOperation::New
-            }
-        }
+        // Every other selection tool, Object Selection included (#12853): the options bar's mode, with ⇧ adding, ⌥
+        // subtracting and ⇧⌥ intersecting.
         _ => SelectionOperation::resolve(SelectionOperation::ALL[usize::from(bar.min(3))], mods, has_selection),
     }
 }
@@ -145,9 +137,12 @@ mod tests {
             // Smart selection tools ignore the bar.
             (Tool::QuickSelection, 2, Mods::NONE, false, Add),
             (Tool::QuickSelection, 0, ALT, true, Subtract),
-            (Tool::ObjectSelection, 3, Mods::NONE, true, New),
+            // Object Selection follows the options bar and the keys like the other selection tools (#12853).
+            (Tool::ObjectSelection, 3, Mods::NONE, true, Intersect),
+            (Tool::ObjectSelection, 0, Mods::NONE, true, New),
             (Tool::ObjectSelection, 0, shift, true, Add),
-            (Tool::ObjectSelection, 0, ALT, false, Subtract),
+            (Tool::ObjectSelection, 0, ALT, true, Subtract),
+            (Tool::ObjectSelection, 0, both, true, Intersect),
         ];
         for (tool, bar, mods, selected, op) in rows {
             assert_eq!(selection_op(tool, bar, mods, selected), op, "{tool:?} bar={bar} {mods:?} selected={selected}");

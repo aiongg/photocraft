@@ -488,6 +488,28 @@ fn delete_key_targets() {
     assert_eq!(names(&h), before, "no layer was deleted");
 }
 
+/// An action key the automation policy refuses leaves the bindings as they were.
+#[test]
+fn denied_shortcut_assignment_leaves_bindings_unmodified() {
+    let mut h = harness();
+    add_action(&mut h, "Action", &[]);
+    h.state_mut().services.automation_command = Some(Box::new(|_, _| Err("denied shortcut edit".into())));
+    h.state_mut().automation_input = true;
+    let prefs = h.state().session.prefs().shortcuts.clone();
+    assert!(crate::actions::assign_shortcut(h.state_mut(), "Action", "F2").is_err());
+    assert_eq!(h.state().session.prefs().shortcuts, prefs);
+}
+
+/// A saved key whose action was deleted or renamed says so instead of playing nothing.
+#[test]
+fn a_key_for_a_missing_action_reports_it() {
+    let mut h = harness();
+    let (id, ctx) = (crate::actions::shortcut_id("Gone"), h.ctx.clone());
+    super::dispatch(h.state_mut(), &ctx, &id);
+    assert!(h.state().ui.status_error);
+    assert!(matches!(&take_log(&h.ctx)[..], [(logged, Outcome::Disabled(why))] if *logged == id && why == "The Action no longer exists"));
+}
+
 #[test]
 fn named_action_function_key_replays_and_survives_preferences_roundtrip() {
     let mut h = harness();

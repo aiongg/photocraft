@@ -320,7 +320,8 @@ pub fn escape_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
     handle_escape_and_view_keys(app, ctx);
 }
 
-/// Esc (leave full screen, else deselect), the Delete Anchor Point Esc stages, and the `+` / `−` path operations.
+/// Esc (reset a rotated view, else leave full screen, else deselect), the Delete Anchor Point and Path Selection Esc
+/// stages, and the `+` / `−` path operations.
 /// Runs last, so every state that owns Esc has already had its chance.
 fn handle_escape_and_view_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // A Properties Levels/Curves eyedropper: Esc disarms it.
@@ -342,6 +343,16 @@ fn handle_escape_and_view_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
         || app.ui.tool == Tool::RotateView
         || app.dialog_open()
         || ctx.any_popup_open();
+    // A rotated view takes the first idle Esc (#13607), before leaving full screen or deselecting.
+    // Rotate View handles its own Escape (its canvas tool), where it also ends a rotation drag.
+    if !esc_taken
+        && let Some(view) = app.session.active_index().and_then(|i| app.ui.views.get_mut(i))
+        && view.rotation != 0.0
+        && crate::window_keys::take_escape(ctx)
+    {
+        view.rotation = 0.0;
+        return;
+    }
     // Both full screen modes (with and without the menu bar) return to Standard, as in Photoshop
     // (#4116), through the menu command so the window and the Screen Mode check follow.
     if !esc_taken && app.ui.view.screen_mode != craft::ui::shell::ScreenMode::Standard && crate::window_keys::take_escape(ctx) {
@@ -383,6 +394,19 @@ fn handle_escape_and_view_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
             }
             return;
         }
+    }
+    // Path Selection (#13287): with components of the saved path targeted in the Paths panel
+    // selected, a bare Esc deselects the components and keeps the path targeted and drawn, with no
+    // History step (the tool's bare Enter also untargets the path). A pixel selection takes the Esc
+    // first, above; ⇧Esc and ⌥Esc pass on.
+    if !esc_taken
+        && app.ui.tool == Tool::PathSelection
+        && ctx.input(|i| i.modifiers.is_none())
+        && crate::vector_ui::saved_path_components_selected(app)
+        && crate::window_keys::take_escape(ctx)
+    {
+        crate::path_components::deselect_components(app);
+        return;
     }
     // + / − pick a Path Operation with the Pen tools and Path Selection (`path_components`).
     crate::path_components::handle_keys(app, ctx);

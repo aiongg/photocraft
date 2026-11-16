@@ -14,7 +14,8 @@ use craft::ui::canvas::Snap;
 use craft::ui::style::DataColor;
 use egui::Color32;
 use photocraft_doc::{DocId, LayerId};
-use photocraft_engine::snap::target_rect_of;
+use photocraft_engine::layer_multi_cmds::move_targets;
+use photocraft_engine::snap::{layer_rect, target_rect_of};
 
 use crate::PhotocraftApp;
 use crate::state::Tool;
@@ -50,16 +51,19 @@ fn selection_moves(app: &PhotocraftApp) -> bool {
     pixels || transform
 }
 
-/// The layers a drag moves or resizes: they are not targets. The selected layers while the Move tool
-/// would move them whole, and the type layer being edited (a paragraph-box handle drag does not snap to
-/// the text it resizes, #6819).
+/// The layers a drag moves or resizes: they are not targets. What the Move tool would move whole
+/// (the selected layers, the layers linked to them and everything inside a group, so a group does not
+/// snap to its own layers' starting edges), and the type layer being edited (a paragraph-box handle
+/// drag does not snap to the text it resizes, #6819).
 fn moving_set(app: &PhotocraftApp) -> Vec<LayerId> {
     let mut set = Vec::new();
     if moves_as_move_tool(app)
         && !crate::move_ui::moves_selected_pixels_with(app, Tool::Move)
         && let Some(st) = app.session.active()
     {
-        set.extend(st.selected_layers());
+        let selected = st.selected_layers();
+        set.extend(crate::move_ui::with_descendants(&st.doc, &move_targets(&st.doc, &selected)));
+        set.extend(selected);
     }
     if let Some(edit) = app.ui.text_edit.as_ref() {
         set.push(LayerId(edit.layer));
@@ -138,6 +142,22 @@ pub(crate) fn targets(app: &PhotocraftApp, idx: usize, exclude: &[LayerId]) -> A
 pub(crate) fn snap(app: &PhotocraftApp, idx: usize) -> Snap {
     let exclude = if app.session.active_index() == Some(idx) { moving_set(app) } else { Vec::new() };
     Snap::new(targets(app, idx, &exclude), options(app))
+}
+
+/// The bounds of layer `id` as the Move tool moves and snaps it. `snap::layer_rect` skips groups,
+/// which hold no pixels of their own: a group is the layers in it, whole even with a selection (it
+/// moves them whole, so clipping its pixel layers to the selection would frame less than moves). An
+/// artboard is its board, as the snap targets take it, since the whole board moves.
+pub(crate) fn tree_rect(doc: &photocraft_doc::Document, id: LayerId) -> Option<[f64; 4]> {
+    let l = doc.layer(id)?;
+    let b = if let Some(a) = l.artboard() {
+        a.rect
+    } else if l.is_group() {
+        photocraft_engine::transform_cmds::transform_bounds(doc, l)
+    } else {
+        return layer_rect(doc, id);
+    };
+    (!b.is_empty()).then(|| [b.x0, b.y0, b.x1, b.y1].map(f64::from))
 }
 
 /// The Smart Guides colour from Preferences › Guides, Grid & Slices; `None` when it does not parse

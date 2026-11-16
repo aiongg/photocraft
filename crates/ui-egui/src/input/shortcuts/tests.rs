@@ -60,6 +60,8 @@ fn pen_command_z_and_backspace_retract_points_before_document_undo() {
 #[test]
 fn pen_custom_undo_binding_and_menu_retract_pending_points() {
     let mut app = pen_app(&[[10.0, 10.0], [50.0, 10.0]]);
+    // A library change older than the Pen points: Undo retracts the points first, then reaches the library.
+    app.run("actions.reset", json!({"confirm": true, "mode": "append"})).unwrap();
     app.session.prefs.edit(|p| p.shortcuts.insert("edit.undo".into(), "Cmd+Shift+Y".into()));
     // Once rebound, the default key must no longer intercept pending points.
     testing::key(&mut app, Key::Z, Modifiers::COMMAND);
@@ -67,9 +69,12 @@ fn pen_custom_undo_binding_and_menu_retract_pending_points() {
     testing::key(&mut app, Key::Y, Modifiers::COMMAND | Modifiers::SHIFT);
     assert_eq!(pen_knots(&app), 1);
     assert!(crate::menus::is_enabled(&app, "edit.undo"));
+    let undo_label = |app: &PhotocraftApp| crate::menus::menu_rows(app).into_iter().find(|row| row.command.id == "edit.undo").unwrap().label;
+    assert_ne!(undo_label(&app), "Undo Reset Actions");
     let ctx = testing::ctx(&mut app);
     crate::menus::invoke(&mut app, &ctx, "edit.undo", json!({})).unwrap();
     assert_eq!(pen_knots(&app), 0);
+    assert_eq!(undo_label(&app), "Undo Reset Actions");
 }
 
 /// Every row of the catalog builds into the runtime's catalog (no repeated id, every row in the app scope), every tool is

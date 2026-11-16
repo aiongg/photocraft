@@ -265,7 +265,7 @@ pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let next = {
         let [w, h] = bar_size(app);
         let (name, hex) = shown_background(app);
-        ArtboardBarTarget::Next { size: Size::new(w as f64, h as f64), background: shown_of_name(&name, &hex) }
+        ArtboardBarTarget::next(Size::new(w as f64, h as f64), shown_of_name(&name, &hex))
     };
     let target = match selected.and_then(|i| boards.items.get(i)) {
         Some(item) => ArtboardBarTarget::Board(item),

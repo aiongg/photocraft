@@ -15,7 +15,7 @@ use craft::behavior::EditEvent;
 use craft::behavior::geometry::quad::{BoxAllow, BoxRules, BoxState, ScaleRule, TransformMode};
 use craft::behavior::kurbo::{BezPath, Point, Rect as DocRect};
 use craft::draw::ui::corner::{CornerKind, CornerPoint, CornerTarget, CornerWidgets};
-use craft::draw::ui::transform::{RotateZone, TransformBox};
+use craft::draw::ui::transform::{LineLook, RotateZone, TransformBox};
 use craft::ui::canvas::ToolHost;
 use craft::ui::canvas_controls::SelectionOutline;
 use craft::ui::contract::{Bind, Props, Show};
@@ -77,8 +77,9 @@ fn box_shows(app: &PhotocraftApp) -> bool {
 }
 
 /// The selected shape layers and the box round their paths `[x0, y0, x1, y1]`. `None` unless at least
-/// one layer is selected and all are shape layers.
-fn selection(app: &PhotocraftApp) -> Option<(Vec<u64>, [f64; 4])> {
+/// one layer is selected and all are shape layers. A box with no extent along one axis counts only
+/// when `flat_ok` (a level or upright live line).
+fn selection(app: &PhotocraftApp, flat_ok: bool) -> Option<(Vec<u64>, [f64; 4])> {
     let st = app.session.active()?;
     let ids = st.selected_layers();
     if ids.is_empty() {
@@ -93,8 +94,46 @@ fn selection(app: &PhotocraftApp) -> Option<(Vec<u64>, [f64; 4])> {
         rect = Some(rect.map_or([x0, y0, x1, y1], |r| [r[0].min(x0), r[1].min(y0), r[2].max(x1), r[3].max(y1)]));
         layers.push(l.id.0);
     }
-    let r = rect.filter(|r| r.iter().all(|v| v.is_finite()) && r[2] > r[0] && r[3] > r[1])?;
+    let r = rect.filter(|r| {
+        r.iter().all(|v| v.is_finite()) && if flat_ok { r[2] >= r[0] && r[3] >= r[1] && (r[2] > r[0] || r[3] > r[1]) } else { r[2] > r[0] && r[3] > r[1] }
+    })?;
     Some((layers, r))
+}
+
+/// With the Line tool, the active layer's live line when it is the whole selection: its ends and, with an
+/// arrowhead, the corners of the box aligned with the segment.
+fn live_line(app: &PhotocraftApp) -> Option<LineLook> {
+    if app.ui.tool != Tool::Line {
+        return None;
+    }
+    let st = app.session.active()?;
+    let id = st.active_layer?;
+    if st.selected_layers() != [id] {
+        return None;
+    }
+    let LayerContent::Shape(sh) = &st.doc.layer(id)?.content else { return None };
+    let (from, to, arrow) = match sh.live.as_ref()? {
+        LiveShape::Line { from, to, .. } => (*from, *to, false),
+        LiveShape::ArrowLine { from, to, start, end, .. } => (*from, *to, *start || *end),
+        _ => return None,
+    };
+    let len = (to[0] - from[0]).hypot(to[1] - from[1]);
+    if !(from.iter().chain(&to).all(|v| v.is_finite()) && len > 0.0) {
+        return None;
+    }
+    let rotated = arrow.then(|| {
+        // The path's control points in the segment's frame: `u` along it, `n` across it.
+        let (u, n) = ([(to[0] - from[0]) / len, (to[1] - from[1]) / len], [(from[1] - to[1]) / len, (to[0] - from[0]) / len]);
+        let at = |a: f64, b: f64| Point::new(from[0] + u[0] * a + n[0] * b, from[1] + u[1] * a + n[1] * b);
+        let mut r = [0.0, 0.0, len, 0.0];
+        for p in sh.path.subpaths.iter().flat_map(|s| &s.knots).flat_map(|k| [k.anchor, k.in_ctrl, k.out_ctrl]) {
+            let (dx, dy) = (p.x - from[0], p.y - from[1]);
+            let (a, b) = (dx * u[0] + dy * u[1], dx * n[0] + dy * n[1]);
+            r = [r[0].min(a), r[1].min(b), r[2].max(a), r[3].max(b)];
+        }
+        [at(r[0], r[1]), at(r[2], r[1]), at(r[2], r[3]), at(r[0], r[3])]
+    });
+    Some(LineLook::new(Point::new(from[0], from[1]), Point::new(to[0], to[1])).with_outline(rotated))
 }
 
 /// The bounds of `state`'s four corners.
@@ -115,7 +154,8 @@ fn bounds_of(state: &BoxState) -> [f64; 4] {
 /// the start box's centre. `None` when nothing scaled or a bound is not finite.
 fn box_scale(start: [f64; 4], now: [f64; 4]) -> Option<([f64; 2], [f64; 2])> {
     let axis = |a0: f64, a1: f64, b0: f64, b1: f64| {
-        let s = (b1 - b0) / (a1 - a0);
+        // A box with no extent on this axis (a level or upright line) has nothing to scale there.
+        let s = if a1 > a0 { (b1 - b0) / (a1 - a0) } else { 1.0 };
         if !s.is_finite() {
             return None;
         }
@@ -135,20 +175,26 @@ fn show_box(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
     if !box_shows(app) {
         return;
     }
-    let (Some((layers, bounds)), Some(salt)) = (selection(app), salt(app)) else { return };
+    let line = live_line(app);
+    let (Some((layers, bounds)), Some(salt)) = (selection(app, line.is_some()), salt(app)) else { return };
     let start = DocRect::new(bounds[0], bounds[1], bounds[2], bounds[3]);
     let given = BoxState::from_rect(start);
     // Free mode with rotating, skewing and distorting refused: a corner scales by the drag's projection on
     // the diagonal and an edge one way (`ScaleRule::Shape`). The outside is the tool's, so the rotate zone is
     // the band that a refused rotation leaves undeclared.
     let rules = BoxRules::in_mode(TransformMode::Free).with_allow(BoxAllow::new(false, false, false)).with_scale(ScaleRule::Shape);
-    let out = TransformBox::new(BOX_LABEL, Bind::given(given), start, 0.0)
+    // The Ellipse tool marks the box's centre; a live line shows its ends and midpoint instead of the frame.
+    let mut transform_box = TransformBox::new(BOX_LABEL, Bind::given(given), start, 0.0)
         .rules(rules)
         .rotate_zone(RotateZone::Band)
         .reference_point(false)
         .inside_moves(false)
-        .id_salt((BOX_LABEL, salt))
-        .show_at(ui, rect);
+        .centre_mark(app.ui.tool == Tool::EllipseShape)
+        .id_salt((BOX_LABEL, salt));
+    if let Some(line) = line {
+        transform_box = transform_box.line(line);
+    }
+    let out = transform_box.show_at(ui, rect);
     // Only this pass's events count: a second pass of the frame sees its own. The box has no session to apply
     // (`apply` and `discard` are ignored), and a key nudge moves nothing here because the box is re-given from
     // the document.
@@ -234,7 +280,7 @@ fn normal_rect([x, y, w, h]: [f64; 4]) -> Option<[f64; 4]> {
 }
 
 /// A shape layer's live shape as a widget target, if it has corners: a rectangle's four, each with its own
-/// radius; a polygon's or star's outer points sharing one.
+/// radius; a polygon's or star's outer points, or a triangle's three, sharing one.
 fn corner_target(layer: u64, live: &LiveShape) -> Option<CornerTarget> {
     let at = |p: [f64; 2]| Point::new(p[0], p[1]);
     match *live {
@@ -259,6 +305,19 @@ fn corner_target(layer: u64, live: &LiveShape) -> Option<CornerTarget> {
             // A star's inner points stay sharp, so they have no widget.
             let corners = (0..n)
                 .filter(|&i| shapes::polygon_rounds_vertex(star_ratio, i))
+                .map(|i| CornerPoint::new(at(vertices[i]), at(vertices[(i + n - 1) % n]), at(vertices[(i + 1) % n]), corner_radius.max(0.0), CornerKind::Round))
+                .collect();
+            Some(CornerTarget::new(layer, corners, false))
+        }
+        LiveShape::Triangle { rect, corner_radius } => {
+            let [x, y, w, h] = normal_rect(rect)?;
+            if !corner_radius.is_finite() {
+                return None;
+            }
+            let sharp = shapes::triangle(x, y, w, h);
+            let vertices: Vec<[f64; 2]> = sharp.subpaths.first()?.knots.iter().map(|k| [k.anchor.x, k.anchor.y]).collect();
+            let n = vertices.len();
+            let corners = (0..n)
                 .map(|i| CornerPoint::new(at(vertices[i]), at(vertices[(i + n - 1) % n]), at(vertices[(i + 1) % n]), corner_radius.max(0.0), CornerKind::Round))
                 .collect();
             Some(CornerTarget::new(layer, corners, false))
@@ -300,6 +359,7 @@ fn rounded_path(live: &LiveShape, radii: &[f64]) -> Option<Path> {
             let corner_radius = radii.first().copied().unwrap_or(0.0);
             Some(shapes::live_path(&LiveShape::Polygon { rect, sides, star_ratio, corner_radius }))
         }
+        LiveShape::Triangle { rect, .. } => Some(shapes::live_path(&LiveShape::Triangle { rect, corner_radius: radii.first().copied().unwrap_or(0.0) })),
         LiveShape::Ellipse { .. } | LiveShape::Line { .. } | LiveShape::ArrowLine { .. } => None,
     }
 }
@@ -343,7 +403,7 @@ fn show_widgets(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
 }
 
 /// One `shape.edit` per changed target, all under `key` so they are one History step: `radii` for a
-/// rectangle, `cornerRadius` for a polygon. A click without movement reports no change and runs nothing.
+/// rectangle, `cornerRadius` for a polygon or a triangle. A click without movement reports no change and runs nothing.
 fn commit_corners(app: &mut PhotocraftApp, targets: &[CornerTarget], change: Option<&craft::draw::ui::corner::CornerEdit>, key: &str) {
     let Some(change) = change else { return };
     for edit in &change.targets {

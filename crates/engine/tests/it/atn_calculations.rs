@@ -75,7 +75,7 @@ fn alpha(s: &Session, index: usize) -> Vec<f32> {
 }
 
 fn play(s: &mut Session, action: Action) -> Value {
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: vec![action], sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(vec![action], Vec::new()));
     s.execute("actions.play", json!({"action": "Calculate"})).unwrap()
 }
 

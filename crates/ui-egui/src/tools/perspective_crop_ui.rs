@@ -3,8 +3,8 @@
 //! - drag a box, or click four corners, to make a quad (the framework's `PerspectiveCropTool`: TL, TR, BR, BL in
 //!   document px, clicked corners put in that order);
 //! - drag a corner to move it alone, or drag inside the quad to move it (the framework's quad control);
-//! - the quad shows its perspective grid (Show Grid) and turns red while it isn't a convex quad wound like its box,
-//!   which can't be applied;
+//! - the quad shows its perspective grid (Show Grid) and turns red while it isn't a convex quad, which can't be
+//!   applied; one flipped on one axis (wound the other way) applies mirrored (#12489);
 //! - ↵ (or ✓) applies: `image.perspectiveCrop` maps the quad onto an upright rectangle, the whole document in one
 //!   undo step. Its size comes from the options bar's W × H and resolution (`CropSizeFields`), or with them empty
 //!   from the rectangle the quad shows in perspective. Esc (or ⊘) cancels.
@@ -174,6 +174,10 @@ mod perspective_crop_bar_buttons_tests;
 #[cfg(test)]
 #[path = "perspective_crop_deselect_tests.rs"]
 mod perspective_crop_deselect_tests;
+
+#[cfg(test)]
+#[path = "perspective_crop_mirrored_tests.rs"]
+mod perspective_crop_mirrored_tests;
 
 #[cfg(test)]
 mod tests {

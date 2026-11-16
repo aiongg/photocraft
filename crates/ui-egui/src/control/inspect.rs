@@ -13,6 +13,19 @@ fn entry_json(entry: &Entry<String>) -> Value {
     }
 }
 
+/// The agent link for `ui.inspect`: its status (`port`, `launchFlags`, `error`), the suite's
+/// `AI-MCP` flag (`mcpFlag`) and the ArtCraft Launcher's switch (`launcher`).
+fn agent_link_json(app: &PhotocraftApp) -> Value {
+    let status = app.services.agent_link.as_ref().map(|link| link.status().clone()).unwrap_or_default();
+    let switch = app.services.agent_switch.as_ref();
+    let mut v = json!(status);
+    if let Some(m) = v.as_object_mut() {
+        m.insert("mcpFlag".into(), json!(switch.is_some_and(|s| s.mcp_flag())));
+        m.insert("launcher".into(), json!(switch.is_some_and(|s| s.launcher())));
+    }
+    v
+}
+
 /// The open canvas context menu's rows for `ui.state`: the spelling suggestions first (type edit
 /// menu over a misspelled word), then the menu's own rows, in the order the menu shows them.
 fn context_entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Value> {
@@ -23,13 +36,14 @@ fn context_entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Value> {
 fn brush_mode_menu(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Value {
     use crate::brush_mode_menu as m;
     let tool = app.ui.tool;
-    let current = m::current(app, tool);
+    let plain = matches!(menu.kind, MenuKind::BrushMode { plain: true });
+    let current = m::checked(app, tool, plain);
     json!({
         "pos": menu.pos,
         "tool": tool,
         "mode": current.and_then(m::Item::label),
         "choices": m::labels(tool),
-        "items": m::entries(app, tool).iter().map(entry_json).collect::<Vec<_>>(),
+        "items": m::entries(app, tool, plain).iter().map(entry_json).collect::<Vec<_>>(),
     })
 }
 
@@ -108,7 +122,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
             _ => None,
         }),
         "layerPicker": app.ui.layer_picker,
-        "brushModeMenu": menu.filter(|menu| matches!(menu.kind, MenuKind::BrushMode)).map(|menu| brush_mode_menu(app, menu)),
+        "brushModeMenu": menu.filter(|menu| matches!(menu.kind, MenuKind::BrushMode { .. })).map(|menu| brush_mode_menu(app, menu)),
         "brushPicker": app.ui.brush_picker.map(|pos| json!({
             "pos": pos,
             "list": {
@@ -122,7 +136,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
                 "scale": picker.browser.zoom,
             },
         })),
-        "canvasToolMenu": menu.filter(|menu| !matches!(menu.kind, MenuKind::Layers { .. } | MenuKind::BrushMode)).map(|menu| {
+        "canvasToolMenu": menu.filter(|menu| !matches!(menu.kind, MenuKind::Layers { .. } | MenuKind::BrushMode { .. })).map(|menu| {
             json!({
                 "pos": menu.pos,
                 "tool": menu.tool,
@@ -175,6 +189,7 @@ pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
         "brush": {"size": app.session.tools.brush.size, "hardness": app.session.tools.brush.hardness, "opacity": app.session.tools.brush.opacity},
         "distort": app.distort.describe(),
         "jobs": crate::jobs_ui::inspect(app),
+        "agentLink": agent_link_json(app),
         "histogram": crate::histogram_panel::inspect(app),
         "cameraRaw": crate::camera_raw_ui::describe(app),
     })

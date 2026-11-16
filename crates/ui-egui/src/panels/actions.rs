@@ -22,6 +22,7 @@ use host::PhotoActions;
 pub(crate) mod dialogs;
 mod files;
 mod host;
+pub(crate) mod library;
 pub(crate) mod menu;
 pub(crate) mod menu_item;
 pub(crate) mod playback;
@@ -37,6 +38,8 @@ pub(crate) use runner::{
 mod drag_drop_tests;
 #[cfg(test)]
 mod files_tests;
+#[cfg(test)]
+mod library_tests;
 #[cfg(test)]
 mod menu_tests;
 #[cfg(test)]
@@ -186,17 +189,38 @@ pub(crate) fn shortcut_id(name: &str) -> String {
 }
 
 pub(crate) fn assign_shortcut(app: &mut PhotocraftApp, name: &str, shortcut: &str) -> Result<Value, String> {
+    use photocraft_engine::prefs::normalize_shortcut;
     let id = shortcut_id(name);
     let mut set = serde_json::Map::new();
-    // A function key belongs to only one action. Ordinary menu bindings remain
-    // intact and become available again when the action binding is removed.
-    for (other, assigned) in &app.session.prefs().shortcuts {
-        if other.starts_with(SHORTCUT_PREFIX) && other != &id && assigned == shortcut && !shortcut.is_empty() {
-            set.insert(other.clone(), json!(""));
+    let mut alternates = serde_json::Map::new();
+    // A function key belongs to only one action, as its main key or an alternate, however the
+    // key was spelled. Ordinary menu bindings remain intact and become available again when the
+    // action binding is removed.
+    if let Some(key) = normalize_shortcut(shortcut) {
+        let same = |assigned: &String| normalize_shortcut(assigned).as_ref() == Some(&key);
+        let prefs = app.session.prefs();
+        for (other, assigned) in &prefs.shortcuts {
+            if other.starts_with(SHORTCUT_PREFIX) && other != &id && same(assigned) {
+                set.insert(other.clone(), json!(""));
+            }
+        }
+        for (other, assigned) in &prefs.alternate_shortcuts {
+            if other.starts_with(SHORTCUT_PREFIX) && other != &id && assigned.iter().any(same) {
+                alternates.insert(other.clone(), json!(assigned.iter().filter(|a| !same(*a)).collect::<Vec<_>>()));
+            }
         }
     }
     set.insert(id, json!(shortcut));
-    app.run("edit.keyboardShortcuts", json!({"set": set, "allowUnknown": true, "removeConflicts": false}))
+    app.run("edit.keyboardShortcuts", json!({"set": set, "alternates": alternates, "allowUnknown": true, "removeConflicts": false}))
+}
+
+/// After Clear All, Reset, Replace or their undo the rows hold other actions: none stays
+/// selected, open or in rename.
+pub(crate) fn library_changed(app: &mut PhotocraftApp) {
+    let ui = &mut app.ui.actions;
+    ui.panel.selected = None;
+    ui.panel.expanded.clear();
+    ui.rename = None;
 }
 
 /// The set New Action records into: the selected action's, else the selected set folder's.
@@ -334,6 +358,9 @@ fn apply_event(app: &mut PhotocraftApp, event: ActionsEvent) -> Result<(), Strin
         ActionsEvent::NewSet => dialogs::new_set_dialog(app).map(drop)?,
         ActionsEvent::InsertStop => dialogs::insert_stop_dialog(app).map(drop)?,
         ActionsEvent::Load => files::load_dialog(app).map(drop)?,
+        ActionsEvent::ClearAll => library::clear_all(app).map(drop)?,
+        ActionsEvent::Reset => library::reset(app).map(drop)?,
+        ActionsEvent::Replace => library::replace(app).map(drop)?,
         ActionsEvent::Save { set, .. } => files::save_dialog(app, set).map(drop)?,
         ActionsEvent::Delete(row) => {
             let deleted = match row {

@@ -2,11 +2,11 @@
 
 use std::sync::Arc;
 
+use craft_cms::Builtin;
 use craft_psd::{
     atn::{self, AtnAction, AtnEvent, AtnFile, AtnItem},
     descriptor::{Descriptor, Id, UnicodeString, Value as D},
 };
-use photocraft_cms::Builtin;
 use photocraft_color::{ColorMode, PixelFormat, SampleType};
 use photocraft_doc::{Document, Layer, LayerContent, SmartObject, SmartSource};
 use photocraft_engine::{
@@ -161,7 +161,7 @@ fn recorded_rgb_flags_survive_save_reimport_and_public_playback() {
         let imported = atn_cmds::import(&saved).unwrap();
         assert!(imported.unsupported.is_empty());
         assert_eq!(imported.actions[0].steps, replay.actions.list.actions()[0].steps);
-        replay.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+        replay.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
         let played = replay.execute("actions.play", json!({"action": "Convert"})).unwrap();
         assert_eq!(played["ran"], 1);
         assert!(played.get("failed").is_none(), "{played}");
@@ -187,7 +187,7 @@ fn defaults_are_explicit_false_and_assign_profile_is_unchanged() {
         assert_eq!(params[param], false);
     }
     let saved = save(&mut s);
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: atn_cmds::import(&saved).unwrap().actions, sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(atn_cmds::import(&saved).unwrap().actions, Vec::new()));
     let mut control = fixture();
     control.execute("edit.convertToProfile", json!({"profile": "srgb", "intent": "relative", "bpc": false})).unwrap();
     let played = s.execute("actions.play", json!({"action": "Convert"})).unwrap();

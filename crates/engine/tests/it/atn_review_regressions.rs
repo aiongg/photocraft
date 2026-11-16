@@ -65,7 +65,7 @@ fn mesh_three_value_shaper_is_applied() {
                 }
             }
         }
-        let lut = photocraft_cms::lutfile::parse_3dl(&text).unwrap();
+        let lut = craft_cms::lutfile::parse_3dl(&text).unwrap();
         let mid = ((lut.size / 2 * lut.size + lut.size / 2) * lut.size + lut.size / 2) * 3;
         assert!((lut.data[mid] - expected).abs() < 0.002, "{shaper}: {}", lut.data[mid]);
     }
@@ -976,7 +976,7 @@ fn called_actions_packages_explicit_batch_children_and_replays_them() {
                 assert_eq!(rewritten["kept"], 17);
             }
             let mut s = Session::new();
-            s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: captured, sets: Vec::new() });
+            s.actions.list = ActionList::from_file(ActionsFile::new(captured, Vec::new()));
             let result = s.execute(&steps[0].0, steps[0].1.clone()).unwrap();
             assert_eq!(result["files"].as_array().unwrap().len(), 1, "{result}");
             let doc = photocraft_io::import("saved.png", &std::fs::read(result["files"][0].as_str().unwrap()).unwrap()).unwrap().document;
@@ -1008,7 +1008,7 @@ fn called_actions_packages_shared_descendants_at_the_shallowest_depth() {
         assert_eq!(captured.iter().map(|a| &a.name).collect::<Vec<_>>(), list.iter().map(|a| &a.name).collect::<Vec<_>>());
         assert_eq!(captured[0].steps[0].params["action"], "Child");
         let mut s = Session::new();
-        s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: captured, sets: Vec::new() });
+        s.actions.list = ActionList::from_file(ActionsFile::new(captured, Vec::new()));
         let result = s.execute(&steps[0].0, steps[0].1.clone()).unwrap();
         assert!(result["errors"].as_array().unwrap().is_empty(), "{result}");
         assert_eq!(result["files"].as_array().unwrap().len(), 1, "{result}");

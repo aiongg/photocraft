@@ -32,21 +32,24 @@ pub(crate) fn clone_params(app: &PhotocraftApp) -> Option<Value> {
     // The options bar's Mode is the tool's own brush's.
     let mode = crate::blend_keys::brush_tool_mode(app.ui.tool, app.session.tools.brush.mode);
     // View › Pattern Preview: both tools carry a stroke on across the canvas edges (#8883).
-    let mut p = json!({"aligned": o.clone_aligned, "sampleLayer": o.clone_sample, "mode": mode.label(), "wrap": app.ui.view.pattern_preview});
+    let sample = if clone_stamp_indexed(app) { "current" } else { o.clone_sample.as_str() };
+    let mut p = json!({"aligned": o.clone_aligned, "sampleLayer": sample, "mode": mode.label(), "wrap": app.ui.view.pattern_preview});
     if app.ui.tool == Tool::CloneStamp {
         p["opacity"] = json!(app.session.tools.brush.opacity * 100.0);
         p["flow"] = json!(app.session.tools.brush.flow * 100.0);
     }
     // The Clone Source panel's active slot (set by ⌥-click) drives the stroke: the engine keeps
-    // the aligned pairing and applies the slot's scale/rotation/flip.
-    let slot = app.session.presets.clone.active().source.is_some();
-    match (app.ui.clone_offset.filter(|_| o.clone_aligned && !slot), app.ui.clone_source.filter(|_| !slot)) {
-        _ if slot => {}
-        (Some(off), _) => p["offset"] = json!(off),
-        (None, Some(src)) => p["source"] = json!(src),
-        (None, None) => return None,
-    }
+    // the aligned pairing and applies the slot's scale/rotation/flip. An empty slot refuses to
+    // paint, as with no source at all: `ui.clone_source` / `ui.clone_offset` carry no document,
+    // so falling back to them would read another document's coordinates from this one's pixels.
+    app.session.presets.clone.active().source?;
     Some(p)
+}
+
+/// The Clone Stamp in an Indexed Color document, where the reference greys Sample at Current Layer
+/// and names the Normal Mode "Threshold" (#12613).
+pub(crate) fn clone_stamp_indexed(app: &PhotocraftApp) -> bool {
+    app.ui.tool == Tool::CloneStamp && app.session.active().is_some_and(|st| st.doc.mode == photocraft_doc::ColorMode::Indexed)
 }
 
 /// History Brush params for the live preview and the commit (without `points` and `target`): the
@@ -154,6 +157,8 @@ pub(crate) fn pattern_stamp_params(app: &PhotocraftApp, points: &[[f64; 3]]) -> 
         "seed": stroke_seed(points),
         // The options bar's Mode is the tool's own brush's; Behind is a mode of that list.
         "mode": if app.session.tools.brush.behind { "Behind" } else { app.session.tools.brush.mode.label() },
+        "opacity": app.session.tools.brush.opacity * 100.0,
+        "flow": app.session.tools.brush.flow * 100.0,
     });
     if o.pattern_stamp_aligned
         && let Some(ph) = app.ui.pattern_stamp_phase
@@ -578,10 +583,10 @@ pub fn content_aware_move_params(app: &PhotocraftApp, offset: [i64; 2]) -> Value
 
 /// Object Selection: the dragged rectangle. A click (or a sub-2 px nudge) cannot be a
 /// rectangle: with Object Finder on it selects the object under the pointer, the one hovering
-/// highlighted (#4087; ⇧ adds, ⌥ subtracts, ⇧⌥ intersects, otherwise replaces). With it off it
-/// falls back to a Quick Selection dab at
-/// the brush size instead of looking dead (⌥ subtracts, otherwise it adds). Larger drags
-/// run the rectangle GrabCut (⌥ subtracts, ⇧ adds, otherwise replaces).
+/// highlighted (#4087). With it off it falls back to a Quick Selection dab at the brush size
+/// instead of looking dead (⌥ or Subtract mode subtracts, otherwise it adds). Larger drags
+/// run the rectangle GrabCut. Both combine as the options bar's New / Add / Subtract /
+/// Intersect buttons say, with ⇧ adding, ⌥ subtracting and ⇧⌥ intersecting (#12853).
 pub fn finish_object_selection(app: &mut PhotocraftApp, start: [f64; 2], end: [f64; 2], mods: Mods) {
     // Indexed Color and Bitmap: the reference application's alert with OK (#12867), and nothing runs.
     if let Some(why) = app.session.active().and_then(|st| photocraft_engine::smartselect_cmds::object_mode_refusal(st.doc.mode)) {
@@ -592,34 +597,31 @@ pub fn finish_object_selection(app: &mut PhotocraftApp, start: [f64; 2], end: [f
     let (x, y) = (start[0].min(end[0]), start[1].min(end[1]));
     let (w, h) = ((end[0] - start[0]).abs(), (end[1] - start[1]).abs());
     let sample_all = app.ui.tool_options.sample_all.object_selection;
+    let hard_edge = app.ui.tool_options.object_hard_edge;
+    let mode = crate::tool_feedback::mode_name(crate::tool_feedback::selection_op(
+        Tool::ObjectSelection,
+        app.ui.selection_mode,
+        mods,
+        crate::tool_feedback::has_selection(app),
+    ));
     if (w < 2.0 || h < 2.0) && app.ui.tool_options.object_finder {
         // Object Finder (#4087): the object under the click, as hovering highlighted it.
-        let mode = match (mods.shift, mods.alt) {
-            (true, true) => "intersect",
-            (true, false) => "add",
-            (false, true) => "subtract",
-            (false, false) => "replace",
-        };
-        let r = app.run("select.object", json!({"point": [end[0], end[1]], "mode": mode, "sampleAllLayers": sample_all}));
+        let r = app.run("select.object", json!({"point": [end[0], end[1]], "mode": mode, "sampleAllLayers": sample_all, "hardEdge": hard_edge}));
         crate::object_finder::clear(app);
         report_smart_result(app, r, tl!("No object found there — drag a rectangle around it"));
         return;
     }
     if w < 2.0 || h < 2.0 {
         let size = app.session.tools.brush.size;
-        let mode = if mods.alt { "subtract" } else { "add" };
+        let mode = if mods.alt || mode == "subtract" { "subtract" } else { "add" };
         let r = app.run("select.quick", json!({"points": [[end[0], end[1]]], "size": size, "mode": mode, "sampleAllLayers": sample_all}));
         report_smart_result(app, r, tl!("Quick Selection found nothing there"));
         return;
     }
-    let mode = if mods.alt {
-        "subtract"
-    } else if mods.shift {
-        "add"
-    } else {
-        "replace"
-    };
-    let r = app.run("select.object", json!({"rect": [x.round(), y.round(), w.round(), h.round()], "mode": mode, "sampleAllLayers": sample_all}));
+    let r = app.run(
+        "select.object",
+        json!({"rect": [x.round(), y.round(), w.round(), h.round()], "mode": mode, "sampleAllLayers": sample_all, "hardEdge": hard_edge}),
+    );
     report_smart_result(app, r, tl!("Object Selection found nothing there — try a tighter rectangle"));
 }
 
@@ -666,17 +668,17 @@ pub fn set_source(app: &mut PhotocraftApp, x: f64, y: f64) {
 
 /// Where the clone source is sampled from, shown only while a Clone Stamp or Healing Brush stroke
 /// is painted, as in Photoshop: setting the source (⌥-click) leaves nothing on the canvas (#668).
-/// `at` is the last point of the running stroke, `None` while none runs.
+/// `at` is the last point of the running stroke, `None` while none runs. A source in another open
+/// document has no point on this canvas.
 pub fn source_marker_point(app: &PhotocraftApp, at: Option<[f64; 2]>) -> Option<[f64; 2]> {
     if !matches!(app.ui.tool, Tool::CloneStamp | Tool::Healing) {
         return None;
     }
-    let at = at?;
-    match (crate::preset_panels::clone_sample_point(app, Some(at)), app.ui.clone_offset, app.ui.clone_source) {
-        (Some(p), ..) => Some(p),
-        (None, Some(off), _) => Some([at[0] + off[0], at[1] + off[1]]),
-        (None, None, s) => s,
+    let slot = app.session.presets.clone.active();
+    if slot.document_closed || slot.document.is_some_and(|id| app.session.active().is_none_or(|st| st.doc.id != id)) {
+        return None;
     }
+    crate::preset_panels::clone_sample_point(app, Some(at?))
 }
 
 pub(crate) mod bar;
@@ -691,3 +693,11 @@ mod healing_indexed_alert_tests;
 #[cfg(test)]
 #[path = "../clone_stamp_no_source_alert_tests.rs"]
 mod clone_stamp_no_source_alert_tests;
+
+#[cfg(test)]
+#[path = "remove_options_bar_labels_tests.rs"]
+mod remove_options_bar_labels_tests;
+
+#[cfg(test)]
+#[path = "../burn_exposure_field_tests.rs"]
+mod burn_exposure_field_tests;

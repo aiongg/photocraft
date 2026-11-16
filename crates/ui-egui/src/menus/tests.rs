@@ -33,7 +33,7 @@ fn sync_with_system_menu_keeps_saved_slots_and_its_checkmark() {
     assert_eq!(app.session.prefs().interface.light_theme, "craft.classic");
     assert!(current_choice(&app).starts_with("System"), "the system row is the checked radio");
 
-    let studio = ThemeChoice::Theme { id: craft::theme::ThemeId::parse("craft.studio").unwrap(), dark: true }.command();
+    let studio = ThemeChoice::theme(craft::theme::ThemeId::parse("craft.studio").unwrap(), true).command();
     invoke(&mut app, &ctx, &studio.id, studio.params.clone()).unwrap();
     assert_eq!(app.session.prefs().interface.appearance_mode, AppearanceMode::Dark);
     assert!(current_choice(&app).starts_with("Theme"), "picking a theme leaves Auto: {}", current_choice(&app));

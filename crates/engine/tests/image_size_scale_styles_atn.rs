@@ -93,7 +93,7 @@ fn imported_style_scaling_survives_saved_bytes_and_playback() {
             let imported = atn_cmds::import(&saved).unwrap();
             assert!(imported.unsupported.is_empty());
             assert_eq!(imported.actions[0].steps, s.actions.list.actions()[0].steps);
-            s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+            s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
             let result = s.execute("actions.play", json!({"action": "Half"})).unwrap();
             assert_eq!(result["ran"], 1);
             assert!(result.get("failed").is_none(), "{result}");

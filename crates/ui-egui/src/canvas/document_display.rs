@@ -261,7 +261,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         .snap(snap)
         .pasteboard(pasteboard)
         .navigation(navigation)
-        .view_follows_pointer(follows_pointer);
+        .view_follows_pointer(follows_pointer)
+        .precise_cursors(app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise);
     if let Some((from, anchor)) = ease {
         canvas = canvas.ease_from(from, anchor);
     }
@@ -414,10 +415,10 @@ fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, id
         if let Some(selection) = doc.selection.as_ref() {
             let mask = super::outline::SurfaceMask::new(selection, crate::app::surface_fingerprint(selection), [doc.size.width, doc.size.height]);
             // The map is `transform_tool::selection_map` while a Free Transform carries the selection.
-            let overlay = SelectionOverlay::new(label.to_owned(), &mask)
-                .visible(ants.is_some())
-                .offset(ants.map_or([0, 0], |(x, y)| [x, y]))
-                .mapped(crate::transform_tool::selection_map(app, doc.id));
+            let mut overlay = SelectionOverlay::new(label.to_owned(), &mask).visible(ants.is_some()).offset(ants.map_or([0, 0], |(x, y)| [x, y]));
+            if let Some(map) = crate::transform_tool::selection_map(app, doc.id) {
+                overlay = overlay.mapped(map);
+            }
             overlay.show_at(ui, rect);
         }
     }

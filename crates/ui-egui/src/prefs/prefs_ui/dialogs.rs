@@ -111,7 +111,11 @@ pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
         }
     };
     let pages: Vec<PageInfo> = StandardPage::ALL.into_iter().map(StandardPage::info).collect();
-    let mut doc = doc.pages(pages).rules(rules());
+    let doc = doc.pages(pages).rules(rules());
+    // Agents reach the desktop app only; the web build shows the settings it had before as rows.
+    #[cfg(not(target_arch = "wasm32"))]
+    let doc = doc.custom_page(super::custom_rows::AGENTS_PAGE);
+    let mut doc = doc;
     let host = Arc::clone(app.framework.host());
     doc.relabel(&host);
     let mut state = PreferencesState::default();

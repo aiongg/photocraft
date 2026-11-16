@@ -176,15 +176,20 @@ pub(crate) fn is_gesture(tool: Tool, mods: Mods) -> bool {
     mods.shift && !mods.alt && !mods.ctrl && !mods.cmd && !items(tool).is_empty()
 }
 
-/// Does a right-click with `mods` open the menu? The Shift gesture for every tool that has one,
-/// and a plain right-click with the Eraser in Block mode, where the Brush Preset picker's Size and
-/// Hardness mean nothing (#11937, as in the reference application).
-/// A plain right-click opens it only where it would otherwise open the picker: with the Erase
-/// preference it still erases.
-pub(crate) fn opens_on(app: &PhotocraftApp, tool: Tool, mods: Mods) -> bool {
+/// Does a right-click with `mods` at document point `doc` open the menu? The Shift gesture for
+/// every tool that has one, and a plain right-click with the Eraser in Block mode, where the Brush
+/// Preset picker's Size and Hardness mean nothing (#11937), or with the Paint Bucket (#12530), as
+/// in the reference application.
+/// A plain right-click opens it only where it would otherwise open the picker or nothing: with the
+/// Erase preference it still erases, and on the pasteboard its colour menu opens. `doc` is `None`
+/// where the press has no document point (the pasteboard check is then the caller's).
+pub(crate) fn opens_on(app: &PhotocraftApp, tool: Tool, mods: Mods, doc: Option<[f64; 2]>) -> bool {
     let plain = mods.is_none();
     let block = tool == Tool::Eraser && app.ui.tool_options.eraser_mode == "block";
-    is_gesture(tool, mods) || (plain && block && !crate::paint_mouse::right_erases(app, tool))
+    let pasteboard = doc.is_some_and(|d| crate::canvas_tool_menu::pasteboard_at(app, tool, d));
+    // An open Free Transform box owns the plain right-click: its transform menu opens instead.
+    let bucket = tool == Tool::PaintBucket && app.ui.transform.is_none();
+    is_gesture(tool, mods) || (plain && (block || bucket) && !crate::paint_mouse::right_erases(app, tool) && !pasteboard)
 }
 
 /// The engine command a row runs, if any: a brush-based tool's mode goes through
@@ -203,7 +208,7 @@ pub(crate) fn engine_call(app: &PhotocraftApp, tool: Tool, item: Item) -> Option
 
 /// The row of the open menu whose English label is `label`, if it can be chosen now.
 pub(crate) fn find(app: &PhotocraftApp, label: &str) -> Result<Item, String> {
-    if !app.ui.canvas_tool_menu.as_ref().is_some_and(|m| m.kind == MenuKind::BrushMode && m.tool == app.ui.tool) {
+    if !app.ui.canvas_tool_menu.as_ref().is_some_and(|m| matches!(m.kind, MenuKind::BrushMode { .. }) && m.tool == app.ui.tool) {
         return Err("no Shift+right-click menu is open".into());
     }
     let item = items(app.ui.tool).into_iter().find(|i| i.label() == Some(label)).ok_or_else(|| format!("the menu has no row `{label}`"))?;
@@ -216,7 +221,7 @@ pub(crate) fn find(app: &PhotocraftApp, label: &str) -> Result<Item, String> {
 /// Chooses `item` for the active tool and closes the menu.
 pub(crate) fn choose(app: &mut PhotocraftApp, item: Item) {
     let tool = app.ui.tool;
-    let pos = app.ui.canvas_tool_menu.take().filter(|m| m.kind == MenuKind::BrushMode).map(|m| m.pos);
+    let pos = app.ui.canvas_tool_menu.take().filter(|m| matches!(m.kind, MenuKind::BrushMode { .. })).map(|m| m.pos);
     if !enabled(app, item) {
         return;
     }
@@ -251,11 +256,18 @@ pub(crate) fn choose(app: &mut PhotocraftApp, item: Item) {
     }
 }
 
+/// The row drawn checked. The Paint Bucket's plain right-click menu checks none, as in the
+/// reference application; its Shift+right-click menu checks the current mode. `plain` is whether
+/// the menu was opened by a plain right-click (`MenuKind::BrushMode { plain }`).
+pub(crate) fn checked(app: &PhotocraftApp, tool: Tool, plain: bool) -> Option<Item> {
+    if plain && tool == Tool::PaintBucket { None } else { current(app, tool) }
+}
+
 /// `tool`'s menu rows for the framework menu: the English label is the row id (what
-/// `ui.context.choose` sends), the tool's current mode is checked, and Behind and Clear are greyed
+/// `ui.context.choose` sends), the checked row is [`checked`], and Behind and Clear are greyed
 /// on the Background. The tool's own brush is synced when the menu opens.
-pub(crate) fn entries(app: &PhotocraftApp, tool: Tool) -> Vec<Entry<String>> {
-    let current = current(app, tool);
+pub(crate) fn entries(app: &PhotocraftApp, tool: Tool, plain: bool) -> Vec<Entry<String>> {
+    let current = checked(app, tool, plain);
     items(tool)
         .into_iter()
         .map(|item| match item.label() {
@@ -272,3 +284,7 @@ mod eraser_block_right_click_tests;
 #[cfg(test)]
 #[path = "pattern_stamp_behind_tests.rs"]
 mod pattern_stamp_behind_tests;
+
+#[cfg(test)]
+#[path = "paint_bucket_right_click_menu_tests.rs"]
+mod paint_bucket_right_click_menu_tests;

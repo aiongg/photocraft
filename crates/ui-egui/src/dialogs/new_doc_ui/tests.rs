@@ -12,7 +12,7 @@ fn options(edit: impl FnOnce(&mut DocumentOptions)) -> DocumentOptions {
 /// #321: New Document offers the working space and the other profiles of the mode's space.
 #[test]
 fn color_profile_menu_lists_the_profiles_of_the_modes_space() {
-    use photocraft_cms::Builtin;
+    use craft::cms::Builtin;
     let app = app();
     let lists = profiles(&app);
     let of = |mode: DialogMode| lists.iter().find(|p| p.mode == mode).unwrap_or_else(|| panic!("{mode:?} has a list"));
@@ -134,13 +134,12 @@ fn a_custom_background_color_is_picked_and_used() {
 fn save_restart_select_create_and_delete_through_the_dialog() {
     let mut h = harness(app());
     let id = open(&mut h);
-    h.get_by_label("Save Preset…").click();
-    h.run_steps(2);
-    h.get_by_label("Preset Name").click();
-    h.run_steps(1);
+    // The icon beside Name opens the naming pane with its proposed name selected, so typing replaces it.
+    h.get_by_label("Save Document Preset").click();
+    h.run_steps(3);
     h.event(egui::Event::Text("Wide".into()));
     h.run_steps(1);
-    h.get_by_label("Save").click();
+    h.get_by_label("Save Preset").click();
     h.run_steps(3);
     let stored = h.state().session.presets.documents.clone();
     assert_eq!(stored.iter().map(|p| p.name.as_str()).collect::<Vec<_>>(), ["Wide"]);
@@ -172,4 +171,52 @@ fn save_restart_select_create_and_delete_through_the_dialog() {
     h.get_by_label("Delete").click();
     h.run_steps(3);
     assert!(h.state().session.presets.documents.is_empty());
+}
+
+/// Opens New Document, applies `edit` to the settings it shows and presses Create.
+fn create_with(h: &mut crate::new_doc_remember_tests::AppHarness, edit: impl FnOnce(&mut DocumentOptions)) {
+    let id = open(h);
+    let mut shown = crate::new_doc_remember_tests::options(h.state(), id);
+    edit(&mut shown);
+    crate::new_doc_remember_tests::set_options(h, id, &shown);
+    assert!(press_create(h, id), "Create is enabled");
+}
+
+/// #14030: Create with Bitmap makes a 1-bit Bitmap document, and the created settings become the first Recent card.
+#[test]
+fn create_makes_a_bitmap_document() {
+    let mut h = harness(app());
+    create_with(&mut h, |o| {
+        o.size = PixelSize::new(32, 24);
+        o.color_mode = DialogMode::Bitmap;
+        o.depth = BitDepth::One;
+        o.background = BackgroundContents::Black;
+    });
+    let doc = &h.state().session.active().expect("a document was created").doc;
+    assert_eq!((doc.size.width, doc.size.height), (32, 24));
+    assert_eq!(doc.mode, ColorMode::Bitmap, "not a silent RGB document");
+    let recent = &h.state().session.presets.recent_documents;
+    assert_eq!((recent[0].mode.as_str(), recent[0].depth, recent[0].background.as_str()), ("bitmap", 1, "black"));
+    assert_eq!(to_options(&recent[0]).color_mode, DialogMode::Bitmap, "the Recent card opens on Bitmap again");
+}
+
+/// #14034: Create gives View › Pixel Aspect Ratio the picked ratio, a saved custom one included, and Square Pixels
+/// resets a ratio picked in the view menu before.
+#[test]
+fn create_gives_the_new_document_the_picked_pixel_aspect() {
+    let mut app = app();
+    app.ui.shell.custom_pars.push(crate::workspace_ui::CustomPar { name: "Cinema".into(), ratio: 1.25 });
+    assert_eq!(custom_pixel_aspects(&app), [("custom:1.25:Cinema".to_owned(), "Cinema".to_owned())], "saved ratios follow the presets");
+    let mut h = harness(app);
+    create_with(&mut h, |o| o.pixel_aspect = "d1DvNtsc".into());
+    assert_eq!(h.state().ui.view.pixel_aspect, "d1DvNtsc");
+    create_with(&mut h, |o| o.pixel_aspect = "custom:1.25:Cinema".into());
+    assert_eq!(crate::view_cmds::pixel_aspect_ratio(&h.state().ui.view.pixel_aspect), 1.25);
+    h.state_mut().ui.view.pixel_aspect = "anamorphic2To1".into();
+    create_with(&mut h, |o| o.pixel_aspect = SQUARE_PIXELS.into());
+    assert_eq!(h.state().ui.view.pixel_aspect, SQUARE_PIXELS);
+    // A custom ratio deleted since the dialog remembered it shows as Square Pixels, and Create gives that.
+    h.state_mut().ui.shell.custom_pars.clear();
+    create_with(&mut h, |o| o.pixel_aspect = "custom:1.25:Cinema".into());
+    assert_eq!(h.state().ui.view.pixel_aspect, SQUARE_PIXELS);
 }

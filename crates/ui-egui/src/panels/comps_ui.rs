@@ -42,17 +42,19 @@ pub(crate) fn run_fired(_app: &mut PhotocraftApp, _ctx: &egui::Context, _command
     false
 }
 
-fn option_key(option: CompOption) -> &'static str {
+fn option_key(option: CompOption) -> Option<&'static str> {
     match option {
-        CompOption::Visibility => "visibility",
-        CompOption::Position => "position",
-        CompOption::Appearance => "appearance",
+        CompOption::Visibility => Some("visibility"),
+        CompOption::Position => Some("position"),
+        CompOption::Appearance => Some("appearance"),
+        _ => None,
     }
 }
 
 /// The commands of one option-toggle event. The events of a gesture share a coalesce key, so a
 /// sweep and its restore after Escape are one undo step; a `Set` is a step of its own.
 fn option_commands(comps: &[u64], option: CompOption, edit: &EditEvent<bool>) -> Vec<(&'static str, Value)> {
+    let Some(key) = option_key(option) else { return Vec::new() };
     let (value, gesture) = match edit {
         EditEvent::Update { id, value, .. } => (*value, Some(id.0)),
         EditEvent::Commit { id, after, .. } => (*after, Some(id.0)),
@@ -63,7 +65,7 @@ fn option_commands(comps: &[u64], option: CompOption, edit: &EditEvent<bool>) ->
     comps
         .iter()
         .map(|comp| {
-            let mut p = json!({ "comp": comp, option_key(option): value });
+            let mut p = json!({ "comp": comp, key: value });
             if let Some(g) = gesture {
                 p["coalesce"] = json!(format!("comp-option-{g}"));
             }

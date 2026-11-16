@@ -25,6 +25,7 @@ use crate::history_keys;
 struct BarOpen {
     path_options: bool,
     arrows: bool,
+    rect_gear: bool,
 }
 
 /// A label from a translated string.
@@ -68,23 +69,15 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
 /// The cells of the bar for `tool`.
 fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut BarOpen) {
     let target = selected_shape(&app.session);
-    if tool == Tool::PathSelection && !crate::direct_select::active_paths(app).is_empty() {
+    // Direct Selection shares the Path Selection bar (#13219).
+    if matches!(tool, Tool::PathSelection | Tool::DirectSelection) && !crate::direct_select::active_paths(app).is_empty() {
         path_operations_menu(app, ui);
         Divider::vertical().show(ui);
     }
-    if tool == Tool::PathSelection && target.is_none() {
-        hint(ui, if app.ui.vector_mask_target { "Drag to move the targeted vector mask" } else { tl!("Drag to move the selected path") });
-        return;
-    }
-    if tool == Tool::DirectSelection && target.is_none() {
-        let (shift, alt) = (crate::shortcuts::pretty("Shift"), crate::shortcuts::pretty("Alt"));
-        hint(
-            ui,
-            &crate::i18n::fmt(
-                tl!("Click: select anchor · Drag: move anchor, handle or segment · {shift}-click: add · {alt}-click: whole subpath"),
-                &[("shift", &shift), ("alt", &alt)],
-            ),
-        );
+    if matches!(tool, Tool::PathSelection | Tool::DirectSelection) && target.is_none() {
+        if tool == Tool::PathSelection {
+            hint(ui, if app.ui.vector_mask_target { "Drag to move the targeted vector mask" } else { tl!("Drag to move the selected path") });
+        }
         return;
     }
     if tool == Tool::AddAnchorPoint {
@@ -100,8 +93,12 @@ fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut BarOpe
         return;
     }
     if is_shape_tool(tool) {
-        // Shape draws a shape layer, Path adds the outline to the work path.
+        // Shape draws a shape layer, Path adds the outline to the work path (#9453).
         VectorModeSelect::new(Bind::bound(&mut app.ui.tool_options.shape_mode), &SHAPE_TOOL_MODES).show(ui);
+        if draws_path(&app.ui.tool_options) {
+            Divider::vertical().show(ui);
+            make_buttons(app, ui);
+        }
     } else {
         // Path Selection and Direct Selection edit the selected shape layer: the Shape tools'
         // Path mode isn't theirs to show or change.
@@ -120,7 +117,21 @@ fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut BarOpe
         path_alignment_menu(app, ui);
         path_arrangement_menu(app, ui);
     }
+    if tool == Tool::Rectangle {
+        // The gear: what a drag is kept to (square, fixed size, proportional) and From Center.
+        Divider::vertical().show(ui);
+        let ppi = document_ppi(app);
+        let gear = super::shapes::constraints_of(&app.ui.tool_options);
+        let out = fw::BoxConstraintsPopover::new(Bind::given(gear), Bind::bound(&mut open.rect_gear), ppi).show(ui);
+        if let Some(picked) = out.edits.iter().rev().find_map(EditEvent::value) {
+            super::shapes::store_constraints(&mut app.ui.tool_options, picked);
+        }
+        if let Some(alert) = out.out_of_range {
+            crate::option_cells::range_alert(app, ui, &alert);
+        }
+    }
     if tool == Tool::Line {
+        let alert;
         Divider::vertical().show(ui);
         let ppi = document_ppi(app);
         let o = &mut app.ui.tool_options;
@@ -131,12 +142,17 @@ fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut BarOpe
         arrows.length = f64::from(o.arrow_length);
         arrows.concavity = f64::from(o.arrow_concavity);
         let out = ArrowheadsPopover::new(Bind::given(arrows), Bind::bound(&mut open.arrows), ppi).show(ui);
+        // A Concavity typed past -50..50 % raises the reference's alert (#13258).
+        alert = out.out_of_range;
         if let Some(a) = out.edits.iter().rev().find_map(EditEvent::value) {
             o.arrow_start = a.start;
             o.arrow_end = a.end;
             o.arrow_width = a.width as f32;
             o.arrow_length = a.length as f32;
             o.arrow_concavity = a.concavity as f32;
+        }
+        if let Some(alert) = alert {
+            crate::option_cells::range_alert(app, ui, &alert);
         }
     }
 }
@@ -151,8 +167,8 @@ fn pen_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut Ba
         let ppi = document_ppi(app);
         let o = &mut app.ui.tool_options;
         let look = fw::ShapeAppearance::new(Paint::None, Paint::None, f64::from(o.stroke_width)).stroke_style((&o.shape_stroke).into());
-        let events = StrokeCells::new(&look, ppi).corners(true).stroke_open(Bind::bound(&mut app.ui.shape_stroke_open)).show(ui);
-        for event in &events {
+        let out = StrokeCells::new(&look, ppi).corners(true).stroke_open(Bind::bound(&mut app.ui.shape_stroke_open)).show(ui);
+        for event in &out.events {
             match event.value() {
                 Some(fw::ShapeChange::StrokeWidth(w)) => o.stroke_width = *w as f32,
                 Some(fw::ShapeChange::StrokeStyle { style, width, .. }) => {
@@ -163,6 +179,9 @@ fn pen_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut Ba
                 }
                 _ => {}
             }
+        }
+        if let Some(alert) = out.out_of_range {
+            crate::option_cells::range_alert(app, ui, &alert);
         }
     }
     Divider::vertical().show(ui);
@@ -289,6 +308,8 @@ fn live_of(live: &photocraft_doc::vector::LiveShape) -> fw::LiveShape {
         Doc::Rect { rect, radii } => fw::LiveShape::rect(rect[2], rect[3], *radii),
         Doc::Ellipse { rect } => fw::LiveShape::ellipse(rect[2], rect[3]),
         Doc::Polygon { rect, sides, star_ratio, corner_radius, .. } => fw::LiveShape::polygon(rect[2], rect[3], *corner_radius, *sides, *star_ratio),
+        // One Corner radius field: a triangle has no sides or star ratio.
+        Doc::Triangle { rect, corner_radius } => fw::LiveShape::triangle(rect[2], rect[3], *corner_radius),
         Doc::Line { weight, .. } => fw::LiveShape::line(*weight),
         Doc::ArrowLine { weight, start, end, width, length, concavity, .. } => {
             let mut arrows = Arrowheads::new();
@@ -364,7 +385,8 @@ fn edit_of(change: &fw::ShapeChange, sh: &photocraft_doc::ShapeLayer, gradients:
             let rect = match sh.live.as_ref()? {
                 photocraft_doc::vector::LiveShape::Rect { rect, .. }
                 | photocraft_doc::vector::LiveShape::Ellipse { rect }
-                | photocraft_doc::vector::LiveShape::Polygon { rect, .. } => *rect,
+                | photocraft_doc::vector::LiveShape::Polygon { rect, .. }
+                | photocraft_doc::vector::LiveShape::Triangle { rect, .. } => *rect,
                 _ => return None,
             };
             plain("wh", json!({"rect": [rect[0], rect[1], width.round(), height.round()]}))
@@ -433,7 +455,7 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
         .fallbacks(Srgba::new(fg[0], fg[1], fg[2], fg[3]), Srgba::new(bg[0], bg[1], bg[2], bg[3]))
         .arrow_default(Bind::bound(&mut linked))
         .show(ui);
-    let fw::ShapePanelOutput { events, pick_color, .. } = output;
+    let fw::ShapePanelOutput { events, pick_color, out_of_range, .. } = output;
     let paint_gradients = [library.gradient(fw::ShapePaint::Fill), library.gradient(fw::ShapePaint::Stroke)];
 
     let mut applied = false;
@@ -486,8 +508,19 @@ pub fn shape_properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: photocra
         };
         let _ = crate::shape_fill_ui::open_paint(app, which, Some(id), false, fg);
     }
+    // A Concavity typed past -50..50 % raises the reference's alert (#13258).
+    if let Some(alert) = out_of_range {
+        crate::option_cells::range_alert(app, ui, &alert);
+    }
 }
+
+#[cfg(test)]
+#[path = "line_arrow_concavity_field_tests.rs"]
+mod line_arrow_concavity_field_tests;
 
 #[cfg(test)]
 #[path = "pen_make_mask_tests.rs"]
 mod pen_make_mask_tests;
+#[cfg(test)]
+#[path = "rectangle_path_make_tests.rs"]
+mod rectangle_path_make_tests;

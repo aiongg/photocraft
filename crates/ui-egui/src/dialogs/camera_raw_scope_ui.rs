@@ -3,13 +3,13 @@
 //! scope strip, the floating scope and the clipping overlay; nothing here draws.
 //!
 //! One [`ScopeData`] is built per develop and kept with its result, so a pass only reads it.
+use craft::cms::Transform;
 use craft::imaging::scopes::{ChannelMask, ClippingMask};
 use craft::imaging::ui::histogram::ChannelColor;
 use craft::imaging::ui::scopes::{ClippingFrame, HistogramSet, ScopeChannel, ScopeFrame, ScopeReadout, VectorscopeFrame};
 use craft::ui::primitives::Revision;
 use photocraft_algo::histogram::RgbHistogram;
 use photocraft_algo::vectorscope::{HUES, SATURATIONS, Vectorscope, hue_saturation};
-use photocraft_cms::Transform;
 use std::sync::Arc;
 
 /// Most colour samplers (probes) on the preview.
@@ -192,8 +192,8 @@ mod tests {
     use super::*;
 
     fn srgb() -> Arc<Transform> {
-        let profile = photocraft_cms::Builtin::Srgb.profile();
-        photocraft_cms::cached(profile, profile, Default::default()).unwrap()
+        let profile = craft::cms::Builtin::Srgb.profile();
+        craft::cms::cached(profile, profile, Default::default()).unwrap()
     }
 
     /// Before is all red, After all blue; the selection covers the left half of a 4 x 2 frame.

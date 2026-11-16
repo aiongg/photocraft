@@ -39,6 +39,21 @@ mod note_show_on_new_tests;
 #[path = "../count_options_bar_tests.rs"]
 mod count_options_bar_tests;
 
+#[cfg(test)]
+#[path = "../count_group_name_tests.rs"]
+mod count_group_name_tests;
+
+#[cfg(test)]
+#[path = "../count_size_alert_tests.rs"]
+mod count_size_alert_tests;
+
+#[cfg(test)]
+mod sampler_extras_tests;
+
+#[cfg(test)]
+#[path = "../analysis_ruler_visibility_tests.rs"]
+mod analysis_ruler_visibility_tests;
+
 /// The registry ids of the two panels the menu items toggle.
 const MEASUREMENT_LOG: &str = "measurementLog";
 const NOTES: &str = "notes";

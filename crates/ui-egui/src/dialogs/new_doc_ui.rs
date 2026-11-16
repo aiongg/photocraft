@@ -7,7 +7,7 @@ use craft::theme::Srgba;
 use craft::ui::contract::{Bind, SaveKey};
 use craft::ui::dialog::{DialogId, DialogResult, StackDialog};
 use craft::ui::patterns::form_dialogs::{
-    BackgroundContents, BitDepth, ColorMode as DialogMode, ColorProfiles, DocumentOptions, HostedNewDocument, NewDocumentDialog,
+    BackgroundContents, BitDepth, ColorMode as DialogMode, ColorProfiles, DocumentOptions, HostedNewDocument, NewDocumentDialog, PIXEL_ASPECTS, SQUARE_PIXELS,
 };
 use craft::ui::patterns::presets::{GroupPath, NamedPresetEvent, PresetLibrary};
 use craft::ui::runtime::env::UnitKind;
@@ -24,8 +24,13 @@ pub(crate) const LAST_CREATED: SaveKey = SaveKey::new("photocraft.file.new");
 const WINDOW: SaveKey = SaveKey::new("photocraft.file.new.window");
 
 /// The colour modes the dialog offers, with the engine's mode of each.
-const MODES: [(ColorMode, DialogMode); 4] =
-    [(ColorMode::Grayscale, DialogMode::Grayscale), (ColorMode::Rgb, DialogMode::Rgb), (ColorMode::Cmyk, DialogMode::Cmyk), (ColorMode::Lab, DialogMode::Lab)];
+const MODES: [(ColorMode, DialogMode); 5] = [
+    (ColorMode::Bitmap, DialogMode::Bitmap),
+    (ColorMode::Grayscale, DialogMode::Grayscale),
+    (ColorMode::Rgb, DialogMode::Rgb),
+    (ColorMode::Cmyk, DialogMode::Cmyk),
+    (ColorMode::Lab, DialogMode::Lab),
+];
 
 /// Opens File › New on the last created settings and returns the dialog's id.
 pub(crate) fn open(app: &mut PhotocraftApp) -> DialogId {
@@ -39,9 +44,14 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> DialogId {
     let usable = |ppi: f64| Some(ppi).filter(|ppi| ppi.is_finite() && *ppi > 0.0);
     let (print, screen) = (usable(units.print_resolution as f64), usable(units.screen_resolution as f64));
     let profiles = profiles(app);
+    let custom = custom_pixel_aspects(app);
     let dialog = HostedNewDocument::new(app.ctx(), options, move |options| {
-        let mut dialog =
-            NewDocumentDialog::new(Bind::bound(options)).background_color(background).profiles(profiles.clone()).app_name("PhotoCraft").remember(WINDOW);
+        let mut dialog = NewDocumentDialog::new(Bind::bound(options))
+            .background_color(background)
+            .profiles(profiles.clone())
+            .custom_pixel_aspects(custom.clone())
+            .app_name("PhotoCraft")
+            .remember(WINDOW);
         if let Some(size) = clipboard {
             dialog = dialog.clipboard(size);
         }
@@ -107,8 +117,8 @@ fn store_preset_events(app: &mut PhotocraftApp) {
     }
 }
 
-/// Creates the document from what Create answered. Only a created document updates the last created settings and the
-/// recent list, so a failed Create stores nothing.
+/// Creates the document from what Create answered. Only a created document updates the last created settings, the
+/// recent list and the pixel aspect ratio, so a failed Create changes none of them.
 fn create(app: &mut PhotocraftApp, options: &DocumentOptions) {
     if let Err(error) = app.run("file.new", create_params(options)) {
         app.ui.status = error;
@@ -117,11 +127,27 @@ fn create(app: &mut PhotocraftApp, options: &DocumentOptions) {
     if let Some(i) = app.session.active_index() {
         app.ui.views[i].fit_pending = true;
     }
+    // The new document gets the picked ratio, Square Pixels included, whatever View › Pixel Aspect Ratio held before
+    // (#14034). The ratio is app-wide, so this sets the view's.
+    app.ui.view.pixel_aspect = listed_pixel_aspect(app, &options.pixel_aspect);
     let mut kept = options.clone();
     kept.name.clear();
     craft::ui::runtime::memory::set_saved_value(app.ctx(), &LAST_CREATED, Some(kept));
     // Best effort: the document exists either way.
     let _ = app.run("document.recent.add", json!({"settings": to_settings(options)}));
+}
+
+/// View › Pixel Aspect Ratio's saved custom ratios as the dialog's own entries: `(id, name)` with the view's
+/// `custom:<ratio>:<name>` ids, in the view menu's order. The names are the user's.
+fn custom_pixel_aspects(app: &PhotocraftApp) -> Vec<(String, String)> {
+    app.ui.shell.custom_pars.iter().map(|c| (format!("custom:{}:{}", c.ratio, c.name), c.name.clone())).collect()
+}
+
+/// `id` while the dialog lists it, else Square Pixels: the dialog shows an id it no longer lists (a custom ratio
+/// deleted since it was remembered) as Square Pixels, and Create gives what it showed.
+fn listed_pixel_aspect(app: &PhotocraftApp, id: &str) -> String {
+    let listed = PIXEL_ASPECTS.iter().any(|(known, _)| *known == id) || custom_pixel_aspects(app).iter().any(|(custom, _)| custom == id);
+    if listed { id.to_owned() } else { SQUARE_PIXELS.to_owned() }
 }
 
 /// The engine's saved document presets as the dialog's library, in the engine's order.
@@ -146,8 +172,7 @@ pub(crate) fn profiles(app: &PhotocraftApp) -> Vec<ColorProfiles> {
         .iter()
         .map(|(mode, dialog_mode)| {
             let space = photocraft_engine::color_cmds::mode_space(*mode);
-            let mut others: Vec<String> =
-                photocraft_cms::Builtin::ALL.iter().filter(|b| b.profile().color_space == space).map(|b| b.id().to_string()).collect();
+            let mut others: Vec<String> = craft::cms::Builtin::ALL.iter().filter(|b| b.profile().color_space == space).map(|b| b.id().to_string()).collect();
             others.extend(installed.iter().filter(|i| i.is_destination() && i.color_space == space).map(|i| i.path.clone()));
             ColorProfiles::new(*dialog_mode, app.session.color.working(*mode).description.clone(), others)
         })
@@ -164,6 +189,7 @@ pub(crate) fn create_params(options: &DocumentOptions) -> Value {
         "resolution": options.pixels_per_inch,
         "mode": mode,
         "depth": match options.depth {
+            BitDepth::One => 1,
             BitDepth::Sixteen => 16,
             BitDepth::ThirtyTwo => 32,
             _ => 8,
@@ -186,6 +212,7 @@ pub(crate) fn create_params(options: &DocumentOptions) -> Value {
 /// The key of a colour mode in the engine's settings.
 fn mode_key(mode: ColorMode) -> &'static str {
     match mode {
+        ColorMode::Bitmap => "bitmap",
         ColorMode::Grayscale => "gray",
         ColorMode::Cmyk => "cmyk",
         ColorMode::Lab => "lab",
@@ -235,12 +262,14 @@ pub(crate) fn to_options(settings: &DocumentSettings) -> DocumentOptions {
     };
     options.resolution_unit = if settings.resolution_unit == "cm" { UnitKind::PixelsPerCentimetre } else { UnitKind::PixelsPerInch };
     options.color_mode = match settings.mode.as_str() {
+        "bitmap" => DialogMode::Bitmap,
         "gray" | "grayscale" => DialogMode::Grayscale,
         "cmyk" => DialogMode::Cmyk,
         "lab" => DialogMode::Lab,
         _ => DialogMode::Rgb,
     };
     options.depth = match settings.depth {
+        1 => BitDepth::One,
         16 => BitDepth::Sixteen,
         32 => BitDepth::ThirtyTwo,
         _ => BitDepth::Eight,

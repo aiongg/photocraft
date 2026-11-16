@@ -306,6 +306,22 @@ fn paused_spelling_repeated_changes_and_errors_keep_one_owned_history() {
     }
 }
 
+/// A playback paused at Check Spelling holds the library: Clear All waits until Done.
+#[test]
+fn spelling_playback_blocks_library_edits_until_done() {
+    let (mut app, _, _) = paused_history_spelling(false, None);
+    assert_eq!(app.session.actions.playing, 0);
+    let error = app.run("actions.clearAll", json!({"confirm": true})).unwrap_err();
+    assert_eq!(app.ui.status, error);
+    assert!(app.ui.status_error);
+    assert_eq!(app.session.actions.list.actions()[0].name, "Spell");
+    close_spelling(&mut app);
+    let st = app.session.active().unwrap();
+    assert_eq!(st.doc.layer(st.active_layer.unwrap()).unwrap().name, "Tail");
+    app.run("actions.clearAll", json!({"confirm": true})).unwrap();
+    assert!(app.session.actions.list.actions().is_empty());
+}
+
 fn deny_second_spelling_change(id: &str, params: &Value) -> photocraft_engine::Result<()> {
     if id == "edit.checkSpelling" && params["word"] == "brwon" { Err(photocraft_engine::EngineError::Other("original spelling gate".into())) } else { Ok(()) }
 }

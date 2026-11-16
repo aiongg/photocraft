@@ -20,7 +20,7 @@ const DISCARD: &str = "discard";
 /// A PNG tagged with Adobe RGB, which doesn't match the sRGB working space.
 fn adobe_png() -> Vec<u8> {
     let mut d = Document::with_background("t", Size::new(8, 8), ColorMode::Rgb, SampleType::U8, Color::rgba(0.2, 0.6, 0.9, 1.0));
-    d.icc_profile = Some(photocraft_cms::Builtin::from_id("adobe-rgb-compat").unwrap().profile().to_bytes());
+    d.icc_profile = Some(craft::cms::Builtin::from_id("adobe-rgb-compat").unwrap().profile().to_bytes());
     photocraft_io::export(&d, "t.png", &Default::default()).unwrap().bytes
 }
 
@@ -150,7 +150,7 @@ fn a_held_file_still_reports_its_missing_fonts() {
     s.execute("file.new", serde_json::json!({"width": 40, "height": 20})).unwrap();
     s.execute("type.create", serde_json::json!({"text": "Hi", "x": 2, "y": 12, "size": 10, "font": MISSING})).unwrap();
     let mut doc = (*s.active().unwrap().doc).clone();
-    doc.icc_profile = Some(photocraft_cms::Builtin::from_id("adobe-rgb-compat").unwrap().profile().to_bytes());
+    doc.icc_profile = Some(craft::cms::Builtin::from_id("adobe-rgb-compat").unwrap().profile().to_bytes());
     let services =
         Services { import: Some(Box::new(move |_: &str, _: &[u8], _: &photocraft_io::ImportOptions| Ok((doc.clone(), Vec::new())))), ..Default::default() };
     let mut app = PhotocraftApp::new(Session::new(), services);

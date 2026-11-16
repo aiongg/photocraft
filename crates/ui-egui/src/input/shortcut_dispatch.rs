@@ -99,6 +99,8 @@ pub(crate) const RUNTIME_COMMANDS: &[(&str, Bridged)] = &[
     ("view.fitArtboardOnScreen", Bridged::View(ViewCommands::FitArtboard)),
     ("view.fitLayersOnScreen", Bridged::View(ViewCommands::FitLayers)),
     ("view.fillScreen", Bridged::View(ViewCommands::FillScreen)),
+    ("view.rotateLeft", Bridged::View(ViewCommands::RotateCounterclockwise)),
+    ("view.rotateRight", Bridged::View(ViewCommands::RotateClockwise)),
     ("view.resetView", Bridged::View(ViewCommands::ResetRotation)),
     ("tools.temporary.hand", Bridged::Momentary(MomentaryCommands::Hand)),
     ("tools.temporary.zoomIn", Bridged::Momentary(MomentaryCommands::ZoomIn)),
@@ -513,12 +515,13 @@ fn tool_step(app: &PhotocraftApp, fired: &Fired) -> PickStep {
     if app.session.prefs().tools.use_shift_key_for_tool_switch { PickStep::Last } else { PickStep::of(fired) }
 }
 
-/// Selects the tool the key `letter` picks. The group is the tools of that letter the user has not remapped, in
-/// toolbar order; the rail's last-used memory is `app.ui.group_tools`, with the group's index among the letters as
+/// Selects the tool the key `letter` picks. The group is the tools of that letter the user has not remapped, in the
+/// toolbar layout's order across slots (Edit › Toolbar); the rail's last-used memory is `app.ui.group_tools`, with the group's index among the letters as
 /// the slot. `plain` is a letter press with no Shift step: only those spring (#2672).
 fn pick_tool(app: &mut PhotocraftApp, ctx: &egui::Context, letter: char, step: PickStep, plain: bool) {
     let mut group: Vec<Tool> = Tool::ALL.iter().copied().filter(|t| t.key() == letter && crate::tool_shortcuts::uses_default(app, *t)).collect();
-    group.sort_by_key(|t| crate::panels::toolbar::toolbar_position(*t));
+    let order = crate::panels::toolbar::layout_order(&app.session.prefs().toolbar);
+    group.sort_by_key(|t| order.iter().position(|x| x == t).unwrap_or(usize::MAX));
     let tools: Vec<RailTool<Tool>> = group.iter().map(|t| RailTool::new(*t, crate::panels::tool_commands::command_of(*t))).collect();
     let refs: Vec<&RailTool<Tool>> = tools.iter().collect();
     let slot = 0;
@@ -566,10 +569,10 @@ fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
         }
     }
     if id == EditCommands::Delete.id() {
-        // A finished work path shown by the Pen or Path Selection: ⌫/Delete deletes it, as in Photoshop (#5702), never
-        // Edit › Clear on the pixels under it.
-        if crate::vector_ui::delete_key_deletes_work_path(app) {
-            if let Err(e) = app.run("path.delete", json!({"name": "work"})) {
+        // A finished work path shown by the Pen or Path Selection, or the path or segment Direct Selection targets:
+        // ⌫/Delete edits the path, as in Photoshop (#5702, #13203), never Edit › Clear on the pixels under it.
+        if let Some((command, params)) = crate::vector_ui::delete_key_edits_path(app) {
+            if let Err(e) = app.run(command, params) {
                 app.ui.status = e;
                 app.ui.status_error = true;
             }
@@ -602,8 +605,10 @@ pub fn dispatch(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str) {
 fn dispatch_as(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, last: bool) {
     let action = id.strip_prefix(crate::actions::SHORTCUT_PREFIX);
     let command_id = if action.is_some() { "actions.play" } else { id };
-    let outcome = if !crate::menus::is_enabled(app, command_id) {
-        let why = disabled_reason(app, command_id);
+    // A key saved for an action that was since deleted or renamed names no action.
+    let missing = action.is_some_and(|name| !app.session.actions.list.actions().iter().any(|a| a.name == name));
+    let outcome = if missing || !crate::menus::is_enabled(app, command_id) {
+        let why = if missing { "The Action no longer exists".into() } else { disabled_reason(app, command_id) };
         let template = "{label} is not available: {reason}";
         app.ui.status = crate::i18n::fmt(tl!(template), &[("label", crate::i18n::tr_id(crate::i18n::current(), id, &label(id))), ("reason", tl!(&why))]);
         app.ui.status_error = true;

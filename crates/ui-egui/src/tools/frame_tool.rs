@@ -489,23 +489,27 @@ pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut FrameTool, _host
 pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut FrameTool, _response: &ToolHostResponse) {
     for event in state.draw.take_events() {
         let ShapeDragEvent::Draw(EditEvent::Commit { after, .. }) = event else { continue };
-        let b = after.bounds();
-        let r = [b.x0, b.y0, b.x1, b.y1].map(|v| v.round() as i64);
-        if r[2] <= r[0] || r[3] <= r[1] {
-            continue;
-        }
-        let mut p = shape_params(app, r);
-        if let Some(id) = content_layer(app, r) {
-            p["layer"] = json!(id);
-        }
-        match app.run("layer.new.frame", p) {
-            Ok(v) => {
-                if let Some(id) = v.get("layer").and_then(Value::as_u64) {
-                    select(app, LayerId(id), Target::Frame);
-                }
+        make_frame(app, after.bounds());
+    }
+}
+
+/// Makes a frame in the drawn box, around the active layer's image when the box overlaps it, and selects it.
+fn make_frame(app: &mut PhotocraftApp, b: KRect) {
+    let r = [b.x0, b.y0, b.x1, b.y1].map(|v| v.round() as i64);
+    if r[2] <= r[0] || r[3] <= r[1] {
+        return;
+    }
+    let mut p = shape_params(app, r);
+    if let Some(id) = content_layer(app, r) {
+        p["layer"] = json!(id);
+    }
+    match app.run("layer.new.frame", p) {
+        Ok(v) => {
+            if let Some(id) = v.get("layer").and_then(Value::as_u64) {
+                select(app, LayerId(id), Target::Frame);
             }
-            Err(e) => report(app, Err(e)),
         }
+        Err(e) => report(app, Err(e)),
     }
 }
 
@@ -560,7 +564,13 @@ impl CanvasTool for FramePass<'_> {
                 app.frame_preview = None;
                 // A click with no drag leaves the transform as it was.
                 if transform != original {
-                    let r = app.run("layer.frame.set", json!({"layer":layer.0,"transform":transform.m}));
+                    let mut p = json!({"layer":layer.0,"transform":transform.m});
+                    // Moving an empty frame is a "Move" step (#13880); a frame with an image keeps "Frame Properties".
+                    let empty = app.session.active().and_then(|st| st.doc.layer(layer)).is_some_and(|l| l.children().is_none_or(<[Layer]>::is_empty));
+                    if empty {
+                        p["historyName"] = json!("Move");
+                    }
+                    let r = app.run("layer.frame.set", p);
                     report(app, r);
                 }
             });
@@ -573,10 +583,16 @@ impl CanvasTool for FramePass<'_> {
         let (scope, time) = (self.scope, cx.time);
         let content = self.state.content.take();
         self.state.moving = None;
+        // Escape while a frame is drawn makes it as drawn, as the reference application does (#13866); a drag still
+        // inside the click distance has no shape and makes nothing.
+        let drawn = (reason == CancelReason::Escape).then(|| self.state.draw.shape().map(|shape| shape.bounds())).flatten();
         scope.with_app(|app| {
             app.frame_preview = None;
             if let Some(c) = &content {
                 cancel_content(app, c, reason, time);
+            }
+            if let Some(b) = drawn {
+                make_frame(app, b);
             }
         });
         self.state.draw.cancel(reason, cx);
@@ -760,6 +776,16 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) -> bo
     true
 }
 
+#[cfg(test)]
+mod escape_commit_tests;
+#[cfg(test)]
+mod move_history_tests;
+#[cfg(test)]
+mod shift_square_tests;
+#[cfg(test)]
+mod size_hud_tests;
+#[cfg(test)]
+mod space_move_tests;
 #[cfg(test)]
 mod tests;
 

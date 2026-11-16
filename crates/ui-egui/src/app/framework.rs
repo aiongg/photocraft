@@ -45,7 +45,7 @@ use crate::theme::AppTheme;
 pub(crate) fn install(ctx: &egui::Context, fonts: &UiFonts<'_>, frame: Option<Decision>) {
     // The wheel zooms with the canvas's own keys and scrolls sideways with Shift or Command, as
     // PhotoCraft's input always has.
-    let wheel = WheelModifiers { zoom: egui::Modifiers::NONE, sideways: egui::Modifiers::SHIFT | egui::Modifiers::COMMAND };
+    let wheel = WheelModifiers::new(egui::Modifiers::NONE, egui::Modifiers::SHIFT | egui::Modifiers::COMMAND);
     let wake = ctx.clone();
     let mut spec = InstallSpec::new(ShellInfo::default().backend(Backend::from_env()), Arc::new(SystemWindows))
         .wheel(wheel)

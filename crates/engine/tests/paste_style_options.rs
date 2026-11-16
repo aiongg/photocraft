@@ -209,7 +209,7 @@ fn atn_group_flag_survives_saved_descriptor_and_public_playback() {
         assert_eq!(parsed.actions[0].items[0].descriptor.as_ref().unwrap().get(KEY), Some(&D::Boolean(allow)));
         let imported = atn_cmds::import(&saved).unwrap();
         assert_eq!(imported.actions[0].steps, scene.s.actions.list.actions()[0].steps);
-        scene.s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+        scene.s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
         let result = scene.s.execute("actions.play", json!({"action": "Paste"})).unwrap();
         assert_eq!(result["ran"], 1);
         assert!(result.get("failed").is_none(), "{result}");

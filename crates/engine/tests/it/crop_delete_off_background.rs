@@ -124,7 +124,7 @@ fn the_action_steps_turned_crop_unlocks_the_background() {
     assert_eq!((step.command.as_str(), &step.params["deleteCroppedPixels"]), ("image.crop", &json!(false)));
 
     let mut s = doc();
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
     let before = past(&s);
     s.execute("actions.play", json!({"action": "Crop"})).unwrap();
     assert_eq!(past(&s), before + 1, "one undo step");

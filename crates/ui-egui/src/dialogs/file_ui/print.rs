@@ -169,7 +169,7 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
     profiles.extend(
         photocraft_engine::installed_profiles::installed()
             .into_iter()
-            .filter(|p| p.is_destination() && p.class == photocraft_cms::ProfileClass::Output)
+            .filter(|p| p.is_destination() && p.class == craft::cms::ProfileClass::Output)
             .map(|p| (p.path.clone(), p.description.clone().into())),
     );
     // A remembered profile that is no longer installed still shows, by its file name.
@@ -206,9 +206,9 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
     let mark = |key: &str, label: &'static str| Param::new(key, label, ParamKind::bool(false));
 
     vec![
-        PrintSection {
-            title: tl!("Color Management").into(),
-            params: vec![
+        PrintSection::new(
+            tl!("Color Management"),
+            vec![
                 Param::new(
                     "colorHandling",
                     tl!("Color Management"),
@@ -239,10 +239,10 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
                 .visible_when(on_key.clone(), on_value.clone()),
                 Param::new("bpc", tl!("Black Point Compensation"), ParamKind::bool(true)).visible_when(on_key, on_value),
             ],
-        },
-        PrintSection {
-            title: tl!("Position and Size").into(),
-            params: vec![
+        ),
+        PrintSection::new(
+            tl!("Position and Size"),
+            vec![
                 Param::new("units", tl!("Units"), choice(&[("cm", tl!("Centimeters")), ("mm", tl!("Millimeters")), ("in", tl!("Inches"))], "cm")),
                 Param::new("paper", tl!("Paper"), ParamKind::choice(papers, Some("letter".into()))),
                 pt("paperWidth", tl!("Paper Width")),
@@ -256,22 +256,22 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
                 Param::new("scale", tl!("Scale (%)"), ParamKind::number(Some(1.0), Some(1000.0), 100.0, 1.0, 2))
                     .enabled_when("scaleToFit", FieldValue::Bool(false)),
             ],
-        },
-        PrintSection {
-            title: tl!("Printing Marks").into(),
-            params: vec![
+        ),
+        PrintSection::new(
+            tl!("Printing Marks"),
+            vec![
                 mark("cornerCropMarks", tl!("Corner Crop Marks")),
                 mark("centerCropMarks", tl!("Center Crop Marks")),
                 mark("registrationMarks", tl!("Registration Marks")),
                 mark("description", tl!("Description")),
                 mark("labels", tl!("Labels")),
             ],
-        },
-        PrintSection { title: tl!("Functions").into(), params: vec![mark("emulsionDown", tl!("Emulsion Down"))] },
-        PrintSection {
-            title: tl!("Save as PDF").into(),
-            params: vec![Param::new("output", tl!("Save as PDF"), ParamKind::text("")).hint(tl!("(print to the printer)")).browse(PathKind::SaveFile)],
-        },
+        ),
+        PrintSection::new(tl!("Functions"), vec![mark("emulsionDown", tl!("Emulsion Down"))]),
+        PrintSection::new(
+            tl!("Save as PDF"),
+            vec![Param::new("output", tl!("Save as PDF"), ParamKind::text("")).hint(tl!("(print to the printer)")).browse(PathKind::SaveFile)],
+        ),
     ]
 }
 
@@ -419,13 +419,12 @@ fn build_sheet(ctx: &egui::Context, doc: &photocraft_doc::Document, revision: u6
     let fits = x >= 0.0 && y >= 0.0 && x + w <= pw && y + h <= ph;
     let note = if fits { "" } else { "  ·  larger than the paper" };
     let readout = format!("Scale {:.1}%  ·  {:.2} × {:.2} in{note}", l.scale * 100.0, w / 72.0, h / 72.0);
-    let marks = PrintMarks {
-        corner_crop: l.marks.corner_crop,
-        center_crop: l.marks.center_crop,
-        registration: l.marks.registration,
-        description: fields.bool("description").unwrap_or(false),
-        labels: fields.bool("labels").unwrap_or(false),
-    };
+    let mut marks = PrintMarks::default();
+    marks.corner_crop = l.marks.corner_crop;
+    marks.center_crop = l.marks.center_crop;
+    marks.registration = l.marks.registration;
+    marks.description = fields.bool("description").unwrap_or(false);
+    marks.labels = fields.bool("labels").unwrap_or(false);
     Some(PrintSheet::new(egui::vec2(pw as f32, ph as f32), image, picture(ctx, doc, revision, l.emulsion_down), readout.into()).marks(marks))
 }
 
@@ -498,7 +497,7 @@ fn finish(app: &mut PhotocraftApp, answer: PrintAnswer) {
                 app.ui.status_error = true;
             }
         }
-        PrintFinish::Done => photocraft_engine::print_cmds::remember_print(&mut app.session, &print_params(&fields)),
+        PrintFinish::Done | _ => photocraft_engine::print_cmds::remember_print(&mut app.session, &print_params(&fields)),
     }
 }
 

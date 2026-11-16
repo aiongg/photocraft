@@ -220,18 +220,19 @@ impl ExportSettings {
 /// goes through Save As, so the original is never overwritten with less than the document has.
 pub(crate) fn saves_flat_in_place(doc: &Document, path: &str) -> bool {
     let Some(layer) = plain_raster(doc) else { return false };
-    let Some(format) = photocraft_engine::file_cmds::extension(path).and_then(|e| photocraft_codecs::from_extension(&e)) else {
+    let Some(format) = photocraft_engine::file_cmds::extension(path).and_then(|e| photocraft_formats::from_extension(&e)) else {
         return false;
     };
-    let caps = format.caps();
+    let Some(codec_format) = format.raster_codec() else { return false };
+    let caps = codec_format.caps();
     // Transparency is kept where the format's plan writes alpha for this document: DPX has no
     // gray + alpha, and float PNM (PFM) no alpha at all.
     let keeps_alpha = caps.alpha
-        && !(format == photocraft_codecs::Format::Dpx && doc.mode == photocraft_doc::ColorMode::Grayscale)
-        && !(format == photocraft_codecs::Format::Pnm && doc.depth == photocraft_color::SampleType::F32);
+        && !(format == photocraft_formats::Format::Dpx && doc.mode == photocraft_doc::ColorMode::Grayscale)
+        && !(format == photocraft_formats::Format::Pnm && doc.depth == photocraft_color::SampleType::F32);
     !photocraft_engine::file_cmds::saves_in_place(path)
         && doc.file_encoding.source_images.is_none()
-        && (!caps.lossy || format == photocraft_codecs::Format::Jpeg)
+        && (!caps.lossy || format == photocraft_formats::Format::Jpeg)
         && (doc.mode != photocraft_doc::ColorMode::Grayscale || caps.layouts.iter().any(|l| l.is_gray()))
         && caps.write
         && caps.depths.contains(&match doc.depth {
@@ -339,6 +340,27 @@ pub type AutomationOpenPcraftFn = Box<dyn FnMut(&str) -> Result<Option<(String, 
 
 /// Reject engine commands which still perform ambient filesystem I/O.
 pub type AutomationCommandFn = Box<dyn Fn(&str, &Value) -> Result<(), String>>;
+/// Same policy as [`AutomationCommandFn`] for each step a command runs (`actions.play`).
+pub type AutomationAuthorizeFn = fn(&str, &Value) -> photocraft_engine::Result<()>;
+
+/// The automation half of [`Services`]: what control and MCP requests may read, write and run.
+/// Replaced as a whole when the agent link starts, stops or its folders change
+/// ([`Services::set_automation`], `prefs_ui::agents::sync_agent_link`).
+#[derive(Default)]
+pub struct AutomationServices {
+    pub read: Option<AutomationReadFn>,
+    pub write: Option<AutomationWriteFn>,
+    pub open_pcraft: Option<AutomationOpenPcraftFn>,
+    pub save: Option<SaveFileFn>,
+    pub command: Option<AutomationCommandFn>,
+    pub authorize: Option<AutomationAuthorizeFn>,
+}
+
+/// What agent requests may read, write and run with the agent settings' folders, and why a folder
+/// is not used (`None`: every folder is). The app's policy, installed while the agent link runs
+/// (`prefs_ui::agents::sync_agent_link`).
+#[cfg(not(target_arch = "wasm32"))]
+pub type AgentAutomationFn = Box<dyn Fn(&craft::automation::agents::AgentSettings) -> (AutomationServices, Option<String>)>;
 
 /// Open a URL in the system browser (native) — reliable cross-platform, unlike `ctx.open_url`.
 pub type OpenUrlFn = Box<dyn Fn(&str) -> Result<(), String>>;
@@ -526,7 +548,20 @@ pub struct Services {
     /// Same policy as [`Self::automation_command`], as a function pointer the engine calls for
     /// each step of `actions.play`. Installed on the session only while a control request or
     /// an automation-driven [`PhotocraftApp::run`] runs, so a local play of a recorded `file.*` step still works.
-    pub automation_authorize: Option<fn(&str, &serde_json::Value) -> photocraft_engine::Result<()>>,
+    pub automation_authorize: Option<AutomationAuthorizeFn>,
+    /// The control server agents reach the open window through while the person lets them in
+    /// (Preferences › Integrations, or `--control` for the whole run). `None` on the web and in
+    /// tests that don't set it.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub agent_link: Option<craft::automation::agents::AgentLink>,
+    /// The ArtCraft Launcher's agents switch behind the suite's `AI-MCP` flag, watched on its own
+    /// thread. `None` is no flag and no launcher (the web, tests that don't set it).
+    #[cfg(not(target_arch = "wasm32"))]
+    pub agent_switch: Option<craft::automation::agents::AgentSwitch>,
+    /// What agent requests may use while the agent link runs ([`AgentAutomationFn`]); `None`: no
+    /// file access for them.
+    #[cfg(not(target_arch = "wasm32"))]
+    pub agent_automation: Option<AgentAutomationFn>,
     /// Open a URL in the system browser (native). Falls back to `ctx.open_url` (web) when unset.
     pub open_url: Option<OpenUrlFn>,
     /// Preferences ▸ General ▸ Beep When Done: the platform's default beep, played when a
@@ -612,4 +647,16 @@ pub struct Services {
     pub read_displays: Option<monitor_status::ReadDisplaysFn>,
     /// The macOS menu bar, when the desktop app installed one; the in-window menus are hidden then.
     pub native_menu: Option<craft::menu::NativeMenu>,
+}
+
+impl Services {
+    /// Install the automation services (see [`AutomationServices`]).
+    pub fn set_automation(&mut self, a: AutomationServices) {
+        self.automation_read = a.read;
+        self.automation_write = a.write;
+        self.automation_open_pcraft = a.open_pcraft;
+        self.automation_save = a.save;
+        self.automation_command = a.command;
+        self.automation_authorize = a.authorize;
+    }
 }

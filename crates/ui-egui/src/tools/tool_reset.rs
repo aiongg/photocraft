@@ -205,7 +205,7 @@ pub fn option_keys(tool: Tool) -> &'static [&'static str] {
         Tool::MagneticLasso => reset!(feather, anti_alias, magnetic),
         Tool::MagicWand => reset!(tolerance, anti_alias, contiguous),
         Tool::QuickSelection => reset!(enhance_edge),
-        Tool::ObjectSelection => reset!(enhance_edge, object_finder),
+        Tool::ObjectSelection => reset!(enhance_edge, object_finder, object_hard_edge),
         Tool::Crop => reset!(crop),
         Tool::PerspectiveCrop => reset!(perspective_crop, perspective_crop_grid),
         Tool::Eyedropper => reset!(eyedropper),
@@ -256,7 +256,27 @@ pub fn option_keys(tool: Tool) -> &'static [&'static str] {
             arrow_length,
             arrow_concavity,
         ),
-        Tool::Rectangle | Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Star | Tool::CustomShape => {
+        // The Rectangle's gear settings are its own (#13343).
+        Tool::Rectangle => reset!(
+            shape_mode,
+            shape_path_op,
+            shape_fill,
+            stroke_width,
+            shape_stroke,
+            shape_fill_gradient,
+            shape_stroke_gradient,
+            corner_radius,
+            align_edges,
+            polygon_sides,
+            line_weight,
+            rect_constraint,
+            rect_fixed_width,
+            rect_fixed_height,
+            rect_ratio_width,
+            rect_ratio_height,
+            rect_from_center,
+        ),
+        Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Star | Tool::CustomShape => {
             reset!(
                 shape_mode,
                 shape_path_op,
@@ -266,6 +286,7 @@ pub fn option_keys(tool: Tool) -> &'static [&'static str] {
                 shape_fill_gradient,
                 shape_stroke_gradient,
                 corner_radius,
+                align_edges,
                 polygon_sides,
                 line_weight
             )
@@ -374,6 +395,35 @@ mod tests {
         reset_options(&mut o, Tool::Move);
         assert!(!o.transform.show_reference_point && !o.transform.relative_position);
         assert!(o.transform.legacy && !o.transform.aspect_linked);
+    }
+
+    /// Object Selection › Hard Edge (#12855) is on by default, Reset Tool turns it back on, and
+    /// both gestures hand it to `select.object`.
+    #[test]
+    fn object_selection_hard_edge_resets_on_and_reaches_the_command() {
+        let ctx = egui::Context::default();
+        let mut app = app();
+        assert!(app.ui.tool_options.object_hard_edge);
+        app.ui.tool = Tool::ObjectSelection;
+        let last = |app: &PhotocraftApp| app.session.journal.last().filter(|(id, _)| id == "select.object").map(|(_, p)| p["hardEdge"].clone());
+        for hard in [false, true] {
+            app.ui.tool_options.object_hard_edge = hard;
+            crate::retouch_ui::finish_object_selection(&mut app, [4.0, 4.0], [4.0, 4.0], craft::keymap::Mods::default());
+            assert_eq!(last(&app), Some(json!(hard)), "a click");
+            crate::retouch_ui::finish_object_selection(&mut app, [1.0, 1.0], [7.0, 7.0], craft::keymap::Mods::default());
+            assert_eq!(last(&app), Some(json!(hard)), "a dragged rectangle");
+        }
+        app.ui.tool_options.object_hard_edge = false;
+        app.ui.tool = Tool::QuickSelection;
+        crate::menus::invoke(&mut app, &ctx, RESET, json!({})).unwrap();
+        assert!(!app.ui.tool_options.object_hard_edge, "Hard Edge is not Quick Selection's");
+        app.ui.tool = Tool::ObjectSelection;
+        crate::menus::invoke(&mut app, &ctx, RESET, json!({})).unwrap();
+        assert!(app.ui.tool_options.object_hard_edge);
+        // Preferences saved before the option existed load with it on.
+        let mut old = serde_json::to_value(ToolOptions::default()).unwrap();
+        old.as_object_mut().unwrap().remove("object_hard_edge");
+        assert!(serde_json::from_value::<ToolOptions>(old).unwrap().object_hard_edge);
     }
 
     /// Sample All Layers is per tool (#5524): resetting Blur turns off only Blur's.

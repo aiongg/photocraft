@@ -238,9 +238,11 @@ pub fn open_web(app: &mut PhotocraftApp) -> DialogId {
     } else {
         photocraft_doc::slices::resolve(&doc)
             .iter()
-            .map(|r| WebSlice {
-                number: r.number as u32,
-                rect: egui::Rect::from_min_max(egui::pos2(r.rect.x0 as f32, r.rect.y0 as f32), egui::pos2(r.rect.x1 as f32, r.rect.y1 as f32)),
+            .map(|r| {
+                WebSlice::new(
+                    r.number as u32,
+                    egui::Rect::from_min_max(egui::pos2(r.rect.x0 as f32, r.rect.y0 as f32), egui::pos2(r.rect.x1 as f32, r.rect.y1 as f32)),
+                )
             })
             .collect()
     };

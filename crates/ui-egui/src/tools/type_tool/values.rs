@@ -348,13 +348,14 @@ fn bar_step(change: &TypeBarChange) -> Option<Step> {
         TypeBarChange::Character(c) => character_step(c),
         TypeBarChange::Paragraph(p) => paragraph_step(p),
         TypeBarChange::AntiAlias(aa) => aa_id(*aa).map(|id| Step::Command(format!("type.antiAlias.{id}"))),
-        TypeBarChange::Orientation(o) => Some(Step::Command(format!(
-            "type.orientation.{}",
-            match o {
+        TypeBarChange::Orientation(o) => {
+            let name = match o {
                 TextOrientation::Horizontal => "horizontal",
                 TextOrientation::Vertical => "vertical",
-            }
-        ))),
+                _ => return None,
+            };
+            Some(Step::Command(format!("type.orientation.{name}")))
+        }
         _ => None,
     }
 }

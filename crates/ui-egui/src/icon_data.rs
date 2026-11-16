@@ -4,7 +4,7 @@ use craft::ui::primitives::AppIcons;
 
 /// PhotoCraft's own icon set, registered by `icons::register`. The documents draw with
 /// `stroke-width="2"`.
-pub static PHOTOCRAFT_ICONS: AppIcons = AppIcons { name: "photocraft", stroke_width: Some(2.0), icons: ICONS };
+pub static PHOTOCRAFT_ICONS: AppIcons = AppIcons::new("photocraft", Some(2.0), ICONS);
 
 /// Every icon of the set: name and SVG document.
 pub static ICONS: &[(&str, &[u8])] = &[

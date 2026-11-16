@@ -63,7 +63,7 @@ fn clone_stamp_in_pattern_preview_wraps_a_dab_across_the_right_edge() {
         crate::paint_mouse::sync_tool_brush(&mut app);
         // A hard tip, so the wrapped part of the dab is fully painted.
         app.run("tools.setBrush", json!({"brush": {"size": 20, "hardness": 1}})).unwrap();
-        app.ui.clone_source = Some([10.0, 10.0]);
+        set_source(&mut app, 10.0, 10.0);
         app.ui.view.pattern_preview = pattern_preview;
         let modifiers = egui::Modifiers::NONE;
         tool_event(&mut app, ToolEvent::Down { x: 98.0, y: 30.0, pressure: 1.0 }, modifiers);
@@ -92,7 +92,7 @@ fn clone_stamp_paints_with_the_brush_hardness() {
         app.run("tools.setBrush", json!({"brush": {"size": 24, "hardness": hardness}})).unwrap();
         app.run("paint.pencil", json!({"points": [[15, 30]], "size": 40, "color": "#ff0000"})).unwrap();
         app.ui.tool = Tool::CloneStamp;
-        app.ui.clone_source = Some([15.0, 30.0]);
+        set_source(&mut app, 15.0, 30.0);
         let m = egui::Modifiers::NONE;
         tool_event(&mut app, ToolEvent::Down { x: 70.0, y: 30.0, pressure: 1.0 }, m);
         tool_event(&mut app, ToolEvent::Up { x: 70.0, y: 30.0 }, m);
@@ -208,7 +208,7 @@ fn stamp_tools_send_the_options_they_paint_with() {
         app.ui.tool = row.tool;
         crate::paint_mouse::sync_tool_brush(&mut app);
         app.run("tools.setBrush", json!({"brush": row.brush})).unwrap();
-        app.ui.clone_source = Some([10.0, 10.0]);
+        set_source(&mut app, 10.0, 10.0);
         (row.setup)(&mut app);
         if row.tool == Tool::RedEye {
             gesture(&mut app, &[[50.0, 30.0]]);
@@ -895,4 +895,17 @@ fn history_source_caption_names_the_source() {
     app.run("edit.undo", json!({})).unwrap();
     app.run("paint.pencil", json!({"points": [[10, 10]], "size": 1, "color": "#0000ff"})).unwrap();
     assert!(matches!(source_caption(&app), SourceCaption::Deleted), "discarded redo state");
+}
+
+/// An empty Clone Source slot refuses to paint, as with no source at all: the ⌥-click point left
+/// in `ui.clone_source` carries no document, so it must not be read from another document.
+#[test]
+fn an_empty_clone_source_slot_refuses_to_paint() {
+    let mut app = app();
+    app.ui.tool = Tool::CloneStamp;
+    crate::retouch_ui::set_source(&mut app, 10.0, 10.0);
+    assert!(crate::retouch_ui::clone_params(&app).is_some());
+    app.run("cloneSource.select", json!({"index": 1})).unwrap();
+    assert!(app.ui.clone_source.is_some(), "the old ⌥-click point is still remembered");
+    assert!(crate::retouch_ui::clone_params(&app).is_none());
 }

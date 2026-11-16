@@ -251,7 +251,7 @@ impl AppTheme {
     /// The Appearance command that shows this theme in its current mode.
     #[cfg(test)]
     pub(crate) fn command(&self) -> craft::ui::runtime::commands::CommandRef {
-        craft::menu::ThemeChoice::Theme { id: self.id.clone(), dark: self.is_dark() }.command()
+        craft::menu::ThemeChoice::theme(self.id.clone(), self.is_dark()).command()
     }
 }
 

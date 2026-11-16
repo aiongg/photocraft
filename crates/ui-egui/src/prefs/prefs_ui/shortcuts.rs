@@ -291,18 +291,20 @@ fn menus_body(ui: &mut egui::Ui, rows: &[Row], draft: &mut MenusDraft) -> bool {
             ui.push_id(id, |ui| {
                 ui.horizontal(|ui| {
                     ui.label(format!("{} › {}", row.path.join(" › "), row.label));
-                    // Edit › Menus, Keyboard Shortcuts, Preferences, Save and Exit always stay (#5096).
-                    let hideable = MenuCustomization::hideable(id);
-                    let visible = !hideable || !draft.hidden.contains(id);
-                    let shown = Checkbox::new(Bind::given(visible)).label(tl!("Visible").to_string()).enabled(hideable).show(ui);
-                    match shown.events.value() {
-                        Some(&true) => {
-                            draft.hidden.remove(id);
+                    // Items that can't be hidden (File › Close, Save…, Edit › Menus…) have no visibility
+                    // control at all, as in the reference application (#5096, #14335).
+                    if MenuCustomization::hideable(id) {
+                        let visible = !draft.hidden.contains(id);
+                        let shown = Checkbox::new(Bind::given(visible)).label(tl!("Visible").to_string()).show(ui);
+                        match shown.events.value() {
+                            Some(&true) => {
+                                draft.hidden.remove(id);
+                            }
+                            Some(&false) => {
+                                draft.hidden.insert(id.to_owned());
+                            }
+                            None => {}
                         }
-                        Some(&false) => {
-                            draft.hidden.insert(id.to_owned());
-                        }
-                        None => {}
                     }
                     let current = draft.colors.get(id).map_or("none", String::as_str).to_owned();
                     let current = COLORS.iter().copied().find(|c| *c == current).unwrap_or("none");

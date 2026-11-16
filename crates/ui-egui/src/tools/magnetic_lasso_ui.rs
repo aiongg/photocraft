@@ -5,8 +5,8 @@
 //! only the app knows:
 //!
 //! - [`PcEdges`], the edge finder over the document's pixels (the engine's `EdgeSource`);
-//! - [`prepare`] and [`store`], which carry the options bar's settings and the cursor preference
-//!   into the tool and back around each pass;
+//! - [`prepare`] and [`store`], which carry the options bar's settings into the tool and back around
+//!   each pass;
 //! - [`commit`], which selects the closed border through `select.magneticLasso` with
 //!   `"trace": false`, so the selection is exactly the outline drawn, in one history step;
 //! - [`inspect`], the border in progress for `ui.inspect`.
@@ -19,7 +19,6 @@ use craft::imaging::ui::select::{EdgeSearch, EdgeTracer, MagneticLassoTool};
 use photocraft_algo::magnetic::Settings;
 use photocraft_engine::Session;
 use photocraft_engine::magnetic_cmds::EdgeSource;
-use photocraft_engine::prefs::OtherCursor;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -61,11 +60,10 @@ impl EdgeTracer for PcEdges {
 }
 
 /// Gives the tool this pass's app state, before the host runs it: the edge snapshot, the options
-/// bar's settings and Other Cursors › Precise.
+/// bar's settings.
 pub(crate) fn prepare(app: &PhotocraftApp, tool: &mut MagneticLassoTool<PcEdges>) {
     tool.tracer_mut().sync(&app.session);
     *tool.settings_mut() = app.ui.tool_options.magnetic;
-    tool.precise_cursor(app.session.prefs().cursors.other == OtherCursor::Precise);
 }
 
 /// Writes the tool's settings back after the run, so `[` and `]` reach the options store.

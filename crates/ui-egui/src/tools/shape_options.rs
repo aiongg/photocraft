@@ -2,10 +2,12 @@
 
 use craft::behavior::{EditEvent, Mixed};
 use craft::draw::stroke::StrokeStyle;
-use craft::draw::ui::shape::{ShapeAppearance, ShapeBar, ShapeChange, ShapePaint, ShapeToolSettings};
+use craft::draw::ui::shape::{ShapeAppearance, ShapeBar, ShapeChange, ShapePaint, ShapeToolSettings, VectorMode};
 use craft::draw::ui::shape_drag::ShapeKind;
-use craft::ui::contract::{Bind, Show as _};
+use craft::ui::choice::Checkbox;
+use craft::ui::contract::{Bind, Props as _, Show as _};
 use craft::ui::dialog::{Alert, HostedAlert};
+use craft::ui::display::Divider;
 use craft::ui::runtime::env::Env;
 use photocraft_doc::{Fill, LayerContent};
 use serde_json::{Value, json};
@@ -157,11 +159,14 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
     };
     let width = stroke.as_ref().map_or(0.0, |s| s.width);
     let has_stroke = stroke.is_some();
-    let rect_target = matches!(target.as_ref().and_then(|s| s.live.as_ref()), Some(photocraft_doc::LiveShape::Rect { .. }));
+    // The Rectangle tool's Radius is the next rectangle's (#13338); the active shape is edited only from the
+    // selection tools, whose Radius is its own.
+    let rect_target = matches!(tool, Tool::PathSelection | Tool::DirectSelection)
+        && matches!(target.as_ref().and_then(|s| s.live.as_ref()), Some(photocraft_doc::LiveShape::Rect { .. }));
     let mut settings = ShapeToolSettings::default();
     settings.fill_on = o.shape_fill;
     settings.corner_radius = match target.as_ref().and_then(|s| s.live.as_ref()) {
-        Some(photocraft_doc::LiveShape::Rect { radii, .. }) => f64::from(radii[0]),
+        Some(photocraft_doc::LiveShape::Rect { radii, .. }) if rect_target => f64::from(radii[0]),
         _ => f64::from(o.corner_radius),
     };
     settings.sides = o.polygon_sides;
@@ -194,6 +199,15 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
         .chips(|which, chip, chip_ui| decorate_chip(chip, which, &mut library, chip_ui))
         .show(ui);
     let (fill_gradient, stroke_gradient) = (library.gradient(ShapePaint::Fill), library.gradient(ShapePaint::Stroke));
+    if tool == Tool::Triangle {
+        Divider::vertical().show(ui);
+        // Only a shape layer has pixel edges to align: greyed in Path mode (#13370).
+        let shape_mode = app.ui.tool_options.shape_mode == VectorMode::Shape;
+        let on = Checkbox::new(Bind::given(app.ui.tool_options.align_edges)).label(tl!("Align Edges").to_owned()).enabled(shape_mode).show(ui);
+        if let Some(next) = on.value().copied() {
+            app.ui.tool_options.align_edges = next;
+        }
+    }
 
     let mut recent: Option<[f32; 3]> = None;
     let mut remembered: Vec<Fill> = Vec::new();
@@ -341,3 +355,15 @@ pub(crate) fn set_tool_paint(app: &mut PhotocraftApp, stroke: bool, change: Pain
     }
     Ok(())
 }
+
+#[cfg(test)]
+#[path = "rectangle_radius_range_tests.rs"]
+mod rectangle_radius_range_tests;
+
+#[cfg(test)]
+#[path = "rectangle_radius_target_tests.rs"]
+mod rectangle_radius_target_tests;
+
+#[cfg(test)]
+#[path = "polygon_sides_alert_tests.rs"]
+mod polygon_sides_alert_tests;

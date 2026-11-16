@@ -245,9 +245,9 @@ fn engine_action(action: ProfileAction) -> &'static str {
 /// The Color Settings policy that answers this mode's files when Ask On Mismatch is off.
 fn policy_key(mode: ColorMode) -> Option<&'static str> {
     match photocraft_engine::color_cmds::mode_space(mode) {
-        photocraft_cms::ColorSpace::Rgb => Some("policyRgb"),
-        photocraft_cms::ColorSpace::Cmyk => Some("policyCmyk"),
-        photocraft_cms::ColorSpace::Gray => Some("policyGray"),
+        craft::cms::ColorSpace::Rgb => Some("policyRgb"),
+        craft::cms::ColorSpace::Cmyk => Some("policyCmyk"),
+        craft::cms::ColorSpace::Gray => Some("policyGray"),
         _ => None,
     }
 }
@@ -394,7 +394,7 @@ fn open(app: &mut PhotocraftApp, held: Held, action: Option<&str>) -> Result<Val
         None => index,
     };
     app.session.set_active(index);
-    crate::jobs_ui::after_open(app, document, &name, path.as_deref(), &warnings, bytes.as_deref().map(Vec::as_slice))?;
+    crate::jobs_ui::after_open(app, document, &name, path.as_deref(), &warnings, bytes.as_ref())?;
     Ok(json!({"document": index, "action": action}))
 }
 

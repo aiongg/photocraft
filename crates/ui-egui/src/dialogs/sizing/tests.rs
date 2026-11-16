@@ -152,3 +152,25 @@ fn large_documents_in_physical_units_open_unchanged() {
         assert_eq!(doc_size(&app), photocraft_doc::Size::new(40000, 4), "{command}");
     }
 }
+
+/// #14768: Image Size's readout counts the flat image: the mode's colour channels at the document's depth, no alpha;
+/// Indexed one index byte and Bitmap one bit, though both are stored expanded.
+#[test]
+fn the_image_size_readout_counts_the_flat_image() {
+    let bpp = |new: Value, commands: &[&str]| {
+        let mut s = photocraft_engine::Session::new();
+        s.execute("file.new", new).unwrap();
+        for c in commands {
+            s.execute(c, json!({})).unwrap();
+        }
+        flat_bytes_per_pixel(&s.active().unwrap().doc)
+    };
+    assert_eq!(bpp(json!({"width": 4, "height": 4}), &[]), 3.0, "RGB 8 bit, no alpha");
+    assert_eq!(bpp(json!({"width": 4, "height": 4, "depth": 16}), &[]), 6.0);
+    assert_eq!(bpp(json!({"width": 4, "height": 4, "depth": 32}), &[]), 12.0);
+    assert_eq!(bpp(json!({"width": 4, "height": 4, "mode": "cmyk"}), &[]), 4.0);
+    assert_eq!(bpp(json!({"width": 4, "height": 4, "mode": "gray"}), &[]), 1.0);
+    assert_eq!(bpp(json!({"width": 4, "height": 4, "mode": "lab"}), &[]), 3.0);
+    assert_eq!(bpp(json!({"width": 4, "height": 4}), &["image.mode.indexedColor"]), 1.0);
+    assert_eq!(bpp(json!({"width": 4, "height": 4}), &["image.mode.grayscale", "image.mode.bitmap"]), 1.0 / 8.0);
+}

@@ -16,7 +16,7 @@ use craft::keymap::{Chord, Key, Mods};
 use craft::ui::canvas::{CanvasTool, ToolAction, ToolClaims, ToolContext, ToolHostResponse, ToolKey, ToolPath, ToolPointer};
 use craft::ui::primitives::Draw;
 
-use super::cursor_policy::{alt_loads_mixer, alt_samples, mixer_target_locked};
+use super::cursor_policy::{alt_loads_mixer, alt_samples, click_tool_cursor, mixer_target_locked, sample_target};
 use super::document_display::CanvasHost;
 
 use super::PhotocraftApp;
@@ -449,11 +449,15 @@ impl CanvasTool for PaintTool<'_> {
             let tool = app.ui.tool;
             // ⌥ on the Mixer Brush loads paint: its sample target, or the crosshair for precise cursors.
             if alt_loads_mixer(tool, cx.mods) && !cx.mods.cmd {
-                return if cx.precise() { Cursor::Painted(PaintedCursor::Crosshair) } else { Cursor::Painted(PaintedCursor::circle(5.0).marked(true, None)) };
+                return if cx.precise() { Cursor::Painted(PaintedCursor::Crosshair) } else { sample_target() };
             }
             // Over a layer it can't paint (Lock All), the Mixer Brush shows a no-entry sign (#11957).
             if tool == Tool::MixerBrush && mixer_target_locked(app) {
                 return Cursor::System(CursorIcon::NotAllowed);
+            }
+            // The Paint Bucket and the Magic Eraser act on a click: their own pointers, no brush tip.
+            if let Some(cursor) = click_tool_cursor(tool, cx.precise()) {
+                return cursor;
             }
             crate::brush_cursor::cursor(app, cx)
         })

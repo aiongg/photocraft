@@ -38,7 +38,7 @@ fn right_click(mode: &str, shift: bool, erase_preference: bool) -> Outcome {
     let journal = app.session.journal.len();
     let mods = if shift { Modifiers::SHIFT } else { Modifiers::NONE };
     testing::secondary_click(&mut app, [32.0, 32.0], mods);
-    if app.ui.canvas_tool_menu.as_ref().is_some_and(|m| matches!(m.kind, MenuKind::BrushMode)) {
+    if app.ui.canvas_tool_menu.as_ref().is_some_and(|m| matches!(m.kind, MenuKind::BrushMode { .. })) {
         Outcome::Menu
     } else if crate::brush_picker::opened_at(&app).is_some() {
         Outcome::Picker

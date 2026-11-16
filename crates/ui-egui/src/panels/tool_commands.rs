@@ -2,10 +2,10 @@
 //! `tools.select.<tool>` (saved shortcuts, `.kys` files, protocol calls), and the rail's slots built from them.
 
 use craft::ui::contract::CommandSet;
-use craft::ui::rails::{RailTool, ToolSlot};
+use craft::ui::rails::{RailTool, SlotId, ToolSlot};
 use photocraft_engine::prefs::ToolbarCustomization;
 
-use super::toolbar::TOOL_SECTIONS;
+use super::toolbar::layout_sections;
 use crate::state::Tool;
 
 /// Selecting a tool, as a command: the rail's buttons and the Edit Toolbar drawer's rows run it, and the application
@@ -308,60 +308,24 @@ pub(crate) fn rail_tool(tool: Tool) -> RailTool<Tool> {
     RailTool::new(tool, command_of(tool))
 }
 
-/// The default slots: one per slot of [`TOOL_SECTIONS`], numbered by its position there, the last of each section
-/// ending a group.
-fn default_slots() -> Vec<ToolSlot<Tool>> {
+/// The rail's slots: one per toolbar group of the stored layout ([`layout_sections`]), the last of each section ending a
+/// group. A slot's id is its first tool's default slot index, so a slot keeps its id when others move.
+pub(crate) fn slots(toolbar: &ToolbarCustomization) -> Vec<ToolSlot<Tool>> {
     let mut slots = Vec::new();
-    let mut id = 0;
-    for section in TOOL_SECTIONS {
-        for (at, tools) in section.iter().enumerate() {
-            let tools: Vec<RailTool<Tool>> = tools.iter().map(|tool| rail_tool(*tool)).collect();
-            slots.push(if at + 1 == section.len() { ToolSlot::ending_group(id, tools) } else { ToolSlot::new(id, tools) });
-            id += 1;
+    for section in layout_sections(toolbar) {
+        let last = section.len().saturating_sub(1);
+        for (at, (index, tools)) in section.into_iter().enumerate() {
+            let id = SlotId::try_from(index).unwrap_or(SlotId::MAX);
+            let tools: Vec<RailTool<Tool>> = tools.into_iter().map(rail_tool).collect();
+            slots.push(if at == last { ToolSlot::ending_group(id, tools) } else { ToolSlot::new(id, tools) });
         }
     }
     slots
 }
 
-/// The rail's slots: the arrangement saved from the Edit Toolbar drawer when there is one, else the defaults. Saved
-/// names that no longer name a tool are skipped, and a slot left empty goes. The slot ids are the saved ones, so the
-/// last-used tool of a slot survives a restart.
-pub(crate) fn slots(toolbar: &ToolbarCustomization) -> Vec<ToolSlot<Tool>> {
-    if toolbar.slots.is_empty() {
-        return default_slots();
-    }
-    toolbar
-        .slots
-        .iter()
-        .filter_map(|saved| {
-            let tools: Vec<RailTool<Tool>> = saved.tools.iter().filter_map(|name| Tool::from_name(name)).map(rail_tool).collect();
-            if tools.is_empty() {
-                None
-            } else if saved.group_end {
-                Some(ToolSlot::ending_group(saved.id, tools))
-            } else {
-                Some(ToolSlot::new(saved.id, tools))
-            }
-        })
-        .collect()
-}
-
-/// `slots` in the form `edit.toolbar {"slots": ..}` saves and [`slots`] reads back: `{id, tools, groupEnd}` per slot, the
-/// tools by their `Tool` names.
-pub(crate) fn saved_slots(slots: &[ToolSlot<Tool>]) -> serde_json::Value {
-    slots
-        .iter()
-        .map(|slot| {
-            let tools: Vec<String> = slot.tools.iter().map(|tool| format!("{:?}", tool.id)).collect();
-            serde_json::json!({"id": slot.id, "tools": tools, "groupEnd": slot.group_end})
-        })
-        .collect()
-}
-
-/// The tools hidden in Edit › Toolbar. The dialog writes `Tool` debug names, and `edit.toolbar` takes any spelling
-/// `Tool::from_name` reads; a name that matches no tool is skipped.
-pub(crate) fn hidden_tools(names: &[String]) -> Vec<Tool> {
-    names.iter().filter_map(|name| Tool::from_name(name)).collect()
+/// `slots` as the group layout `edit.toolbar {"toolbar": ..}` stores: one list of `Tool` names per slot.
+pub(crate) fn saved_groups(slots: &[ToolSlot<Tool>]) -> serde_json::Value {
+    slots.iter().map(|slot| slot.tools.iter().map(|tool| format!("{:?}", tool.id)).collect::<Vec<String>>()).collect()
 }
 
 #[cfg(test)]
@@ -369,10 +333,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn names_saved_by_edit_toolbar_hide_the_same_tools() {
-        let names: Vec<String> = ["EllipseMarquee", "Single Column Marquee Tool", "not a tool", "SingleRowMarquee"].map(String::from).into();
-        assert_eq!(hidden_tools(&names), [Tool::EllipseMarquee, Tool::SingleColumnMarquee, Tool::SingleRowMarquee]);
-        // The command and the tool map back and forth for every tool.
+    fn every_tool_maps_to_its_command_and_back() {
         for tool in Tool::ALL {
             assert_eq!(tool_of(command_of(tool)), tool);
         }

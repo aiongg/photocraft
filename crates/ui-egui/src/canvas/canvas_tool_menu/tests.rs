@@ -33,6 +33,11 @@ pub(super) fn choose_open(app: &mut PhotocraftApp, command: &str) {
     pick(app, command);
 }
 
+/// The labels of `rows`, a separator as `None`.
+pub(super) fn labels(rows: &[Row]) -> Vec<Option<&str>> {
+    rows.iter().map(|row| row.map(|(label, _)| label)).collect()
+}
+
 /// `choose` on the app's own context.
 pub(super) fn pick(app: &mut PhotocraftApp, command: &str) {
     let ctx = app.ctx().clone();
@@ -345,7 +350,7 @@ fn kind_name(kind: &MenuKind) -> &'static str {
         MenuKind::TypeEdit { .. } => "TypeEdit",
         MenuKind::TypeLayer { .. } => "TypeLayer",
         MenuKind::Layers { .. } => "Layers",
-        MenuKind::BrushMode => "BrushMode",
+        MenuKind::BrushMode { .. } => "BrushMode",
     }
 }
 

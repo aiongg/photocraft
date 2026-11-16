@@ -7,7 +7,7 @@ use serde_json::{Value, json};
 
 /// A list holding exactly `actions`.
 fn list_of(actions: Vec<Action>) -> ActionList {
-    ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions, sets: Vec::new() })
+    ActionList::from_file(ActionsFile::new(actions, Vec::new()))
 }
 
 /// A tiny document to distinguish definition edits from document mutations and playback.

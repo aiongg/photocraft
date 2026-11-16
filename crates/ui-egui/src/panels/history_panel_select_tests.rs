@@ -11,7 +11,7 @@ use serde_json::json;
 use super::history::{self, apply, can_delete, rows};
 use super::*;
 
-/// Open, then New Layer, Fill, New Layer, Fill.
+/// New (the opening state of File › New), then New Layer, Fill, New Layer, Fill.
 fn app() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
@@ -23,7 +23,7 @@ fn app() -> PhotocraftApp {
     app
 }
 
-/// Open, New Layer, Fill red, a snapshot, Fill blue.
+/// New, New Layer, Fill red, a snapshot, Fill blue.
 fn with_snapshot() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
@@ -91,6 +91,18 @@ fn clicking_a_state_jumps_there_with_one_command() {
     assert_eq!(state(&app), (4, 0, rev + 2));
 }
 
+/// #14029: a document from File › New lists its opening state as "New" (an opened file's reads "Open"), first among
+/// the states, with the opening state's icon.
+#[test]
+fn a_new_documents_opening_state_reads_new_with_the_opening_icon() {
+    let app = app();
+    let listed = rows(app.session.active().unwrap());
+    assert!(listed.iter().all(|r| r.label.as_str() != "Open"), "no row reads Open");
+    let first_state = listed.iter().find(|r| matches!(r.key, HistoryKey::State(_))).expect("the opening state");
+    assert_eq!(first_state.label.as_str(), "New");
+    assert_eq!(first_state.icon, Some(history::step_icon("Open")), "the opening state's icon");
+}
+
 /// The rows are the snapshots, then the states with the later ones dimmed; a state's key survives a step back.
 #[test]
 fn rows_list_snapshots_then_states_then_redo_states() {
@@ -98,7 +110,7 @@ fn rows_list_snapshots_then_states_then_redo_states() {
     app.run("edit.undo", json!({})).unwrap();
     let before = rows(app.session.active().unwrap());
     let kinds: Vec<(bool, bool)> = before.iter().map(|r| (matches!(r.key, HistoryKey::Snapshot(_)), r.redo)).collect();
-    // The first snapshot, "Snapshot 1", then Open, New Layer, Fill (current), Fill (redo).
+    // The first snapshot, "Snapshot 1", then New, New Layer, Fill (current), Fill (redo).
     assert_eq!(kinds, [(true, false), (true, false), (false, false), (false, false), (false, false), (false, true)]);
     app.run("edit.redo", json!({})).unwrap();
     let after = rows(app.session.active().unwrap());
@@ -155,7 +167,7 @@ fn snapshot_rows_select_rename_and_delete() {
     assert_eq!(selected_snapshot(&app), None);
     assert_eq!(state(&app).2, revision, "and runs no command");
 
-    apply(&mut app, HistoryEvent::Rename { snapshot: id, text: "Lesson start".into() });
+    apply(&mut app, HistoryEvent::rename(id, "Lesson start"));
     assert_eq!(app.perf.last_command, "history.renameSnapshot");
     let names: Vec<String> = app.session.active().unwrap().snapshots.iter().skip(1).map(|s| s.name.clone()).collect();
     assert_eq!(names, ["Lesson start"]);
@@ -202,7 +214,7 @@ fn rows_dragged_onto_the_trash_are_deleted() {
     assert_eq!(snapshots(&app), 1, "the dragged snapshot is deleted, leaving the first one");
     assert_eq!(steps(&app), before, "no state is");
 
-    // The second state: it and the states after it go, as with Delete. The states are Open, New Layer, Fill, Fill.
+    // The second state: it and the states after it go, as with Delete. The states are New, New Layer, Fill, Fill.
     let mut app = with_snapshot();
     assert_eq!(steps(&app), 4);
     assert!(!can_delete(&app, &state_key(&app, 0)), "the oldest state stays");
@@ -233,7 +245,7 @@ fn non_linear_trash_click_never_targets_the_oldest_state() {
         let st = app.session.active().unwrap();
         (st.history.past_len(), st.history.redo_labels().count())
     };
-    assert_eq!(counts(&app), (0, 3), "Open current, New Layer, Fill, Fill dimmed");
+    assert_eq!(counts(&app), (0, 3), "New current, New Layer, Fill, Fill dimmed");
     assert!(app.session.is_enabled("history.deleteState"), "the engine still offers a later state to delete");
     assert!(!can_delete(&app, &state_key(&app, 0)), "the oldest state is never deletable");
     assert!(can_delete(&app, &last(&app)), "a later state is, with the option on");
@@ -348,7 +360,7 @@ fn alt_click_on_the_camera_opens_new_snapshot() {
     app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
-    apply(&mut app, HistoryEvent::NewSnapshot { mods: Mods::ALT });
+    apply(&mut app, HistoryEvent::new_snapshot(Mods::ALT));
     assert_eq!(snapshots(&app), 1, "⌥-click opens the dialog instead");
     assert!(snapshot_dialog_open(&app));
 }
@@ -362,7 +374,7 @@ fn show_new_snapshot_dialog_by_default_makes_a_click_open_the_dialog() {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
         app.run("file.new", json!({"width": 200, "height": 150})).unwrap();
         app.run("history.options", json!({"showNewSnapshotDialogByDefault": dialog_by_default})).unwrap();
-        apply(&mut app, HistoryEvent::NewSnapshot { mods });
+        apply(&mut app, HistoryEvent::new_snapshot(mods));
         let dialog = snapshot_dialog_open(&app);
         if dialog_by_default {
             assert!(dialog, "{mods:?}: the dialog opens");

@@ -43,7 +43,7 @@ fn app_on(files: &Arc<MemoryFiles>) -> PhotocraftApp {
     PhotocraftApp::new(photocraft_engine::Session::new(), services_on(files))
 }
 
-fn app_with_store() -> (PhotocraftApp, Arc<MemoryFiles>) {
+pub(super) fn app_with_store() -> (PhotocraftApp, Arc<MemoryFiles>) {
     let files = Arc::new(MemoryFiles::new());
     (app_on(&files), files)
 }
@@ -412,7 +412,7 @@ fn system_theme_menu_choice_stays_checked_as_the_appearance_changes() {
         assert_eq!(app.session.prefs.rev(), revision);
         assert_eq!(saved_text(&store), Some(saved.clone()));
     }
-    let solarized = ThemeChoice::Theme { id: AppTheme::solarized_dark().id().clone(), dark: true };
+    let solarized = ThemeChoice::theme(AppTheme::solarized_dark().id().clone(), true);
     pick_theme(&mut app, &ctx, &solarized);
     for appearance in [Some(egui::Theme::Light), Some(egui::Theme::Dark)] {
         appearance_frame(&mut app, &ctx, appearance);
@@ -471,7 +471,7 @@ fn theme_star_saves_favorite_and_menu_groups_it() {
     assert!(h.query_by_label("Remove from Favorites: Classic").is_some());
     let nodes = theme_menu(h.state()).favorite_items(&ThemeLabels::default(), CommandRef::new("edit.preferences.interface"));
     let listed: Vec<_> = nodes.iter().filter_map(|node| if let Node::Item(item) = node { Some(item.command.clone()) } else { None }).collect();
-    let classic = ThemeChoice::Theme { id: ThemeId::parse("craft.classic").unwrap(), dark: false };
+    let classic = ThemeChoice::theme(ThemeId::parse("craft.classic").unwrap(), false);
     assert!(listed.contains(&classic.command()), "{listed:?}");
     assert_eq!(listed.len(), 2, "the settings row and the one favourite: {listed:?}");
 }
@@ -573,7 +573,7 @@ fn preferences_persist_through_services_and_theme_follows() {
     assert_eq!(app2.session.prefs().performance.history_states, 12);
     assert_eq!(app2.ui.theme, AppTheme::studio_light());
     // Picking a theme from the Window menu becomes the preference.
-    pick_theme(&mut app2, &ctx, &ThemeChoice::Theme { id: AppTheme::classic().id().clone(), dark: false });
+    pick_theme(&mut app2, &ctx, &ThemeChoice::theme(AppTheme::classic().id().clone(), false));
     tick(&mut app2, &ctx);
     assert_eq!(app2.session.prefs().interface.light_theme, "craft.classic");
     assert_eq!(stored(&store)["interface"]["lightTheme"], "craft.classic");
@@ -1271,23 +1271,24 @@ fn the_saved_brush_owner_follows_the_saved_last_brush() {
     app.session.tools.brush_changed();
     crate::last_brush::persist(&mut app, &ctx);
     crate::tool_memory::persist(&mut app, &ctx);
-    // The Brush's tip becomes a big sampled one, then the Eraser takes over that brush.
+    // The Brush's tip becomes a big sampled one, then the Blur tool takes over that brush (the Eraser has its own
+    // starting tip since #11936).
     app.session.tools.brush.tip = TipShape::Sampled(GrayTile::from_fn(400, 300, |x, y| ((x * y) % 7) as f32 / 7.0));
     app.session.tools.brush_changed();
-    app.ui.tool = Tool::Eraser;
+    app.ui.tool = Tool::Blur;
     crate::paint_mouse::sync_tool_brush(&mut app);
     crate::last_brush::persist(&mut app, &ctx);
     crate::tool_memory::persist(&mut app, &ctx);
     tick(&mut app, &ctx);
     let saved = stored(&store);
     assert_eq!(saved["lastBrush"]["brush"]["size"], json!(77.0), "the big tip is not remembered yet");
-    assert_ne!(saved["toolBrushes"]["owner"], json!("Eraser"), "{saved}");
+    assert_ne!(saved["toolBrushes"]["owner"], json!("Blur"), "{saved}");
     let mut app2 = app_on(&store);
     tick(&mut app2, &ctx);
     assert_eq!(app2.ui.brush_tool, Tool::Brush, "the 77 px brush is the Brush's");
     assert_eq!(app2.session.tools.brush.size, 77.0);
 
-    // Once the Eraser's brush is saved, the Eraser owns it in the preferences too.
+    // Once the Blur tool's brush is saved, the Blur tool owns it in the preferences too.
     app.session.tools.brush.tip = TipShape::Round;
     app.session.tools.brush.size = 33.0;
     app.session.tools.brush_changed();
@@ -1295,7 +1296,7 @@ fn the_saved_brush_owner_follows_the_saved_last_brush() {
     crate::tool_memory::persist(&mut app, &ctx);
     tick(&mut app, &ctx);
     let saved = stored(&store);
-    assert_eq!(saved["toolBrushes"]["owner"], json!("Eraser"), "{saved}");
+    assert_eq!(saved["toolBrushes"]["owner"], json!("Blur"), "{saved}");
     assert_eq!(saved["lastBrush"]["brush"]["size"], json!(33.0));
 }
 
@@ -1708,4 +1709,45 @@ fn reset_section_on_type_keeps_the_favourite_fonts() {
     assert!(prefs.smart_quotes, "the Type settings are reset");
     assert_eq!(prefs.favorite_fonts, ["Bebas Neue"], "the favourites are kept");
     assert_eq!(stored(&store)["type"]["favoriteFonts"], json!(["Bebas Neue"]));
+}
+
+/// #13588: a scratch disk's Browse… asks for a folder and fills that disk's path in the window's draft only; a
+/// cancelled Browse keeps it, and the system's temporary folder has no Browse.
+#[test]
+fn scratch_disk_browse_sets_only_its_draft_entry_and_cancel_keeps_it() {
+    use craft::host::{PickKind, Picked, ScriptedFiles};
+    use egui_kittest::kittest::Queryable;
+    let scripted = Arc::new(ScriptedFiles::answering([Picked::Paths(vec!["/tmp/scratch".into()]), Picked::Cancelled]));
+    let (store, picks) = (Arc::new(MemoryFiles::new()), scripted.clone());
+    let mut h = egui_kittest::Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        let services = crate::Services { files: Some(picks), ..services_on(&store) };
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), services);
+        open_prefs(&mut app, "scratchDisks");
+        app
+    });
+    h.run_steps(4);
+    assert!(h.query_by_label("Browse…").is_none(), "the system's temporary folder is not browsed for");
+    h.get_by_label("Add disk").click();
+    h.run_steps(3);
+    h.get_by_label("Browse…").click();
+    h.run_steps(4);
+    assert_eq!(h.state().session.prefs().scratch_disks.disks.len(), 1, "Browse edits only the draft");
+    h.get_by_label("Browse…").click();
+    h.run_steps(4);
+    h.get_by_label("OK").click();
+    h.run_steps(4);
+    let paths: Vec<String> = h.state().session.prefs().scratch_disks.disks.iter().map(|d| d.path.clone()).collect();
+    assert_eq!(paths, ["(system temp)", "/tmp/scratch"], "the pick lands in its own entry and a cancelled Browse keeps it");
+    let asked = scripted.requests();
+    assert_eq!(asked.iter().map(|r| r.kind).collect::<Vec<_>>(), [PickKind::Folder, PickKind::Folder]);
+}
+
+/// The agent settings apply at once, so none of them says "Applies at next launch." (they did before the agent link
+/// followed the preferences live).
+#[test]
+fn integrations_apply_without_a_restart() {
+    for key in ["allowAgentControl", "connectAgents", "controlPort", "readRoot", "writeRoot", "whenAppClosed"] {
+        assert!(!super::fields::read_at_launch(&format!("integrations.{key}")), "{key}");
+    }
 }

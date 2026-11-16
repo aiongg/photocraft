@@ -97,7 +97,7 @@ fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Re
     use crate::canvas_tool_menu::MenuKind;
     let Some(id) = str_param(p, "id") else { return err("missing `id`") };
     let Some(menu) = app.ui.canvas_tool_menu.as_ref() else { return err("no canvas context menu is open") };
-    if matches!(menu.kind, MenuKind::BrushMode) {
+    if matches!(menu.kind, MenuKind::BrushMode { .. }) {
         return mode_menu_choose(app, ctx, id);
     }
     if !crate::canvas_tool_menu::available(app, menu, id) {
@@ -1216,6 +1216,9 @@ fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     let (Some(idx), Some(view)) = (app.session.active_index(), crate::canvas::document_display::active_view(app)) else { return err("no canvas to drive") };
     if let Some(t) = parsed.tool {
         crate::tool_memory::select(app, t);
+        // The tool's own brush now, not at the next frame, so a paint command right after uses
+        // it (the Pencil's 1 px tip, #12200; any tool's remembered brush).
+        crate::paint_mouse::sync_tool_brush(app);
     }
     let button = match parsed.button.as_str() {
         "secondary" | "right" => PointerButton::Secondary,

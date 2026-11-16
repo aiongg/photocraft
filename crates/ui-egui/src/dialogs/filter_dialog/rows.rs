@@ -14,6 +14,7 @@ use std::sync::Arc;
 
 use craft::behavior::{CursorBadge, EditEvent, IconId, Mixed};
 use craft::cms::lutfile::write_cube;
+use craft::cms::{ColorSpace, TransformOptions};
 use craft::color::ui::{LutChoice, LutPicker, LutPickerOutput};
 use craft::imaging::ui::color_range::{ColorSamples, SampleSign, SampleTool};
 use craft::keymap::Mods;
@@ -27,7 +28,6 @@ use craft::ui::pickers::Select;
 use craft::ui::primitives::IconSpec;
 use craft::ui::runtime::env::Label;
 use craft::ui::runtime::requests::EyedropperRequest;
-use photocraft_cms::{ColorSpace, TransformOptions};
 use photocraft_color::ColorMode;
 use photocraft_doc::Document;
 use photocraft_engine::installed_profiles::InstalledProfile;
@@ -135,7 +135,7 @@ fn indexed_matte_document_color(app: &PhotocraftApp, doc: &Document, color: [f32
     };
     let source = app.session.color.working(ColorMode::Rgb);
     let options = TransformOptions { intent: app.session.color.settings.intent(), bpc: app.session.color.settings.bpc, ..Default::default() };
-    let transform = photocraft_cms::transform::cached(&source, &destination, options).map_err(|e| e.to_string())?;
+    let transform = craft::cms::transform::cached(&source, &destination, options).map_err(|e| e.to_string())?;
     let mut output = [0.0; 16];
     transform.eval(&color[..3], &mut output);
     let rgb = if destination.color_space == ColorSpace::Gray { [output[0]; 3] } else { [output[0], output[1], output[2]] };
@@ -253,7 +253,7 @@ const PROFILE_DIALOGS: &[&str] = &["edit.assignProfile", "edit.convertToProfile"
 /// working spaces those of that space, as Photoshop lists them (#6323). An RGB working space is a
 /// display or colour-space profile, not a scanner's or a printer's.
 fn installed_filter(cmd: &str, key: &str) -> Option<fn(&InstalledProfile) -> bool> {
-    use photocraft_cms::ProfileClass;
+    use craft::cms::ProfileClass;
     match (cmd, key) {
         (c, "profile") if PROFILE_DIALOGS.contains(&c) => Some(|_| true),
         ("edit.colorSettings", "workingRgb") => {
@@ -524,7 +524,11 @@ fn points_at(fields: &DialogFields, key: &str) -> Vec<[f64; 2]> {
 fn samples_of(fields: &DialogFields) -> ColorSamples {
     let order: Vec<SampleSign> =
         fields.get("order").and_then(|v| serde_json::to_value(v).ok()).and_then(|v| serde_json::from_value(v).ok()).unwrap_or_default();
-    ColorSamples { add: points_at(fields, "points"), subtract: points_at(fields, "subtractPoints"), order }
+    let mut samples = ColorSamples::default();
+    samples.add = points_at(fields, "points");
+    samples.subtract = points_at(fields, "subtractPoints");
+    samples.order = order;
+    samples
 }
 
 /// Sample the merged image at document point `at` into Replace Color's "From" colour.

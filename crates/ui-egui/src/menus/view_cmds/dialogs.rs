@@ -209,10 +209,16 @@ pub(super) fn params_for(app: &mut PhotocraftApp, id: &str) -> Option<(Vec<Param
         "file.fileInfo" => file_info_form(app),
         "file.automate.fitImage" => {
             let (w, h, _) = doc?;
+            // The values Fit Image last ran with, else the document's size (#13853). A stored value that isn't a
+            // usable size is ignored. The engine keeps them in the preferences, so the rows opt out of the
+            // dialog's own remembered values.
+            let kept = app.session.prefs().dialogs.get(photocraft_engine::file_cmds::FIT_IMAGE).cloned().unwrap_or_default();
+            let size = |key: &str| kept.get(key).and_then(Value::as_u64).filter(|v| (1..=300_000).contains(v)).and_then(|v| i64::try_from(v).ok());
+            let enlarge = kept.get("dontEnlarge").and_then(Value::as_bool).unwrap_or(false);
             plain(vec![
-                Param::new("width", tl!("Width"), ParamKind::int(Some(1), None, i64::from(w))),
-                Param::new("height", tl!("Height"), ParamKind::int(Some(1), None, i64::from(h))),
-                Param::new("dontEnlarge", tl!("Don't Enlarge"), ParamKind::bool(false)),
+                Param::new("width", tl!("Width"), ParamKind::int(Some(1), Some(300_000), size("width").unwrap_or(i64::from(w)))).not_remembered(),
+                Param::new("height", tl!("Height"), ParamKind::int(Some(1), Some(300_000), size("height").unwrap_or(i64::from(h)))).not_remembered(),
+                Param::new("dontEnlarge", tl!("Don't Enlarge"), ParamKind::bool(enlarge)).not_remembered(),
             ])
         }
         "file.automate.conditionalModeChange" => {
@@ -395,16 +401,24 @@ pub(super) fn params_for(app: &mut PhotocraftApp, id: &str) -> Option<(Vec<Param
             folder("input", tl!("Input Folder"), dir.clone()).visible_when("source", "folder"),
             Param::new("includeSubfolders", tl!("Include All Subfolders"), ParamKind::bool(false)).visible_when("source", "folder"),
             folder("output", tl!("Output Folder"), format!("{dir}/processed")),
-            choice(
-                "format",
-                tl!("File Type"),
-                opts(&[("jpg", tl!("JPEG")), ("png", tl!("PNG")), ("psd", tl!("PSD")), ("tiff", tl!("TIFF")), ("webp", tl!("WebP"))]),
-                "jpg",
-            ),
-            Param::new("quality", tl!("Quality"), ParamKind::int(Some(0), Some(12), 8)),
-            Param::new("width", tl!("Width"), ParamKind::int(Some(0), None, 0)),
-            Param::new("height", tl!("Height"), ParamKind::int(Some(0), None, 0)),
-            Param::new("convertToSrgb", tl!("Convert Profile to sRGB"), ParamKind::bool(true)),
+            Param::section(tl!("File Type")),
+            // One section per format: the checkbox that enables it, then its own options and size.
+            Param::new("jpeg/enabled", tl!("Save as JPEG"), ParamKind::bool(true)),
+            Param::new("jpeg/quality", tl!("Quality"), ParamKind::number(Some(1.0), Some(12.0), 5.0, 1.0, 2)).enabled_when("jpeg/enabled", true),
+            Param::new("jpeg/convertToSrgb", tl!("Convert Profile to sRGB"), ParamKind::bool(false)).enabled_when("jpeg/enabled", true),
+            Param::new("jpeg/resize", tl!("Resize to Fit"), ParamKind::bool(false)).enabled_when("jpeg/enabled", true),
+            Param::new("jpeg/width", tl!("W"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("jpeg/resize", true),
+            Param::new("jpeg/height", tl!("H"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("jpeg/resize", true),
+            Param::new("psd/enabled", tl!("Save as PSD"), ParamKind::bool(false)),
+            Param::new("psd/maximizeCompatibility", tl!("Maximize Compatibility"), ParamKind::bool(true)).enabled_when("psd/enabled", true),
+            Param::new("psd/resize", tl!("Resize to Fit"), ParamKind::bool(false)).enabled_when("psd/enabled", true),
+            Param::new("psd/width", tl!("W"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("psd/resize", true),
+            Param::new("psd/height", tl!("H"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("psd/resize", true),
+            Param::new("tiff/enabled", tl!("Save as TIFF"), ParamKind::bool(false)),
+            Param::new("tiff/lzw", tl!("LZW Compression"), ParamKind::bool(false)).enabled_when("tiff/enabled", true),
+            Param::new("tiff/resize", tl!("Resize to Fit"), ParamKind::bool(false)).enabled_when("tiff/enabled", true),
+            Param::new("tiff/width", tl!("W"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("tiff/resize", true),
+            Param::new("tiff/height", tl!("H"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("tiff/resize", true),
         ]),
         "file.automate.batch" => batch_form(app, &dir),
         "select.saveSelection" | "select.loadSelection" | "image.applyImage" | "image.calculations" => channel_form(app, id),
@@ -717,16 +731,23 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
     }
 }
 
+/// The name Save a Copy suggests: "<name> copy.psd" for a document with a file, or with
+/// Preferences › File Handling › Do not append "copy" to filename (`copy_suffix` empty) the
+/// document's own name (only the extension may change), as in Photoshop (#8080). A document that
+/// was never saved suggests its own name without " copy" either way (#14169).
+pub(super) fn suggested_copy_name(doc_name: &str, has_file: bool, copy_suffix: &str) -> String {
+    let stem = doc_name.rsplit_once('.').map_or(doc_name, |(a, _)| a);
+    let suffix = if has_file { copy_suffix } else { "" };
+    format!("{stem}{suffix}.psd")
+}
+
 /// File › Save a Copy: pick a name, encode with the export service, write; the document's path
 /// and saved state are untouched. An action being recorded keeps it as a `file.saveACopy` step
 /// with its path (#4373).
 fn save_a_copy(app: &mut PhotocraftApp) -> Result<Value, String> {
     let doc = app.session.active().ok_or("no document")?.doc.clone();
-    let stem = doc.name.rsplit_once('.').map_or(doc.name.as_str(), |(a, _)| a);
-    // "<name> copy.psd", or with Preferences › File Handling › Do not append "copy" to filename
-    // when saving a copy the document's own name (only the extension may change), as in
-    // Photoshop (#8080).
-    let suggested = format!("{stem}{}.psd", app.session.prefs().file_handling.copy_suffix());
+    let has_file = app.session.active().is_some_and(|d| d.path.is_some());
+    let suggested = suggested_copy_name(&doc.name, has_file, app.session.prefs().file_handling.copy_suffix());
     // The copy is of the document as it was when asked.
     app.pick_save(&suggested, move |app, path| {
         // An RGB Targa asks for its bits per pixel first, a DDS texture for its compression, a

@@ -120,14 +120,7 @@ fn commit_path_current(app: &mut PhotocraftApp, pen: &PenPath, closed: bool, fre
         app.run("shape.create", json!({"kind": "path", "path": path, "addTo": layer, "op": op}))
     } else if shape_mode {
         let fill = if closed { fill_param(app) } else { Value::Null };
-        let stroke = if closed {
-            stroke_param(app)
-        } else {
-            let mut stroke = app.ui.tool_options.shape_stroke.params();
-            stroke["width"] = json!(app.ui.tool_options.stroke_width.max(1.0));
-            stroke["color"] = json!(app.session.tools.foreground);
-            stroke
-        };
+        let stroke = if closed { stroke_param(app) } else { super::shapes::open_pen_stroke_param(app) };
         app.run("shape.create", json!({"kind": "path", "path": path, "fill": fill, "stroke": stroke, "historyName": freeform.then_some("Freeform Pen")}))
     } else if let Some((name, p)) =
         pen.resumes.as_ref().and_then(|r| app.session.active().and_then(|st| with_resumed_subpath(&st.doc, r, &path)).map(|p| (r.path.clone(), p)))
@@ -402,10 +395,10 @@ pub(crate) fn shape_path_op(o: &ToolOptions) -> Option<&'static str> {
 }
 
 /// Whether the active tool draws shape layers (so New Layer applies): the Shape tools in Shape
-/// mode, the Pens in Shape mode; Path Selection has no shape layer to make.
+/// mode, the Pens in Shape mode; Path Selection and Direct Selection have no shape layer to make.
 pub(super) fn tool_in_shape_mode(app: &PhotocraftApp) -> bool {
     let (tool, o) = (app.ui.tool, &app.ui.tool_options);
-    if tool == Tool::PathSelection {
+    if matches!(tool, Tool::PathSelection | Tool::DirectSelection) {
         false
     } else if super::shapes::is_shape_tool(tool) {
         o.shape_mode == VectorMode::Shape
@@ -425,12 +418,14 @@ pub(crate) fn path_op_field(app: &mut PhotocraftApp) -> &mut String {
 }
 
 /// What the Path Operations menu's Merge Shape Components merges, as a command, its params and
-/// the number of shape components there: with Path Selection the path it selects in; in Shape
-/// mode the selected shape layer; in Path mode the path the Pen draws into (a targeted vector
-/// mask, the selected path, else the Work Path).
+/// the number of shape components there: with Path Selection or Direct Selection the path they
+/// select in (with Direct Selection the one with selected anchors first); in Shape mode the
+/// selected shape layer; in Path mode the path the Pen draws into (a targeted vector mask, the
+/// selected path, else the Work Path).
 pub(super) fn merge_target(app: &PhotocraftApp) -> Option<(&'static str, Value, usize)> {
-    if app.ui.tool == Tool::PathSelection {
-        let (r, p) = crate::direct_select::active_paths(app).into_iter().next()?;
+    if matches!(app.ui.tool, Tool::PathSelection | Tool::DirectSelection) {
+        let anchored = crate::path_components::selected(app).filter(|_| app.ui.tool == Tool::DirectSelection).map(|(r, p, _)| (r, p));
+        let (r, p) = anchored.or_else(|| crate::direct_select::active_paths(app).into_iter().next())?;
         return Some(("path.mergeShapeComponents", r.params(app), p.components().len()));
     }
     let st = app.session.active()?;
@@ -477,7 +472,7 @@ pub(crate) fn freeform_finish_owned(app: &mut PhotocraftApp, points: &[[f64; 3]]
     };
     pen.owner = Some(owner);
     if let Err(e) = commit_path_named(app, &pen, closed, true) {
-        app.ui.pen = Some(PenPath { commit_failed: true, ..pen });
+        app.ui.pen = Some(PenPath { commit_failed: true, freeform_origin: true, ..pen });
         app.ui.status = e;
         app.ui.status_error = true;
     }

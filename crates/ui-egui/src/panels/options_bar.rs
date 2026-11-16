@@ -4,14 +4,14 @@
 
 use std::ops::RangeInclusive;
 
-use craft::behavior::{EditEvents, IconId};
+use craft::behavior::{EditEvents, IconId, NumberCodec};
 use craft::ui::bars::{Bar, BarHome, BarKind, BarOutput, BarTool};
 use craft::ui::choice::Checkbox;
 use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};
 use craft::ui::display::Divider;
 use craft::ui::form::Field;
 use craft::ui::menu::Menu;
-use craft::ui::runtime::env::{Label, WheelScope, with_env};
+use craft::ui::runtime::env::{Env, Label, WheelScope, with_env};
 use craft::ui::text::NumberField;
 use photocraft_paint::BrushSettings;
 
@@ -206,8 +206,12 @@ fn lead(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// size. Art History has no Mode (the engine paints Normal) and no Flow.
 fn stamp_members(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
     let brush = app.session.tools.brush.clone();
+    // An Indexed Color document names the Clone Stamp's and the Pattern Stamp's Normal "Threshold"
+    // (#12613, #12887); the other entries weren't measured there.
+    let indexed = app.session.active().is_some_and(|st| st.doc.mode == photocraft_doc::ColorMode::Indexed);
+    let threshold = crate::retouch_ui::clone_stamp_indexed(app) || (tool == Tool::PatternStamp && indexed);
     // Pattern Stamp's list has Behind, greyed on the Background.
-    let entries = fill::mode_entries(tool, crate::brush_mode_menu::enabled(app, crate::brush_mode_menu::Item::Behind));
+    let entries = fill::mode_entries(tool, crate::brush_mode_menu::enabled(app, crate::brush_mode_menu::Item::Behind), threshold);
     if !entries.is_empty() {
         let current =
             if tool == Tool::PatternStamp && brush.behind { PaintMode::Behind } else { PaintMode::Blend(crate::blend_keys::brush_tool_mode(tool, brush.mode)) };
@@ -227,6 +231,14 @@ fn stamp_members(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) {
             // A pick is one step of its own.
             crate::brush_panel::commit_keyed(app, &brush, &after, None);
         }
+    }
+    // The Pattern Stamp's Opacity and Flow are whole percents with the Brush's tooltips (#12616).
+    if tool == Tool::PatternStamp {
+        let opacity = whole_percent_field(ui, tl!("Opacity"), brush.opacity, tl!("Set opacity for stroke"));
+        edit_brush(app, &opacity, |b, v| b.opacity = v);
+        let flow = whole_percent_field(ui, tl!("Flow"), brush.flow, tl!("Set flow rate for stroke"));
+        edit_brush(app, &flow, |b, v| b.flow = v);
+        return;
     }
     if matches!(tool, Tool::CloneStamp | Tool::HistoryBrush | Tool::ArtHistoryBrush) {
         let opacity = percent_field(ui, tl!("Opacity"), brush.opacity, 1.0..=100.0);
@@ -277,6 +289,28 @@ pub(super) fn percent_field(ui: &mut egui::Ui, label: &str, fraction: f32, range
     number_field(ui, label, fraction * 100.0, range, "%").map(|percent| percent / 100.0)
 }
 
+/// A whole-percent field 1..100 % over a fraction `fraction`, with `tip`; its events carry fractions. A fraction set
+/// elsewhere (a `tools.setBrush` value) shows as its whole percent; a typed value past the range is clamped silently, as
+/// the Brush's fields do.
+fn whole_percent_field(ui: &mut egui::Ui, label: &str, fraction: f32, tip: &str) -> EditEvents<f32> {
+    let percent = f64::from((fraction * 100.0).round());
+    let events = labelled(ui, label, |ui| {
+        let codec = NumberCodec::new(Env::of(ui).units().reader(None), 0);
+        NumberField::new(label.to_owned(), Bind::given(Some(percent)))
+            .range(1.0..=100.0)
+            .scrub_by_label()
+            .unit("%")
+            .step(1.0)
+            .commit_decimals(0)
+            .codec(codec)
+            .tooltip(tip.to_owned())
+            .show(ui)
+            .events
+            .clone()
+    });
+    events.unwrap_or_default().filter_map(|v| v.map(|v| v.round() as f32 / 100.0))
+}
+
 /// The `layer.setProps` edit of a Layers panel Opacity or Fill (`key`) field at `pct` percent. A drag of the pop-up
 /// slider carries its history step's `coalesce` key, so it is one step, as in Photoshop.
 pub(super) fn pct_action(target: &Value, key: &str, pct: f32, coalesce: Option<String>) -> (String, Value) {
@@ -287,3 +321,7 @@ pub(super) fn pct_action(target: &Value, key: &str, pct: f32, coalesce: Option<S
     }
     ("layer.setProps".into(), p)
 }
+
+#[cfg(test)]
+#[path = "../pattern_stamp_opacity_flow_tests.rs"]
+mod pattern_stamp_opacity_flow_tests;

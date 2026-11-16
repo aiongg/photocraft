@@ -14,8 +14,13 @@ use crate::commands::CommandSpec;
 use crate::{EngineError, Result, Session};
 
 mod insert_path;
+mod library_commands;
 mod record_again;
+
 pub use insert_path::selected_path as selected_recording_path;
+pub(crate) use library_commands::enabled as library_change_enabled;
+pub use library_commands::{BASICS_SET, LibraryUndo, undo_library_label};
+pub(crate) use library_commands::{confirmed_idle, publish_library};
 pub use record_again::{RecordAgainTarget, target as record_again_target};
 
 fn bad(cmd: &str, msg: impl Into<String>) -> EngineError {
@@ -364,6 +369,36 @@ fn conditional(s: &mut Session, p: &Value) -> Result<Value> {
 pub fn specs() -> Vec<CommandSpec> {
     vec![
         CommandSpec {
+            id: "actions.clearAll",
+            label: "Clear All Actions",
+            menu: &[],
+            shortcut: None,
+            params: r#"{"confirm":true} → {cleared}. Removes every action and set, empty ones included, and the action shortcuts. Undo with actions.undoLibrary."#,
+            enabled: library_commands::enabled,
+            run: library_commands::clear,
+            journal: false,
+        },
+        CommandSpec {
+            id: "actions.reset",
+            label: "Reset Actions…",
+            menu: &[],
+            shortcut: None,
+            params: r#"{"confirm":true,"mode":"replace"|"append"} → {set,appended,actions:[names]}. Restores the PhotoCraft Basics set; appended beside a set of that name it gets a numbered name."#,
+            enabled: library_commands::enabled,
+            run: library_commands::reset,
+            journal: false,
+        },
+        CommandSpec {
+            id: "actions.undoLibrary",
+            label: "Undo Actions Library Change",
+            menu: &[],
+            shortcut: None,
+            params: "{} → {undone}. Restores the library and action shortcuts from before the latest Clear All, Reset or Replace without editing document History.",
+            enabled: library_commands::undo_enabled,
+            run: library_commands::undo,
+            journal: false,
+        },
+        CommandSpec {
             id: "actions.insertMenuItem",
             label: "Insert Menu Item…",
             menu: &[],
@@ -458,7 +493,7 @@ pub fn specs() -> Vec<CommandSpec> {
             label: "New Set",
             menu: &[],
             shortcut: None,
-            params: r##"{"name":str? (default "Set N")} → {set}. An empty set folder in the Actions panel, as Photoshop's New Set… makes; New Action records into the selected set (actions.record's `set`). Save Actions… (actions.save's `set`) writes it even while empty; it is remembered between sessions once it holds an action."##,
+            params: r##"{"name":str? (default "Set N")} → {set}. An empty set folder in the Actions panel, as Photoshop's New Set… makes; New Action records into the selected set (actions.record's `set`). Save Actions… (actions.save's `set`) writes it even while empty, and the preset store keeps it between sessions."##,
             enabled: always,
             run: new_set,
             journal: false,

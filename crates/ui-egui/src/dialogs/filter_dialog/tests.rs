@@ -80,7 +80,7 @@ fn top_dialog(app: &PhotocraftApp) -> DialogId {
 fn color_settings_working_spaces_list_installed_profiles_of_their_space() {
     // #6323: a press condition installed in the system can be the CMYK working space, as in
     // Photoshop's Color Settings; each working-space menu lists only profiles of its space.
-    use photocraft_cms::{ColorSpace, ProfileClass};
+    use craft::cms::{ColorSpace, ProfileClass};
     let p = |path: &str, class, color_space| photocraft_engine::installed_profiles::InstalledProfile {
         path: path.into(),
         description: path.to_uppercase(),
@@ -108,7 +108,7 @@ fn color_settings_working_spaces_list_installed_profiles_of_their_space() {
 
 #[test]
 fn indexed_matte_tool_seeds_use_document_encoded_rgb() {
-    use photocraft_cms::Transform;
+    use craft::cms::Transform;
 
     let mut session = photocraft_engine::Session::new();
     session.color.settings.working_rgb = "display-p3".into();

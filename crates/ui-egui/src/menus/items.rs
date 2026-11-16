@@ -37,7 +37,9 @@ pub fn is_live(id: &str) -> bool {
 const PLACE_AFTER: &[(&str, &str)] = &[
     ("file.newFromClipboard", "file.new"),
     ("filter.render.relight", "filter.render.lightingEffects"),
-    ("view.resetView", "view.flipHorizontal"),
+    ("view.rotateLeft", "view.flipHorizontal"),
+    ("view.rotateRight", "view.rotateLeft"),
+    ("view.resetView", "view.rotateRight"),
     ("filter.other.colorToAlpha", "filter.other.offset"),
 ];
 
@@ -224,8 +226,9 @@ pub fn base_rows(app: &PhotocraftApp) -> Vec<Row> {
     if let Some(item) = find(&mut rows, "layer.smartObjects.revealInFinder") {
         item.label = reveal_label().into();
     }
-    // File › Open Recent: a dynamic submenu of recently opened files (inserted after "Open As…").
-    if let Some(after) = rows.iter().position(|i| i.command.id == "file.openAs") {
+    // File › Open Recent: a dynamic submenu of recently opened files, after Open as Smart Object… (#14053).
+    if let Some(after) = rows.iter().position(|i| i.command.id == "file.openAsSmartObject").or_else(|| rows.iter().position(|i| i.command.id == "file.openAs"))
+    {
         let rp = ["File", "Open Recent"];
         let mut recent: Vec<Row> = app
             .ui
@@ -293,6 +296,12 @@ pub fn base_rows(app: &PhotocraftApp) -> Vec<Row> {
         item.command = CommandRef::new("layer.releaseClippingMask");
         item.label = "Release Clipping Mask".into();
         item.enabled = is_enabled(app, "layer.releaseClippingMask");
+    }
+    // Edit › Undo names the most recent change, a document's or the Actions library's.
+    if let Some(label) = crate::actions::library::edit_undo_label(app)
+        && let Some(row) = rows.iter_mut().find(|row| row.command.id == "edit.undo")
+    {
+        row.label = label.into();
     }
     for row in &mut rows {
         decorate(row);

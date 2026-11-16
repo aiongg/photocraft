@@ -87,6 +87,28 @@ fn a_function_key_with_shift_and_command_plays_its_action() {
     assert_eq!(layers(&app), before + 1, "Cmd+Shift+F2 plays it");
 }
 
+/// A function key belongs to one action, as its main key or an alternate, however the key was
+/// spelled; other commands keep it.
+#[test]
+fn assigning_an_action_key_clears_it_only_from_other_actions() {
+    let mut app = new_app();
+    push(&mut app, "First", None, vec![]);
+    push(&mut app, "Second", None, vec![]);
+    app.session.edit_prefs(|prefs| {
+        prefs.shortcuts.insert(shortcut_id("First"), "f6".into());
+        prefs.shortcuts.insert("file.save".into(), "f6".into());
+        prefs.alternate_shortcuts.insert(shortcut_id("First"), vec!["F6".into(), "F7".into()]);
+        prefs.alternate_shortcuts.insert("file.save".into(), vec!["F6".into(), "F8".into()]);
+    });
+    assign_shortcut(&mut app, "Second", "F6").unwrap();
+    let prefs = app.session.prefs();
+    assert_eq!(prefs.shortcuts[&shortcut_id("Second")], "F6");
+    assert_eq!(prefs.shortcuts[&shortcut_id("First")], "");
+    assert_eq!(prefs.alternate_shortcuts[&shortcut_id("First")], ["F7"]);
+    assert_eq!(prefs.shortcuts["file.save"], "f6");
+    assert_eq!(prefs.alternate_shortcuts["file.save"], ["F6", "F8"]);
+}
+
 /// The panel shows a saved shortcut through the host: the text the engine writes reads back.
 #[test]
 fn the_host_reads_the_shortcut_text_the_engine_writes() {

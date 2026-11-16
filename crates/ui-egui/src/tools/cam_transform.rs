@@ -163,7 +163,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect)
             // A scale and rotate box has no horizon: the map always answers.
             SelectionOverlay::new(tl!("Content-Aware Move").to_owned(), &mask)
                 .offset(t.offset)
-                .mapped(Some(PointMap::new(move |p: Point| Some(h.apply(p)))))
+                .mapped(PointMap::new(move |p: Point| Some(h.apply(p))))
                 .show_at(ui, rect);
         }
         TransformOverlay::new(tl!("Content-Aware Move").to_owned(), &t.session, &settings).show_at(ui, rect)

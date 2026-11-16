@@ -1,6 +1,10 @@
-use super::convert::{clip_name, export, import_with_encoding};
+use super::convert::{ReplacementSet, clip_name, export, import_first_with_keys};
 use super::{Action, DEFAULT_SET, EngineError, Result, Session, Value, bad, json};
 use crate::actions_cmds::ActionsFile;
+
+mod replacement;
+pub(super) use replacement::replace;
+pub use replacement::validate as validate_replacement;
 
 /// The name the file gave an action that `merge_file` renamed to stay unique, to the name it got.
 fn renamed_to<'a>(renames: &'a [(String, String)], name: &str) -> Option<&'a String> {
@@ -23,7 +27,7 @@ pub(super) fn load(s: &mut Session, p: &Value) -> Result<Value> {
         Some(_) => return Err(bad(cmd, "encoding must be \"auto\" or a label such as shift_jis, gbk, big5, euc-kr, windows-1252, macintosh")),
     };
     let (bytes, _) = crate::preset_import_cmds::file_bytes(p, cmd, ".atn file")?;
-    let mut imp = import_with_encoding(&bytes, encoding).map_err(|e| bad(cmd, e))?;
+    let ReplacementSet { imported: mut imp, keys: function_keys } = import_first_with_keys(&bytes, encoding).map_err(|e| bad(cmd, e))?;
     let original_set = imp.set.clone();
     match p.get("set") {
         None | Some(Value::Null) => {}
@@ -44,7 +48,12 @@ pub(super) fn load(s: &mut Session, p: &Value) -> Result<Value> {
     let steps = imp.actions.iter().fold(0usize, |total, a| total.saturating_add(a.steps.len()));
     // The file names its set even when it holds no action (Photoshop saves an empty set): the list
     // keeps it as an empty folder, like one New Set made, and `replace` drops the set's actions.
-    let file = ActionsFile { version: ActionsFile::VERSION, actions: imp.actions, sets: vec![imp.set.clone()] };
+    if replace {
+        // The function keys of the actions it replaces go with them.
+        let replaced: Vec<String> = s.actions.list.actions().iter().filter(|a| a.set.as_deref() == Some(imp.set.as_str())).map(|a| a.name.clone()).collect();
+        crate::actions_cmds::remove_shortcuts(s, replaced.iter().map(String::as_str));
+    }
+    let file = ActionsFile::new(imp.actions, vec![imp.set.clone()]);
     // Play, Conditional, Batch and Create Droplet steps call actions by name: follow the renames in
     // the actions just loaded, each target looked up once by the name the file gave it.
     let merged = s.actions.list.merge_file(file, replace, |step, renames| {
@@ -76,7 +85,8 @@ pub(super) fn load(s: &mut Session, p: &Value) -> Result<Value> {
         }
     }
     let names: Vec<String> = merged.added.iter().map(|&index| s.actions.list.actions()[index].name.clone()).collect();
-    let keys: Vec<(String, String)> = imp.function_keys.into_iter().map(|(n, k)| (renamed_to(&merged.renames, &n).cloned().unwrap_or(n), k)).collect();
+    // Keys go by the file's action order, so two actions the file gives one name keep their own.
+    let keys: Vec<(String, String)> = function_keys.into_iter().filter_map(|(index, key)| Some((names.get(index)?.clone(), key))).collect();
     if !keys.is_empty() {
         s.edit_prefs(|prefs| {
             for (name, key) in &keys {

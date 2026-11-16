@@ -34,7 +34,9 @@ pub(super) fn dodge_burn(ui: &mut egui::Ui, app: &mut PhotocraftApp) -> Option<R
     let o = &mut app.ui.tool_options;
     let ranges = string_entries(&[("shadows", tl!("Shadows")), ("midtones", tl!("Midtones")), ("highlights", tl!("Highlights"))]);
     choose(ui, tl!("Range"), &mut o.tone_range, &ranges, true, Some(tl!("Painting Mode")));
-    let exposure = number(tl!("Exposure"), &mut o.exposure, 1.0..=100.0).unit("%").tooltip(tl!("Set exposure for stroke")).show(ui).out_of_range;
+    // Whole numbers 1..100 with the range alert and a slider arrow; Dodge shares the field (#12669).
+    let exposure =
+        number(tl!("Exposure"), &mut o.exposure, 1.0..=100.0).whole().unit("%").popup_slider().tooltip(tl!("Set exposure for stroke")).show(ui).out_of_range;
     check(ui, tl!("Protect Tones"), &mut o.protect_tones, true, Some(tl!("Minimizes clipping in shadows and highlights, and keeps colors from shifting hue")));
     exposure
 }

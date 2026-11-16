@@ -52,7 +52,7 @@ pub(crate) const TOOL_SECTIONS: &[&[&[Tool]]] = &[
 ];
 
 /// Position of `tool` in [`TOOL_SECTIONS`] read top to bottom, slot by slot. Tools outside the
-/// toolbar sort last. Shift+letter orders a key's group by this so it steps like the flyout.
+/// toolbar sort last. A key's first tool and the Edit Toolbar drawer's list follow this order.
 pub(crate) fn toolbar_position(tool: Tool) -> usize {
     TOOL_SECTIONS.iter().flat_map(|section| section.iter()).flat_map(|slot| slot.iter()).position(|&t| t == tool).unwrap_or(usize::MAX)
 }
@@ -60,6 +60,68 @@ pub(crate) fn toolbar_position(tool: Tool) -> usize {
 /// Opens the Edit Toolbar drawer beside the rail. The rail's "…" button and the `edit.toolbar` command both come here.
 pub(crate) fn open_drawer(app: &mut PhotocraftApp) {
     app.ui.toolbar_drawer = true;
+}
+
+/// The toolbar's group layout from Edit › Toolbar (`edit.toolbar`), as tools: the slots' groups
+/// in order, then the Extra Tools groups. Names were resolved by the engine
+/// (`ToolbarCustomization::layout`), which writes `Tool` debug names.
+pub(crate) fn tool_layout(custom: &ToolbarCustomization) -> (Vec<Vec<Tool>>, Vec<Vec<Tool>>) {
+    let layout = custom.layout();
+    let tools = |groups: Vec<Vec<String>>| -> Vec<Vec<Tool>> {
+        groups.iter().map(|g| g.iter().filter_map(|n| Tool::from_name(n)).collect::<Vec<Tool>>()).filter(|g| !g.is_empty()).collect()
+    };
+    (tools(layout.toolbar), tools(layout.extras))
+}
+
+/// Every tool in layout order: the slots' groups, then the extras. Shift+letter steps through a
+/// key's tools in this order, across slots.
+pub(crate) fn layout_order(custom: &ToolbarCustomization) -> Vec<Tool> {
+    let (toolbar, extras) = tool_layout(custom);
+    toolbar.into_iter().chain(extras).flatten().collect()
+}
+
+/// The default slot (section, index in [`TOOL_SECTIONS`] read slot by slot) that holds `tool`.
+fn home_slot(tool: Tool) -> Option<(usize, usize)> {
+    let mut index = 0usize;
+    for (si, section) in TOOL_SECTIONS.iter().enumerate() {
+        for slot in section.iter() {
+            if slot.contains(&tool) {
+                return Some((si, index));
+            }
+            index += 1;
+        }
+    }
+    None
+}
+
+/// The slots the toolbar draws: one per toolbar group of the stored layout, in order, each
+/// listing its group's tools in order. Consecutive groups whose first tools come from the same
+/// default section share a section, so the default layout keeps its dividers. Each slot carries
+/// the index of its first tool's default slot in `TOOL_SECTIONS` (or one past the defaults when
+/// that index is taken), so its flyout stays put when other slots are hidden or moved.
+pub(crate) fn layout_sections(custom: &ToolbarCustomization) -> Vec<Vec<(usize, Vec<Tool>)>> {
+    let (groups, _) = tool_layout(custom);
+    let defaults: usize = TOOL_SECTIONS.iter().map(|section| section.len()).sum();
+    let mut used: Vec<usize> = Vec::new();
+    let mut sections: Vec<Vec<(usize, Vec<Tool>)>> = Vec::new();
+    let mut last_section = None;
+    for (i, group) in groups.into_iter().enumerate() {
+        let home = group.first().copied().and_then(home_slot);
+        let index = match home {
+            Some((_, slot)) if !used.contains(&slot) => slot,
+            _ => defaults + i,
+        };
+        used.push(index);
+        let section = home.map(|(si, _)| si);
+        if sections.is_empty() || section != last_section {
+            sections.push(Vec::new());
+        }
+        last_section = section;
+        if let Some(current) = sections.last_mut() {
+            current.push((index, group));
+        }
+    }
+    sections
 }
 
 /// The tool each slot shows when the current tool is not in it: the most recent tool of `group_tools` (most recent first)
@@ -83,12 +145,11 @@ fn rail_edge(side: ToolbarSide) -> PaneEdge {
 /// its footer, and, while the Edit Toolbar drawer is open, the drawer beside it. The caller places it on the side
 /// `panels.toolbar_side` gives (AppShell's tools slot).
 ///
-/// A frame can run this twice. Every outcome comes from the pass's own widgets (a click, a drop), and the slots, hidden
-/// tools and remembered tools are read again at the start of each pass, so a second pass applies only its own input.
+/// A frame can run this twice. Every outcome comes from the pass's own widgets (a click, a drop), and the slots and
+/// remembered tools are read again at the start of each pass, so a second pass applies only its own input.
 pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let ctx = ui.ctx().clone();
     let slots = tool_commands::slots(&app.session.prefs().toolbar);
-    let hidden = tool_commands::hidden_tools(&app.session.prefs().toolbar.hidden);
     let remembered = last_used(&slots, &app.ui.group_tools);
     let current = app.ui.tool;
     let columns = if app.ui.panels.toolbar_double { 2 } else { 1 };
@@ -102,8 +163,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         .edge(edge)
         .column_toggle(tl!("Toolbar").to_string())
         .side_toggle(move_label.to_string())
-        .edit_toolbar(tl!("Edit Toolbar…").to_string())
-        .hidden(&hidden);
+        .edit_toolbar(tl!("Edit Toolbar…").to_string());
     // The drawer's open flag is the one source of "editing".
     if app.ui.toolbar_drawer {
         rail = rail.editing();
@@ -189,8 +249,11 @@ fn show_drawer(
         for edit in &out.edits {
             arranged = apply_toolbar_edit(&arranged, edit, &defaults);
         }
-        let params =
-            if matches!(out.edits.last(), Some(ToolbarEdit::Reset)) { json!({"reset": true}) } else { json!({"slots": tool_commands::saved_slots(&arranged)}) };
+        let params = if matches!(out.edits.last(), Some(ToolbarEdit::Reset)) {
+            json!({"reset": true})
+        } else {
+            json!({"toolbar": tool_commands::saved_groups(&arranged)})
+        };
         if let Err(e) = crate::menus::invoke(app, ctx, "edit.toolbar", params) {
             app.ui.status = e;
             app.ui.status_error = true;

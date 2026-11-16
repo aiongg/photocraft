@@ -106,6 +106,9 @@ pub struct DirectSelection {
     pub anchors: Vec<[usize; 2]>,
     /// A clicked segment (`[subpath, knot]` it leaves): its two handles show.
     pub segment: Option<[usize; 2]>,
+    /// The subpaths of the target whose anchors show; `None` shows every subpath's (a Delete Anchor click on a
+    /// saved path narrows it, #12769). Mirrors `PathSelection::shown`.
+    pub shown: Option<Vec<usize>>,
     /// The document, revision and target the running overlay gesture began on: its commit runs
     /// only while they still hold.
     #[serde(skip)]
@@ -283,7 +286,9 @@ pub(crate) fn editing(app: &PhotocraftApp) -> bool {
 }
 
 /// The overlay's path tool for `tool` with `mods` held. ⌘/Ctrl makes the Freeform Pen Direct
-/// Selection (the Pen's table resolves it); the Freeform Pen has no other overlay.
+/// Selection (the Pen's table resolves it); the Freeform Pen has no other overlay. Path Selection
+/// with ⌘/Ctrl alone is Direct Selection too (#13284; with ⌥ or ⇧ too the reference was not
+/// measured, so it stays Path Selection).
 pub(crate) fn path_tool(tool: Tool, mods: Mods) -> Option<PathTool> {
     match tool {
         Tool::Pen => Some(PathTool::Pen),
@@ -293,18 +298,25 @@ pub(crate) fn path_tool(tool: Tool, mods: Mods) -> Option<PathTool> {
         Tool::ConvertPoint => Some(PathTool::ConvertPoint),
         Tool::DirectSelection => Some(PathTool::DirectSelection),
         Tool::FreeformPen if mods.cmd => Some(PathTool::Pen),
+        Tool::PathSelection if mods.cmd && !mods.alt && !mods.shift => Some(PathTool::DirectSelection),
         _ => None,
     }
 }
 
-/// The selection the overlay shows: this selection while it still holds, else none.
-pub(crate) fn selection(app: &PhotocraftApp) -> PathSelection {
+/// The selection the overlay shows for `bezier`: this selection while it still holds, else none.
+/// Path Selection's ⌘/Ctrl (Direct Selection) moves the anchor pressed alone, not the selected
+/// component it belongs to (#13284), so the component's anchors are not Direct Selection's.
+pub(crate) fn selection(app: &PhotocraftApp, bezier: BezierTool) -> PathSelection {
     let ds = &app.ui.direct_selection;
     if !still_valid(app, ds) {
         return PathSelection::new(None, Vec::new(), None);
     }
     let knot = |&[s, k]: &[usize; 2]| KnotRef::new(s, k);
-    PathSelection::new(ds.target.as_ref().map(PathRef::key), ds.anchors.iter().map(knot).collect(), ds.segment.as_ref().map(knot))
+    let target = ds.target.as_ref().map(PathRef::key);
+    if app.ui.tool == Tool::PathSelection && bezier == BezierTool::Direct {
+        return PathSelection::new(target, Vec::new(), None).shown(ds.shown.clone());
+    }
+    PathSelection::new(target, ds.anchors.iter().map(knot).collect(), ds.segment.as_ref().map(knot)).shown(ds.shown.clone())
 }
 
 /// The paths the overlay edits with `bezier`, back to front, and their refs in the same order. A
@@ -338,7 +350,7 @@ pub(crate) fn edit_paths(app: &PhotocraftApp, bezier: BezierTool) -> (Vec<EditPa
     let (mut paths, mut refs) = (Vec::new(), Vec::new());
     for (r, path) in front.into_iter().rev() {
         let edit = match (r, drafted(app)) {
-            (PathRef::Pen, Some(pen)) => EditPath::new(r.key(), vec![pen.draft.clone()]),
+            (PathRef::Pen, Some(pen)) => EditPath::new(r.key(), vec![pen.draft.clone()]).copies(false),
             _ => crate::vector_ui::edit_path(&path, r.key()),
         };
         paths.push(edit);
@@ -481,6 +493,15 @@ mod convert_point_targeted_path_tests;
 
 #[cfg(test)]
 mod convert_point_drag_segment_tests;
+
+#[cfg(test)]
+mod delete_key_tests;
+
+#[cfg(test)]
+mod history_names_tests;
+
+#[cfg(test)]
+mod options_bar_tests;
 
 #[cfg(test)]
 mod freeform_command_tests {

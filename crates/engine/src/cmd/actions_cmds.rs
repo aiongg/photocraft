@@ -109,6 +109,12 @@ pub struct ActionState {
     pub script_depth: u8,
     /// Steps run by the current top-level script and everything it calls.
     pub script_steps: u64,
+    /// What the undo of the last Clear All, Reset or Replace restores beside the list (which keeps
+    /// its own, [`ActionList::library_undo`]): the action shortcuts and the document history marks.
+    pub library_undo: Option<Box<crate::actions_edit_cmds::LibraryUndo>>,
+    /// Clear All, Reset or Replace ran before the preset store attached: the list is the whole
+    /// library, so attaching writes it instead of merging the stored one in.
+    pub(crate) replaced_before_attachment: bool,
     /// Bumped by each `actions.record`, so a background job knows whether the recording it was
     /// started in is still the one running when its result lands.
     pub take: u64,
@@ -980,13 +986,8 @@ fn delete(s: &mut Session, p: &Value) -> Result<Value> {
         return Err(bad("actions.delete", "stop recording before deleting an action"));
     }
     let name = s.actions.list.delete_action(idx).map_err(|e| list_error("actions.delete", e))?.name;
-    // Its function key goes with it, or the next action given the same name would inherit it.
-    let key = format!("{PLAY_SHORTCUT_PREFIX}{name}");
-    if s.prefs().shortcuts.contains_key(&key) {
-        s.edit_prefs(|prefs| {
-            prefs.shortcuts.remove(&key);
-        });
-    }
+    // Its function keys go with it, or the next action given the same name would inherit them.
+    remove_shortcuts(s, std::iter::once(name.as_str()));
     Ok(json!({"deleted": name}))
 }
 
@@ -1033,6 +1034,109 @@ fn toggle(s: &mut Session, p: &Value) -> Result<Value> {
 /// Prefix of the persisted shortcut override that plays a named action (`actions.play:<name>`).
 pub const PLAY_SHORTCUT_PREFIX: &str = "actions.play:";
 
+/// Prefix of the shortcut keys PhotoCraft files of the Actions library commands era stored per
+/// action id (`actions.playById:<id>`); [`name_id_shortcuts`] moves them to names on load.
+const PLAY_BY_ID_PREFIX: &str = "actions.playById:";
+
+/// Whether a shortcut key plays an action: it belongs to the Actions library, not to a set.
+pub fn is_action_key(key: &str) -> bool {
+    key.starts_with(PLAY_SHORTCUT_PREFIX)
+}
+
+/// Remove the function keys (primary and alternate) of the actions `names`.
+pub(crate) fn remove_shortcuts<'a>(s: &mut Session, names: impl IntoIterator<Item = &'a str>) {
+    let prefs = s.prefs();
+    let keys: Vec<String> = names
+        .into_iter()
+        .map(|name| format!("{PLAY_SHORTCUT_PREFIX}{name}"))
+        .filter(|key| prefs.shortcuts.contains_key(key) || prefs.alternate_shortcuts.contains_key(key))
+        .collect();
+    if keys.is_empty() {
+        return;
+    }
+    s.edit_prefs(|prefs| {
+        for key in &keys {
+            prefs.shortcuts.remove(key);
+            prefs.alternate_shortcuts.remove(key);
+        }
+    });
+}
+
+/// The stored id → name map of [`MergedFile::ids`](craft::automation::actions::MergedFile::ids).
+fn id_names(ids: &[(String, String)]) -> std::collections::HashMap<&str, &str> {
+    ids.iter().map(|(id, name)| (id.as_str(), name.as_str())).collect()
+}
+
+/// Names are the list's only identity: the calls a loaded PhotoCraft file made by stored action id
+/// (`actionId`, a Conditional's `thenActionId` / `elseActionId`) name the action
+/// [`ActionList::load`] gave that id (`ids`: stored id, name) instead. A call whose id no action
+/// has keeps the name it carried.
+pub(crate) fn name_id_calls(list: &mut ActionList, ids: &[(String, String)]) {
+    let names = id_names(ids);
+    for index in 0..list.actions().len() {
+        for step in 0..list.step_count(index) {
+            let mut edited = list.actions()[index].steps[step].clone();
+            let mut changed = false;
+            visit_calls(step_calls(std::slice::from_mut(&mut edited)), &mut |id, params, scoped| {
+                let fields: &[(&str, &str, &str)] = match id {
+                    "actions.play" | "file.automate.batch" | "file.automate.createDroplet" => &[("actionId", "action", "set")],
+                    "actions.conditional" => &[("thenActionId", "then", "thenSet"), ("elseActionId", "else", "elseSet")],
+                    _ => &[],
+                };
+                let Some(object) = params.as_object_mut() else { return };
+                for (field, key, scope) in fields {
+                    let Some(stored) = object.remove(*field) else { continue };
+                    changed = true;
+                    // A Batch with its own action list selects in that list, which the ids don't name.
+                    if let Some(name) = stored.as_str().and_then(|stored| names.get(stored)).filter(|_| !scoped) {
+                        object.insert((*key).into(), json!(name));
+                        object.remove(*scope);
+                    }
+                }
+            });
+            if changed {
+                let _ = list.replace_step(index, step, edited);
+            }
+        }
+    }
+}
+
+/// The `actions.playById:<id>` shortcut keys (primary and alternate) of a loaded PhotoCraft file's
+/// actions become `actions.play:<name>`, with the names [`ActionList::load`] gave the ids; a key
+/// whose id no action has goes.
+pub(crate) fn name_id_shortcuts(s: &mut Session, ids: &[(String, String)]) {
+    let names = id_names(ids);
+    let prefs = s.prefs();
+    if !prefs.shortcuts.keys().chain(prefs.alternate_shortcuts.keys()).any(|key| key.starts_with(PLAY_BY_ID_PREFIX)) {
+        return;
+    }
+    let named = |key: &str| key.strip_prefix(PLAY_BY_ID_PREFIX).map(|id| names.get(id).map(|name| format!("{PLAY_SHORTCUT_PREFIX}{name}")));
+    s.edit_prefs(|prefs| {
+        for (key, value) in std::mem::take(&mut prefs.shortcuts) {
+            match named(&key) {
+                None => {
+                    prefs.shortcuts.entry(key).or_insert(value);
+                }
+                Some(Some(name)) => {
+                    prefs.shortcuts.insert(name, value);
+                }
+                Some(None) => {}
+            }
+        }
+        for (key, value) in std::mem::take(&mut prefs.alternate_shortcuts) {
+            match named(&key) {
+                None => {
+                    prefs.alternate_shortcuts.entry(key).or_insert(value);
+                }
+                Some(Some(name)) => {
+                    prefs.alternate_shortcuts.insert(name, value);
+                }
+                Some(None) => {}
+            }
+        }
+    });
+}
+
 /// Rename an action in place. Nested `actions.play` steps, named Batch steps and `actions.conditional` branches
 /// that call it by name, and its function-key binding, follow the new name so nothing silently
 /// stops working.
@@ -1061,10 +1165,13 @@ fn rename(s: &mut Session, p: &Value) -> Result<Value> {
         follow(id, params, &old, &name);
     }
     let (from, to) = (format!("{PLAY_SHORTCUT_PREFIX}{old}"), format!("{PLAY_SHORTCUT_PREFIX}{name}"));
-    if s.prefs().shortcuts.contains_key(&from) {
+    if s.prefs().shortcuts.contains_key(&from) || s.prefs().alternate_shortcuts.contains_key(&from) {
         s.edit_prefs(|prefs| {
             if let Some(key) = prefs.shortcuts.remove(&from) {
-                prefs.shortcuts.insert(to, key);
+                prefs.shortcuts.insert(to.clone(), key);
+            }
+            if let Some(keys) = prefs.alternate_shortcuts.remove(&from) {
+                prefs.alternate_shortcuts.insert(to, keys);
             }
         });
     }

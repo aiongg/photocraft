@@ -58,7 +58,7 @@ fn samples() -> Vec<(&'static str, Vec<u8>)> {
         }
     }
     let hex: String =
-        photocraft_cms::lutfile::LutFile::identity(2).data.into_iter().flat_map(|v| (1.0 - v).to_le_bytes()).map(|b| format!("{b:02X}")).collect();
+        craft_cms::lutfile::LutFile::identity(2).unwrap().data.into_iter().flat_map(|v| (1.0 - v).to_le_bytes()).map(|b| format!("{b:02X}")).collect();
     let look = format!("<look><LUT><size>2</size><data>{hex}</data></LUT></look>");
     let le = [vec![0xff, 0xfe], look.encode_utf16().flat_map(u16::to_le_bytes).collect()].concat();
     let be = [vec![0xfe, 0xff], look.encode_utf16().flat_map(u16::to_be_bytes).collect()].concat();
@@ -81,7 +81,7 @@ fn embedded_lookup_bytes_replay_invert_and_save_the_exact_descriptor() {
             let mut s = fixture(depth);
             let before = saved(&s);
             let original = pixels(&s);
-            s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions.clone(), sets: Vec::new() });
+            s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions.clone(), Vec::new()));
             assert_eq!(s.execute("actions.play", json!({"action":"Lookup"})).unwrap()["ran"], 1);
             for (got, old) in pixels(&s).iter().zip(&original) {
                 for c in 0..3 {
@@ -169,7 +169,7 @@ fn embedded_three_dl_retains_its_nonlinear_shaper_through_action_playback() {
     for depth in [8, 16, 32] {
         let mut s = fixture(depth);
         let original = pixels(&s);
-        s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions.clone(), sets: Vec::new() });
+        s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions.clone(), Vec::new()));
         assert_eq!(s.execute("actions.play", json!({"action":"Lookup"})).unwrap()["ran"], 1);
         for (got, old) in pixels(&s).iter().zip(&original) {
             for c in 0..3 {
@@ -240,7 +240,7 @@ fn recorded_dither_changes_float_pixels_within_its_documented_bound() {
         let imported = atn_cmds::import(&encoded(d)).unwrap();
         assert!(imported.unsupported.is_empty());
         let mut s = fixture(32);
-        s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+        s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
         assert_eq!(s.execute("actions.play", json!({"action":"Lookup"})).unwrap()["ran"], 1);
         pixels(&s)
     };

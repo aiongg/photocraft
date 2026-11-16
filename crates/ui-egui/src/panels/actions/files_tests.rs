@@ -8,7 +8,7 @@ use super::files;
 use crate::PhotocraftApp;
 
 /// A small valid Photoshop set, generated without external action files.
-fn action_set_bytes(set: &str, action: &str) -> Vec<u8> {
+pub(super) fn action_set_bytes(set: &str, action: &str) -> Vec<u8> {
     use craft_psd::atn::{AtnAction, AtnEvent, AtnFile, AtnItem};
     use craft_psd::descriptor::UnicodeString;
     craft_psd::atn::write(&AtnFile {

@@ -232,18 +232,13 @@ pub(crate) fn act(app: &mut PhotocraftApp, action: &StartAction) -> bool {
 
 /// Check if two path strings match, tolerating slash direction and Windows case differences.
 fn paths_match(a: &str, b: &str) -> bool {
-    if a == b {
-        return true;
-    }
     #[cfg(windows)]
     {
-        let a_norm = a.replace('\\', "/");
-        let b_norm = b.replace('\\', "/");
-        a_norm.eq_ignore_ascii_case(&b_norm)
+        a == b || a.replace('\\', "/").eq_ignore_ascii_case(&b.replace('\\', "/"))
     }
     #[cfg(not(windows))]
     {
-        false
+        a == b
     }
 }
 

@@ -564,3 +564,188 @@ fn undo_gives_back_a_refused_draft_esc_kept_as_the_work_path() {
     assert_eq!(app.ui.pen.as_ref().map(|p| p.triples()), Some(knots), "the draft is back on the Pen");
     assert!(work_path(&app).is_none());
 }
+
+/// Keep a real refused commit, with an older document edit and a library Undo to route to.
+fn failed_library_draft(tool: Tool, shape: bool) -> PhotocraftApp {
+    let mut app = app();
+    app.run("layer.new.layer", json!({})).unwrap();
+    app.run("actions.newSet", json!({"name": "Keep"})).unwrap();
+    app.run("actions.clearAll", json!({"confirm": true})).unwrap();
+    app.ui.tool = tool;
+    app.ui.tool_options.vector_mode = if shape { craft::draw::ui::shape::VectorMode::Shape } else { craft::draw::ui::shape::VectorMode::Path };
+    for (x, y) in [(20.0, 20.0), (80.0, 60.0)] {
+        click(&mut app, x, y);
+    }
+    if shape {
+        app.session.authorize =
+            Some(|id, _| if id == "shape.create" { Err(photocraft_engine::EngineError::Other("refused shape fixture".into())) } else { Ok(()) });
+    } else {
+        app.session.authorize = Some(|id, _| if id == "path.set" { Err(photocraft_engine::EngineError::Other("refused path fixture".into())) } else { Ok(()) });
+    }
+    assert!(!pen_commit(&mut app, false), "the fixture must actually refuse the commit");
+    let draft = app.ui.pen.as_ref().unwrap();
+    assert!(draft.commit_failed && draft.owner.as_ref().is_some_and(|owner| owner.valid(&app)));
+    assert_eq!(draft.draft.knots.len(), 2);
+    app
+}
+
+#[test]
+fn failed_pen_draft_after_tool_switch_leaves_library_undo_to_each_entrypoint() {
+    for tool in [Tool::Pen, Tool::CurvaturePen] {
+        for entry in ["menu", "shortcut", "command"] {
+            let mut app = failed_library_draft(tool, false);
+            assert!(pen_can_undo(&app));
+            assert!(crate::actions::library::edit_undo_label(&app).is_none());
+            let draft = app.ui.pen.clone();
+            let history = app.session.active().unwrap().history.past_len();
+            switch_tool(&mut app, Tool::Brush);
+            assert_eq!(app.ui.pen, draft, "a refused path waits for explicit retry");
+            assert!(!pen_can_undo(&app));
+            assert_eq!(crate::actions::library::edit_undo_label(&app), Some("Undo Clear All Actions"));
+            match entry {
+                "menu" => menu(&mut app, "edit.undo"),
+                "shortcut" => press(&mut app, egui::Key::Z, egui::Modifiers::COMMAND),
+                _ => {
+                    app.run("edit.undo", json!({})).unwrap();
+                }
+            }
+            assert_eq!(app.session.actions.list.sets(), ["Keep"], "{tool:?}, {entry}: the library was restored");
+            assert_eq!(app.ui.pen, draft, "{tool:?}, {entry}: hidden anchors are untouched");
+            assert_eq!(app.session.active().unwrap().history.past_len(), history);
+        }
+    }
+}
+
+#[test]
+fn active_failed_pen_drafts_keep_anchor_undo_and_library_pending() {
+    for tool in [Tool::Pen, Tool::CurvaturePen] {
+        for shortcut in [false, true] {
+            let mut app = failed_library_draft(tool, false);
+            let history = app.session.active().unwrap().history.past_len();
+            assert!(pen_can_undo(&app));
+            assert!(crate::actions::library::edit_undo_label(&app).is_none());
+            if shortcut {
+                press(&mut app, egui::Key::Z, egui::Modifiers::COMMAND);
+            } else {
+                menu(&mut app, "edit.undo");
+            }
+            assert_eq!(app.ui.pen.as_ref().unwrap().draft.knots.len(), 1, "{tool:?}: the active editor owns Undo");
+            assert!(app.session.actions.list.sets().is_empty(), "the library Undo is still pending");
+            assert_eq!(app.session.active().unwrap().history.past_len(), history);
+        }
+    }
+}
+
+#[test]
+fn hidden_failed_pen_drafts_do_not_take_document_history_steps() {
+    for tool in [Tool::Pen, Tool::CurvaturePen] {
+        let mut app = failed_library_draft(tool, false);
+        let draft = app.ui.pen.clone();
+        let history = app.session.active().unwrap().history.past_len();
+        assert_eq!(history, 1, "the fixture has exactly one committed layer edit");
+        switch_tool(&mut app, Tool::Brush);
+        menu(&mut app, "history.stepBackward");
+        assert_eq!(app.session.active().unwrap().history.past_len(), 0, "the document edit was undone");
+        assert_eq!(app.ui.pen, draft, "the retained draft was not edited");
+        assert!(!crate::menus::is_enabled(&app, "history.stepBackward"), "hidden anchors cannot enable another History step");
+        assert!(app.session.actions.list.sets().is_empty(), "History does not consume the library Undo");
+    }
+}
+
+#[test]
+fn failed_shape_drafts_keep_the_work_path_fallback_on_tool_switch() {
+    for tool in [Tool::Pen, Tool::CurvaturePen] {
+        let mut app = failed_library_draft(tool, true);
+        let draft = app.ui.pen.clone().unwrap();
+        let history = app.session.active().unwrap().history.past_len();
+        assert!(app.session.active().unwrap().doc.work_path.is_none());
+        switch_tool(&mut app, Tool::Brush);
+        assert!(app.ui.pen.is_none(), "a refused Shape is kept as the Work Path instead");
+        let path = app.session.active().unwrap().doc.work_path.as_ref().unwrap();
+        let knots: Vec<_> =
+            path.subpaths[0].knots.iter().map(|k| [[k.anchor.x, k.anchor.y], [k.in_ctrl.x, k.in_ctrl.y], [k.out_ctrl.x, k.out_ctrl.y]]).collect();
+        assert_eq!(knots, draft.triples(), "{tool:?}: the fallback retains all geometry");
+        assert!(!path.subpaths[0].closed);
+        assert_eq!(app.session.active().unwrap().history.past_len(), history + 1);
+    }
+}
+
+/// A valid Freeform release which the document refuses, not an in-progress lasso gesture.
+fn refused_freeform_library_draft() -> PhotocraftApp {
+    let mut app = app();
+    app.run("layer.new.layer", json!({})).unwrap();
+    app.run("actions.newSet", json!({"name": "Keep"})).unwrap();
+    app.run("actions.clearAll", json!({"confirm": true})).unwrap();
+    app.ui.tool = Tool::FreeformPen;
+    app.ui.tool_options.vector_mode = craft::draw::ui::shape::VectorMode::Path;
+    let owner = capture_pen_owner(&app).unwrap();
+    app.session.authorize = Some(|id, _| if id == "path.set" { Err(photocraft_engine::EngineError::Other("refused Freeform fixture".into())) } else { Ok(()) });
+    freeform_finish_owned(&mut app, &[[20.0, 20.0, 1.0], [80.0, 20.0, 1.0], [80.0, 80.0, 1.0]], &[1, 2], owner);
+    let draft = app.ui.pen.as_ref().expect("the refused fitted release must be retained");
+    assert!(draft.commit_failed && draft.freeform_origin && draft.owner.as_ref().is_some_and(|owner| owner.valid(&app)));
+    assert_eq!(draft.draft.knots.len(), 3, "all three straight vertices survived fitting");
+    app
+}
+
+#[test]
+fn failed_freeform_drafts_keep_same_tool_anchor_undo() {
+    for entry in ["menu", "shortcut", "history"] {
+        let mut app = refused_freeform_library_draft();
+        let draft = app.ui.pen.as_ref().unwrap().clone();
+        let history = app.session.active().unwrap().history.past_len();
+        assert!(!draft.drawn_with(Tool::FreeformPen), "general drawing and finish policy is unchanged");
+        assert!(pen_can_undo(&app));
+        assert!(crate::actions::library::edit_undo_label(&app).is_none());
+        match entry {
+            "menu" => menu(&mut app, "edit.undo"),
+            "shortcut" => press(&mut app, egui::Key::Z, egui::Modifiers::COMMAND),
+            _ => menu(&mut app, "history.stepBackward"),
+        }
+        assert_eq!(app.ui.pen.as_ref().unwrap().triples(), draft.triples()[..2].to_vec(), "{entry}: retain the old fitted-anchor Undo");
+        assert!(app.session.actions.list.sets().is_empty(), "the library Undo stays pending");
+        assert_eq!(app.session.active().unwrap().history.past_len(), history);
+        switch_tool(&mut app, Tool::Brush);
+        let remaining = app.ui.pen.clone();
+        assert_eq!(crate::actions::library::edit_undo_label(&app), Some("Undo Clear All Actions"));
+        menu(&mut app, "edit.undo");
+        assert_eq!(app.session.actions.list.sets(), ["Keep"]);
+        assert_eq!(app.ui.pen, remaining, "another tool does not edit the failed Freeform draft");
+    }
+}
+
+#[test]
+fn freeform_selection_does_not_claim_a_failed_pen_or_curvature_draft() {
+    for tool in [Tool::Pen, Tool::CurvaturePen] {
+        for shortcut in [false, true] {
+            let mut app = failed_library_draft(tool, false);
+            let draft = app.ui.pen.clone();
+            assert!(!draft.as_ref().unwrap().freeform_origin);
+            let history = app.session.active().unwrap().history.past_len();
+            switch_tool(&mut app, Tool::FreeformPen);
+            assert!(!pen_can_undo(&app), "selecting Freeform cannot invent a Freeform release");
+            assert_eq!(crate::actions::library::edit_undo_label(&app), Some("Undo Clear All Actions"));
+            if shortcut {
+                press(&mut app, egui::Key::Z, egui::Modifiers::COMMAND);
+            } else {
+                menu(&mut app, "edit.undo");
+            }
+            assert_eq!(app.session.actions.list.sets(), ["Keep"], "{tool:?}: undo the library, not foreign anchors");
+            assert_eq!(app.ui.pen, draft);
+            assert_eq!(app.session.active().unwrap().history.past_len(), history);
+        }
+    }
+}
+
+/// a864229579: a draft kept under a tool that did not draw it leaves Delete to that tool, as it leaves Undo; back on
+/// its own tool, Delete takes its last anchor back again.
+#[test]
+fn a_kept_pen_draft_takes_delete_only_under_its_own_tool() {
+    let mut app = failed_library_draft(Tool::Pen, false);
+    let draft = app.ui.pen.clone();
+    switch_tool(&mut app, Tool::AddAnchorPoint);
+    press(&mut app, egui::Key::Delete, egui::Modifiers::NONE);
+    assert_eq!(app.ui.pen, draft, "Add Anchor Point does not take the draft's anchors back");
+    switch_tool(&mut app, Tool::Pen);
+    press(&mut app, egui::Key::Delete, egui::Modifiers::NONE);
+    assert_eq!(app.ui.pen.as_ref().map(|p| p.draft.knots.len()), Some(1));
+}

@@ -69,6 +69,7 @@ pub(crate) mod params {
         },
         ParamFamily::new(new_layer_ui::owns, new_layer_ui::run),
         ParamFamily::new(new_group_ui::owns, new_group_ui::run),
+        ParamFamily { check: Some(count_group_name_ui::check), ..ParamFamily::new(count_group_name_ui::owns, count_group_name_ui::run) },
         ParamFamily { check: Some(duplicate_layer_ui::check), ..ParamFamily::new(duplicate_layer_ui::owns, duplicate_layer_ui::run) },
         ParamFamily::new(snapshot_dialog::owns, snapshot_dialog::run),
         ParamFamily::new(history_options_ui::owns, history_options_ui::run),
@@ -90,6 +91,11 @@ pub(crate) mod params {
         },
         ParamFamily::new(crate::analysis::dialogs::owns, crate::analysis::dialogs::run),
         ParamFamily::new(crate::layers_panel_ui::owns, crate::layers_panel_ui::run),
+        ParamFamily {
+            check: Some(image_processor_ui::check),
+            cancel: Some(filter_dialog::cancel),
+            ..ParamFamily::new(|key| key == image_processor_ui::COMMAND, filter_dialog::run)
+        },
         ParamFamily { cancel: Some(filter_dialog::cancel), ..ParamFamily::new(crate::view_cmds::dialogs::is_form, filter_dialog::run) },
         crate::prefs_ui::PRESETS_FAMILY,
         ParamFamily { check: Some(crate::crop_presets::check), ..ParamFamily::new(crate::crop_presets::owns, crate::crop_presets::run) },
@@ -244,8 +250,17 @@ pub(crate) mod params {
         for id in hosted(app) {
             let key = key_of(app, id);
             let Some(dialog) = dialog_mut(app, id) else { continue };
-            let (colour, path, dropper, listing, footer) =
-                (dialog.pick_color(), dialog.pick_path(), dialog.take_eyedropper(), dialog.take_listing(), dialog.take_footer_action());
+            let (colour, path, dropper, listing, footer, range) = (
+                dialog.pick_color(),
+                dialog.pick_path(),
+                dialog.take_eyedropper(),
+                dialog.take_listing(),
+                dialog.take_footer_action(),
+                dialog.take_range_alert(),
+            );
+            if let Some(alert) = range {
+                let _ = alerts::show(app, alert);
+            }
             if let Some(request) = colour {
                 color_picker_ui::open_for_request(app, id, request);
             }
@@ -382,6 +397,7 @@ pub(crate) const PROMPTS: &[PromptRow] = &[
     alerts::answer,
     crate::jobs_ui::answer,
     crate::gpu_status::answer,
+    crate::actions::library::answer,
 ];
 
 /// [`prompts_take`] over the rows `rows`.
@@ -663,6 +679,7 @@ pub(crate) mod color_picker_preview;
 pub mod color_picker_ui;
 pub mod color_range_ui;
 pub mod color_table_ui;
+pub mod count_group_name_ui;
 pub mod credits;
 pub mod dds_options_ui;
 pub mod delete_layer_prompt;
@@ -672,6 +689,7 @@ pub mod distort_ui;
 pub mod duplicate_layer_ui;
 pub mod equalize_ui;
 pub mod export_dialog;
+pub(crate) mod fade_modes;
 pub mod file_forms;
 pub mod file_ui;
 pub mod fill_ui;
@@ -684,6 +702,7 @@ pub mod gallery_ui;
 pub(crate) mod guide_edit;
 pub mod guide_layout_ui;
 pub mod history_options_ui;
+mod image_processor_ui;
 pub mod jpeg_options_ui;
 pub mod layer_picker;
 pub mod layer_style;
@@ -697,6 +716,10 @@ pub mod new_guide_ui;
 pub mod new_layer_ui;
 pub mod open_prompt;
 pub mod palette;
+#[cfg(test)]
+mod paths_export_default_tests;
+#[cfg(test)]
+mod paths_export_document_bounds_tests;
 pub(crate) mod pattern_fill_ui;
 pub mod preset_group_prompt;
 pub mod rasterize_prompt;

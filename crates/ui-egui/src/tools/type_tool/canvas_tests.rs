@@ -1461,7 +1461,10 @@ fn variable_faces_list_the_weights_of_their_axis() {
 /// Families the host serves are in the picker's source before they are fetched.
 #[test]
 fn the_font_menu_lists_served_families() {
-    photocraft_text::served::add_families(["Served Menu Test Serif".to_string()]);
+    {
+        let _catalog = crate::served_fonts::changing_catalog();
+        photocraft_text::served::add_families(["Served Menu Test Serif".to_string()]);
+    }
     let app = new_app();
     let mut state = super::font_state(&app);
     let source = state.source();
@@ -1597,6 +1600,7 @@ mod multi_layer_formatting {
 
     #[test]
     fn options_font_family_preserves_peer_faces_and_batches_layer_flags() {
+        let _catalog = crate::served_fonts::steady_catalog();
         let (app, ids) = fixture();
         let before = ids.map(|id| style(&app, id, 0));
         let mut h = controls(app, false);
@@ -1690,6 +1694,7 @@ mod multi_layer_formatting {
     /// and is kept for new type: the pick is one `{font, fontStyle}` change.
     #[test]
     fn a_style_picked_in_the_character_sections_font_menu_is_kept_for_new_type() {
+        let _catalog = crate::served_fonts::steady_catalog();
         let (app, ids) = fixture();
         // The first style of the family other than the defaults'.
         let pick = super::super::fonts::styles("Inter").into_iter().find(|s| s != "Regular" && s != "Bold Italic").expect("Inter has several styles");

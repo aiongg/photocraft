@@ -106,7 +106,7 @@ fn shown_paths(app: &PhotocraftApp, doc: &Document) -> Vec<(PathRef, EditPath)> 
     }
     // The Pen path in progress, only on the document it is drawn on: a view of another document never shows it (#5373).
     if let Some(pen) = app.ui.pen.as_ref().filter(|p| !p.draft.knots.is_empty()).filter(|_| app.ui.pen_doc.is_none_or(|d| d == doc.id)) {
-        out.push((PathRef::Pen, EditPath::new(PathRef::Pen.key(), vec![pen.draft.clone()])));
+        out.push((PathRef::Pen, EditPath::new(PathRef::Pen.key(), vec![pen.draft.clone()]).copies(false)));
     }
     out
 }
@@ -139,7 +139,7 @@ pub(crate) fn show_paths(app: &mut PhotocraftApp, ui: &mut egui::Ui, at: egui::R
     }
     let anchors = shown.first().map_or(AnchorsShown::Hidden, |(_, _, a)| *a);
     let (refs, mut paths): (Vec<PathRef>, Vec<EditPath>) = shown.into_iter().map(|(r, p, _)| (r, p)).unzip();
-    let selection = crate::direct_select::selection(app);
+    let selection = crate::direct_select::selection(app, tool);
     let output = BezierOverlay::new("Paths", Bind::bound(&mut paths), &selection)
         .tool(tool)
         .anchors(anchors)

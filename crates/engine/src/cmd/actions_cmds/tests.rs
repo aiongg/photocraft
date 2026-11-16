@@ -3,7 +3,7 @@ use serde_json::json;
 
 /// An `ActionList` holding `actions` in order.
 fn list_of(actions: Vec<Action>) -> ActionList {
-    ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions, sets: Vec::new() })
+    ActionList::from_file(ActionsFile::new(actions, Vec::new()))
 }
 
 /// A journal-style step: the journal, `called_actions`' steps and Batch steps stay `(id, params)` pairs.
@@ -1642,7 +1642,7 @@ fn record_keeps_an_existing_sets_exact_name() {
 #[test]
 fn record_keeps_an_empty_loaded_sets_exact_name() {
     let mut src = Session::new();
-    src.actions.list.replace(ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: Vec::new(), sets: vec![" Web ".into()] }));
+    src.actions.list.replace(ActionList::from_file(ActionsFile::new(Vec::new(), vec![" Web ".into()])));
     let saved = src.execute("actions.save", json!({"set": " Web "})).unwrap();
     let mut s = Session::new();
     assert_eq!(s.execute("actions.load", json!({"data": saved["data"]})).unwrap()["set"], " Web ");
@@ -1681,7 +1681,7 @@ fn captured_calls_keep_their_target_among_actions_a_load_renamed() {
         file.push(Action { set: Some(set.into()), ..Action::new("Retouch", vec![ActionStep::new(step, json!({}))]) });
     }
     file.push(Action::new("Other", vec![ActionStep::new("image.imageRotation.90cw", json!({}))]));
-    let list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: file, sets: Vec::new() });
+    let list = ActionList::from_file(ActionsFile::new(file, Vec::new()));
     let names: Vec<&str> = list.actions().iter().map(|a| a.name.as_str()).collect();
     assert_eq!(names, ["Retouch", "Retouch 2", "Other"], "a load renames the repeat");
     let mut steps = vec![
@@ -1724,7 +1724,7 @@ fn rename_leaves_calls_that_reach_another_sets_action_alone() {
             .into_iter()
             .chain([Action::new("Caller", calls())])
             .collect();
-        s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: file, sets: Vec::new() });
+        s.actions.list = ActionList::from_file(ActionsFile::new(file, Vec::new()));
         assert_eq!(s.actions.list.actions()[1].name, "Target 2", "the load renamed the repeat");
         s
     };

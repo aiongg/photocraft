@@ -53,7 +53,7 @@ fn fractional_amounts_remain_native_and_are_refused_by_strict_export() {
                     assert!(skipped.is_empty() && imported.unsupported.is_empty() && imported.warnings.is_empty());
                     let exported = imported.actions[0].steps[0].params["amount"].clone();
                     let mut replay = fixture(depth);
-                    replay.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+                    replay.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
                     replay.execute("actions.play", json!({"action": "Fractional Ripple"})).unwrap();
                     let changed = pixels(&replay) != pixels(&direct);
                     if amount == 81.4 {
@@ -99,7 +99,7 @@ fn integer_amounts_sizes_and_defaults_preserve_playback() {
             assert_eq!(imported.actions[0].steps.len(), 1);
             assert_eq!(imported.actions[0].steps[0].command, RIPPLE);
             let mut replay = fixture(depth);
-            replay.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+            replay.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
             replay.execute("actions.play", json!({"action": "Integer Ripple"})).unwrap();
             assert_eq!(pixels(&replay), pixels(&direct), "depth {depth}: {params}");
         }

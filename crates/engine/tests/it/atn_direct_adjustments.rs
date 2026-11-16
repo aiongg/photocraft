@@ -196,7 +196,7 @@ fn fractional_gradient_changes_pixels_and_preserves_selection_and_undo() {
         assert_eq!(&expected[12..], &original[12..], "outside the selection");
         let mut replay = fixture("rgb", depth);
         replay.execute("select.rect", json!({"x":0,"y":0,"width":3,"height":1})).unwrap();
-        replay.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+        replay.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
         play(&mut replay);
         assert_eq!(raw(&replay), expected);
         assert!(replay.undo());
@@ -294,7 +294,7 @@ fn kept(event: [u8; 4], d: Descriptor) {
     let imported = atn_cmds::import(&bytes(event, d.clone())).unwrap();
     assert_eq!(imported.unsupported.len(), 1, "{d:?}");
     let mut s = Session::new();
-    s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+    s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
     assert_eq!(saved(&s).descriptor, Some(d));
 }
 
@@ -376,7 +376,7 @@ fn recorded_replace_color_clamps_shifts_and_plays_the_lab_box_at_every_depth() {
             std::sync::Arc::make_mut(&mut s.active_mut().unwrap().doc).selection = Some(mask);
         }
         let before = raw(&s);
-        s.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+        s.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
         play(&mut s);
         let after = raw(&s);
         if inverse {
@@ -398,7 +398,7 @@ fn recorded_replace_color_clamps_shifts_and_plays_the_lab_box_at_every_depth() {
 /// Matching uses original Lab/CMYK channels and tagged RGB rather than display-converted samples.
 #[test]
 fn lab_matching_uses_native_channels_and_the_embedded_rgb_profile() {
-    use photocraft_cms::{Builtin, Transform, TransformOptions};
+    use craft_cms::{Builtin, Transform, TransformOptions};
     for depth in [8, 16, 32] {
         for (mode, profile) in [("rgb", Builtin::DisplayP3), ("gray", Builtin::SGray), ("cmyk", Builtin::CoatedCmyk), ("lab", Builtin::LabD50)] {
             let mut s = fixture(mode, depth);
@@ -415,7 +415,7 @@ fn lab_matching_uses_native_channels_and_the_embedded_rgb_profile() {
             // not the command's profile resolver or its new matching helper.
             let t = Transform::with_options(profile.profile(), Builtin::LabD50.profile(), TransformOptions::default()).unwrap();
             let mut lab = [[0.0, 0.0, 0.0, 1.0]; 4];
-            t.convert_f32(&before, format.channels(), lab.as_flattened_mut(), 4, true);
+            t.convert_f32(&before, format.channels(), lab.as_flattened_mut(), 4, true).unwrap();
             let center = [lab[1][0] as f64 * 100.0, lab[1][1] as f64 * 255.0 - 128.0, lab[1][2] as f64 * 255.0 - 128.0];
             let lo = center.map(|v| v - 0.2);
             let hi = center.map(|v| v + 0.2);

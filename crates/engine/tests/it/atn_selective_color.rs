@@ -68,7 +68,7 @@ fn check_cases(id: &str, cases: &[Value], require_effect: bool) {
             assert_eq!(imported.actions[0].steps[0].command, id);
 
             let mut replay = fixture(depth);
-            replay.actions.list = ActionList::from_file(ActionsFile { version: ActionsFile::VERSION, actions: imported.actions, sets: Vec::new() });
+            replay.actions.list = ActionList::from_file(ActionsFile::new(imported.actions, Vec::new()));
             replay.execute("actions.play", json!({"action": action.name})).unwrap();
             if pixels(&replay) != expected {
                 failures.push(format!("{id}, depth {depth}, {params}"));

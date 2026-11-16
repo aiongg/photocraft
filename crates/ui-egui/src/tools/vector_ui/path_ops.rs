@@ -120,6 +120,12 @@ pub(crate) fn deselect_loaded_path(app: &mut PhotocraftApp, name: &str) {
     app.ui.hidden_work_path = app.session.active().and_then(|st| st.doc.work_path.clone().map(|p| (st.doc.id.0, p)));
 }
 
+/// Path Selection has components of the saved path targeted in the Paths panel selected: what its bare Enter and
+/// Esc deselect (#13287).
+pub(crate) fn saved_path_components_selected(app: &PhotocraftApp) -> bool {
+    selected_saved_path_index(app).is_some_and(|(index, _)| matches!(crate::path_components::selected(app), Some((PathRef::Saved(i), ..)) if i == index))
+}
+
 /// Is the active document's Work Path drawn and edited on the canvas? Not after
 /// [`deselect_loaded_path`] hid it, until the Work Path is selected again in the Paths panel (which
 /// ends the hide; a saved path or a layer's path doesn't show it) or it changes (a new one drawn, Make Work Path,
@@ -202,6 +208,49 @@ pub(crate) fn delete_key_deletes_work_path(app: &PhotocraftApp) -> bool {
         && matches!(target_path(app), Some((PathRef::Work, _)))
 }
 
+/// What ⌫ / Delete edits besides an anchor (the overlay's own key): the command and its params.
+/// With Direct Selection and a clicked segment (`[subpath, knot]` it leaves) and no selected
+/// anchor, the segment goes on its own: its anchors stay and the subpath opens there, as in
+/// Photoshop (#13203). With nothing selected, the path Direct Selection targets is deleted: a
+/// saved path, the work path or a vector mask. The work path with the Pen, Freeform Pen or Path
+/// Selection is [`delete_key_deletes_work_path`]. A shape layer's path wasn't measured: the key
+/// keeps deleting the layer.
+pub(crate) fn delete_key_edits_path(app: &PhotocraftApp) -> Option<(&'static str, Value)> {
+    if delete_key_deletes_work_path(app) {
+        return Some(("path.delete", json!({"name": "work"})));
+    }
+    let ds = &app.ui.direct_selection;
+    let usable = app.ui.tool == Tool::DirectSelection
+        && app.ui.pen.is_none()
+        && app.ui.transform.is_none()
+        && ds.editing.is_none()
+        && app.ui.view.shows(app.ui.view.show.target_path);
+    usable.then_some(())?;
+    let holds = crate::direct_select::still_valid(app, ds);
+    if holds
+        && ds.anchors.is_empty()
+        && let (Some([s, k]), Some(target)) = (ds.segment, ds.target)
+    {
+        let (_, path) = crate::direct_select::candidates(app).into_iter().find(|(r, _)| *r == target)?;
+        path.subpaths.get(s)?.knots.get(k)?;
+        crate::direct_select::writable(app, &target).then_some(())?;
+        let mut params = json!({"subpath": s, "knot": k});
+        if let (Some(p), Some(t)) = (params.as_object_mut(), target.params(app).as_object()) {
+            p.extend(t.clone());
+        }
+        return Some(("path.deleteSegment", params));
+    }
+    (!holds || (ds.anchors.is_empty() && ds.segment.is_none())).then_some(())?;
+    let st = app.session.active()?;
+    match target_path(app)?.0 {
+        PathRef::Work => Some(("path.delete", json!({"name": "work"}))),
+        PathRef::Saved(i) => Some(("path.delete", json!({"name": st.doc.paths.get(i)?.name}))),
+        // As the Paths panel's trash does with a vector mask's row.
+        PathRef::Layer(id) if targeted_vector_mask_id(app) == Some(id) => Some(("layer.vectorMask.delete", json!({"layer": id}))),
+        _ => None,
+    }
+}
+
 /// The path Path Selection edits: the selected Work or saved path, the targeted vector mask, the
 /// active shape layer's path (both `PathRef::Layer`), else the work path.
 pub(super) fn target_path(app: &PhotocraftApp) -> Option<(PathRef, Path)> {
@@ -229,7 +278,8 @@ pub(super) fn target_path(app: &PhotocraftApp) -> Option<(PathRef, Path)> {
 /// overlay's `is_straight` compares exactly, so such a handle is set equal to its anchor.
 const RETRACTED: f64 = 1e-9;
 
-/// The overlay's `EditPath` of a document path, keyed `key` (`PathRef::key`).
+/// The overlay's `EditPath` of a document path, keyed `key` (`PathRef::key`). A Type Path takes no copies of its
+/// subpaths: Direct Selection's ⌥ drag on its segment moves the subpath.
 pub(crate) fn edit_path(path: &Path, key: u64) -> EditPath {
     let point = |p: &photocraft_geom::Point| EditPoint::new(p.x, p.y);
     let handle = |anchor: EditPoint, h: &photocraft_geom::Point| {
@@ -251,7 +301,8 @@ pub(crate) fn edit_path(path: &Path, key: u64) -> EditPath {
             EditSubpath::new(knots, s.closed)
         })
         .collect();
-    EditPath::new(key, subpaths)
+    let copies = !matches!(PathRef::from_key(key), Some(PathRef::TypePath(_)));
+    EditPath::new(key, subpaths).copies(copies)
 }
 
 /// The document path of an edited `EditPath`, with each subpath's operation and the path's fill
@@ -402,12 +453,14 @@ pub(crate) struct PathSelectionDrag {
     pub start: [f64; 2],
     /// The pointer's last document point.
     pub last: [f64; 2],
+    /// The modifiers held at the press; the cursor keeps them for the drag.
+    pub mods: craft::keymap::Mods,
     /// What the press targeted; a drag whose owner is no longer valid shows and commits nothing.
     pub owner: Option<super::VectorOwner>,
 }
 
-/// The Path Selection tool (A): a press selects, a drag moves the selected path or components,
-/// a release commits through [`path_selection_finish`]. It keeps its drag as its own state.
+/// The state of the Path Selection tool (A), kept across passes: the drag in progress and the
+/// events the pass reports. [`PathSelectionPass`] runs it.
 #[derive(Default)]
 pub(crate) struct PathSelectionTool {
     drag: Option<PathSelectionDrag>,
@@ -433,35 +486,63 @@ impl PathSelectionTool {
     pub(crate) fn take_events(&mut self) -> Vec<PathSelectionEvent> {
         std::mem::take(&mut self.events)
     }
-
-    fn doc_point(pointer: &craft::ui::canvas::ToolPointer, cx: &craft::ui::canvas::ToolContext<'_>) -> Option<[f64; 2]> {
-        let p = cx.space()?.view.to_doc(pointer.pos);
-        Some([p.x, p.y])
-    }
 }
 
-impl craft::ui::canvas::CanvasTool for PathSelectionTool {
+/// The Path Selection tool for one pass: a press selects, a drag moves the selected path or
+/// components, a release commits through [`path_selection_finish`]. Its cursor reads the app
+/// through the pass's scope.
+pub(crate) struct PathSelectionPass<'a> {
+    pub(crate) scope: &'a crate::canvas::tools::ToolScope<'a>,
+    pub(crate) tool: &'a mut PathSelectionTool,
+}
+
+fn doc_point(pointer: &craft::ui::canvas::ToolPointer, cx: &craft::ui::canvas::ToolContext<'_>) -> Option<[f64; 2]> {
+    let p = cx.space()?.view.to_doc(pointer.pos);
+    Some([p.x, p.y])
+}
+
+impl craft::ui::canvas::CanvasTool for PathSelectionPass<'_> {
     fn press(&mut self, pointer: &craft::ui::canvas::ToolPointer, cx: &mut craft::ui::canvas::ToolContext<'_>) -> craft::ui::canvas::ToolAction {
-        let Some(at) = Self::doc_point(pointer, cx) else { return craft::ui::canvas::ToolAction::Ignored };
-        self.drag = Some(PathSelectionDrag { start: at, last: at, owner: None });
-        self.events.push(PathSelectionEvent::Press { at, shift: pointer.mods.shift });
+        let Some(at) = doc_point(pointer, cx) else { return craft::ui::canvas::ToolAction::Ignored };
+        self.tool.drag = Some(PathSelectionDrag { start: at, last: at, mods: pointer.mods, owner: None });
+        self.tool.events.push(PathSelectionEvent::Press { at, shift: pointer.mods.shift });
         craft::ui::canvas::ToolAction::Claimed
     }
 
     fn drag(&mut self, pointer: &craft::ui::canvas::ToolPointer, cx: &mut craft::ui::canvas::ToolContext<'_>) {
-        if let (Some(d), Some(at)) = (&mut self.drag, Self::doc_point(pointer, cx)) {
+        if let (Some(d), Some(at)) = (&mut self.tool.drag, doc_point(pointer, cx)) {
             d.last = at;
         }
     }
 
     fn release(&mut self, pointer: &craft::ui::canvas::ToolPointer, cx: &mut craft::ui::canvas::ToolContext<'_>) {
-        let Some(d) = self.drag.take() else { return };
-        let end = Self::doc_point(pointer, cx).unwrap_or(d.last);
-        self.events.push(PathSelectionEvent::Release { start: d.start, end, owner: d.owner });
+        let Some(d) = self.tool.drag.take() else { return };
+        let end = doc_point(pointer, cx).unwrap_or(d.last);
+        self.tool.events.push(PathSelectionEvent::Release { start: d.start, end, owner: d.owner });
     }
 
     fn cancel(&mut self, _reason: craft::behavior::CancelReason, _cx: &mut craft::ui::canvas::ToolContext<'_>) {
-        self.drag = None;
+        self.tool.drag = None;
+    }
+
+    /// #13287: with components of the saved path targeted in the Paths panel selected, a bare Enter deselects the
+    /// components and also untargets the path (its row and outline go), with no History step. With no component of
+    /// that path selected, or a modifier held, Enter passes on. Esc is the window's idle Esc (`shortcuts::escape_keys`),
+    /// after its pixel deselect.
+    fn key(&mut self, key: &craft::ui::canvas::ToolKey, cx: &mut craft::ui::canvas::ToolContext<'_>) -> bool {
+        if !matches!(key, craft::ui::canvas::ToolKey::Submit) || cx.mods != craft::keymap::Mods::NONE || self.tool.drag.is_some() {
+            return false;
+        }
+        self.scope.with_app(|app| {
+            if !saved_path_components_selected(app) {
+                return false;
+            }
+            crate::path_components::deselect_components(app);
+            if let Some(name) = app.ui.selected_path.clone() {
+                deselect_loaded_path(app, &name);
+            }
+            true
+        })
     }
 
     fn command_form(&self) -> craft::ui::canvas::ToolPath {
@@ -470,6 +551,15 @@ impl craft::ui::canvas::CanvasTool for PathSelectionTool {
 
     // The moved path shows through the overlay (`show_paths`), so the tool paints nothing.
     fn paint(&self, _draw: &craft::ui::primitives::Draw<'_>, _cx: &craft::ui::canvas::ToolContext<'_>) {}
+
+    /// `cursor_policy::path_selection_cursor`, with the press's modifiers and point while a drag runs.
+    fn cursor(&self, cx: &craft::ui::canvas::ToolContext<'_>) -> craft::behavior::Cursor {
+        let (mods, at) = match &self.tool.drag {
+            Some(d) => (d.mods, Some(d.start)),
+            None => (cx.mods, cx.pointer.as_ref().and_then(|p| doc_point(p, cx))),
+        };
+        self.scope.with_app(|app| crate::canvas::cursor_policy::path_selection_cursor(app, mods, at, cx.precise()))
+    }
 }
 
 /// The path a Path Selection drag in progress shows moved.

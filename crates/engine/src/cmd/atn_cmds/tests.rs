@@ -708,6 +708,7 @@ fn every_mapped_command_exports_and_imports_back() {
                 "rotationAdaptation":"none","scale":true,"mirror":false,"output":"new"}),
         ),
         ("edit.fade", json!({"opacity":50,"mode":"Multiply"})),
+        ("layer.new.frameFromLayers", json!({"layer": "Photo", "name": "Frame 1"})),
         ("layer.linkLayers", json!({})),
         ("layer.new.artboard", json!({"rect": [10, 20, 100, 50], "name": "Hero"})),
         ("layer.new.artboardFromLayers", json!({"name": "Cards"})),
@@ -880,6 +881,7 @@ fn every_mapped_command_exports_and_imports_back() {
         ("image.analysis.recordMeasurements", json!({})),
         ("image.analysis.setMeasurementScale", json!({"preset": "custom", "pixelLength": 120, "logicalLength": 2.5, "units": "mm"})),
         ("layer.videoLayers.insertBlankFrame", json!({})),
+        ("file.automate.conditionalModeChange", json!({"from": ["grayscale", "rgb"], "to": "cmyk"})),
         ("layer.videoLayers.duplicateFrame", json!({})),
         ("layer.videoLayers.deleteFrame", json!({})),
         ("file.automate.cropAndStraightenPhotos", json!({})),
@@ -7044,4 +7046,29 @@ fn adjustment_layer_name_must_round_trip() {
             assert_eq!(step.command, PHOTOSHOP_STEP, "{name:?}");
         }
     }
+}
+
+// Calls between the actions of a set keep reaching them through Save Actions… and Replace
+// Actions…: the saved file names the set it is written as in each call to one of its actions.
+#[test]
+fn whole_library_conditional_scopes_roundtrip() {
+    let mut caller = Action::new(
+        "Caller",
+        vec![ActionStep::new("actions.conditional", json!({"if":"always", "then":"Target", "thenSet":"Original", "else":"Target", "elseSet":"Original"}))],
+    );
+    caller.set = Some("Original".into());
+    let mut target = Action::new("Target", vec![]);
+    target.set = Some("Original".into());
+
+    let (original, _) = export("Original", &[&caller, &target], &[], false).unwrap();
+    let mut s = Session::new();
+    s.execute("actions.replace", json!({"data":b64(&original),"confirm":true})).unwrap();
+    let saved = s.execute("actions.save", json!({})).unwrap();
+    let bytes = photocraft_paint::tile::b64_decode(saved["data"].as_str().unwrap()).unwrap();
+    let imported = super::convert::import_sets(&bytes, None).unwrap().remove(0).0.imported;
+    assert_eq!(imported.actions[0].steps[0].params["thenSet"], DEFAULT_SET);
+    assert_eq!(imported.actions[0].steps[0].params["elseSet"], DEFAULT_SET);
+    s.execute("actions.replace", json!({"data":b64(&bytes),"confirm":true})).unwrap();
+    let params = &s.actions.list.actions()[0].steps[0].params;
+    assert_eq!((params["then"].as_str(), params["else"].as_str()), (Some("Target"), Some("Target")), "{params}");
 }

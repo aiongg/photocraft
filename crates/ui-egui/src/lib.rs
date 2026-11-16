@@ -129,6 +129,7 @@ pub(crate) use dialogs::color_picker_preview;
 pub use dialogs::color_picker_ui;
 pub use dialogs::color_range_ui;
 pub use dialogs::color_table_ui;
+pub use dialogs::count_group_name_ui;
 pub use dialogs::credits;
 pub use dialogs::dds_options_ui;
 pub use dialogs::delete_layer_prompt;
@@ -228,16 +229,18 @@ use panels::variables_ui;
 pub use prefs::kys_import;
 pub use prefs::prefs_ui;
 use prefs::pressure_curve_ui;
+#[cfg(not(target_arch = "wasm32"))]
+pub use services::AgentAutomationFn;
 pub use services::AutomationReadResult;
 pub(crate) use services::SAVE_OPTIONS_OPEN;
 #[cfg(test)]
 pub(crate) use services::saved_revision_after_write;
 pub use services::{
-    AdoptAutosaveFn, AppendTextFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationWriteFn, AutosaveFn, AutosaveResultsFn, CapsLockFn,
-    ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, ExportFn, ExportSettings, ExternalSvgEditor,
-    ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox, LoadTextFn, OpenExternalSvgFn,
-    OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn, SameFileFn, SaveFileFn, SaveTextFn, Services,
-    SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
+    AdoptAutosaveFn, AppendTextFn, AutomationAuthorizeFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationServices, AutomationWriteFn,
+    AutosaveFn, AutosaveResultsFn, CapsLockFn, ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn,
+    ExportFn, ExportSettings, ExternalSvgEditor, ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn,
+    Inbox, LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn,
+    SameFileFn, SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
 };
 pub(crate) use services::{opaque_layer, saves_flat_in_place};
 pub use text::cjk_fonts;
@@ -710,6 +713,8 @@ mod cam_no_pixels_alert_tests;
 #[cfg(test)]
 mod eyedropper_context_menu_tests;
 #[cfg(test)]
+mod menu_automate_groups_tests;
+#[cfg(test)]
 mod patch_shift_constrain_tests;
 #[cfg(test)]
 mod paths_scroll_tests;
@@ -828,6 +833,8 @@ mod tool_shift_cycle_order_tests;
 #[cfg(test)]
 mod tool_shortcut_tests;
 #[cfg(test)]
+mod toolbar_custom_group_layout_tests;
+#[cfg(test)]
 mod toolbar_group_order_tests;
 
 #[cfg(test)]
@@ -840,7 +847,11 @@ mod transform_fx_tests;
 
 #[cfg(test)]
 mod transform_commit_click_tests;
+#[cfg(test)]
+mod transform_drag_start_tests;
 
+#[cfg(test)]
+mod artboard_from_group_label_tests;
 #[cfg(test)]
 mod layer_props_ui_tests;
 #[cfg(test)]
@@ -855,6 +866,9 @@ mod transform_type_tests;
 
 #[cfg(test)]
 mod star_tool_tests;
+
+#[cfg(test)]
+mod new_doc_bitmap_mode_tests;
 
 #[cfg(test)]
 mod transform_several_tests;
@@ -981,6 +995,8 @@ mod browse_field_tests;
 mod export_quality_tests;
 #[cfg(test)]
 mod select_and_mask_button_tests;
+#[cfg(test)]
+mod wand_tolerance_field_tests;
 
 #[cfg(test)]
 mod saved_path_edit_tests;
@@ -1001,9 +1017,16 @@ mod selection_move_step_tests;
 mod view_guides_submenu_tests;
 
 #[cfg(test)]
+mod lasso_click_tests;
+#[cfg(test)]
 mod reset_tip_tests;
+#[cfg(test)]
+mod rotate_steps_tests;
 #[cfg(test)]
 mod zoom_mode_tests;
 
 #[cfg(test)]
 mod red_eye_context_menu_tests;
+
+#[cfg(test)]
+mod clone_stamp_indexed_bar_tests;

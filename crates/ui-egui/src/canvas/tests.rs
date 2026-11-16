@@ -24,7 +24,7 @@ fn display_image_matches_egui_unmultiplied_conversion() {
     let reference = |img: photocraft_raster::Rgba8Image| egui::ColorImage::from_rgba_unmultiplied([img.width as usize, img.height as usize], &img.pixels);
     assert_eq!(super::display_image(None, &buf).pixels, reference(buf.to_rgba8()).pixels);
     let mut doc = photocraft_doc::Document::new("t", photocraft_geom::Size::new(1, 1), photocraft_doc::ColorMode::Rgb, photocraft_doc::SampleType::U8);
-    doc.icc_profile = Some(photocraft_cms::Builtin::AdobeRgbCompat.profile().to_bytes());
+    doc.icc_profile = Some(craft::cms::Builtin::AdobeRgbCompat.profile().to_bytes());
     let mut color = photocraft_engine::color_cmds::ColorState::default();
     color.settings.monitor_profile = "srgb".into();
     let d = color.canvas_display(&doc).unwrap();
@@ -229,6 +229,192 @@ fn clone_overlay_follows_the_brush_hardness() {
     assert_eq!(clone_source_image(&mut big).unwrap()(32, 32).a(), 255, "a 1000 px soft brush previews too");
 }
 
+/// The overlay's alpha at the brush centre, 0..1.
+fn clone_overlay_centre_alpha(app: &mut PhotocraftApp) -> f32 {
+    f32::from(clone_source_image(app).expect("the Clone Source image shows")(32, 32).a()) / 255.0
+}
+
+/// The Clone Stamp's overlay shows at the strength a stamp prints with: its Opacity and Flow,
+/// clipped or not, at every depth, and changes when they change under a still pointer (#13124).
+#[test]
+fn clone_overlay_opacity_and_flow_match_a_stamp_on_another_layer() {
+    for depth in [8, 16, 32] {
+        for clipped in [true, false] {
+            let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+            app.run("file.new", json!({"width": 64, "height": 64, "depth": depth})).unwrap();
+            crate::retouch_ui::set_source(&mut app, 16.0, 16.0);
+            app.run("layer.new.layer", json!({})).unwrap();
+            app.ui.tool = Tool::CloneStamp;
+            app.ui.tool_options.clone_sample = "all".into();
+            app.session.tools.brush.size = 20.0;
+            app.session.presets.clone.overlay.clipped = clipped;
+            for (opacity, flow) in [(1.0, 1.0), (0.5, 1.0), (1.0, 0.25), (0.5, 0.4)] {
+                // A full-strength overlay is shown first, so the change comes after a shown one.
+                clone_overlay_centre_alpha(&mut app);
+                app.run("tools.setBrush", json!({"size": 20, "hardness": 1.0, "opacity": opacity, "flow": flow})).unwrap();
+                let revision = app.session.active().unwrap().revision;
+                let alpha = clone_overlay_centre_alpha(&mut app);
+                assert_eq!(app.session.active().unwrap().revision, revision, "hovering is read-only");
+                let mut params = crate::retouch_ui::clone_params(&app).unwrap();
+                params["points"] = json!([[32, 32]]);
+                app.run("paint.cloneStamp", params).unwrap();
+                let st = app.session.active().unwrap();
+                let printed = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().rgba(32, 32)[3];
+                assert!((printed - opacity * flow).abs() < 0.01, "opacity={opacity} flow={flow}: printed {printed}");
+                assert!((alpha - printed).abs() < 0.01, "{depth} clipped={clipped} opacity={opacity} flow={flow}: preview {alpha}, print {printed}");
+                assert!(app.session.undo());
+            }
+        }
+    }
+}
+
+/// The overlay's own Opacity multiplies the brush's.
+#[test]
+fn clone_overlay_separate_opacity_setting_still_multiplies_the_brush_opacity() {
+    let mut app = clone_overlay_app(20.0);
+    app.session.tools.brush.opacity = 0.5;
+    app.session.presets.clone.overlay.opacity = 40.0;
+    let alpha = clone_overlay_centre_alpha(&mut app);
+    assert!((alpha - 0.2).abs() < 0.01, "50% brush opacity times 40% overlay opacity: {alpha}");
+}
+
+#[test]
+fn clone_overlay_refreshes_when_the_source_layer_changes_at_the_same_coordinates() {
+    let mut app = clone_overlay_app(20.0);
+    app.run("layer.new.layer", json!({})).unwrap();
+    assert_eq!(clone_source_image(&mut app).unwrap()(32, 32).a(), 255, "the picked white source survives the layer switch");
+    crate::retouch_ui::set_source(&mut app, 16.0, 16.0);
+    assert_eq!(clone_source_image(&mut app).unwrap()(32, 32).a(), 0, "picking the transparent layer refreshes the cached overlay");
+}
+
+/// The Healing Brush paints at full strength, so its overlay ignores the Clone Stamp's Opacity
+/// and Flow.
+#[test]
+fn clone_overlay_strength_changes_leave_the_healing_preview_at_full_strength() {
+    let mut app = clone_overlay_app(20.0);
+    app.session.tools.brush.opacity = 0.5;
+    app.session.tools.brush.flow = 0.4;
+    assert!(clone_overlay_centre_alpha(&mut app) < 0.5, "the Clone Stamp previews at its strength");
+    app.ui.tool = Tool::Healing;
+    assert_eq!(clone_overlay_centre_alpha(&mut app), 1.0, "Healing Brush still previews at full strength");
+}
+
+#[test]
+fn clone_overlay_repicking_on_the_original_layer_updates_preview_and_both_layers() {
+    let mut app = clone_overlay_app(12.0);
+    let source = app.session.active().unwrap().active_layer.unwrap();
+    for (point, color) in [([16, 16], "#ff0000"), ([8, 8], "#0000ff")] {
+        app.run("paint.pencil", json!({"points": [point], "size": 6, "color": color})).unwrap();
+    }
+    crate::retouch_ui::set_source(&mut app, 16.0, 16.0);
+    app.run("layer.new.layer", json!({})).unwrap();
+    let target = app.session.active().unwrap().active_layer.unwrap();
+    app.run("tools.setBrush", json!({"size": 6, "hardness": 1, "opacity": 1, "flow": 1})).unwrap();
+    assert_eq!(clone_source_image(&mut app).unwrap()(32, 32), Color32::RED);
+    let stamp = |app: &mut PhotocraftApp| {
+        let mut params = crate::retouch_ui::clone_params(app).unwrap();
+        params["points"] = json!([[32, 32]]);
+        app.run("paint.cloneStamp", params).unwrap();
+    };
+    stamp(&mut app);
+    app.run("layer.select", json!({"layer": source.0})).unwrap();
+    crate::retouch_ui::set_source(&mut app, 8.0, 8.0);
+    stamp(&mut app);
+    assert_eq!(app.session.active().unwrap().doc.layer(source).unwrap().surface().unwrap().rgba(32, 32), [0.0, 0.0, 1.0, 1.0]);
+    app.run("layer.select", json!({"layer": target.0})).unwrap();
+    assert_eq!(clone_source_image(&mut app).unwrap()(32, 32), Color32::BLUE);
+    stamp(&mut app);
+    assert_eq!(app.session.active().unwrap().doc.layer(target).unwrap().surface().unwrap().rgba(32, 32), [0.0, 0.0, 1.0, 1.0]);
+}
+
+/// A source in another document (#10381): the overlay follows edits there and blends with this
+/// document's pixels, the crosshair stays off this canvas, and an empty slot paints nothing.
+#[test]
+fn clone_overlay_between_documents_updates_after_source_edits_and_blends_with_the_destination() {
+    let mut app = clone_overlay_app(12.0);
+    crate::paint_mouse::sync_tool_brush(&mut app);
+    app.run("paint.pencil", json!({"points": [[16,16]], "size": 8, "color": "#ff0000"})).unwrap();
+    app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+    app.run("paint.pencil", json!({"points": [[32,32]], "size": 16, "color": "#000000"})).unwrap();
+    app.run("layer.new.layer", json!({})).unwrap();
+    app.run("tools.setBrush", json!({"size": 8, "hardness": 1, "opacity": 1, "flow": 1})).unwrap();
+    assert_eq!(clone_source_image(&mut app).unwrap()(32, 32), Color32::RED);
+    app.run("cloneSource.overlay", json!({"blend": "difference"})).unwrap();
+    assert_eq!(clone_source_image(&mut app).unwrap()(32, 32), Color32::RED, "Difference uses the black destination, not the white source document");
+    let revision = app.session.active().unwrap().revision;
+    assert!(app.session.set_active(0));
+    app.run("paint.pencil", json!({"points": [[16,16]], "size": 8, "color": "#00ff00"})).unwrap();
+    assert!(app.session.set_active(1));
+    assert_eq!(app.session.active().unwrap().revision, revision);
+    assert_eq!(clone_source_image(&mut app).unwrap()(32, 32), Color32::GREEN, "editing another document invalidates the cached source");
+    let mods = egui::Modifiers::NONE;
+    tool_event(&mut app, ToolEvent::Down { x: 32.0, y: 32.0, pressure: 1.0 }, mods);
+    assert!(crate::retouch_ui::source_marker_point(&app, Some([32.0, 32.0])).is_none(), "the source crosshair belongs to the other document");
+    tool_event(&mut app, ToolEvent::Up { x: 32.0, y: 32.0 }, mods);
+    let st = app.session.active().unwrap();
+    assert_eq!(st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().rgba(32, 32), [0.0, 1.0, 0.0, 1.0]);
+    app.run("cloneSource.select", json!({"index": 1})).unwrap();
+    assert!(crate::retouch_ui::clone_params(&app).is_none(), "an empty slot cannot reuse coordinates from another document");
+    let before = app.session.active().unwrap().doc.clone();
+    let revision = app.session.active().unwrap().revision;
+    tool_event(&mut app, ToolEvent::Down { x: 48.0, y: 48.0, pressure: 1.0 }, mods);
+    tool_event(&mut app, ToolEvent::Up { x: 48.0, y: 48.0 }, mods);
+    assert_eq!(app.session.active().unwrap().doc, before, "painting with an empty slot cannot sample stale coordinates");
+    assert_eq!(app.session.active().unwrap().revision, revision, "the refused gesture does not create a history edit");
+}
+
+/// Hovering another document's tile cannot replace the active document's clone offset reference:
+/// the Clone Source panel's X/Y keep reading the active document's last hover point (#13124).
+#[test]
+fn clone_cursor_from_an_inactive_document_cannot_replace_the_active_offset_reference() {
+    use craft::behavior::dock::{Arrangement, DocumentGroup};
+    use craft::behavior::kurbo::Point;
+    use craft::ui::canvas::ToolHost;
+    for tool in [Tool::CloneStamp, Tool::Healing] {
+        for aligned in [false, true] {
+            let mut app = clone_overlay_app(12.0);
+            app.background_jobs = false;
+            app.ui.extras.rulers = false;
+            app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+            app.ui.tool = tool;
+            app.ui.tool_options.clone_aligned = aligned;
+            app.sync_views();
+            let ids: Vec<_> = app.session.documents().iter().map(|st| st.doc.id).collect();
+            let group = |id: u64, doc| {
+                let mut g = DocumentGroup::new(id, vec![doc]);
+                g.shown = Some(doc);
+                g
+            };
+            app.ui.document_windows.docked = vec![group(0, ids[0]), group(1, ids[1])];
+            app.ui.document_windows.arrangement = Some(Arrangement::TwoUpVertical);
+            super::testing::frame(&mut app);
+            let document = app.session.active().unwrap().doc.id;
+            let slots = app.session.presets.clone.clone();
+            let revision = app.session.active().unwrap().revision;
+            super::testing::move_to(&mut app, [40.0, 30.0], egui::Modifiers::NONE);
+            assert_eq!(app.ui.presets_ui.clone_cursor, Some((document, [40.0, 30.0])));
+            assert_eq!(crate::preset_panels::clone_offset_readout(&app), Some([-24.0, -14.0]));
+            // The pointer over the other document's tile.
+            let other = ToolHost::shown_space(app.ctx(), CanvasHost::main(0).canvas_id()).expect("the other tile shows").view;
+            let at = other.to_screen(Point::new(12.0, 24.0));
+            assert!(other.rect.contains(at), "the point is on the other tile");
+            let host = craft::ui::runtime::windows::WindowHost::of(app.ctx());
+            host.inject_move(egui::ViewportId::ROOT, at, craft::keymap::Mods::NONE, 0.0);
+            for _ in 0..8 {
+                super::testing::frame(&mut app);
+            }
+            assert_eq!(app.session.active().unwrap().doc.id, document, "hovering activates nothing");
+            assert_eq!(app.ui.presets_ui.clone_cursor, Some((document, [40.0, 30.0])), "{tool:?}/{aligned}: retain the active document's reference");
+            assert_eq!(crate::preset_panels::clone_offset_readout(&app), Some([-24.0, -14.0]));
+            assert_eq!(crate::preset_panels::clone_offset_edit(&app, [-20.0, -10.0]).unwrap()["anchor"], json!([40.0, 30.0]));
+            super::testing::move_to(&mut app, [44.0, 34.0], egui::Modifiers::NONE);
+            assert_eq!(app.ui.presets_ui.clone_cursor, Some((document, [44.0, 34.0])), "the active canvas still updates normally");
+            assert_eq!(app.session.presets.clone, slots, "hover does not establish a source anchor");
+            assert_eq!(app.session.active().unwrap().revision, revision, "hover does not paint");
+        }
+    }
+}
+
 /// A scaled Clone Source reads a larger source area than the image covers: a large brush's
 /// image shrinks around the pointer until that area fits the sampling budget, rather than
 /// vanishing.
@@ -255,6 +441,60 @@ fn clone_overlay_shows_for_the_healing_brush_too() {
         assert_eq!(image.is_some(), shown, "{tool:?}");
         if let Some(image) = image {
             assert_eq!(image(32, 32).a(), 255, "{tool:?}: the source shows under the brush");
+        }
+    }
+}
+
+/// Pattern Preview changes the Healing Brush source overlay at a stationary cursor.
+#[test]
+fn clone_healing_overlay_wraps_with_the_live_texture_at_source_edges() {
+    let mut app = clone_overlay_app(12.0);
+    app.ui.tool = Tool::Healing;
+    app.run("cloneSource.set", json!({"source": [0,0]})).unwrap();
+    app.run("file.new", json!({"width": 64, "height": 64, "background": "transparent"})).unwrap();
+    assert_eq!(clone_source_image(&mut app).unwrap()(30, 32).a(), 0);
+    app.ui.view.pattern_preview = true;
+    assert_eq!(crate::retouch_ui::clone_params(&app).unwrap()["wrap"], true);
+    assert_eq!(clone_source_image(&mut app).unwrap()(30, 32).a(), 255, "the repeated source is visible before painting");
+    let live = photocraft_engine::retouch_cmds::LiveRetouch::begin(
+        &app.session,
+        "paint.healingBrush",
+        &json!({"points": [[32,32]], "size": 12, "hardness": 100, "wrap": true}),
+    )
+    .unwrap();
+    let st = app.session.active().unwrap();
+    assert_eq!(live.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().rgba(30, 32), [1.0; 4]);
+    app.ui.view.pattern_preview = false;
+    assert_eq!(clone_source_image(&mut app).unwrap()(30, 32).a(), 0);
+}
+
+/// Unsupported cross-document targets never reuse a cached pixel-layer source overlay.
+#[test]
+fn clone_overlay_suppresses_cross_document_masks_and_channels() {
+    for tool in [Tool::CloneStamp, Tool::Healing] {
+        for mask in [false, true] {
+            let mut app = clone_overlay_app(12.0);
+            app.ui.tool = tool;
+            app.run("file.new", json!({"width": 64, "height": 64})).unwrap();
+            if mask {
+                app.run("layer.layerMask.revealAll", json!({})).unwrap();
+            } else {
+                app.run("channel.new", json!({"fill": "white"})).unwrap();
+            }
+            app.run("channel.target", json!({"channel": "composite"})).unwrap();
+            app.ui.mask_target = false;
+            assert!(clone_source_image(&mut app).is_some());
+            let revision = app.session.active().unwrap().revision;
+            if mask {
+                app.ui.mask_target = true;
+            } else {
+                app.session.active_mut().unwrap().channel_view.target = photocraft_engine::channel_cmds::ChannelTarget::Alpha(0);
+            }
+            assert_eq!(app.session.active().unwrap().revision, revision, "only the target changed");
+            assert!(clone_source_image(&mut app).is_none(), "{tool:?}, mask={mask}: the gesture has no supported source");
+            app.ui.mask_target = false;
+            app.run("channel.target", json!({"channel": "composite"})).unwrap();
+            assert!(clone_source_image(&mut app).is_some(), "returning to pixels restores the source overlay");
         }
     }
 }

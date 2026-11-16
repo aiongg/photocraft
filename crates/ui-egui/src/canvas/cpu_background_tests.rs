@@ -33,6 +33,7 @@ fn harness(size: [u32; 2], background: &str) -> Option<Harness> {
 #[test]
 #[ignore = "manual release benchmark: 24 MP CPU canvas on the offscreen software adapter"]
 fn cpu_canvas_background_benchmark() {
+    let _gpu = photocraft_testkit::gpu_lock();
     use std::time::Instant;
     let mut results = Vec::new();
     for background in ["white", "transparent"] {

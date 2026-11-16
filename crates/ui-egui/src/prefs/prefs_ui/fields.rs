@@ -142,6 +142,13 @@ pub(super) fn rules() -> Vec<SettingRule> {
     ] {
         tweak(&mut rules, path, |r| r.hidden());
     }
+    // The web build has no Agents page (`custom_rows::AGENTS_PAGE`): it shows the settings PhotoCraft had before the
+    // ArtCraft Launcher's switch.
+    if cfg!(target_arch = "wasm32") {
+        for key in ["connectAgents", "readRoot", "writeRoot", "whenAppClosed"] {
+            tweak(&mut rules, &format!("integrations.{key}"), |r| r.hidden());
+        }
+    }
     // The browser presents frames itself: Low-Latency Drawing does nothing there.
     if cfg!(target_arch = "wasm32") {
         tweak(&mut rules, "performance.lowLatencyDrawing", |r| r.hidden());
@@ -262,12 +269,10 @@ fn spelled(id: &str) -> String {
 }
 
 /// Settings read only when the app starts, which say "Applies at next launch." under their row.
-fn read_at_launch(path: &str) -> bool {
+pub(super) fn read_at_launch(path: &str) -> bool {
     match path {
         // Only Windows and Linux draw their own title bar.
         "interface.systemTitleBar" => cfg!(all(not(target_arch = "wasm32"), not(target_os = "macos"))),
-        // The desktop app decides on the control server before its window opens.
-        "integrations.allowAgentControl" | "integrations.controlPort" => cfg!(not(target_arch = "wasm32")),
         // The WinTab context is opened once, when the window starts.
         "tools.tabletInput" => cfg!(target_os = "windows"),
         _ => false,

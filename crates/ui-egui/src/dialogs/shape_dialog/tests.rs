@@ -95,7 +95,7 @@ fn from_center_and_the_other_tools() {
     click(&mut app, Tool::Triangle, [305.0, 206.0]);
     let id = only_dialog(&app);
     confirm_by_id(&mut app, id);
-    let LiveShape::Polygon { sides: 3, .. } = live(&app) else { panic!("a triangle") };
+    assert_eq!(live(&app), LiveShape::Triangle { rect: [305.0, 206.0, 100.0, 100.0], corner_radius: 0.0 });
 }
 
 #[test]
