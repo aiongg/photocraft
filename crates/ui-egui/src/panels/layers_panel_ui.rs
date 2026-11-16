@@ -19,6 +19,7 @@ use crate::PhotocraftApp;
 const OPTIONS_PREF: &str = "ui.layersPanelOptions";
 const CLIP_PREF: &str = "interface.clipThumbnailsToLayerBounds";
 const LOCK_LAYERS: &str = "layer.lockLayers";
+const DUPLICATE: &str = "layer.duplicate";
 
 /// The saved name of a thumbnail size: the one rule both the saved entry and the panel's row menu use.
 pub(crate) fn size_key(size: ThumbSize) -> &'static str {
@@ -119,6 +120,8 @@ pub(crate) fn panel_rows(app: &PhotocraftApp) -> Vec<PanelRow> {
     let mut rows = vec![
         command("layer.new.layer"),
         command("layer.new.group"),
+        // Duplicate Layer… opens the Duplicate Layer dialog, like Layer › Duplicate Layer… (#14615).
+        command(DUPLICATE),
         command("layer.new.groupFromLayers"),
         PanelRow::Separator,
         command("layer.flattenImage"),
@@ -135,14 +138,20 @@ pub(crate) fn panel_rows(app: &PhotocraftApp) -> Vec<PanelRow> {
     rows
 }
 
-/// The states of the framework's settings rows: Show Filters and Clip Thumbnails are checked when on.
+/// The states of the framework's settings rows: Show Filters and Clip Thumbnails are checked when on. Duplicate Layer…
+/// reads Duplicate Layers… with several layers selected (#14615).
 pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
     let row = |command: LayersPanelCommands, state: CommandState| (CommandRef::from(command), state);
-    vec![
+    let mut states = vec![
         row(LayersPanelCommands::ShowFilters, CommandState::new().checked(app.ui.layers_settings.show_filters)),
         row(LayersPanelCommands::ClipThumbnails, CommandState::new().checked(thumbnail_contents(app) == ThumbContents::LayerBounds)),
         row(LayersPanelCommands::CollapseAll, CommandState::new().enabled(app.session.is_enabled("layer.setExpanded"))),
-    ]
+    ];
+    if app.session.active().is_some_and(|st| st.selected_layers().len() > 1) {
+        let duplicate = CommandState::new().enabled(crate::menus::is_enabled(app, DUPLICATE)).title(tl!("Duplicate Layers…"));
+        states.push((CommandRef::new(DUPLICATE), duplicate));
+    }
+    states
 }
 
 /// Runs a fired settings command of the panel menu. `false` for every other command: PhotoCraft's `layer.arrange.*`
@@ -273,6 +282,10 @@ pub(crate) fn display_reorder(app: &PhotocraftApp, index: usize) -> Option<(std:
     let cached = app.reorder_preview.as_ref()?;
     (cached.source == st.doc.id && cached.revision == st.revision).then(|| (cached.document.clone(), cached.key))
 }
+
+#[cfg(test)]
+#[path = "layers_menu_duplicate_tests.rs"]
+mod layers_menu_duplicate_tests;
 
 #[cfg(test)]
 mod tests {

@@ -120,6 +120,13 @@ pub(crate) fn deselect_loaded_path(app: &mut PhotocraftApp, name: &str) {
     app.ui.hidden_work_path = app.session.active().and_then(|st| st.doc.work_path.clone().map(|p| (st.doc.id.0, p)));
 }
 
+/// Path Selection has components of the saved path targeted in the Paths panel selected: what its bare Enter and
+/// Esc deselect (#13287).
+pub(crate) fn saved_path_components_selected(app: &PhotocraftApp) -> bool {
+    selected_saved_path_index(app)
+        .is_some_and(|(index, _)| matches!(crate::path_components::selected(app), Some((PathRef::Saved(i), ..)) if i == index))
+}
+
 /// Is the active document's Work Path drawn and edited on the canvas? Not after
 /// [`deselect_loaded_path`] hid it, until the Work Path is selected again in the Paths panel (which
 /// ends the hide; a saved path or a layer's path doesn't show it) or it changes (a new one drawn, Make Work Path,
@@ -512,6 +519,26 @@ impl craft::ui::canvas::CanvasTool for PathSelectionPass<'_> {
 
     fn cancel(&mut self, _reason: craft::behavior::CancelReason, _cx: &mut craft::ui::canvas::ToolContext<'_>) {
         self.tool.drag = None;
+    }
+
+    /// #13287: with components of the saved path targeted in the Paths panel selected, a bare Enter deselects the
+    /// components and also untargets the path (its row and outline go), with no History step. With no component of
+    /// that path selected, or a modifier held, Enter passes on. Esc is the window's idle Esc (`shortcuts::escape_keys`),
+    /// after its pixel deselect.
+    fn key(&mut self, key: &craft::ui::canvas::ToolKey, cx: &mut craft::ui::canvas::ToolContext<'_>) -> bool {
+        if !matches!(key, craft::ui::canvas::ToolKey::Submit) || cx.mods != craft::keymap::Mods::NONE || self.tool.drag.is_some() {
+            return false;
+        }
+        self.scope.with_app(|app| {
+            if !saved_path_components_selected(app) {
+                return false;
+            }
+            crate::path_components::deselect_components(app);
+            if let Some(name) = app.ui.selected_path.clone() {
+                deselect_loaded_path(app, &name);
+            }
+            true
+        })
     }
 
     fn command_form(&self) -> craft::ui::canvas::ToolPath {

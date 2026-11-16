@@ -1381,36 +1381,14 @@ impl MenuCustomization {
     }
 }
 
-<<<<<<< HEAD
-/// Edit › Toolbar: hidden tools and the Edit Toolbar drawer's arrangement (tool names as in
-/// `ui.set {tool}`).
-=======
 /// Edit › Toolbar: the toolbar's group layout (tool names as in `ui.set {tool}`), plus the older
-/// flat `hidden` list and the unused `order` list.
->>>>>>> upstream/main
+/// flat `hidden` list.
 #[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct ToolbarCustomization {
     /// Tools taken off the toolbar one by one (the Keyboard Shortcuts dialog's Toolbar tab). The
     /// layout moves each into `extras` as its own group.
     pub hidden: Vec<String>,
-<<<<<<< HEAD
-    /// The toolbar's slots in order; empty means the default arrangement.
-    pub slots: Vec<SavedSlot>,
-}
-
-/// One toolbar slot as the Edit Toolbar drawer saves it.
-#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
-#[serde(default, rename_all = "camelCase")]
-pub struct SavedSlot {
-    /// The slot's id, kept across restarts so the slot's last-used tool comes back with it.
-    pub id: u32,
-    /// The slot's tools, first shown first.
-    pub tools: Vec<String>,
-    /// The slot is the last of its group (a divider follows it).
-    pub group_end: bool,
-=======
-    pub order: Vec<String>,
     /// The toolbar's slots in order, each a group of tools in flyout order. `None` is the
     /// default layout ([`DEFAULT_TOOLBAR`]).
     pub toolbar: Option<Vec<Vec<String>>>,
@@ -1525,7 +1503,6 @@ impl ToolbarCustomization {
         }
         ToolbarLayout { toolbar, extras }
     }
->>>>>>> upstream/main
 }
 
 /// Layer Mask Display Options (double-click the layer mask's row in the Channels panel, or Mask
@@ -2039,7 +2016,6 @@ impl Session {
     /// [`Session::set_saved_prefs`]. The returned list names the values both left at their
     /// defaults. Only text that isn't a JSON object fails as a whole.
     pub fn load_prefs_json(&mut self, s: &str) -> std::result::Result<Vec<InvalidPref>, String> {
-<<<<<<< HEAD
         let (saved, mut invalid) = parse_prefs_json(s)?;
         invalid.extend(self.set_saved_prefs(saved));
         Ok(invalid)
@@ -2056,52 +2032,6 @@ impl Session {
     /// put back to their defaults (or the nearest accepted value) and returned.
     pub fn set_saved_prefs(&mut self, saved: SavedPrefs) -> Vec<InvalidPref> {
         let SavedPrefs { mut prefs, color_settings, presets } = saved;
-=======
-        let mut v: Value = serde_json::from_str(s).map_err(|e| format!("preferences: {e}"))?;
-        if !v.is_object() {
-            return Err("preferences: expected a JSON object".into());
-        }
-        // Files before version 2 hold Use Shift Key for Tool Switch off because that was the
-        // default when they were written: every key is saved, chosen or not. Like Photoshop it is
-        // on by default now (#3528), so those files take the new default (#5647: a tool letter
-        // pressed again kept cycling its group). A choice made since is saved as version 2.
-        if v.get("version").and_then(Value::as_u64).unwrap_or(0) < 2
-            && let Some(tools) = v.get_mut("tools").and_then(Value::as_object_mut)
-            && tools.get("useShiftKeyForToolSwitch") == Some(&json!(false))
-        {
-            tools.remove("useShiftKeyForToolSwitch");
-        }
-        // Saved preferences before appearance modes had one concrete theme. Preserve its
-        // appearance instead of silently switching established users to Auto.
-        if let Some(interface) = v.get_mut("interface").and_then(Value::as_object_mut)
-            && !interface.contains_key("appearanceMode")
-            && let Some(theme) = interface.get("theme").and_then(Value::as_str).and_then(Theme::parse)
-        {
-            let (mode, slot) = match theme {
-                Theme::Pro | Theme::ProMedium | Theme::Studio | Theme::SolarizedDark | Theme::AdwaitaDark | Theme::BreezeDark | Theme::SoftDark => {
-                    ("dark", "darkTheme")
-                }
-                Theme::StudioLight | Theme::ProLightGray | Theme::ProLight | Theme::Classic | Theme::Adwaita | Theme::BreezeLight | Theme::SoftLight => {
-                    ("light", "lightTheme")
-                }
-            };
-            interface.insert("appearanceMode".into(), json!(mode));
-            // A partially migrated file may already contain a newer theme selection (#5139).
-            interface.entry(slot).or_insert_with(|| json!(theme.name()));
-        }
-        // The Serbian interface catalog was `sr`; since the catalogs moved to craft-i18n it is
-        // `sr-latn`, the same Latin text. A saved `sr` loads as `sr-latn` and is saved that way next.
-        if let Some(language) = v.get_mut("interface").and_then(|interface| interface.get_mut("language"))
-            && language.as_str().is_some_and(|code| code.eq_ignore_ascii_case("sr"))
-        {
-            *language = json!("sr-latn");
-        }
-        if let Some(integrations) = v.get_mut("integrations") {
-            migrate_integrations(integrations);
-        }
-        let color = v.as_object_mut().and_then(|m| m.remove("colorSettings"));
-        let presets = v.as_object_mut().and_then(|m| m.remove("presets"));
->>>>>>> upstream/main
         let mut invalid = Vec::new();
         // An Effect Cache the field no longer accepts (above the 32-bit cap, saved before the cap
         // or by a 64-bit build; a hand-edited 0) loads as the nearest value it does. Otherwise
