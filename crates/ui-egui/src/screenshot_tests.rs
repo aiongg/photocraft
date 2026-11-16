@@ -3,7 +3,7 @@
 //! write authority. The queue's own rules (budgets, settling, deadlines, image checks) are
 //! craft-automation's and tested there.
 
-use craft::automation::screenshot::{CaptureGeometry, Captures, DocumentId, SETTLE_PASSES};
+use craft::automation::screenshot::{CaptureGeometry, Captures, DocumentId, SETTLE_PASSES, ScreenshotRequest};
 use craft::ui::runtime::motion;
 use craft::ui::runtime::windows::WindowHost;
 use egui::{Color32, ColorImage, Context, ViewportId, vec2};
@@ -82,7 +82,7 @@ fn actual_callback_fixture() -> ActualCallbackFixture {
     let old_geometry = captures(&app).last_geometry(ViewportId::ROOT).expect("the old real UI geometry");
     let document = app.document_identity();
     let (tx, reply) = std::sync::mpsc::channel();
-    captures_mut(&mut app).admit(91, Some("fixture/current.png".into()), ViewportId::ROOT, tx, document, 0.0, motion::now()).unwrap();
+    captures_mut(&mut app).admit(ScreenshotRequest { token: 91, path: Some("fixture/current.png".into()), viewport: ViewportId::ROOT, reply: tx, document, settle_ms: 0.0 }, motion::now()).unwrap();
     let mut callback = None;
     for _ in 0..8 {
         let output = actual_capture_frame(&mut app, &ctx, vec2(600.0, 400.0), 1.0, false);
@@ -155,7 +155,7 @@ fn verify_minimized_capture(fixture: &mut ActualCallbackFixture, size: egui::Vec
     assert!(actual_callback(output).is_none());
     actual_capture_frame(&mut fixture.app, &fixture.ctx, size, scale, false);
     let (tx, restored_rx) = std::sync::mpsc::channel();
-    captures_mut(&mut fixture.app).admit(92, Some("fixture/restored.png".into()), ViewportId::ROOT, tx, fixture.document, 0.0, motion::now()).unwrap();
+    captures_mut(&mut fixture.app).admit(ScreenshotRequest { token: 92, path: Some("fixture/restored.png".into()), viewport: ViewportId::ROOT, reply: tx, document: fixture.document, settle_ms: 0.0 }, motion::now()).unwrap();
     for _ in 0..8 {
         let output = actual_capture_frame(&mut fixture.app, &fixture.ctx, size, scale, false);
         if let Some(callback) = actual_callback(&output) {
@@ -241,7 +241,7 @@ fn a_capture_in_flight_follows_the_app_document_identity() {
         let mut queue = Captures::default();
         queue.note_geometry(ViewportId::ROOT, geometry(admitted));
         let (tx, _reply) = std::sync::mpsc::channel();
-        queue.admit(1, None, ViewportId::ROOT, tx, admitted, 0.0, now).unwrap();
+        queue.admit(ScreenshotRequest { token: 1, path: None, viewport: ViewportId::ROOT, reply: tx, document: admitted, settle_ms: 0.0 }, now).unwrap();
         for _ in 0..SETTLE_PASSES {
             queue.note_pass();
         }
