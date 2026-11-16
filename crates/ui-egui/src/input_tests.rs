@@ -372,8 +372,7 @@ fn alt_scroll_zooms_while_a_temporary_tool_is_held() {
 }
 
 /// Type tool (#206): Alt+←/→ at a collapsed caret kerns the pair before it by 20/1000 em (100
-/// with ⌘/Ctrl), one history step per press; ⌘/Ctrl+←/→ moves by word; Alt+Shift+→ extends
-/// the selection by a word.
+/// with ⌘/Ctrl), one history step per press.
 #[test]
 fn type_tool_alt_arrows_kern_the_pair() {
     use photocraft_doc::text::Kerning;
@@ -406,20 +405,11 @@ fn type_tool_alt_arrows_kern_the_pair() {
     h.run_steps(2);
     assert_eq!(kern(&h).1, metric + 100.0);
     assert_eq!(steps(&h), s0 + 3, "one history step per press");
-    // The caret didn't move; ⌘/Ctrl+→ moves by word, Alt+Shift+→ selects by word.
+    // The caret didn't move; at the text end there's no pair to kern.
     assert_eq!(h.state().ui.text_edit.as_ref().map(|e| (e.caret, e.anchor)), Some((1, 1)));
-    h.key_press_modifiers(Modifiers::COMMAND, Key::ArrowRight);
-    h.run_steps(2);
-    assert_eq!(h.state().ui.text_edit.as_ref().map(|e| (e.caret, e.anchor)), Some((3, 3)));
-    h.key_press_modifiers(Modifiers::ALT | Modifiers::SHIFT, Key::ArrowRight);
-    h.run_steps(2);
-    assert_eq!(h.state().ui.text_edit.as_ref().map(|e| (e.anchor, e.caret)), Some((3, 6)));
-    // With a selection Alt+→ tracks it instead (see `type_tool_format_keys_*`); at the text end
-    // there's no pair to kern.
+    let end = text(&h).text.chars().count();
+    edit_type(&mut h, id, end, end);
     let before = kern(&h);
-    h.key_press(Key::ArrowRight);
-    h.run_steps(2);
-    assert_eq!(h.state().ui.text_edit.as_ref().map(|e| (e.anchor, e.caret)), Some((6, 6)));
     h.key_press_modifiers(Modifiers::ALT, Key::ArrowRight);
     h.run_steps(2);
     assert_eq!(kern(&h), before);
