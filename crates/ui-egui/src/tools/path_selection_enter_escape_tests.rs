@@ -143,9 +143,7 @@ fn free_transform_path_still_owns_enter_and_escape() {
     let n = steps(&app);
     crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({})).unwrap();
     // 5 px down: an unchanged box commits nothing.
-    let t = app.ui.transform.as_mut().unwrap();
-    let [x0, y0, x1, y1] = t.rect;
-    t.quad = [[x0, y0 + 5.0], [x1, y0 + 5.0], [x1, y1 + 5.0], [x0, y1 + 5.0]];
+    app.ui.transform.as_mut().unwrap().edit_box(|b| *b = b.moved((0.0, 5.0).into()));
     press(&mut app, Key::Enter, Modifiers::NONE);
     assert!(app.ui.transform.is_none(), "Enter commits the transform");
     assert_eq!(steps(&app), n + 1, "one History step");

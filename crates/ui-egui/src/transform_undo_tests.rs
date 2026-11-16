@@ -351,9 +351,9 @@ fn free_transform_moves_every_selected_layer_in_one_step() {
     begin(&mut h);
     let t = h.state().ui.transform.clone().expect("transforming");
     assert_eq!(t.layers.len(), 2, "both layers move: {:?}", t.layers);
-    assert!(close(t.quad, [[100.0, 100.0], [300.0, 100.0], [300.0, 250.0], [100.0, 250.0]]), "one box around both: {:?}", t.quad);
+    assert!(close(t.quad_array(), [[100.0, 100.0], [300.0, 100.0], [300.0, 250.0], [100.0, 250.0]]), "one box around both: {:?}", t.quad_array());
     // Scale the shared box by ½ about its top-left corner.
-    h.state_mut().ui.transform.as_mut().unwrap().quad = [[100.0, 100.0], [200.0, 100.0], [200.0, 175.0], [100.0, 175.0]];
+    set_quad(&mut h, [[100.0, 100.0], [200.0, 100.0], [200.0, 175.0], [100.0, 175.0]]);
     key(&mut h, Modifiers::NONE, Key::Enter);
     assert!(h.state().ui.transform.is_none());
     assert_eq!(history(&h), steps + 1, "one history step");
@@ -388,7 +388,7 @@ fn a_single_selected_layer_keeps_its_own_box() {
     begin(&mut h);
     let t = h.state().ui.transform.clone().expect("transforming");
     assert!(t.layers.is_empty());
-    assert!(close(t.quad, [[100.0, 100.0], [200.0, 100.0], [200.0, 160.0], [100.0, 160.0]]));
+    assert!(close(t.quad_array(), [[100.0, 100.0], [200.0, 100.0], [200.0, 160.0], [100.0, 160.0]]));
 }
 
 #[test]
@@ -405,6 +405,11 @@ fn a_locked_layer_in_the_selection_refuses_the_box() {
     let ctx = h.ctx.clone();
     assert!(crate::menus::invoke(h.state_mut(), &ctx, "edit.freeTransform", json!({})).is_err());
     assert!(h.state().ui.transform.is_none());
+}
+
+/// Sets the open box's corners through the session, as a typed field would.
+fn set_quad(h: &mut Harness<'static, PhotocraftApp>, quad: [[f64; 2]; 4]) {
+    h.state_mut().ui.transform.as_mut().expect("transforming").edit_box(|b| b.quad = quad.map(|[x, y]| (x, y).into()));
 }
 
 fn shift_x(q: [[f64; 2]; 4], dx: f64) -> [[f64; 2]; 4] {
@@ -439,7 +444,7 @@ fn free_transform_a_copy_duplicates_every_selected_layer_and_moves_the_copies() 
     assert_eq!(t.layers.len(), 2, "both copies in the box");
     assert!(!t.layers.contains(&red) && !t.layers.contains(&blue), "the copies move, not the originals");
     assert_eq!(count(&h), n + 2);
-    h.state_mut().ui.transform.as_mut().unwrap().quad = shift_x(t.quad, 20.0);
+    set_quad(&mut h, shift_x(t.quad_array(), 20.0));
     key(&mut h, Modifiers::NONE, Key::Enter);
     assert_eq!(history(&h), steps + 1, "the copies and their transform are one step");
     assert_eq!(bounds(&h, red), photocraft_geom::Rect::new(100, 100, 200, 160));
@@ -482,7 +487,7 @@ fn several_layers_keep_the_selection_frame_and_move_the_selection_once() {
     begin(&mut h);
     assert_eq!(quad(&h), [[60.0, 80.0], [340.0, 80.0], [340.0, 300.0], [60.0, 300.0]]);
     let q = quad(&h);
-    h.state_mut().ui.transform.as_mut().unwrap().quad = shift_x(q, 10.0);
+    set_quad(&mut h, shift_x(q, 10.0));
     key(&mut h, Modifiers::NONE, Key::Enter);
     assert!(h.state().ui.transform.is_none());
     assert_eq!(bounds(&h, red), photocraft_geom::Rect::new(110, 100, 210, 160));
