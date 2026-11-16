@@ -1277,7 +1277,7 @@ fn temporary_type_transform_control_roundtrip_and_input_safety() {
     let a = frame.quad[2];
     crate::canvas::testing::press(&mut app, a, type_command());
     let inspected = crate::type_transform::inspect(&app);
-    assert_eq!(inspected["layer"], id.0, "{inspected}");
+    assert_eq!(inspected["frame"]["layer"], id.0, "the press alone captures the text: {inspected}");
     crate::canvas::testing::move_to(&mut app, [a[0] + 60.0, a[1] + 30.0], type_command());
     crate::canvas::testing::release(&mut app, [a[0] + 60.0, a[1] + 30.0], Modifiers::NONE);
     assert_ne!(text(&app, id).transform, initial);

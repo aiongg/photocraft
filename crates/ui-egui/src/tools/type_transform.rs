@@ -9,7 +9,7 @@ use std::sync::Arc;
 use craft::behavior::geometry::quad::{BoxAllow, BoxState};
 use craft::behavior::kurbo;
 use craft::behavior::{CanvasView, GesturePhase};
-use craft::draw::ui::transform::{TransformEdit, TransformOverlay, TransformSession, TransformSettings};
+use craft::draw::ui::transform::{TransformEdit, TransformOverlay, TransformReach, TransformSession, TransformSettings};
 use craft::keymap::Mods;
 use craft::ui::canvas::canvas_space;
 use craft::ui::runtime::env::{Env, Label};
@@ -53,9 +53,19 @@ pub(crate) fn active(app: &PhotocraftApp) -> bool {
 }
 
 /// Whether the transform box shows: while typing with ⌘ held (the held modifiers include the ones the app latches),
-/// or while a drag of it runs.
+/// or while a capture of it runs.
 pub(crate) fn visible(app: &PhotocraftApp, mods: Mods) -> bool {
     app.ui.tool.is_type() && app.ui.text_edit.is_some() && (mods.cmd || active(app))
+}
+
+/// Whether the whole box takes the pointer, above the editor, rather than only its move reach, below it. A capture
+/// keeps the box it began on to its release, whatever modifiers change during it; otherwise ⌘ held picks the whole
+/// box.
+fn whole_box(app: &PhotocraftApp, mods: Mods) -> bool {
+    match &app.ui.type_transform {
+        Some(t) => !t.from_reach,
+        None => mods.cmd,
+    }
 }
 
 /// The canvas view of the pass the control is shown in; `None` outside a canvas.
@@ -177,52 +187,14 @@ pub(crate) fn frame(app: &mut PhotocraftApp) -> Option<Frame> {
     Some(Frame { layer: id, rect, state: BoxState::new(quad, pivot) })
 }
 
-/// Screen points from `p` to the frame's outline, as the view draws it (zoom, rotation and pixel
-/// aspect).
-fn border_points(view: &CanvasView, state: &BoxState, p: [f64; 2]) -> f64 {
-    let at = view.to_screen(kurbo::Point::new(p[0], p[1]));
-    let on_screen = |q: kurbo::Point| {
-        let s = view.to_screen(q);
-        [f64::from(s.x - at.x), f64::from(s.y - at.y)]
-    };
-    state
-        .quad
-        .iter()
-        .zip(state.quad.iter().cycle().skip(1))
-        .take(4)
-        .map(|(a, b)| {
-            let (a, b) = (on_screen(*a), on_screen(*b));
-            let (dx, dy) = (b[0] - a[0], b[1] - a[1]);
-            let len = dx * dx + dy * dy;
-            let f = if len > 0.0 { (-a[0] * dx - a[1] * dy) / len } else { 0.0 }.clamp(0.0, 1.0);
-            (a[0] + f * dx).hypot(a[1] + f * dy)
-        })
-        .fold(f64::INFINITY, f64::min)
-}
-
-/// Whether `p` is just outside the text's frame, where a plain press moves the text (#5956). Over
-/// another type layer the press is the Type tool's, as before.
-pub(crate) fn move_zone(app: &mut PhotocraftApp, view: &CanvasView, p: [f64; 2]) -> bool {
-    let Some(f) = frame(app) else { return false };
-    if f.state.contains(kurbo::Point::new(p[0], p[1])) || border_points(view, &f.state, p) > MOVE_REACH_PT {
-        return false;
-    }
-    !press_is_the_tools(app, f.layer, p)
-}
-
-/// Whether a press at `p` belongs to the Type tool rather than to the move zone: inside the paragraph box of the
-/// edited layer (it places the caret, #7606), or over another type layer (it edits that one).
-pub(crate) fn press_is_the_tools(app: &mut PhotocraftApp, edited: LayerId, p: [f64; 2]) -> bool {
-    crate::type_tool::inside_box(app, edited, p[0], p[1]) || crate::type_tool::hit_layer(app, p[0], p[1]).is_some_and(|id| id != edited)
-}
-
-/// Starts a temporary transform of `frame`. False when it can't start.
-fn start(app: &mut PhotocraftApp, frame: &Frame) -> bool {
+/// Starts a temporary transform of `frame`, begun on the move reach of the hidden box when `from_reach`. False when it
+/// can't start.
+fn start(app: &mut PhotocraftApp, frame: &Frame, from_reach: bool) -> bool {
     let Some((_, original, _)) = crate::type_tool::layout(app, frame.layer) else { return false };
     let Some(st) = app.session.active() else { return false };
     let (document, revision) = (st.doc.id.0, st.revision);
     let session = session_of(app, frame);
-    app.ui.type_transform = Some(TypeTransform { document, revision, original, session });
+    app.ui.type_transform = Some(TypeTransform { document, revision, original, session, from_reach });
     true
 }
 
@@ -292,38 +264,26 @@ pub(crate) fn finish(app: &mut PhotocraftApp) {
     }
 }
 
-/// The transform box of the open edit, over the canvas `canvas`. It shows (handles live) while ⌘ is held or a drag
-/// runs; otherwise only its move zone is live, so a plain press just outside the text moves it without ending typing
-/// (#5956). A pass applies only the box's own events of its own input: a second pass of a frame gets none, so a drag
-/// is never applied twice.
+/// The transform box of the open edit, over the canvas `canvas`. With ⌘ held, or while a capture begun so runs, the
+/// whole box takes the pointer; otherwise only its move reach does, so a plain press just outside the text moves it
+/// without ending typing (#5956), and every other press is the editor's or the tool's. A press the box holds starts
+/// the capture at once, before any movement; the capture ends with the press. A pass applies only the box's own events
+/// of its own input: a second pass of a frame gets none, so a drag is never applied twice.
 ///
-/// Called twice per pass: with `drawn` false before the text editor (the move zone sits under it, so a press on the
-/// text is the editor's) and with `drawn` true after it (the box's inside moves the text, above the editor). Each
-/// call does its own half. The box must sit below the editor while hidden and above it while shown, so the entry
-/// takes the stage.
+/// Called twice per pass: with `drawn` false before the text editor (the move reach sits under it, so a press on the
+/// text is the editor's) and with `drawn` true after it (the whole box is above the editor). Each call does its own
+/// half; both show the one box, under one id, so a press it holds carries over.
 pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rect, drawn: bool) {
     cancel_stale(app);
     if !app.ui.tool.is_type() || app.ui.text_edit.is_none() {
         return;
     }
     let ctx = ui.ctx().clone();
-    let mods = craft::ui::runtime::pointer::frame(&ctx).mods;
-    if visible(app, mods) != drawn {
+    let pointer = craft::ui::runtime::pointer::frame(&ctx);
+    if whole_box(app, pointer.mods) != drawn {
         return;
     }
     let Some(frame) = frame(app) else { return };
-    // A press inside the paragraph box or over another type layer is the Type tool's (caret, or editing that layer):
-    // the move zone is off for it. A drag that began already keeps going.
-    let press = craft::ui::runtime::pointer::frame(&ctx).press.map(|p| p.origin);
-    let running = app.ui.type_transform.as_ref().is_some_and(|t| t.session.dragging());
-    let tools_press = match (press, view_of(ui)) {
-        (Some(at), Some(view)) if !running => {
-            let p = view.to_doc(at);
-            press_is_the_tools(app, frame.layer, [p.x, p.y])
-        }
-        _ => false,
-    };
-    let reach = if tools_press { 0.0 } else { MOVE_REACH_PT as f32 };
     let spare;
     let session = match &app.ui.type_transform {
         Some(t) => &t.session,
@@ -333,34 +293,41 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rec
         }
     };
     let settings = settings();
-    let out = TransformOverlay::new(Label::from(&*tl!("Type transform")), session, &settings).move_reach(reach).mods(Some(mods)).show_at(ui, canvas);
-    if out.edits.is_empty() && out.apply.is_none() && !out.discard {
+    let reach = if drawn { TransformReach::Box } else { TransformReach::MoveOnly { points: MOVE_REACH_PT as f32 } };
+    let out = TransformOverlay::new(Label::from(&*tl!("Type transform")), session, &settings)
+        .reach(reach)
+        .mods(Some(pointer.mods))
+        .id_salt("type transform")
+        .show_at(ui, canvas);
+    // The press that went down on the box in this pass, or the box's first edit, starts the capture.
+    let pressed = out.held.is_some() && pointer.press.is_some();
+    if app.ui.type_transform.is_none() && !pressed && out.edits.is_empty() && out.apply.is_none() && !out.discard {
         return;
     }
-    // A press that reached the box starts the drag.
-    if app.ui.type_transform.is_none() && !start(app, &frame) {
+    if app.ui.type_transform.is_none() && !start(app, &frame, !drawn) {
         return;
     }
     let now = ui.input(|i| i.time);
     let (mut released, mut cancelled) = (false, false);
-    if let Some(t) = app.ui.type_transform.as_mut() {
-        for edit in out.edits {
-            if let TransformEdit::Box(event) = &edit {
-                released |= event.phase() == Some(GesturePhase::Commit);
-                cancelled |= event.phase() == Some(GesturePhase::Cancel);
-            }
-            t.session.apply(edit, now);
+    let Some(t) = app.ui.type_transform.as_mut() else { return };
+    for edit in out.edits {
+        if let TransformEdit::Box(event) = &edit {
+            released |= event.phase() == Some(GesturePhase::Commit);
+            cancelled |= event.phase() == Some(GesturePhase::Cancel);
         }
+        t.session.apply(edit, now);
     }
+    let dragging = t.session.dragging();
     if out.discard {
-        if let Some(t) = app.ui.type_transform.as_mut() {
-            let _ = t.session.discard();
-        }
+        let _ = t.session.discard();
         cancel_drag(app);
     } else if released || out.apply.is_some() {
         finish(app);
-    } else if cancelled && app.ui.type_transform.as_ref().is_some_and(|t| !t.session.dragging()) {
+    } else if cancelled && !dragging {
         cancel_drag(app);
+    } else if out.held.is_none() && !dragging {
+        // The press ended without a drag (a click), or a key moved the box: the capture ends with it.
+        finish(app);
     }
 }
 
