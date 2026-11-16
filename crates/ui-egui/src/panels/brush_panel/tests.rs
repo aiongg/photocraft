@@ -252,7 +252,8 @@ fn section_locks_round_trip_and_survive_preset_picks() {
 fn options_bar_harness(tool: crate::state::Tool) -> Harness<'static, PhotocraftApp> {
     let mut app = app();
     app.ui.tool = tool;
-    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(2400.0, 60.0)).build_app(
+    // As tall as a window, so the bar's menus open in full below it.
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(2400.0, 600.0)).build_app(
         |ui, app: &mut PhotocraftApp| {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
