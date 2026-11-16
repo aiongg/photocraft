@@ -1531,6 +1531,8 @@ fn export_as_is_recorded_and_replayed() {
     }
     control(&mut app, "ui.dialog.confirm", json!({"dialog": id}));
     answer(&mut app);
+    // The dialog's next pass takes the answered path and exports.
+    control(&mut app, "ui.dialog.confirm", json!({"dialog": id}));
     app.run("actions.stop", json!({})).unwrap();
     assert_eq!(*exported.borrow(), [("/pics/out.jpg".to_string(), 20, 10, Some(70))]);
     let craft::automation::actions::ActionStep { command: step_id, params: step } = app.session.actions.list.actions()[0].steps.last().cloned().unwrap();
