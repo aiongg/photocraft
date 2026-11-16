@@ -40,18 +40,16 @@ pub fn config_dir() -> Option<PathBuf> {
     crate::app_dirs::config_dir()
 }
 
-/// The preferences file before `config.toml`: read once, as the settings store's legacy import
-/// ([`settings_store`]), and never written or removed, so an older build still finds it.
-pub fn prefs_file() -> Option<PathBuf> {
-    config_dir().map(|d| d.join("preferences.json"))
+/// The preferences store in [`config_dir`] (in memory when there is none), importing the older
+/// `preferences.json` on the first run (`photocraft_engine::prefs::store_options`).
+fn settings_store() -> (craft::settings::SettingsStore<photocraft_engine::prefs::SavedPrefs>, craft::settings::LoadReport) {
+    craft::settings::SettingsStore::open_with(photocraft_engine::prefs::store_options(config_dir().as_deref()))
 }
 
-/// The preferences store in [`config_dir`] (in memory when there is none), importing
-/// [`prefs_file`] on the first run.
-fn settings_store() -> (craft::settings::SettingsStore<photocraft_engine::prefs::SavedPrefs>, craft::settings::LoadReport) {
-    let location = config_dir().map_or(craft::settings::Location::Memory, craft::settings::Location::Dir);
-    let legacy = prefs_file().map(|path| craft::settings::LegacyFile { path, parse: photocraft_engine::prefs::parse_legacy_prefs }).into_iter().collect();
-    craft::settings::SettingsStore::open_with(craft::settings::OpenOptions::new(location).legacy(legacy))
+/// The preferences [`settings_store`] would load, read without opening it: the launch reads
+/// before the window opens.
+pub fn saved_prefs() -> photocraft_engine::prefs::SavedPrefs {
+    photocraft_engine::prefs::read_saved(config_dir().as_deref())
 }
 
 fn gpu_memo_file() -> Option<PathBuf> {

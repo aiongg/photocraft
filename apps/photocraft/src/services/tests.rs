@@ -46,7 +46,7 @@ fn a_psd_save_streams_the_exported_bytes_and_keeps_the_old_file_on_error() {
 #[ignore = "requires exclusive use of the Windows clipboard"]
 fn busy_native_clipboard_preserves_copied_shape() {
     for id in ["edit.paste", "edit.pasteSpecial.pasteInPlace"] {
-        let mut native = native(None);
+        let mut native = native(None, craft::host::Wake::none());
         let services =
             Services { clipboard_set_image: native.clipboard_set_image.take(), clipboard_get_image: native.clipboard_get_image.take(), ..Default::default() };
         let mut app = PhotocraftApp::new(Session::new(), services);
