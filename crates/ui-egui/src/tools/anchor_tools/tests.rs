@@ -125,6 +125,22 @@ fn the_pen_adds_and_deletes_anchors_on_the_active_path() {
     assert_eq!(app.ui.pen.as_ref().map(|p| p.draft.knots.len()), Some(1));
 }
 
+/// The anchor tools and Direct Selection leave every press to the path overlay: a click off the paths, or with no path
+/// at all, starts no Pen path and changes nothing.
+#[test]
+fn a_click_off_the_paths_starts_no_pen_path() {
+    for tool in [Tool::AddAnchorPoint, Tool::DeleteAnchorPoint, Tool::ConvertPoint, Tool::DirectSelection] {
+        let mut app = app(tool);
+        click(&mut app, [170.0, 170.0], Modifiers::NONE);
+        assert!(app.ui.pen.is_none(), "{tool:?}: no path");
+        with_path(&mut app);
+        let (before, n) = (work(&app), steps(&app));
+        click(&mut app, [170.0, 170.0], Modifiers::NONE);
+        assert!(app.ui.pen.is_none(), "{tool:?}");
+        assert_eq!((work(&app), steps(&app)), (before, n), "{tool:?}");
+    }
+}
+
 fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2]) {
     testing::press(app, from, Modifiers::NONE);
     let mid = [(from[0] + to[0]) / 2.0, (from[1] + to[1]) / 2.0];

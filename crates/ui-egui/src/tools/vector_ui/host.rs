@@ -1,4 +1,5 @@
-//! The Vector family of the tool host: the Pen, Curvature Pen, Freeform Pen, Path Selection and the Shape tools.
+//! The Vector family of the tool host: the Pen, Curvature Pen, Freeform Pen, the anchor tools, Direct Selection, Path
+//! Selection and the Shape tools.
 //!
 //! [`tool`] builds the selected tool for one pass from the app's options; [`drain`] turns what the tools reported into
 //! the draft in `app.ui.pen`, engine commands and dialogs after the run. A tool switch cancels the Pen through
@@ -6,8 +7,9 @@
 
 use craft::behavior::EditEvent;
 use craft::draw::geometry::ShapeGeometry;
-use craft::draw::ui::pen::{PenEvent, PenTool};
-use craft::draw::ui::{EditSubpath, KnotRef, PenEnd, PenMode, ShapeDragEvent, ShapeDragOptions, ShapeDragTool, ShapeKind};
+use craft::draw::ui::pen::{AnchorTool, PenEvent, PenTool};
+use craft::draw::ui::{EditSubpath, KnotRef, PathTool, PenEnd, PenMode, ShapeDragEvent, ShapeDragOptions, ShapeDragTool, ShapeKind};
+use craft::keymap::Mods;
 use craft::ui::canvas::ToolHostResponse;
 use serde_json::json;
 
@@ -48,6 +50,8 @@ pub(crate) fn handles(tool: Tool) -> bool {
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Which {
     Pen,
+    /// Add and Delete Anchor Point, Convert Point and Direct Selection: the path overlay takes their presses.
+    Anchors(PathTool),
     Shapes,
     Freeform,
     PathSelection,
@@ -92,6 +96,8 @@ fn configure(app: &PhotocraftApp, state: &mut VectorTools) -> Which {
         _ => {
             let curvature = tool == Tool::CurvaturePen;
             let pen = app.ui.pen.as_ref();
+            // The anchor tools run the Pen only to show the open draft (`AnchorTool::draft`).
+            let anchors = crate::direct_select::path_tool(tool, Mods::NONE).filter(|t| !matches!(t, PathTool::Pen | PathTool::Curvature));
             // ⌘ makes the pointer Direct Selection: the draft is drawn and keeps its keys, but takes no presses.
             let sensing = !craft::ui::runtime::pointer::frame(&app.ctx()).mods.cmd;
             state
@@ -103,7 +109,7 @@ fn configure(app: &PhotocraftApp, state: &mut VectorTools) -> Which {
                 .ends(&if pen.is_none_or(|p| p.draft.knots.is_empty()) { pen::ends(app) } else { Vec::new() })
                 .draft(pen.map(|p| &p.draft))
                 .kept(pen.map_or(0, |p| p.kept));
-            Which::Pen
+            anchors.map_or(Which::Pen, Which::Anchors)
         }
     }
 }
@@ -114,6 +120,7 @@ pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut VectorTools, _ho
     // `&mut T` is a `CanvasTool` where `T` is (R92): the selected tool runs as it is.
     match which {
         Which::Pen => Box::new(&mut state.pen),
+        Which::Anchors(tool) => Box::new(AnchorTool::new(tool).draft(&mut state.pen)),
         Which::Shapes => Box::new(&mut state.shapes),
         Which::Freeform => Box::new(&mut state.freeform),
         Which::PathSelection => Box::new(PathSelectionPass { scope, tool: &mut state.path_selection }),
