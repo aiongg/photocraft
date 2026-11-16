@@ -73,37 +73,117 @@ impl SelectionTools {
         self.polygon.reset();
         self.magnetic.reset();
         self.wand.drag.reset();
-        self.wand.dragging = false;
         self.wand.clicks.clear();
         self.lock_prompted = false;
     }
 
     /// The whole-pixel offset of the selection drag in progress, from the tool that runs it.
     pub(crate) fn drag_offset(&self) -> Option<(i32, i32)> {
-        [self.marquee.phase(), self.lasso.phase(), self.polygon.phase(), self.magnetic.phase(), self.wand.drag.phase()].into_iter().find_map(
-            |phase| match phase {
-                SelectPhase::Dragging(drag) => Some((drag.delta[0], drag.delta[1])),
-                _ => None,
-            },
-        )
+        [self.marquee.phase(), self.lasso.phase(), self.polygon.phase(), self.magnetic.phase(), self.wand.drag.phase()]
+            .into_iter()
+            .find_map(drag_delta)
     }
 }
 
-/// The Magic Wand: a click tool of the app. A press inside the selection that drags the outline runs on `drag` (a
-/// marquee, so one mechanism drags every selection); any other press is a click, answered after the run.
+/// The whole-pixel offset of a selection drag in `phase`, if one is under way.
+pub(crate) fn drag_delta(phase: SelectPhase) -> Option<(i32, i32)> {
+    match phase {
+        SelectPhase::Dragging(drag) => Some((drag.delta[0], drag.delta[1])),
+        _ => None,
+    }
+}
+
+/// The drag of a press inside the selection for the app's own tools that select (the Magic Wand, and Object Selection
+/// with Object Finder on): a marquee runs it, so one mechanism drags every selection, and its events go through
+/// [`apply`] like the marquee's own. The tool decides which presses it gets.
+pub(crate) struct InsideSelectionDrag {
+    /// Runs the outline and pixel drags.
+    marquee: MarqueeTool,
+    /// `marquee` owns the gesture, from its press to its release or cancel.
+    active: bool,
+    /// The refusal message of the running pixel drag has been shown.
+    lock_prompted: bool,
+}
+
+impl Default for InsideSelectionDrag {
+    fn default() -> Self {
+        Self { marquee: MarqueeTool::new(MarqueeKind::Rectangle), active: false, lock_prompted: false }
+    }
+}
+
+impl InsideSelectionDrag {
+    /// The options bar's operation, which decides whether a plain press inside the selection drags the outline.
+    pub(crate) fn operation(&mut self, bar: SelectionOperation) {
+        self.marquee.operation(bar);
+    }
+
+    /// The drag owns the gesture.
+    pub(crate) fn active(&self) -> bool {
+        self.active
+    }
+
+    /// Where the drag is, for [`SelectionTools::drag_offset`] and the retouch family's offset.
+    pub(crate) fn phase(&self) -> SelectPhase {
+        self.marquee.phase()
+    }
+
+    /// Drops the drag without a command.
+    pub(crate) fn reset(&mut self) {
+        self.marquee.reset();
+        self.active = false;
+        self.lock_prompted = false;
+    }
+
+    pub(crate) fn each_pass(&mut self, probe: &dyn SelectionProbe, cx: &mut ToolContext<'_>) {
+        self.marquee.pass(probe).each_pass(cx);
+    }
+
+    /// Starts the drag; the caller has checked that the press is inside the selection and drags it.
+    pub(crate) fn press(&mut self, probe: &dyn SelectionProbe, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> ToolAction {
+        let action = self.marquee.pass(probe).press(pointer, cx);
+        self.active = action == ToolAction::Claimed;
+        action
+    }
+
+    pub(crate) fn drag(&mut self, probe: &dyn SelectionProbe, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
+        if self.active {
+            self.marquee.pass(probe).drag(pointer, cx);
+        }
+    }
+
+    pub(crate) fn release(&mut self, probe: &dyn SelectionProbe, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
+        if std::mem::take(&mut self.active) {
+            self.marquee.pass(probe).release(pointer, cx);
+        }
+    }
+
+    pub(crate) fn cancel(&mut self, probe: &dyn SelectionProbe, reason: CancelReason, cx: &mut ToolContext<'_>) {
+        if std::mem::take(&mut self.active) {
+            self.marquee.pass(probe).cancel(reason, cx);
+        }
+    }
+
+    /// The marquee's cursor over the selection: the move cursor for the outline, kept while the drag runs.
+    pub(crate) fn cursor(&mut self, probe: &dyn SelectionProbe, cx: &ToolContext<'_>) -> Cursor {
+        self.marquee.pass(probe).cursor(cx)
+    }
+
+    /// Runs what the drag reported during the run; `tool` is the tool whose drag it was.
+    pub(crate) fn drain(&mut self, app: &mut PhotocraftApp, tool: Tool) {
+        for event in self.marquee.take_events() {
+            apply(app, &mut self.lock_prompted, tool, event);
+        }
+    }
+}
+
+/// The Magic Wand: a click tool of the app. A press inside the selection that drags it runs on `drag`; any other press
+/// is a click, answered after the run.
+#[derive(Default)]
 pub(crate) struct WandState {
-    /// Runs the outline and pixel drags of a press inside the selection.
-    drag: MarqueeTool,
-    /// `drag` owns the gesture.
-    dragging: bool,
+    /// The drag of a press inside the selection.
+    drag: InsideSelectionDrag,
     /// The clicks of this pass, for [`drain`].
     clicks: Vec<WandClick>,
-}
-
-impl Default for WandState {
-    fn default() -> Self {
-        Self { drag: MarqueeTool::new(MarqueeKind::Rectangle), dragging: false, clicks: Vec::new() }
-    }
 }
 
 /// A Magic Wand click: where, and how it combines with the selection.
@@ -377,15 +457,13 @@ impl WandPass<'_> {
 
 impl CanvasTool for WandPass<'_> {
     fn each_pass(&mut self, cx: &mut ToolContext<'_>) {
-        self.state.drag.pass(self.probe).each_pass(cx);
+        self.state.drag.each_pass(self.probe, cx);
     }
 
     fn press(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> ToolAction {
         let Some(at) = cx.space().map(|space| space.view.to_doc(pointer.pos)) else { return ToolAction::Ignored };
         if self.drag_kind(pointer, at).is_some() {
-            let action = self.state.drag.pass(self.probe).press(pointer, cx);
-            self.state.dragging = action == ToolAction::Claimed;
-            return action;
+            return self.state.drag.press(self.probe, pointer, cx);
         }
         if pointer.mods.cmd {
             return ToolAction::Ignored;
@@ -396,28 +474,22 @@ impl CanvasTool for WandPass<'_> {
     }
 
     fn drag(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
-        if self.state.dragging {
-            self.state.drag.pass(self.probe).drag(pointer, cx);
-        }
+        self.state.drag.drag(self.probe, pointer, cx);
     }
 
     fn release(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
-        if std::mem::take(&mut self.state.dragging) {
-            self.state.drag.pass(self.probe).release(pointer, cx);
-        }
+        self.state.drag.release(self.probe, pointer, cx);
     }
 
     fn cancel(&mut self, reason: CancelReason, cx: &mut ToolContext<'_>) {
-        if std::mem::take(&mut self.state.dragging) {
-            self.state.drag.pass(self.probe).cancel(reason, cx);
-        }
+        self.state.drag.cancel(self.probe, reason, cx);
     }
 
     fn paint(&self, _draw: &Draw<'_>, _cx: &ToolContext<'_>) {}
 
     /// The marquee's selection drag takes every move from the press, as the marquee's own does.
     fn takes_every_move(&self) -> bool {
-        self.state.dragging
+        self.state.drag.active()
     }
 
     fn command_form(&self) -> ToolPath {
@@ -499,9 +571,7 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut SelectionTools, _respon
     for event in state.magnetic.take_events() {
         apply(app, &mut state.lock_prompted, Tool::MagneticLasso, event);
     }
-    for event in state.wand.drag.take_events() {
-        apply(app, &mut state.lock_prompted, Tool::MagicWand, event);
-    }
+    state.wand.drag.drain(app, Tool::MagicWand);
     for click in std::mem::take(&mut state.wand.clicks) {
         wand_click(app, &click);
     }
@@ -626,6 +696,7 @@ pub(crate) fn floating_outline(app: &PhotocraftApp, idx: usize) -> Option<photoc
 pub(crate) fn shown_offset(app: &PhotocraftApp) -> Option<(i32, i32)> {
     crate::move_ui::floating_offset(app)
         .or_else(|| app.canvas_tools.selection.drag_offset())
+        .or_else(|| app.canvas_tools.retouch.drag_offset())
         .or_else(|| crate::move_ui::carries_selection(app).then(|| app.canvas_tools.mover.offset()).flatten())
 }
 
