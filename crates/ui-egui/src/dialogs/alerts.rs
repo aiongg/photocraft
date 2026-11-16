@@ -46,7 +46,7 @@ pub fn alert_once(app: &mut PhotocraftApp, message: impl Into<String>, pref: &'s
     if dismissed(app, pref) {
         return None;
     }
-    let prompt = StandardPrompt::custom(message.into()).button(PromptChoice::Proceed, tl!("OK").to_owned()).dont_show_again().tag(AlertOnce { pref });
+    let prompt = StandardPrompt::custom(message.into()).title(TITLE).button(PromptChoice::Proceed, tl!("OK").to_owned()).dont_show_again().tag(AlertOnce { pref });
     open_prompt(app, prompt).ok().or_else(|| prompt_tagged::<AlertOnce>(app))
 }
 
