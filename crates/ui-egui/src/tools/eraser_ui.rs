@@ -1,6 +1,8 @@
 //! UI for the Eraser group's colour-aware tools: Magic Eraser (click → `paint.magicEraser`) and
-<<<<<<< HEAD
 //! Background Eraser (stroke → `paint.backgroundEraser`), with their options-bar members.
+//!
+//! A Magic Eraser press in an Indexed Color or Bitmap document shows the reference's alert (message
+//! + OK) and runs nothing: the document keeps its pixels and its History (#12032).
 
 use craft::behavior::IconId;
 use craft::ui::buttons::ToggleButton;
@@ -9,25 +11,12 @@ use craft::ui::contract::{Bind, Entry, Props as _, Show as _};
 use craft::ui::display::Divider;
 use craft::ui::pickers::Select;
 use craft::ui::primitives::IconSpec;
-=======
-//! Background Eraser (stroke → `paint.backgroundEraser`), with their options bars.
-//!
-//! A Magic Eraser press in an Indexed Color or Bitmap document shows the reference's alert (message
-//! + OK) and runs nothing: the document keeps its pixels and its History (#12032).
-
 use photocraft_engine::eraser_cmds::{MAGIC_ERASER_BITMAP_ERROR, MAGIC_ERASER_INDEXED_ERROR};
->>>>>>> upstream/main
 use serde_json::{Value, json};
 
 use super::option_cells;
 use crate::PhotocraftApp;
-<<<<<<< HEAD
 use crate::state::Tool;
-=======
-use crate::state::{DialogKind, Tool};
-use crate::theme::Tokens;
-use crate::{icons, widgets};
->>>>>>> upstream/main
 
 fn report(app: &mut PhotocraftApp, r: Result<Value, String>) {
     if let Err(e) = r {
@@ -52,7 +41,7 @@ fn error_alert(error: &str) -> Option<&'static str> {
 /// Opens the alert: the message and one OK button, as a refused Move press does
 /// (`move_lock::prompt`).
 fn refuse(app: &mut PhotocraftApp, message: &str) {
-    app.ui.open_dialog(DialogKind::Error, json!({"message": alert_text(message)}).as_object().cloned().unwrap_or_default());
+    crate::dialogs::alerts::alert(app, alert_text(message));
 }
 
 /// The alert in the UI language. Literal keys, so the translation report lists both alerts for the
@@ -268,6 +257,7 @@ fn background_eraser_members(ui: &mut egui::Ui, app: &mut PhotocraftApp) {
 
 #[cfg(test)]
 mod tests {
+    use super::super::brush_refusal::brush_refusal_alert_tests::alerts;
     use super::*;
     use photocraft_doc::{Color, ColorMode, Document, SampleType, Size};
 
@@ -280,11 +270,6 @@ mod tests {
                 assert_eq!(alert_text(text), text);
             }
         });
-    }
-
-    /// The message of every open error dialog, in the order they were opened.
-    fn alerts(app: &PhotocraftApp) -> Vec<&str> {
-        app.ui.dialogs.iter().filter(|d| d.kind == DialogKind::Error).filter_map(|d| d.fields.get("message").and_then(|m| m.as_str())).collect()
     }
 
     /// The app with a white 64x48 document in `mode` open and the Magic Eraser picked: a click on
@@ -315,12 +300,11 @@ mod tests {
             assert_eq!(st.doc.layer(id).unwrap().name, "Background", "{case}: still a Background");
             assert!(st.doc.layer(id).unwrap().surface().unwrap().rgba(2, 2)[3] > 0.0, "{case}: nothing erased");
             assert!(!app.ui.status_error, "{case}: the alert is the answer, not the status bar");
-            // OK closes it (`DialogKind::Error` asks for nothing else), and the next press answers
-            // the same way: the document is no more erasable than it was.
-            let open: Vec<u64> = app.ui.dialogs.iter().map(|d| d.id).collect();
-            for dialog in open {
-                app.ui.close_dialog(dialog);
-            }
+            // OK closes it, and the next press answers the same way: the document is no more
+            // erasable than it was.
+            let id = app.framework.dialogs.open_dialogs().first().map(|d| d.id).unwrap();
+            let ctx = app.ctx().clone();
+            crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
             click(&mut app, Tool::MagicEraser, 10.0, 10.0);
             assert_eq!(alerts(&app), [want], "{case}: the next press is refused too");
             assert_eq!(app.session.active().unwrap().history.past_len(), steps, "{case}: still no History step");
@@ -342,7 +326,7 @@ mod tests {
             let mut app = app_in(mode);
             let steps = app.session.active().unwrap().history.past_len();
             assert!(click(&mut app, Tool::MagicEraser, 2.0, 2.0), "{case}");
-            assert!(app.ui.dialogs.iter().all(|d| d.kind != DialogKind::Error), "{case}: no alert");
+            assert!(alerts(&app).is_empty(), "{case}: no alert");
             let st = app.session.active().unwrap();
             let id = st.active_layer.unwrap();
             assert_eq!(st.doc.layer(id).unwrap().name, "Layer 0", "{case}: the Background became a layer");
