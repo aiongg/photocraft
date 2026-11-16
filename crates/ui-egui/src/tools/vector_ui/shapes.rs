@@ -1,11 +1,12 @@
 use craft::behavior::CanvasView;
 use craft::behavior::kurbo::{Point, Rect};
 use craft::draw::geometry::shape::ShapeGeometry;
-use craft::draw::ui::shape_drag::ShapeKind;
+use craft::draw::ui::shape_drag::{BoxConstraints, ShapeKind};
 use craft::keymap::Mods;
 
 use super::options::{draws_path, solid_paint};
 use super::{Color32, PhotocraftApp, Tool, Value, json, paint_param};
+use crate::state::ToolOptions;
 
 pub fn is_shape_tool(t: Tool) -> bool {
     matches!(t, Tool::Rectangle | Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Star | Tool::Line | Tool::CustomShape)
@@ -138,6 +139,7 @@ fn snapped(geometry: &ShapeGeometry, keep_angle: bool, whole: bool) -> Option<Sh
     Some(match geometry {
         ShapeGeometry::Rect { rect, radii } => ShapeGeometry::Rect { rect: whole_box(rect, whole)?, radii: *radii },
         ShapeGeometry::Ellipse { rect } => ShapeGeometry::Ellipse { rect: whole_box(rect, whole)? },
+        ShapeGeometry::Triangle { rect } => ShapeGeometry::Triangle { rect: whole_box(rect, whole)? },
         ShapeGeometry::Polygon { rect, sides, star_ratio } => ShapeGeometry::Polygon { rect: whole_box(rect, whole)?, sides: *sides, star_ratio: *star_ratio },
         ShapeGeometry::Custom { rect, keep_proportions } => ShapeGeometry::Custom { rect: whole_box(rect, whole)?, keep_proportions: *keep_proportions },
         ShapeGeometry::Line { from, to, weight } => {
@@ -149,6 +151,33 @@ fn snapped(geometry: &ShapeGeometry, keep_angle: bool, whole: bool) -> Option<Sh
         }
         other => other.clone(),
     })
+}
+
+/// The Rectangle tool's gear as the framework's [`BoxConstraints`]: the stored constraint name (serde's names), the
+/// fixed and ratio pairs (a 0 is an empty field) and From Center. The one mapping the tool's drag
+/// (`host::configure`) and the gear in the options bar share.
+pub(super) fn constraints_of(o: &ToolOptions) -> BoxConstraints {
+    let field = |v: f32| (v != 0.0).then_some(f64::from(v));
+    let mut c = BoxConstraints::default();
+    c.constraint = serde_json::from_value(json!(o.rect_constraint)).unwrap_or_default();
+    c.fixed = (field(o.rect_fixed_width), field(o.rect_fixed_height));
+    c.ratio = (field(o.rect_ratio_width), field(o.rect_ratio_height));
+    c.from_center = o.rect_from_center;
+    c
+}
+
+/// Stores the gear's `constraints` into the options: the inverse of [`constraints_of`].
+pub(super) fn store_constraints(o: &mut ToolOptions, constraints: &BoxConstraints) {
+    let field = |v: Option<f64>| v.map_or(0.0, |v| v as f32);
+    o.rect_constraint = match serde_json::to_value(constraints.constraint) {
+        Ok(Value::String(name)) => name,
+        _ => "unconstrained".into(),
+    };
+    o.rect_fixed_width = field(constraints.fixed.0);
+    o.rect_fixed_height = field(constraints.fixed.1);
+    o.rect_ratio_width = field(constraints.ratio.0);
+    o.rect_ratio_height = field(constraints.ratio.1);
+    o.rect_from_center = constraints.from_center;
 }
 
 fn box_of(rect: &Rect) -> [f64; 4] {
@@ -165,7 +194,7 @@ fn geometry_params(app: &PhotocraftApp, geometry: &ShapeGeometry, kind: ShapeKin
         ShapeGeometry::Rect { rect, .. } => json!({"kind": "rect", "rect": box_of(rect)}),
         ShapeGeometry::Ellipse { rect } => json!({"kind": "ellipse", "rect": box_of(rect)}),
         // The Triangle tool's triangle fills its box (#13350).
-        ShapeGeometry::Polygon { rect, .. } if kind == ShapeKind::Triangle => json!({"kind": "triangle", "rect": box_of(rect)}),
+        ShapeGeometry::Triangle { rect } => json!({"kind": "triangle", "rect": box_of(rect)}),
         ShapeGeometry::Polygon { rect, sides, star_ratio } => {
             let mut p = json!({"kind": if kind == ShapeKind::Star { "star" } else { "polygon" }, "rect": box_of(rect), "sides": sides});
             if kind == ShapeKind::Star || *star_ratio < 1.0 {

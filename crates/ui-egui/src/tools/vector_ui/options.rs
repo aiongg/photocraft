@@ -25,6 +25,7 @@ use crate::history_keys;
 struct BarOpen {
     path_options: bool,
     arrows: bool,
+    rect_gear: bool,
 }
 
 /// A label from a translated string.
@@ -116,6 +117,19 @@ fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut BarOpe
         path_alignment_menu(app, ui);
         path_arrangement_menu(app, ui);
     }
+    if tool == Tool::Rectangle {
+        // The gear: what a drag is kept to (square, fixed size, proportional) and From Center.
+        Divider::vertical().show(ui);
+        let ppi = document_ppi(app);
+        let gear = super::shapes::constraints_of(&app.ui.tool_options);
+        let out = fw::BoxConstraintsPopover::new(Bind::given(gear), Bind::bound(&mut open.rect_gear), ppi).show(ui);
+        if let Some(picked) = out.edits.iter().rev().find_map(EditEvent::value) {
+            super::shapes::store_constraints(&mut app.ui.tool_options, picked);
+        }
+        if let Some(alert) = out.out_of_range {
+            crate::option_cells::range_alert(app, ui, &alert);
+        }
+    }
     if tool == Tool::Line {
         let alert;
         Divider::vertical().show(ui);
@@ -153,8 +167,8 @@ fn pen_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut Ba
         let ppi = document_ppi(app);
         let o = &mut app.ui.tool_options;
         let look = fw::ShapeAppearance::new(Paint::None, Paint::None, f64::from(o.stroke_width)).stroke_style((&o.shape_stroke).into());
-        let events = StrokeCells::new(&look, ppi).corners(true).stroke_open(Bind::bound(&mut app.ui.shape_stroke_open)).show(ui);
-        for event in &events {
+        let out = StrokeCells::new(&look, ppi).corners(true).stroke_open(Bind::bound(&mut app.ui.shape_stroke_open)).show(ui);
+        for event in &out.events {
             match event.value() {
                 Some(fw::ShapeChange::StrokeWidth(w)) => o.stroke_width = *w as f32,
                 Some(fw::ShapeChange::StrokeStyle { style, width, .. }) => {
@@ -165,6 +179,9 @@ fn pen_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut Ba
                 }
                 _ => {}
             }
+        }
+        if let Some(alert) = out.out_of_range {
+            crate::option_cells::range_alert(app, ui, &alert);
         }
     }
     Divider::vertical().show(ui);

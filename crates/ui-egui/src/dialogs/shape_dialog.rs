@@ -29,7 +29,7 @@ pub(crate) fn open(app: &mut PhotocraftApp, kind: ShapeKind, at: Point) -> Optio
     let units = GuideUnits::new(ruler, size[0], size[1], dpi).points_per_inch(points);
     // The options bar has no star ratio: a polygon opens as a plain polygon.
     let options = CreateShapeOptions::initial(kind, at).units(units).tool(radius, sides, 1.0);
-    Some(app.framework.dialogs.open(CreateShapeDialog::new(options)))
+    Some(app.framework.dialogs.open(CreateShapeDialog::new(options).alert_title(tl!("PhotoCraft"))))
 }
 
 /// Whether a click at `at` (document px) with the Rectangle tool in Shape mode lies inside the active live
@@ -57,8 +57,12 @@ pub(crate) fn click_inside_active_rectangle(app: &PhotocraftApp, kind: ShapeKind
         .all(|((dx, dy), radius)| dx >= radius || dy >= radius || (radius - dx).hypot(radius - dy) <= radius)
 }
 
-/// Draws the shape of a Create Shape dialog that finished OK this pass.
+/// Opens the alert of a size typed past its range, once, then draws the shape of a Create Shape dialog that
+/// finished OK this pass.
 pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
+    if let Some(alert) = app.framework.dialogs.get_mut::<CreateShapeDialog>().and_then(CreateShapeDialog::take_range_alert) {
+        let _ = super::alerts::show(app, alert);
+    }
     let Some(DialogResult::Ok(shape)) = app.framework.dialogs.take::<CreateShapeDialog>() else { return };
 
     if let Err(e) = crate::vector_ui::create_geometry(app, &shape.geometry, shape.kind, crate::vector_ui::tool_history_name(shape.kind)) {
