@@ -37,7 +37,7 @@ fn app() -> PhotocraftApp {
 /// What a press could change: history states, layers, open dialogs and colour samplers.
 fn document_state(app: &PhotocraftApp) -> (usize, usize, usize, usize) {
     let st = app.session.active().unwrap();
-    (st.history.past_len(), st.doc.layers.len(), app.ui.dialogs.len(), st.color_samplers.len())
+    (st.history.past_len(), st.doc.layers.len(), app.framework.dialogs.stack().ids().count(), st.color_samplers.len())
 }
 
 /// The foreground colour in 8-bit RGB.
@@ -159,11 +159,11 @@ fn unmeasured_cases_keep_drawing() {
     assert!(!shape_alt_samples(&mut app, Modifiers::NONE, ON_RED[0], ON_RED[1]));
     assert!(!shape_alt_samples(&mut app, Modifiers::ALT | Modifiers::CTRL, ON_RED[0], ON_RED[1]), "Control+⌥ is the brush resize");
     assert!(!shape_alt_samples(&mut app, Modifiers::ALT, -40.0, -40.0), "nothing to sample off the image");
-    for mode in ["path", "pixels"] {
-        app.ui.tool_options.shape_mode = mode.into();
-        assert!(!shape_alt_samples(&mut app, Modifiers::ALT, ON_RED[0], ON_RED[1]), "{mode} mode wasn't measured");
+    for mode in [craft::draw::ui::VectorMode::Path, craft::draw::ui::VectorMode::Pixels] {
+        app.ui.tool_options.shape_mode = mode;
+        assert!(!shape_alt_samples(&mut app, Modifiers::ALT, ON_RED[0], ON_RED[1]), "{mode:?} mode wasn't measured");
     }
-    app.ui.tool_options.shape_mode = "shape".into();
+    app.ui.tool_options.shape_mode = craft::draw::ui::VectorMode::Shape;
     app.ui.tool = Tool::Rectangle;
     assert!(!shape_alt_samples(&mut app, Modifiers::ALT, ON_RED[0], ON_RED[1]), "the other shape tools are their own items");
     // Off the image the press draws from the centre, as before.

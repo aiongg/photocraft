@@ -1,6 +1,8 @@
 use crate::canvas::{ToolEvent, tool_event};
 use crate::state::Tool;
 use crate::{PhotocraftApp, Services};
+use craft::draw::ui::VectorMode;
+use craft::draw::ui::shape_drag::CreateShapeDialog;
 use serde_json::json;
 
 fn app() -> PhotocraftApp {
@@ -30,11 +32,9 @@ fn state(app: &PhotocraftApp) -> (usize, usize) {
 }
 
 fn assert_create_rectangle(app: &PhotocraftApp) {
-    let [dialog] = app.ui.dialogs.as_slice() else { panic!("expected one Create Rectangle dialog") };
-    assert_eq!(dialog.fields["__label"], "Create Rectangle");
-    assert_eq!(dialog.fields["width"], 100.0);
-    assert_eq!(dialog.fields["height"], 100.0);
-    assert_eq!(dialog.fields["fromCenter"], false);
+    let dialog = app.framework.dialogs.get::<CreateShapeDialog>().expect("one Create Rectangle dialog");
+    assert_eq!(dialog.options().size, (100.0, 100.0));
+    assert!(!dialog.options().from_center);
 }
 
 #[test]
@@ -45,7 +45,7 @@ fn inside_the_active_live_rectangle_is_a_no_op() {
     let center = [500.0, 350.0];
     for end in [center, [501.0, 350.0]] {
         gesture(&mut app, center, end);
-        assert!(app.ui.dialogs.is_empty());
+        assert!(app.framework.dialogs.is_empty());
         assert_eq!(state(&app), before);
     }
 }
@@ -87,10 +87,10 @@ fn rounded_corners_use_the_outline() {
     let before = state(&app);
     let center = [500.0, 350.0];
     gesture(&mut app, center, center);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.framework.dialogs.is_empty());
     assert_eq!(state(&app), before);
     let corner = [401.0, 301.0];
-    super::finish_gesture(&mut app, super::Drag::new(Tool::Rectangle, corner, vec![[corner[0], corner[1], 1.0]], egui::Modifiers::NONE, false));
+    gesture(&mut app, corner, corner);
     assert_create_rectangle(&app);
 }
 
@@ -100,12 +100,12 @@ fn other_modes_keep_their_click_behavior() {
     shape(&mut app, "rect", 0.0);
     let before = state(&app);
     let center = [500.0, 350.0];
-    app.ui.tool_options.shape_mode = "path".into();
+    app.ui.tool_options.shape_mode = VectorMode::Path;
     gesture(&mut app, center, center);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.framework.dialogs.is_empty());
     assert!(app.session.active().unwrap().doc.work_path.is_none());
-    app.ui.tool_options.shape_mode = "pixels".into();
-    super::finish_gesture(&mut app, super::Drag::new(Tool::Rectangle, center, vec![[center[0], center[1], 1.0]], egui::Modifiers::NONE, false));
+    app.ui.tool_options.shape_mode = VectorMode::Pixels;
+    gesture(&mut app, center, center);
     assert_create_rectangle(&app);
     assert_eq!(state(&app), before);
 }
@@ -116,6 +116,6 @@ fn more_than_one_pixel_of_travel_still_draws_a_shape() {
     shape(&mut app, "rect", 0.0);
     let (layers, history) = state(&app);
     gesture(&mut app, [500.0, 350.0], [502.0, 351.0]);
-    assert!(app.ui.dialogs.is_empty());
+    assert!(app.framework.dialogs.is_empty());
     assert_eq!(state(&app), (layers + 1, history + 1));
 }

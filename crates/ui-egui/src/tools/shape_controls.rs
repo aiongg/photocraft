@@ -234,7 +234,7 @@ fn normal_rect([x, y, w, h]: [f64; 4]) -> Option<[f64; 4]> {
 }
 
 /// A shape layer's live shape as a widget target, if it has corners: a rectangle's four, each with its own
-/// radius; a polygon's or star's outer points sharing one.
+/// radius; a polygon's or star's outer points, or a triangle's three, sharing one.
 fn corner_target(layer: u64, live: &LiveShape) -> Option<CornerTarget> {
     let at = |p: [f64; 2]| Point::new(p[0], p[1]);
     match *live {
@@ -259,6 +259,19 @@ fn corner_target(layer: u64, live: &LiveShape) -> Option<CornerTarget> {
             // A star's inner points stay sharp, so they have no widget.
             let corners = (0..n)
                 .filter(|&i| shapes::polygon_rounds_vertex(star_ratio, i))
+                .map(|i| CornerPoint::new(at(vertices[i]), at(vertices[(i + n - 1) % n]), at(vertices[(i + 1) % n]), corner_radius.max(0.0), CornerKind::Round))
+                .collect();
+            Some(CornerTarget::new(layer, corners, false))
+        }
+        LiveShape::Triangle { rect, corner_radius } => {
+            let [x, y, w, h] = normal_rect(rect)?;
+            if !corner_radius.is_finite() {
+                return None;
+            }
+            let sharp = shapes::triangle(x, y, w, h);
+            let vertices: Vec<[f64; 2]> = sharp.subpaths.first()?.knots.iter().map(|k| [k.anchor.x, k.anchor.y]).collect();
+            let n = vertices.len();
+            let corners = (0..n)
                 .map(|i| CornerPoint::new(at(vertices[i]), at(vertices[(i + n - 1) % n]), at(vertices[(i + 1) % n]), corner_radius.max(0.0), CornerKind::Round))
                 .collect();
             Some(CornerTarget::new(layer, corners, false))
@@ -300,6 +313,7 @@ fn rounded_path(live: &LiveShape, radii: &[f64]) -> Option<Path> {
             let corner_radius = radii.first().copied().unwrap_or(0.0);
             Some(shapes::live_path(&LiveShape::Polygon { rect, sides, star_ratio, corner_radius }))
         }
+        LiveShape::Triangle { rect, .. } => Some(shapes::live_path(&LiveShape::Triangle { rect, corner_radius: radii.first().copied().unwrap_or(0.0) })),
         LiveShape::Ellipse { .. } | LiveShape::Line { .. } | LiveShape::ArrowLine { .. } => None,
     }
 }
@@ -343,7 +357,7 @@ fn show_widgets(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect) {
 }
 
 /// One `shape.edit` per changed target, all under `key` so they are one History step: `radii` for a
-/// rectangle, `cornerRadius` for a polygon. A click without movement reports no change and runs nothing.
+/// rectangle, `cornerRadius` for a polygon or a triangle. A click without movement reports no change and runs nothing.
 fn commit_corners(app: &mut PhotocraftApp, targets: &[CornerTarget], change: Option<&craft::draw::ui::corner::CornerEdit>, key: &str) {
     let Some(change) = change else { return };
     for edit in &change.targets {

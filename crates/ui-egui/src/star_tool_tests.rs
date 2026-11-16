@@ -86,8 +86,6 @@ fn a_drag_makes_a_live_star_shape_layer_with_one_undo_step() {
     app.run("edit.undo", json!({})).unwrap();
     assert!(live_shape(&app).is_none(), "undo takes the star away");
 }
-<<<<<<< HEAD
-=======
 
 #[test]
 fn shift_and_alt_constrain_and_centre_the_star_like_the_polygon_tool() {
@@ -99,4 +97,3 @@ fn shift_and_alt_constrain_and_centre_the_star_like_the_polygon_tool() {
         other => panic!("a live star shape, got {other:?}"),
     }
 }
->>>>>>> upstream/main
