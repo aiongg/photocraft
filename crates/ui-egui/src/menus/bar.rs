@@ -33,10 +33,10 @@ fn english_of(model: &items::MenuModel) -> impl Fn(Labeled<'_>) -> Option<String
 /// is laid out with the options the model was built with, so the palette and the bars agree.
 pub(crate) fn help_entries(app: &mut PhotocraftApp, ctx: &egui::Context) -> Vec<craft::ui::menu::HelpEntry> {
     use craft::menu::{LayoutOptions, Target};
-    let extra = crate::shortcut_dispatch::extra_shortcuts(app);
     let lang = crate::i18n::current();
     let model = items::model(app, ctx);
     let label = |s: &'static str| crate::i18n::tr(lang, s).to_string();
-    let options = LayoutOptions::new(crate::native_menu::APP_NAME).label(&label).extra_shortcuts(&extra);
+    let keys = |chord: &craft::keymap::Chord| craft::ui::runtime::commands::holder(ctx, chord);
+    let options = LayoutOptions::new(crate::native_menu::APP_NAME).label(&label).keys(&keys);
     model.bar.help_entries(Target::current(), &options, Some(&english_of(model)))
 }

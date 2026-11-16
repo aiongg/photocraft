@@ -462,6 +462,13 @@ impl Framework {
             .unwrap_or_else(|| id.as_str().to_owned())
     }
 
+    /// What the runtime's keymap was last built from: the preferences revision of the overrides and the catalog's
+    /// generation. They change at the start of the frame whose keymap follows them, so a surface that shows the
+    /// keymap's chords (the menu model) hashes them to rebuild in that frame.
+    pub(crate) fn keymap_inputs(&self) -> (Option<u64>, u64) {
+        (self.overrides_rev, self.catalog_generation)
+    }
+
     /// Rebuilds the catalog and the runtime's keymap overrides at preferences revision `rev`. The
     /// pane moves are unbound in the overrides, because PhotoCraft's own table binds F6 and
     /// Shift+F6 (Window › Color, Select › Modify › Feather) until those are a framework

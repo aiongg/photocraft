@@ -106,6 +106,8 @@ fn saved_bindings_decide_which_row_shows_the_system_keys() {
                 p.alternate_shortcuts.insert((*id).into(), vec![(*key).into()]);
             }
         });
+        // The runtime's keymap takes the saved bindings at the start of a frame.
+        crate::canvas::testing::frame(&mut a);
         let layout = laid(&mut a);
         assert_eq!(showing(&layout, c.key), c.shown_by, "{}", c.case);
     }
@@ -124,6 +126,7 @@ fn an_imported_kys_set_owns_the_system_keys_it_binds() {
     let mut a = app(true);
     // PLAN: assumed the import still runs through `edit.keyboardShortcuts {importKys}` (top-w20 owns the `ImportPlan` route).
     a.session.execute("edit.keyboardShortcuts", json!({"importKys": SET})).unwrap();
+    crate::canvas::testing::frame(&mut a);
     let layout = laid(&mut a);
     assert_eq!(showing(&layout, "Cmd+M"), ["image.adjustments.levels"]);
 
