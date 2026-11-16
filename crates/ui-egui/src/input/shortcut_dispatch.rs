@@ -506,7 +506,9 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[F
         if crate::opacity_keys::fired(app, f, now) || crate::blend_keys::fired(app, f) {
             continue;
         }
-        if let Some(tool) = crate::tool_shortcuts::tool(id) {
+        // A tool command a key fired: its letter picks within the group; a click or a menu row selects the tool itself.
+        let keyed_tool = || (f.source == FireSource::Key).then(|| crate::panels::tool_commands::ToolCommand::from_ref(&f.command)).flatten();
+        if let Some(tool) = crate::tool_shortcuts::tool(id).or_else(|| keyed_tool().map(crate::panels::tool_commands::tool_of)) {
             match f.phase {
                 // A key the user gave this tool selects exactly it (#4086); its letter belongs to the group.
                 FirePhase::Press if !crate::tool_shortcuts::uses_default(app, tool) => crate::tool_memory::select(app, tool),

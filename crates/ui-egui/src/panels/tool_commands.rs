@@ -9,95 +9,96 @@ use super::toolbar::layout_sections;
 use crate::state::Tool;
 
 /// Selecting a tool, as a command: the rail's buttons and the Edit Toolbar drawer's rows run it, and the application
-/// routes a fired one to `tool_memory::select`. Tool letters are the tool keys' own (`tool_shortcuts`), not declared here.
+/// routes a fired one to `tool_memory::select`. A tool's letter is the command's default key and its group, so the rail's tooltips and the menus show it; the
+/// tools of one letter cycle through `shortcut_dispatch::run_fired`, and the Shift+letter step is `tool_shortcuts`'s.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, CommandSet)]
 #[command(prefix = "toolSelect")]
 pub(crate) enum ToolCommand {
-    #[command(label = "Move Tool", icon = "move", kind = "tool", group = "tools", alias = "tools.select.move")]
+    #[command(label = "Move Tool", icon = "move", kind = "tool", group = "V", default = "V", alias = "tools.select.move")]
     Move,
-    #[command(label = "Artboard Tool", icon = "artboard", kind = "tool", group = "tools", alias = "tools.select.artboard")]
+    #[command(label = "Artboard Tool", icon = "artboard", kind = "tool", group = "V", default = "V", alias = "tools.select.artboard")]
     Artboard,
-    #[command(label = "Rectangular Marquee Tool", icon = "square-dashed", kind = "tool", group = "tools", alias = "tools.select.rectMarquee")]
+    #[command(label = "Rectangular Marquee Tool", icon = "square-dashed", kind = "tool", group = "M", default = "M", alias = "tools.select.rectMarquee")]
     RectMarquee,
-    #[command(label = "Elliptical Marquee Tool", icon = "ellipse_dashed", kind = "tool", group = "tools", alias = "tools.select.ellipseMarquee")]
+    #[command(label = "Elliptical Marquee Tool", icon = "ellipse_dashed", kind = "tool", group = "M", default = "M", alias = "tools.select.ellipseMarquee")]
     EllipseMarquee,
     #[command(label = "Single Row Marquee Tool", icon = "marquee_row", kind = "tool", group = "tools", alias = "tools.select.singleRowMarquee")]
     SingleRowMarquee,
     #[command(label = "Single Column Marquee Tool", icon = "marquee_column", kind = "tool", group = "tools", alias = "tools.select.singleColumnMarquee")]
     SingleColumnMarquee,
-    #[command(label = "Lasso Tool", icon = "lasso", kind = "tool", group = "tools", alias = "tools.select.lasso")]
+    #[command(label = "Lasso Tool", icon = "lasso", kind = "tool", group = "L", default = "L", alias = "tools.select.lasso")]
     Lasso,
-    #[command(label = "Polygonal Lasso Tool", icon = "pentagon", kind = "tool", group = "tools", alias = "tools.select.polygonLasso")]
+    #[command(label = "Polygonal Lasso Tool", icon = "pentagon", kind = "tool", group = "L", default = "L", alias = "tools.select.polygonLasso")]
     PolygonLasso,
-    #[command(label = "Magnetic Lasso Tool", icon = "lasso_magnetic", kind = "tool", group = "tools", alias = "tools.select.magneticLasso")]
+    #[command(label = "Magnetic Lasso Tool", icon = "lasso_magnetic", kind = "tool", group = "L", default = "L", alias = "tools.select.magneticLasso")]
     MagneticLasso,
-    #[command(label = "Magic Wand Tool", icon = "wand_sparkles", kind = "tool", group = "tools", alias = "tools.select.magicWand")]
+    #[command(label = "Magic Wand Tool", icon = "wand_sparkles", kind = "tool", group = "W", default = "W", alias = "tools.select.magicWand")]
     MagicWand,
-    #[command(label = "Crop Tool", icon = "crop", kind = "tool", group = "tools", alias = "tools.select.crop")]
+    #[command(label = "Crop Tool", icon = "crop", kind = "tool", group = "C", default = "C", alias = "tools.select.crop")]
     Crop,
-    #[command(label = "Perspective Crop Tool", icon = "perspective_crop", kind = "tool", group = "tools", alias = "tools.select.perspectiveCrop")]
+    #[command(label = "Perspective Crop Tool", icon = "perspective_crop", kind = "tool", group = "C", default = "C", alias = "tools.select.perspectiveCrop")]
     PerspectiveCrop,
-    #[command(label = "Eyedropper Tool", icon = "pipette", kind = "tool", group = "tools", alias = "tools.select.eyedropper")]
+    #[command(label = "Eyedropper Tool", icon = "pipette", kind = "tool", group = "I", default = "I", alias = "tools.select.eyedropper")]
     Eyedropper,
-    #[command(label = "Color Sampler Tool", icon = "sampler", kind = "tool", group = "tools", alias = "tools.select.colorSampler")]
+    #[command(label = "Color Sampler Tool", icon = "sampler", kind = "tool", group = "I", default = "I", alias = "tools.select.colorSampler")]
     ColorSampler,
-    #[command(label = "Ruler Tool", icon = "ruler", kind = "tool", group = "tools", alias = "tools.select.ruler")]
+    #[command(label = "Ruler Tool", icon = "ruler", kind = "tool", group = "I", default = "I", alias = "tools.select.ruler")]
     Ruler,
-    #[command(label = "Note Tool", icon = "message-square", kind = "tool", group = "tools", alias = "tools.select.note")]
+    #[command(label = "Note Tool", icon = "message-square", kind = "tool", group = "I", default = "I", alias = "tools.select.note")]
     Note,
-    #[command(label = "Count Tool", icon = "target", kind = "tool", group = "tools", alias = "tools.select.count")]
+    #[command(label = "Count Tool", icon = "target", kind = "tool", group = "I", default = "I", alias = "tools.select.count")]
     Count,
-    #[command(label = "Brush Tool", icon = "brush", kind = "tool", group = "tools", alias = "tools.select.brush")]
+    #[command(label = "Brush Tool", icon = "brush", kind = "tool", group = "B", default = "B", alias = "tools.select.brush")]
     Brush,
-    #[command(label = "Pencil Tool", icon = "pencil", kind = "tool", group = "tools", alias = "tools.select.pencil")]
+    #[command(label = "Pencil Tool", icon = "pencil", kind = "tool", group = "B", default = "B", alias = "tools.select.pencil")]
     Pencil,
-    #[command(label = "Mixer Brush Tool", icon = "palette", kind = "tool", group = "tools", alias = "tools.select.mixerBrush")]
+    #[command(label = "Mixer Brush Tool", icon = "palette", kind = "tool", group = "B", default = "B", alias = "tools.select.mixerBrush")]
     MixerBrush,
-    #[command(label = "Color Replacement Tool", icon = "brush_replace", kind = "tool", group = "tools", alias = "tools.select.colorReplacement")]
+    #[command(label = "Color Replacement Tool", icon = "brush_replace", kind = "tool", group = "B", default = "B", alias = "tools.select.colorReplacement")]
     ColorReplacement,
-    #[command(label = "Eraser Tool", icon = "eraser", kind = "tool", group = "tools", alias = "tools.select.eraser")]
+    #[command(label = "Eraser Tool", icon = "eraser", kind = "tool", group = "E", default = "E", alias = "tools.select.eraser")]
     Eraser,
-    #[command(label = "Background Eraser Tool", icon = "eraser_background", kind = "tool", group = "tools", alias = "tools.select.backgroundEraser")]
+    #[command(label = "Background Eraser Tool", icon = "eraser_background", kind = "tool", group = "E", default = "E", alias = "tools.select.backgroundEraser")]
     BackgroundEraser,
-    #[command(label = "Magic Eraser Tool", icon = "eraser_magic", kind = "tool", group = "tools", alias = "tools.select.magicEraser")]
+    #[command(label = "Magic Eraser Tool", icon = "eraser_magic", kind = "tool", group = "E", default = "E", alias = "tools.select.magicEraser")]
     MagicEraser,
-    #[command(label = "Gradient Tool", icon = "gradient", kind = "tool", group = "tools", alias = "tools.select.gradient")]
+    #[command(label = "Gradient Tool", icon = "gradient", kind = "tool", group = "G", default = "G", alias = "tools.select.gradient")]
     Gradient,
-    #[command(label = "Paint Bucket Tool", icon = "paint_bucket", kind = "tool", group = "tools", alias = "tools.select.paintBucket")]
+    #[command(label = "Paint Bucket Tool", icon = "paint_bucket", kind = "tool", group = "G", default = "G", alias = "tools.select.paintBucket")]
     PaintBucket,
-    #[command(label = "Horizontal Type Tool", icon = "type", kind = "tool", group = "tools", alias = "tools.select.type")]
+    #[command(label = "Horizontal Type Tool", icon = "type", kind = "tool", group = "T", default = "T", alias = "tools.select.type")]
     Type,
-    #[command(label = "Vertical Type Tool", icon = "type", kind = "tool", group = "tools", alias = "tools.select.verticalType")]
+    #[command(label = "Vertical Type Tool", icon = "type", kind = "tool", group = "T", default = "T", alias = "tools.select.verticalType")]
     VerticalType,
-    #[command(label = "Horizontal Type Mask Tool", icon = "type_mask", kind = "tool", group = "tools", alias = "tools.select.horizontalTypeMask")]
+    #[command(label = "Horizontal Type Mask Tool", icon = "type_mask", kind = "tool", group = "T", default = "T", alias = "tools.select.horizontalTypeMask")]
     HorizontalTypeMask,
-    #[command(label = "Vertical Type Mask Tool", icon = "type_mask_vertical", kind = "tool", group = "tools", alias = "tools.select.verticalTypeMask")]
+    #[command(label = "Vertical Type Mask Tool", icon = "type_mask_vertical", kind = "tool", group = "T", default = "T", alias = "tools.select.verticalTypeMask")]
     VerticalTypeMask,
-    #[command(label = "Hand Tool", icon = "hand", kind = "tool", group = "tools", alias = "tools.select.hand")]
+    #[command(label = "Hand Tool", icon = "hand", kind = "tool", group = "H", default = "H", alias = "tools.select.hand")]
     Hand,
-    #[command(label = "Rotate View Tool", icon = "compass", kind = "tool", group = "tools", alias = "tools.select.rotateView")]
+    #[command(label = "Rotate View Tool", icon = "compass", kind = "tool", group = "R", default = "R", alias = "tools.select.rotateView")]
     RotateView,
-    #[command(label = "Zoom Tool", icon = "zoom_in", kind = "tool", group = "tools", alias = "tools.select.zoom")]
+    #[command(label = "Zoom Tool", icon = "zoom_in", kind = "tool", group = "Z", default = "Z", alias = "tools.select.zoom")]
     Zoom,
-    #[command(label = "Remove Tool", icon = "bandage_sparkle", kind = "tool", group = "tools", alias = "tools.select.remove")]
+    #[command(label = "Remove Tool", icon = "bandage_sparkle", kind = "tool", group = "J", default = "J", alias = "tools.select.remove")]
     Remove,
-    #[command(label = "Spot Healing Brush Tool", icon = "bandage", kind = "tool", group = "tools", alias = "tools.select.spotHealing")]
+    #[command(label = "Spot Healing Brush Tool", icon = "bandage", kind = "tool", group = "J", default = "J", alias = "tools.select.spotHealing")]
     SpotHealing,
-    #[command(label = "Healing Brush Tool", icon = "bandage", kind = "tool", group = "tools", alias = "tools.select.healing")]
+    #[command(label = "Healing Brush Tool", icon = "bandage", kind = "tool", group = "J", default = "J", alias = "tools.select.healing")]
     Healing,
-    #[command(label = "Patch Tool", icon = "lasso_select", kind = "tool", group = "tools", alias = "tools.select.patch")]
+    #[command(label = "Patch Tool", icon = "lasso_select", kind = "tool", group = "J", default = "J", alias = "tools.select.patch")]
     Patch,
-    #[command(label = "Content-Aware Move Tool", icon = "arrow-left-right", kind = "tool", group = "tools", alias = "tools.select.contentAwareMove")]
+    #[command(label = "Content-Aware Move Tool", icon = "arrow-left-right", kind = "tool", group = "J", default = "J", alias = "tools.select.contentAwareMove")]
     ContentAwareMove,
-    #[command(label = "Red Eye Tool", icon = "eye", kind = "tool", group = "tools", alias = "tools.select.redEye")]
+    #[command(label = "Red Eye Tool", icon = "eye", kind = "tool", group = "J", default = "J", alias = "tools.select.redEye")]
     RedEye,
-    #[command(label = "Clone Stamp Tool", icon = "stamp", kind = "tool", group = "tools", alias = "tools.select.cloneStamp")]
+    #[command(label = "Clone Stamp Tool", icon = "stamp", kind = "tool", group = "S", default = "S", alias = "tools.select.cloneStamp")]
     CloneStamp,
-    #[command(label = "Pattern Stamp Tool", icon = "grid", kind = "tool", group = "tools", alias = "tools.select.patternStamp")]
+    #[command(label = "Pattern Stamp Tool", icon = "grid", kind = "tool", group = "S", default = "S", alias = "tools.select.patternStamp")]
     PatternStamp,
-    #[command(label = "History Brush Tool", icon = "history-brush", kind = "tool", group = "tools", alias = "tools.select.historyBrush")]
+    #[command(label = "History Brush Tool", icon = "history-brush", kind = "tool", group = "Y", default = "Y", alias = "tools.select.historyBrush")]
     HistoryBrush,
-    #[command(label = "Art History Brush Tool", icon = "sparkles", kind = "tool", group = "tools", alias = "tools.select.artHistoryBrush")]
+    #[command(label = "Art History Brush Tool", icon = "sparkles", kind = "tool", group = "Y", default = "Y", alias = "tools.select.artHistoryBrush")]
     ArtHistoryBrush,
     #[command(label = "Blur Tool", icon = "droplet", kind = "tool", group = "tools", alias = "tools.select.blur")]
     Blur,
@@ -105,21 +106,21 @@ pub(crate) enum ToolCommand {
     Sharpen,
     #[command(label = "Smudge Tool", icon = "pointer", kind = "tool", group = "tools", alias = "tools.select.smudge")]
     Smudge,
-    #[command(label = "Dodge Tool", icon = "lollipop", kind = "tool", group = "tools", alias = "tools.select.dodge")]
+    #[command(label = "Dodge Tool", icon = "lollipop", kind = "tool", group = "O", default = "O", alias = "tools.select.dodge")]
     Dodge,
-    #[command(label = "Burn Tool", icon = "flame", kind = "tool", group = "tools", alias = "tools.select.burn")]
+    #[command(label = "Burn Tool", icon = "flame", kind = "tool", group = "O", default = "O", alias = "tools.select.burn")]
     Burn,
-    #[command(label = "Sponge Tool", icon = "cloud", kind = "tool", group = "tools", alias = "tools.select.sponge")]
+    #[command(label = "Sponge Tool", icon = "cloud", kind = "tool", group = "O", default = "O", alias = "tools.select.sponge")]
     Sponge,
-    #[command(label = "Quick Selection Tool", icon = "quick_selection", kind = "tool", group = "tools", alias = "tools.select.quickSelection")]
+    #[command(label = "Quick Selection Tool", icon = "quick_selection", kind = "tool", group = "W", default = "W", alias = "tools.select.quickSelection")]
     QuickSelection,
-    #[command(label = "Object Selection Tool", icon = "square-dashed-mouse-pointer", kind = "tool", group = "tools", alias = "tools.select.objectSelection")]
+    #[command(label = "Object Selection Tool", icon = "square-dashed-mouse-pointer", kind = "tool", group = "W", default = "W", alias = "tools.select.objectSelection")]
     ObjectSelection,
-    #[command(label = "Pen Tool", icon = "pen_tool", kind = "tool", group = "tools", alias = "tools.select.pen")]
+    #[command(label = "Pen Tool", icon = "pen_tool", kind = "tool", group = "P", default = "P", alias = "tools.select.pen")]
     Pen,
-    #[command(label = "Freeform Pen Tool", icon = "pen_freeform", kind = "tool", group = "tools", alias = "tools.select.freeformPen")]
+    #[command(label = "Freeform Pen Tool", icon = "pen_freeform", kind = "tool", group = "P", default = "P", alias = "tools.select.freeformPen")]
     FreeformPen,
-    #[command(label = "Curvature Pen Tool", icon = "pen_curvature", kind = "tool", group = "tools", alias = "tools.select.curvaturePen")]
+    #[command(label = "Curvature Pen Tool", icon = "pen_curvature", kind = "tool", group = "P", default = "P", alias = "tools.select.curvaturePen")]
     CurvaturePen,
     #[command(label = "Add Anchor Point Tool", icon = "pen_add_anchor", kind = "tool", group = "tools", alias = "tools.select.addAnchorPoint")]
     AddAnchorPoint,
@@ -127,29 +128,29 @@ pub(crate) enum ToolCommand {
     DeleteAnchorPoint,
     #[command(label = "Convert Point Tool", icon = "convert_point", kind = "tool", group = "tools", alias = "tools.select.convertPoint")]
     ConvertPoint,
-    #[command(label = "Path Selection Tool", icon = "mouse_pointer_2", kind = "tool", group = "tools", alias = "tools.select.pathSelection")]
+    #[command(label = "Path Selection Tool", icon = "mouse_pointer_2", kind = "tool", group = "A", default = "A", alias = "tools.select.pathSelection")]
     PathSelection,
-    #[command(label = "Direct Selection Tool", icon = "direct_select", kind = "tool", group = "tools", alias = "tools.select.directSelection")]
+    #[command(label = "Direct Selection Tool", icon = "direct_select", kind = "tool", group = "A", default = "A", alias = "tools.select.directSelection")]
     DirectSelection,
-    #[command(label = "Rectangle Tool", icon = "rectangle-horizontal", kind = "tool", group = "tools", alias = "tools.select.rectangle")]
+    #[command(label = "Rectangle Tool", icon = "rectangle-horizontal", kind = "tool", group = "U", default = "U", alias = "tools.select.rectangle")]
     Rectangle,
-    #[command(label = "Ellipse Tool", icon = "circle", kind = "tool", group = "tools", alias = "tools.select.ellipseShape")]
+    #[command(label = "Ellipse Tool", icon = "circle", kind = "tool", group = "U", default = "U", alias = "tools.select.ellipseShape")]
     EllipseShape,
-    #[command(label = "Triangle Tool", icon = "triangle", kind = "tool", group = "tools", alias = "tools.select.triangle")]
+    #[command(label = "Triangle Tool", icon = "triangle", kind = "tool", group = "U", default = "U", alias = "tools.select.triangle")]
     Triangle,
-    #[command(label = "Polygon Tool", icon = "pentagon", kind = "tool", group = "tools", alias = "tools.select.polygon")]
+    #[command(label = "Polygon Tool", icon = "pentagon", kind = "tool", group = "U", default = "U", alias = "tools.select.polygon")]
     Polygon,
-    #[command(label = "Star Tool", icon = "star", kind = "tool", group = "tools", alias = "tools.select.star")]
+    #[command(label = "Star Tool", icon = "star", kind = "tool", group = "U", default = "U", alias = "tools.select.star")]
     Star,
-    #[command(label = "Line Tool", icon = "slash", kind = "tool", group = "tools", alias = "tools.select.line")]
+    #[command(label = "Line Tool", icon = "slash", kind = "tool", group = "U", default = "U", alias = "tools.select.line")]
     Line,
-    #[command(label = "Custom Shape Tool", icon = "cloud", kind = "tool", group = "tools", alias = "tools.select.customShape")]
+    #[command(label = "Custom Shape Tool", icon = "cloud", kind = "tool", group = "U", default = "U", alias = "tools.select.customShape")]
     CustomShape,
-    #[command(label = "Slice Tool", icon = "slice_knife", kind = "tool", group = "tools", alias = "tools.select.slice")]
+    #[command(label = "Slice Tool", icon = "slice_knife", kind = "tool", group = "C", default = "C", alias = "tools.select.slice")]
     Slice,
-    #[command(label = "Slice Select Tool", icon = "slice_select", kind = "tool", group = "tools", alias = "tools.select.sliceSelect")]
+    #[command(label = "Slice Select Tool", icon = "slice_select", kind = "tool", group = "C", default = "C", alias = "tools.select.sliceSelect")]
     SliceSelect,
-    #[command(label = "Frame Tool", icon = "frame_placeholder", kind = "tool", group = "tools", alias = "tools.select.frame")]
+    #[command(label = "Frame Tool", icon = "frame_placeholder", kind = "tool", group = "K", default = "K", alias = "tools.select.frame")]
     Frame,
 }
 
