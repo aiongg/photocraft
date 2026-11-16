@@ -63,6 +63,8 @@ fn external_edit_invalidates_the_preedit_and_rejects_its_late_commit() {
     testing::frame(&mut app);
     let revision = app.session.active().unwrap().revision;
     let history = app.session.active().unwrap().history.entries();
+    // The commit was already on its way when the composition ended: it arrives before the platform answers the reset.
+    testing::hold_ime_reset_answer(&app);
     ime(&mut app, ime_commit("に"));
     assert_eq!(layer_text(&app), "bcにdef", "the late commit edits nothing");
     assert_eq!(app.session.active().unwrap().revision, revision);

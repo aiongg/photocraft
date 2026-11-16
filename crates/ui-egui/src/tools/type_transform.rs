@@ -283,6 +283,11 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rec
     if whole_box(app, pointer.mods) != drawn {
         return;
     }
+    // Other type under the pointer is the Type tool's (it commits and edits that text), so the move reach just outside
+    // the edited text does not cover it.
+    if !drawn && app.ui.type_transform.is_none() && over_other_type(app, ui, pointer.pos) {
+        return;
+    }
     let Some(frame) = frame(app) else { return };
     let spare;
     let session = match &app.ui.type_transform {
@@ -329,6 +334,13 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rec
         // The press ended without a drag (a click), or a key moved the box: the capture ends with it.
         finish(app);
     }
+}
+
+/// Whether the pointer is over a type layer other than the one being edited.
+fn over_other_type(app: &mut PhotocraftApp, ui: &egui::Ui, pos: Option<egui::Pos2>) -> bool {
+    let (Some(pos), Some(view), Some(edited)) = (pos, view_of(ui), app.ui.text_edit.as_ref().map(|ed| LayerId(ed.layer))) else { return false };
+    let at = view.to_doc(pos);
+    super::type_tool::hit_layer(app, at.x, at.y).is_some_and(|id| id != edited)
 }
 
 /// The `typeTransform` of the control protocol: the open transform's document, revision, frame and reference point,
