@@ -114,7 +114,8 @@ pub(crate) fn delete_anchors(app: &mut PhotocraftApp, path: PathRef, anchors: &[
     if deleted {
         let after = follower.and_then(|before| {
             let [subpath, knot] = order[0];
-            let edit = crate::vector_ui::edit_path(&super::path_of(app, &path)?, path.key());
+            let current = super::path_of(app, &path)?;
+            let edit = crate::vector_ui::edit_path(&current, path.key());
             Some(PathSelection::after_delete(&edit, KnotRef::new(subpath, knot), before))
         });
         app.ui.direct_selection = match after {

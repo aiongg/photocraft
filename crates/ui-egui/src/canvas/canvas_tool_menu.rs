@@ -1652,7 +1652,7 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
         MenuKind::Layers { layers } => {
             return crate::layer_pick_ui::entries(layers, app.session.active().and_then(|s| s.active_layer).map(|l| l.0));
         }
-        MenuKind::BrushMode { plain } => return crate::brush_mode_menu::entries(app, menu.tool, plain),
+        MenuKind::BrushMode { plain } => return crate::brush_mode_menu::entries(app, menu.tool, *plain),
         _ => {}
     }
     let mut out = Vec::new();

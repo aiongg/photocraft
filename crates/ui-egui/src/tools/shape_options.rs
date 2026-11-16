@@ -5,7 +5,7 @@ use craft::draw::stroke::StrokeStyle;
 use craft::draw::ui::shape::{ShapeAppearance, ShapeBar, ShapeChange, ShapePaint, ShapeToolSettings, VectorMode};
 use craft::draw::ui::shape_drag::ShapeKind;
 use craft::ui::choice::Checkbox;
-use craft::ui::contract::{Bind, Show as _};
+use craft::ui::contract::{Bind, Props as _, Show as _};
 use craft::ui::dialog::{Alert, HostedAlert};
 use craft::ui::display::Divider;
 use craft::ui::runtime::env::Env;
