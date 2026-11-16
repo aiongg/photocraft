@@ -1366,6 +1366,7 @@ dependencies = [
 name = "craft"
 version = "0.1.0"
 dependencies = [
+ "craft-ai-agents",
  "craft-automation",
  "craft-behavior",
  "craft-browse",
@@ -1373,6 +1374,7 @@ dependencies = [
  "craft-color",
  "craft-dialogs",
  "craft-draw",
+ "craft-flags",
  "craft-font-catalog",
  "craft-font-manager",
  "craft-host",
@@ -1431,17 +1433,23 @@ name = "craft-automation"
 version = "0.1.0"
 dependencies = [
  "base64 0.22.1",
+ "craft-ai-agents",
+ "craft-atomic",
  "craft-behavior",
+ "craft-flags",
+ "craft-host",
  "craft-keymap",
  "craft-platform",
  "craft-theme",
  "craft-ui",
  "egui",
  "getrandom 0.3.4",
+ "hmac",
  "log",
  "png 0.17.16",
  "serde",
  "serde_json",
+ "sha2 0.10.9",
  "thiserror 2.0.21",
 ]
 
@@ -1765,8 +1773,8 @@ version = "0.1.0"
 dependencies = [
  "craft-host",
  "craft-i18n",
+ "craft-xml",
  "egui",
- "roxmltree 0.21.2",
  "serde",
  "serde_json",
 ]
@@ -2150,6 +2158,7 @@ dependencies = [
  "craft-platform",
  "craft-quit",
  "craft-settings",
+ "craft-svg",
  "craft-theme",
  "craft-ui-macros",
  "craft-window",
@@ -2161,7 +2170,6 @@ dependencies = [
  "inventory",
  "libtest-mimic",
  "log",
- "resvg 0.45.1",
  "serde",
  "skrifa 0.44.0",
  "smallvec",
@@ -2224,12 +2232,12 @@ dependencies = [
  "craft-host",
  "craft-i18n",
  "craft-platform",
+ "craft-svg",
  "craft-theme",
  "craft-ui-macros",
  "craft-ui-panels",
  "craft-window",
  "egui",
- "resvg 0.45.1",
  "serde",
  "web-time",
 ]
@@ -2261,7 +2269,6 @@ dependencies = [
  "dunce",
  "egui",
  "flate2",
- "getrandom 0.3.4",
  "image",
  "log",
  "plist",
@@ -3520,11 +3527,9 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "899def5c37c4fd7b2664648c28120ecec138e4d395b459e5ca34f9cce2dd77fd"
 dependencies = [
  "cfg-if",
- "js-sys",
  "libc",
  "r-efi 5.3.0",
  "wasip2",
- "wasm-bindgen",
 ]
 
 [[package]]
@@ -6167,7 +6172,6 @@ dependencies = [
  "core-graphics2",
  "craft",
  "craft-cms",
- "craft-flags",
  "craft-image-codecs",
  "craft-svg",
  "craft-update",
@@ -6234,12 +6238,10 @@ dependencies = [
  "base64 0.23.1",
  "cap-std",
  "clap",
- "craft-ai-agents",
- "craft-flags",
+ "craft",
  "craft-image-codecs",
  "craft-psd",
  "getrandom 0.3.4",
- "hmac",
  "photocraft-color",
  "photocraft-compose",
  "photocraft-doc",
@@ -6256,7 +6258,6 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
- "sha2 0.10.9",
  "thiserror 2.0.21",
  "tokio",
  "wgpu",
@@ -6269,6 +6270,7 @@ dependencies = [
  "clap",
  "clap_complete",
  "clap_mangen",
+ "craft",
  "craft-cms",
  "craft-image-codecs",
  "craft-psd",
@@ -6341,7 +6343,6 @@ dependencies = [
  "craft-xml",
  "exr",
  "flate2",
- "getrandom 0.3.4",
  "photocraft-algo",
  "photocraft-color",
  "photocraft-compose",
@@ -6592,7 +6593,6 @@ dependencies = [
  "base64 0.23.1",
  "chrono",
  "craft",
- "craft-cms",
  "craft-file-formats",
  "craft-i18n",
  "craft-image-codecs",
