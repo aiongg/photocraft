@@ -609,6 +609,10 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
     let mut tools = std::mem::take(&mut app.canvas_tools);
     let tool = app.ui.tool;
+    // A tool switch ends the other lassos' outlines between presses; a gesture keeps its tool (`ToolHost`).
+    if primary && !ToolHost::in_gesture(&ctx, host.canvas_id()) {
+        tools.selection.end_outlines_but(tool);
+    }
     let navigation = document_display::navigation(app);
     tools.momentary.hand_selected(tool == Tool::Hand && app.ui.transform.is_none());
     tools.momentary.set_options(navigation.clone());

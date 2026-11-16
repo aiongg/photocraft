@@ -30,8 +30,7 @@ fn freeform_app() -> PhotocraftApp {
     app
 }
 
-/// A ⌥-click fed straight to the tool, so a point outside any canvas (which the engine refuses) still
-/// reaches it; the canvas pass cannot deliver such a point.
+/// A ⌥-click at the document point `(x, y)`, with a drag of `drag_by` px when given.
 fn alt_click_raw(app: &mut PhotocraftApp, x: f64, y: f64, drag_by: Option<f64>) {
     tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, Modifiers::ALT);
     if let Some(d) = drag_by {
@@ -40,16 +39,21 @@ fn alt_click_raw(app: &mut PhotocraftApp, x: f64, y: f64, drag_by: Option<f64>) 
     tool_event(app, ToolEvent::Up { x, y }, Modifiers::ALT);
 }
 
+/// Whether the Freeform Pen has a trace open: after a release with ⌥ held the trace stays open between presses.
+fn tracing(app: &PhotocraftApp) -> bool {
+    app.canvas_tools.vector.freeform.draft.is_open()
+}
+
 /// A freehand run released with ⌥ held, then a ⌥-click: the fitted path stays in progress.
 fn freeform_run_and_straight_click(app: &mut PhotocraftApp) {
     testing::press(app, [50.0, 50.0], Modifiers::NONE);
     testing::move_to(app, [90.0, 40.0], Modifiers::NONE);
     testing::move_to(app, [120.0, 50.0], Modifiers::NONE);
     testing::release(app, [120.0, 50.0], Modifiers::ALT);
-    assert!(testing::in_gesture(app), "Alt-held release keeps the fitted path in progress");
+    assert!(tracing(app), "Alt-held release keeps the fitted path in progress");
     testing::press(app, [180.0, 100.0], Modifiers::ALT);
     testing::release(app, [180.0, 100.0], Modifiers::ALT);
-    assert!(testing::in_gesture(app));
+    assert!(tracing(app));
 }
 
 #[test]
@@ -59,7 +63,7 @@ fn real_freeform_freehand_and_alt_straight_segments_append_to_the_owned_saved_pa
     let n = app.session.active().unwrap().history.past_len();
     freeform_run_and_straight_click(&mut app);
     testing::modifiers(&mut app, Modifiers::NONE);
-    assert!(!testing::in_gesture(&app) && app.ui.pen.is_none());
+    assert!(!tracing(&app) && app.ui.pen.is_none());
     let st = app.session.active().unwrap();
     assert_eq!(st.doc.work_path, original.work_path);
     let path = &st.doc.paths[0].path;
@@ -96,7 +100,7 @@ fn real_freeform_stale_target_source_revision_and_document_cancel_without_finish
         testing::move_to(&mut app, [200.0, 120.0], Modifiers::ALT);
         testing::release(&mut app, [200.0, 120.0], Modifiers::NONE);
         testing::modifiers(&mut app, Modifiers::NONE);
-        assert!(!testing::in_gesture(&app) && app.ui.pen.is_none(), "{change}: no stale trace remains");
+        assert!(!tracing(&app) && app.ui.pen.is_none(), "{change}: no stale trace remains");
         assert!(std::sync::Arc::ptr_eq(&source, &app.session.active().unwrap().doc), "{change}: late input changed document pixels or paths");
         assert_eq!(app.session.active().unwrap().history.past_len(), n, "{change}");
     }
@@ -105,20 +109,22 @@ fn real_freeform_stale_target_source_revision_and_document_cancel_without_finish
 #[test]
 fn another_freeform_trace_cannot_replace_a_failed_owned_draft_or_retry_it_automatically() {
     let mut app = app();
-    for [x, y] in [[40.0, 60.0], [1e40, 60.0], [140.0, 80.0]] {
+    app.ui.tool_options.vector_mode = VectorMode::Path;
+    app.session.authorize = Some(|id, _| if id == "path.set" { Err(photocraft_engine::EngineError::Other("refused path fixture".into())) } else { Ok(()) });
+    for [x, y] in [[40.0, 60.0], [100.0, 60.0], [140.0, 80.0]] {
         alt_click_raw(&mut app, x, y, None);
     }
     testing::modifiers(&mut app, Modifiers::NONE);
     let failed = app.ui.pen.clone().expect("invalid fitted trace must remain available");
     assert!(failed.commit_failed && failed.owner.is_some());
-    assert!(!testing::in_gesture(&app));
+    assert!(!tracing(&app));
     let source = app.session.active().unwrap().doc.clone();
     let n = app.session.active().unwrap().history.past_len();
     let journal = app.session.journal.len();
-    for middle in [[1e40, 90.0], [220.0, 90.0]] {
+    for middle in [[180.0, 90.0], [220.0, 90.0]] {
         for [x, y] in [[160.0, 120.0], middle, [260.0, 140.0]] {
             alt_click_raw(&mut app, x, y, Some(10.0));
-            assert!(!testing::in_gesture(&app), "pending fitted draft owns the next drawing attempt");
+            assert!(!tracing(&app), "pending fitted draft owns the next drawing attempt");
         }
         testing::modifiers(&mut app, Modifiers::NONE);
         assert_eq!(app.ui.pen.as_ref(), Some(&failed));

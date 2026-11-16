@@ -298,7 +298,13 @@ fn failed_pen_and_curvature_commits_keep_the_exact_draft_and_do_not_retry_each_f
     for tool in [Tool::Pen, Tool::CurvaturePen] {
         let mut app = app(tool);
         click(&mut app, 30.0, 60.0);
-        click(&mut app, 1e7, 60.0);
+        click(&mut app, 130.0, 60.0);
+        // A point no path can hold: the canvas never delivers one, so the draft is edited as Direct Selection would.
+        let knot = &mut app.ui.pen.as_mut().unwrap().draft.knots[1];
+        knot.anchor.x = 1e40;
+        knot.in_ctrl.x = 1e40;
+        knot.out_ctrl.x = 1e40;
+        vector_ui::host::release_draft(&mut app);
         let (before, original, n) = (app.session.active().unwrap().doc.clone(), app.ui.pen.clone().unwrap(), steps(&app));
         vector_ui::pen_commit(&mut app, false);
         let failed = app.ui.pen.as_ref().expect("invalid geometry leaves an editable draft");
