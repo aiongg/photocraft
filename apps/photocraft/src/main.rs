@@ -680,7 +680,7 @@ fn main() -> eframe::Result {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));
                 // The macOS menu bar, installed now so winit's default menu doesn't stay up.
                 if !in_window_menus {
-                    app.services.native_menu = photocraft_ui_egui::native_menu::install(&cc.egui_ctx, &app);
+                    app.services.native_menu = photocraft_ui_egui::native_menu::install(&cc.egui_ctx, &mut app);
                 }
             }
             #[cfg(not(target_os = "macos"))]
