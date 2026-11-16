@@ -161,16 +161,16 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
 fn a_tool_gesture_begun_before_the_dialog_still_ends_under_it() {
     let mut h = harness(None, 0.0);
     let before = edits(&h);
-    pointer(&mut h, json!([{"kind": "down", "x": 40, "y": 30}, {"kind": "move", "x": 80, "y": 30}]));
+    pointer(&mut h, json!([{"kind": "down", "x": 140, "y": 100}, {"kind": "move", "x": 180, "y": 100}]));
     assert!(crate::canvas::testing::in_gesture(h.state()), "the Brush stroke is under way");
     crate::filter_dialog::open(h.state_mut(), SMART_SHARPEN).expect("the dialog opens");
     h.run_steps(2);
     assert!(crate::canvas::testing::in_gesture(h.state()), "the stroke is still open under the dialog");
-    pointer(&mut h, json!([{"kind": "move", "x": 80, "y": 120}, {"kind": "move", "x": 120, "y": 120}]));
-    pointer(&mut h, json!([{"kind": "up", "x": 120, "y": 120}]));
+    pointer(&mut h, json!([{"kind": "move", "x": 180, "y": 200}, {"kind": "move", "x": 220, "y": 200}]));
+    pointer(&mut h, json!([{"kind": "up", "x": 220, "y": 200}]));
     assert!(!crate::canvas::testing::in_gesture(h.state()), "the release reached the Brush");
     assert_eq!(edits(&h).1, before.1 + 1, "the stroke is one history step");
-    assert!(painted(&h, 95..105, 115..125), "the moves under the dialog reached the stroke");
+    assert!(painted(&h, 175..185, 195..205), "the moves under the dialog reached the stroke");
     assert!(near(centre(&h), [200.0, 150.0]), "the stroke's moves and release are not locator presses: {:?}", centre(&h));
 }
 

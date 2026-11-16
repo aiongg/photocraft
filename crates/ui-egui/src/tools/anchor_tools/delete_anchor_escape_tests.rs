@@ -172,7 +172,7 @@ fn an_escape_during_a_direct_selection_drag_keeps_the_anchors() {
     // A marquee held with ⌘ over empty canvas.
     testing::press(&mut app, [200.0, 200.0], Modifiers::COMMAND);
     testing::move_to(&mut app, [400.0, 400.0], Modifiers::COMMAND);
-    assert!(testing::in_gesture(&app), "the marquee is held");
+    assert!(editing(&app), "the marquee is held");
     escape(&mut app);
     assert!(!editing(&app), "Esc ends the drag");
     assert_eq!(app.ui.direct_selection.anchors, vec![[0, 1]], "the anchors stay selected");
