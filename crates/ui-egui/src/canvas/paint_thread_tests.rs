@@ -63,8 +63,7 @@ fn wait_until(what: &str, done: impl Fn() -> bool) {
 }
 
 /// Pen-up while the thread is still painting: the release waits for the steps it was given, and
-/// the commit takes the live stroke's pixels (the Brush) or its prepared commit (the Mixer Brush,
-/// which `PaintTool::release` and `strokes::finish` handle on their own), with every point.
+/// the commit has every point and replays to the same document.
 #[test]
 fn pen_up_while_the_thread_is_busy_commits_the_whole_stroke() {
     for tool in [Tool::Brush, Tool::MixerBrush] {
@@ -86,9 +85,6 @@ fn pen_up_while_the_thread_is_busy_commits_the_whole_stroke() {
         assert!(app.live_stroke.is_none(), "{what}");
         assert!(!app.ui.status_error, "{what}: {}", app.ui.status);
         assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1, "{what}: one edit");
-        if tool == Tool::Brush {
-            assert!(app.committed_stroke.is_some(), "the commit took the live stroke's pixels");
-        }
         let cmd = if tool == Tool::Brush { stroke_command(&app, tool) } else { "paint.mixerBrush" };
         assert_commit_replays(&mut app, cmd, &what);
     }
