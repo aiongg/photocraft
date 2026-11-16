@@ -202,79 +202,49 @@ pub(crate) fn delete_key_deletes_work_path(app: &PhotocraftApp) -> bool {
         && matches!(target_path(app), Some((PathRef::Work, _)))
 }
 
-<<<<<<< HEAD
-/// The path Path Selection edits: the selected Work or saved path, the targeted vector mask, the
-/// active shape layer's path (both `PathRef::Layer`), else the work path.
-pub(super) fn target_path(app: &PhotocraftApp) -> Option<(PathRef, Path)> {
-=======
-/// Does ⌫ / Delete act on what Direct Selection or the anchor tools selected on `target`: the
-/// selection still holds, nothing is being drawn or dragged, and the path is shown and writable.
-fn delete_key_edits_selection(app: &PhotocraftApp, target: &crate::direct_select::PathRef) -> bool {
-    let ds = &app.ui.direct_selection;
-    app.ui.pen.is_none()
-        && ds.drag.is_none()
-        && app.ui.view.shows(app.ui.view.show.target_path)
-        && crate::direct_select::still_valid(app, ds)
-        && crate::direct_select::writable(app, target)
-}
-
-/// The anchor ⌫ / Delete removes, with its two segments: with Direct Selection or the Add or
-/// Delete Anchor Point tool, the one anchor selected on it while that selection still holds and
-/// its path is shown, as in Photoshop (#12703, #13203). The key reached Edit › Clear and deleted
-/// the active layer. Several selected anchors weren't measured and keep the key's other routes.
-pub(crate) fn delete_key_deletes_anchor(app: &PhotocraftApp) -> Option<(crate::direct_select::PathRef, [usize; 2])> {
-    let ds = &app.ui.direct_selection;
-    let ([[s, k]], Some(target)) = (ds.anchors.as_slice(), ds.target) else { return None };
-    let tool = matches!(app.ui.tool, Tool::DirectSelection | Tool::AddAnchorPoint | Tool::DeleteAnchorPoint);
-    (tool && delete_key_edits_selection(app, &target)).then_some(())?;
-    let (_, path) = crate::direct_select::candidates(app).into_iter().find(|(r, _)| *r == target)?;
-    path.subpaths.get(*s)?.knots.get(*k)?;
-    Some((target, [*s, *k]))
-}
-
-/// The segment ⌫ / Delete removes (`[subpath, knot]` it leaves): with Direct Selection, a clicked
-/// segment and no selected anchor. Its anchors stay and the subpath opens there, as in Photoshop
-/// (#13203).
-pub(crate) fn delete_key_deletes_segment(app: &PhotocraftApp) -> Option<(crate::direct_select::PathRef, [usize; 2])> {
-    let ds = &app.ui.direct_selection;
-    let (Some([s, k]), Some(target)) = (ds.segment, ds.target) else { return None };
-    let usable = app.ui.tool == Tool::DirectSelection && ds.anchors.is_empty() && delete_key_edits_selection(app, &target);
-    usable.then_some(())?;
-    let (_, path) = crate::direct_select::candidates(app).into_iter().find(|(r, _)| *r == target)?;
-    path.subpaths.get(s)?.knots.get(k)?;
-    Some((target, [s, k]))
-}
-
-/// The path ⌫ / Delete deletes, as the command and its params: the work path with the Pen,
-/// Freeform Pen or Path Selection ([`delete_key_deletes_work_path`]); with Direct Selection and
-/// no anchor or segment selected, the targeted saved path, work path or vector mask, as in
-/// Photoshop (#13203). A shape layer's path wasn't measured: the key keeps deleting the layer.
-pub(crate) fn delete_key_deletes_path(app: &PhotocraftApp) -> Option<(&'static str, Value)> {
+/// What ⌫ / Delete edits besides an anchor (the overlay's own key): the command and its params.
+/// With Direct Selection and a clicked segment (`[subpath, knot]` it leaves) and no selected
+/// anchor, the segment goes on its own: its anchors stay and the subpath opens there, as in
+/// Photoshop (#13203). With nothing selected, the path Direct Selection targets is deleted: a
+/// saved path, the work path or a vector mask. The work path with the Pen, Freeform Pen or Path
+/// Selection is [`delete_key_deletes_work_path`]. A shape layer's path wasn't measured: the key
+/// keeps deleting the layer.
+pub(crate) fn delete_key_edits_path(app: &PhotocraftApp) -> Option<(&'static str, Value)> {
     if delete_key_deletes_work_path(app) {
         return Some(("path.delete", json!({"name": "work"})));
     }
     let ds = &app.ui.direct_selection;
-    let selected = crate::direct_select::still_valid(app, ds) && (!ds.anchors.is_empty() || ds.segment.is_some());
     let usable = app.ui.tool == Tool::DirectSelection
-        && !selected
         && app.ui.pen.is_none()
         && app.ui.transform.is_none()
-        && ds.drag.is_none()
+        && ds.editing.is_none()
         && app.ui.view.shows(app.ui.view.show.target_path);
     usable.then_some(())?;
+    let holds = crate::direct_select::still_valid(app, ds);
+    if holds && ds.anchors.is_empty() && let (Some([s, k]), Some(target)) = (ds.segment, ds.target) {
+        let (_, path) = crate::direct_select::candidates(app).into_iter().find(|(r, _)| *r == target)?;
+        path.subpaths.get(s)?.knots.get(k)?;
+        crate::direct_select::writable(app, &target).then_some(())?;
+        let mut params = json!({"subpath": s, "knot": k});
+        if let (Some(p), Some(t)) = (params.as_object_mut(), target.params(app).as_object()) {
+            p.extend(t.clone());
+        }
+        return Some(("path.deleteSegment", params));
+    }
+    (!holds || (ds.anchors.is_empty() && ds.segment.is_none())).then_some(())?;
+    let st = app.session.active()?;
     match target_path(app)?.0 {
-        PathTarget::Work => Some(("path.delete", json!({"name": "work"}))),
-        PathTarget::Saved(name) => Some(("path.delete", json!({"name": name}))),
+        PathRef::Work => Some(("path.delete", json!({"name": "work"}))),
+        PathRef::Saved(i) => Some(("path.delete", json!({"name": st.doc.paths.get(i)?.name}))),
         // As the Paths panel's trash does with a vector mask's row.
-        PathTarget::VectorMask(id) => Some(("layer.vectorMask.delete", json!({"layer": id}))),
-        PathTarget::Shape(_) => None,
+        PathRef::Layer(id) if targeted_vector_mask_id(app) == Some(id) => Some(("layer.vectorMask.delete", json!({"layer": id}))),
+        _ => None,
     }
 }
 
-/// The path Path Selection edits: the targeted vector mask, the active shape layer's path, the
-/// saved path selected in the Paths panel (#8478), else the work path.
-pub(super) fn target_path(app: &PhotocraftApp) -> Option<(PathTarget, Path)> {
->>>>>>> upstream/main
+/// The path Path Selection edits: the selected Work or saved path, the targeted vector mask, the
+/// active shape layer's path (both `PathRef::Layer`), else the work path.
+pub(super) fn target_path(app: &PhotocraftApp) -> Option<(PathRef, Path)> {
     if let Some((name, p)) = selected_document_geometry(app) {
         if name == "work" {
             return Some((PathRef::Work, p.clone()));

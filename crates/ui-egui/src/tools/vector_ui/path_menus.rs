@@ -60,15 +60,16 @@ enum OpsPick {
 /// What the Path Operations menu's rows mean: Align To's two choices, in `path_align_to` order.
 const ALIGN_TO: [&str; 2] = ["Selection", "Canvas"];
 
-/// The Path Operations button of the Pen, Freeform Pen, Curvature Pen and Path Selection,
-/// Photoshop's: the operation of the selected path components, or with none selected how the next
+/// The Path Operations button of the Pen, Freeform Pen, Curvature Pen, Path Selection and Direct
+/// Selection, Photoshop's: the operation of the selected path components, or with none selected how the next
 /// path combines with the shape or path it is drawn into; and Merge Shape Components. Its icon
 /// shows the selected components' operation, else the tool's.
 pub(super) fn path_operations_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    // New Layer makes a shape layer: Path mode and Path Selection have none.
+    // New Layer makes a shape layer: Path mode, Path Selection and Direct Selection have none.
     let shape = tool_in_shape_mode(app);
-    let current =
-        crate::path_components::selected_op(app).or_else(|| tool_path_op(app)).map_or("newLayer", |op| if op == "newLayer" && !shape { "combine" } else { op });
+    let current = crate::path_components::selected_op(app)
+        .or_else(|| tool_path_op(app))
+        .map_or(if shape { "newLayer" } else { "combine" }, |op| if op == "newLayer" && !shape { "combine" } else { op });
     // PLAN: icon ids assumed registered under the PATH_OPS glyph names.
     let icon = PATH_OPS.iter().find(|(v, ..)| *v == current).map_or("path-op-combine", |(.., i)| *i);
     let merge = merge_target(app).filter(|(.., n)| *n > 1);

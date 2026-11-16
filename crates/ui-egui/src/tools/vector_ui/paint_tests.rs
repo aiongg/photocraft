@@ -357,8 +357,8 @@ fn open_pen_uses_selected_stroke_color_and_width() {
     app.run("tools.setColors", json!({"foreground": foreground})).unwrap();
     set_tool_paint(&mut app, true, PaintChange::Color(stroke)).unwrap();
     app.ui.tool_options.stroke_width = 4.0;
-    app.ui.tool_options.vector_mode = "shape".into();
-    app.ui.pen = Some(PenPath { knots: vec![[[20.0, 20.0]; 3], [[80.0, 60.0]; 3]], owner: super::capture_pen_owner(&app), ..Default::default() });
+    app.ui.tool_options.vector_mode = VectorMode::Shape;
+    app.ui.pen = Some(PenPath::corners(&[[20.0, 20.0], [80.0, 60.0]], super::capture_pen_owner(&app)));
     pen_commit(&mut app, false);
     let drawn = shape(&app).stroke.as_ref().unwrap();
     assert_eq!(drawn.paint, solid_paint(stroke));
@@ -517,8 +517,8 @@ fn test_gradient() -> photocraft_doc::Fill {
 fn open_pen_preserves_selected_stroke_gradient() {
     let mut app = app("rgb", 32);
     set_tool_paint(&mut app, true, PaintChange::Gradient(test_gradient())).unwrap();
-    app.ui.tool_options.vector_mode = "shape".into();
-    app.ui.pen = Some(PenPath { knots: vec![[[20.0, 20.0]; 3], [[80.0, 60.0]; 3]], owner: super::capture_pen_owner(&app), ..Default::default() });
+    app.ui.tool_options.vector_mode = VectorMode::Shape;
+    app.ui.pen = Some(PenPath::corners(&[[20.0, 20.0], [80.0, 60.0]], super::capture_pen_owner(&app)));
     pen_commit(&mut app, false);
     assert_eq!(shape(&app).stroke.as_ref().unwrap().paint, test_gradient());
 }
