@@ -201,17 +201,25 @@ fn defaults() -> AppDefaults {
         theme: ThemePair { light: theme(DEFAULT_LIGHT), dark: theme(DEFAULT_DARK) },
         mode: ModeChoice::Dark,
         size: Size::default(),
-        sizes: AppSizes::parse_or_default(SIZES),
+        sizes: (**app_sizes()).clone(),
     }
 }
 
 /// PhotoCraft's size overrides: Photoshop's panel dock width, and 12-point Label and Mono text in the compact density.
 const SIZES: &[u8] = include_bytes!("sizes.json");
 
+/// The size overrides, parsed once: the root keeps one `Arc` so the runtime's token and hit-size caches, which key on
+/// its identity, resolve once.
+fn app_sizes() -> &'static Arc<AppSizes> {
+    static SIZES_ONCE: std::sync::LazyLock<Arc<AppSizes>> = std::sync::LazyLock::new(|| Arc::new(AppSizes::parse_or_default(SIZES)));
+    &SIZES_ONCE
+}
+
 /// The root values PhotoCraft gives the runtime before the theme, mode, scale and direction: the
 /// contrast, size and sizes a theme's tokens resolve under.
 fn base_root() -> RootEnv {
     let mut root = RootEnv::new();
+    root.sizes = Arc::clone(app_sizes());
     // Photoshop's Tab hides the panels, Shift+Tab all but the tools, over the canvas.
     root.tab_toggles_chrome = true;
     // Tab in a dialog moves between its fields, as in Photoshop.
@@ -684,5 +692,11 @@ mod tests {
         if let Err(errors) = craft::theme::AppSizes::parse(super::SIZES) {
             panic!("sizes.json: {errors:?}");
         }
+    }
+
+    /// The overrides reach the root every frame's tokens resolve under, not only the suite's defaults.
+    #[test]
+    fn the_root_carries_the_size_overrides() {
+        assert_eq!(*super::base_root().sizes, craft::theme::AppSizes::parse(super::SIZES).unwrap());
     }
 }
