@@ -42,7 +42,7 @@ fn enabled(app: &PhotocraftApp, command: ChannelsCommands) -> bool {
 /// The `channel` field of the newest open dialog.
 fn newest_dialog_channel(app: &PhotocraftApp) -> Value {
     let open = app.framework.dialogs.open_dialogs().pop().expect("a dialog is open");
-    open.fields.expect("the dialog lists its fields")["channel"].clone()
+    crate::dialogs::params::captured(app, open.key.as_deref().expect("a keyed dialog"))["channel"].clone()
 }
 
 /// The thumbnail revision of a colour key follows the pixels and Show Channels in Color, not the selection (#4518).

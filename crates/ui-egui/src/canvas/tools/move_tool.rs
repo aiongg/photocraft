@@ -236,6 +236,7 @@ fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Mods, style: ConstrainSt
         if !crate::move_ui::float_selected_for_drag(app, mods.alt) {
             return (ToolAction::Done, None);
         }
+        crate::move_mods::begin(app, mods.alt);
         let mut run = Run::plain(Kind::Pixels, p);
         run.gesture = Some(gesture);
         run.box_rect = moving_box(app, true);
