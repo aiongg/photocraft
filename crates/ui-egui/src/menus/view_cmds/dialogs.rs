@@ -216,8 +216,8 @@ pub(super) fn params_for(app: &mut PhotocraftApp, id: &str) -> Option<(Vec<Param
             let size = |key: &str| kept.get(key).and_then(Value::as_u64).filter(|v| (1..=300_000).contains(v)).and_then(|v| i64::try_from(v).ok());
             let enlarge = kept.get("dontEnlarge").and_then(Value::as_bool).unwrap_or(false);
             plain(vec![
-                Param::new("width", tl!("Width"), ParamKind::int(Some(1), None, size("width").unwrap_or(i64::from(w)))).not_remembered(),
-                Param::new("height", tl!("Height"), ParamKind::int(Some(1), None, size("height").unwrap_or(i64::from(h)))).not_remembered(),
+                Param::new("width", tl!("Width"), ParamKind::int(Some(1), Some(300_000), size("width").unwrap_or(i64::from(w)))).not_remembered(),
+                Param::new("height", tl!("Height"), ParamKind::int(Some(1), Some(300_000), size("height").unwrap_or(i64::from(h)))).not_remembered(),
                 Param::new("dontEnlarge", tl!("Don't Enlarge"), ParamKind::bool(enlarge)).not_remembered(),
             ])
         }

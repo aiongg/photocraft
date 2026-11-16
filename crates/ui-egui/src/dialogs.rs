@@ -682,6 +682,7 @@ pub mod export_dialog;
 pub mod file_forms;
 pub mod file_ui;
 pub mod fill_ui;
+pub(crate) mod fade_modes;
 pub mod filter_dialog;
 pub(super) mod filter_preview_ui;
 #[cfg(not(target_arch = "wasm32"))]
