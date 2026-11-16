@@ -356,7 +356,12 @@ fn end_for_other_tool(app: &mut PhotocraftApp) {
         tool,
         Tool::Pen | Tool::CurvaturePen | Tool::FreeformPen | Tool::AddAnchorPoint | Tool::DeleteAnchorPoint | Tool::PathSelection | Tool::DirectSelection
     );
-    if pen.commit_failed || pen.draft.knots.is_empty() || works_on_path {
+    if pen.draft.knots.is_empty() || works_on_path {
+        return;
+    }
+    // A refused draft waits for an explicit retry, except a new shape's, which is kept as the Work Path.
+    let shape = pen.owner.as_ref().is_some_and(|o| o.valid(app) && matches!(o.target, super::PenTarget::Shape { .. }));
+    if pen.commit_failed && !shape {
         return;
     }
     end_keeping(app);
