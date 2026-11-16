@@ -194,14 +194,24 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
     }
 
+    // A fill the engine refused stays reported: the replan that follows (the document changed under the workspace)
+    // starts from a clean error otherwise.
+    let mut refused = None;
     for command in applies {
         let answer = apply(app, &command);
+        if let Err(e) = &answer {
+            refused = Some(e.clone());
+        }
         if let Some(h) = host(app, id) {
             h.workspace_mut().answer_apply(answer);
         }
     }
     if let Some(command) = ok {
-        let answer = apply(app, &command).map_err(Label::from);
+        let answer = apply(app, &command);
+        if let Err(e) = &answer {
+            refused = Some(e.clone());
+        }
+        let answer = answer.map_err(Label::from);
         if let Some(h) = host(app, id) {
             h.answer_ok(answer);
         }
@@ -209,6 +219,9 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
     sync_document(app, &mut replan);
     reconcile(app, id, replan, committed);
+    if let (Some(e), Some(c)) = (refused, app.caf.as_mut()) {
+        c.error = Some(e);
+    }
 
     for request in picks {
         crate::color_picker_ui::open_for_request(app, id, request);
