@@ -205,7 +205,7 @@ fn defaults() -> AppDefaults {
     }
 }
 
-/// PhotoCraft's size overrides: Photoshop's panel dock width.
+/// PhotoCraft's size overrides: Photoshop's panel dock width, and 12-point Label and Mono text in the compact density.
 const SIZES: &[u8] = include_bytes!("sizes.json");
 
 /// The root values PhotoCraft gives the runtime before the theme, mode, scale and direction: the
