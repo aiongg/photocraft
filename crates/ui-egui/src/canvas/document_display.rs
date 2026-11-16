@@ -190,6 +190,9 @@ pub(crate) struct Shown {
     pub response: ToolHostResponse,
     /// The guides' output (their context request), when the body showed them.
     pub guides: Option<GuidesOutput>,
+    /// Where the Crop frame's overlay was asked for its menu (a secondary press on one of its parts) and the modifiers
+    /// held then: the overlay takes that press, so the tool host never reports it.
+    pub crop_context: Option<(Pos2, craft::keymap::Mods)>,
 }
 
 /// The document's picture as prepared for this pass, before the app is borrowed shared.
@@ -388,13 +391,14 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         let active = !app.dialog_open();
         crate::alt_grab::watch(app, ui.ctx(), egui::Id::unique(("pc-alt-grab", host.idx)), canvas_output.response.rect, tool, active);
     }
+    let crop_context = body_shown.crop.as_mut().and_then(craft::draw::ui::CropShown::take_context);
     let response = tools::run(app, ui, host, &canvas_output, body_shown);
     // A view a tool set (the Crop tool's slide) is the one the app keeps; the canvas's own otherwise.
     if let Some(next) = response.view.as_ref() {
         view.set_from(next, ppp);
     }
     let view = canvas_output.space.map_or(given, |space| space.view);
-    Shown { view, output: canvas_output, response, guides }
+    Shown { view, output: canvas_output, response, guides, crop_context }
 }
 
 /// The document's pasteboard, and for an artboard document a second one over the boards that leaves the shown layers
