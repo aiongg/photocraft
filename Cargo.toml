@@ -13,12 +13,6 @@ rust-version = "1.95"
 # The craft framework through its facade (`craft::ui::…`). The egui `[patch]` below must match
 # `craft::egui_fork::REV` (checked by `cargo xtask ci`).
 craft = { git = "https://github.com/aiongg/craft-libs", rev = "84683709fd5aceb9a2d78d3a53d7b87afbd9a0e2" }
-# Feature flags shared with the launcher and the other Craft apps (craft-libs#1118, #1119).
-craft-flags = { git = "https://github.com/storytold/craft-libs", rev = "ad8faa1c136ce289e9f132c9137d0cd913bd4ef6" }
-# The ArtCraft Launcher's agents switch and app list, shared with the launcher, the MCP gateway and
-# every Craft app (storytold/craft-ai-integrations#195). Pinned to the head of
-# storytold/craft-ai-integrations#197 until it merges.
-craft-ai-agents = { git = "https://github.com/storytold/craft-ai-integrations", rev = "35e0352666a117407d62230a6c6c2366f3e21a3b" }
 # internal
 photocraft-geom = { path = "crates/geom" }
 photocraft-color = { path = "crates/color" }

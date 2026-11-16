@@ -27,11 +27,11 @@ photocraft-io = { workspace = true }
 photocraft-format = { workspace = true }
 photocraft-automation = { workspace = true }
 photocraft-ui-egui = { workspace = true }
-craft-flags = { workspace = true }
 # Pen tablet pressure/tilt on macOS and X11 (the workspace's one isolated unsafe helper crate).
 photocraft-tablet = { workspace = true }
-# The framework facade: `craft::host` (Wake, window services) and `craft::menu` (the macOS menu bar).
-craft = { workspace = true, features = ["ui", "menu"] }
+# The framework facade: `craft::host` (Wake, window services), `craft::menu` (the macOS menu bar)
+# and `craft::automation` (the control server, the agent link and the launcher's agents switch).
+craft = { workspace = true, features = ["ui", "menu", "automation-agents"] }
 eframe = { workspace = true, features = ["wgpu", "accesskit", "wayland", "x11", "persistence", "clipboard"] }
 egui = { workspace = true }
 serde = { workspace = true }

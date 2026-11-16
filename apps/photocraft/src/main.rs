@@ -29,13 +29,11 @@
 #![cfg_attr(all(windows, not(debug_assertions)), windows_subsystem = "windows")]
 #![deny(clippy::unwrap_used, clippy::expect_used, clippy::panic, clippy::unimplemented, clippy::todo, clippy::unreachable)]
 
-mod agent_link;
 mod app_dirs;
 mod app_icon;
 #[cfg(target_os = "macos")]
 mod apple_events;
 mod caps_lock;
-mod control_server;
 mod crash_guard;
 mod cursor;
 mod gpu_startup;
@@ -83,17 +81,10 @@ fn title_bar_pref(prefs_file: Option<&std::path::Path>) -> TitleBarPref {
     if prefs.interface.system_title_bar { TitleBarPref::System } else { TitleBarPref::Integrated }
 }
 
-<<<<<<< HEAD
 /// Preferences › Integrations, read before the window opens the way [`title_bar_pref`] is:
-/// whether agents may drive this launch at all, and the port to listen on when no `--control`
-/// was given (0 = only with `--control`). A missing or unreadable file keeps the defaults.
-=======
-/// Preferences › AI Integrations, read before the window opens the way [`custom_titlebar`] is:
-/// whether agents may drive this launch at all, the port to listen on when no `--control`
-/// was given (0 = only with `--control`) and the automation folders used when no
+/// whether agents may drive this launch at all, and the automation folders used when no
 /// `--automation-read-root` / `--automation-write-root` was given. A missing or unreadable file
 /// keeps the defaults.
->>>>>>> upstream/main
 ///
 /// The section is read on its own, and when it doesn't read as a whole each value on its own,
 /// as the app's lenient load reads them (#6611): a wrong-typed value elsewhere in the file, or
@@ -117,14 +108,13 @@ fn integrations(prefs_file: Option<&std::path::Path>) -> photocraft_engine::pref
 /// and writing shares one capability, as it does when given by flags.
 fn automation_workspace(
     flags: &photocraft_automation::args::AutomationArgs,
-    prefs: &photocraft_engine::prefs::Integrations,
+    prefs: &craft::automation::agents::AgentSettings,
 ) -> Result<(photocraft_automation::workspace::AuthorizedWorkspace, Option<String>), photocraft_automation::AutomationError> {
-    use photocraft_automation::agent_link::folder;
     let mut workspace = flags.workspace()?;
     let mut warnings = Vec::new();
     for read in [true, false] {
         let given = if read { !flags.automation_read_root.is_empty() } else { flags.automation_write_root.is_some() };
-        let Some(root) = folder(if read { &prefs.read_root } else { &prefs.write_root }).filter(|_| !given) else {
+        let Some(root) = (if read { prefs.read_folder() } else { prefs.write_folder() }).filter(|_| !given) else {
             continue;
         };
         let opened = if !root.is_absolute() {
@@ -146,11 +136,11 @@ fn automation_workspace(
 }
 
 /// The control port this launch listens on, and the warning to print when a request was refused.
-/// Only `--control` (or `PHOTOCRAFT_CONTROL_PORT`) opens one at launch: Preferences › AI
-/// Integrations' connection starts and stops while the app runs (`agent_link`). Allow Agent
-/// Control off refuses the flag too, and says so rather than ignoring it silently.
+/// Only `--control` (or `PHOTOCRAFT_CONTROL_PORT`) opens one at launch: the agent link starts and
+/// stops its own while the app runs (`craft::automation::agents::AgentLink`). Allow Agent Control
+/// off refuses the flag too, and says so rather than ignoring it silently.
 fn control_port_for(cli: Option<u16>, prefs: &photocraft_engine::prefs::Integrations) -> (Option<u16>, Option<String>) {
-    if !prefs.allow_agent_control {
+    if !prefs.agents.allow_agent_control {
         let warning = cli.map(|p| {
             format!(
                 "photocraft: Preferences › AI Integrations › Allow Agent Control is off: not listening on port {p}
@@ -314,7 +304,7 @@ struct ControlNotice {
 
 /// The `--control` server's port, token and workspace, when it is on (exits 2 on a bad
 /// configuration). Preferences › AI Integrations' folders stand in for automation roots no flag
-/// names. The server the agents switch starts is `agent_link`'s, not this.
+/// names. The server the agents switch starts is the agent link's, not this.
 fn control_setup(
     cli_port: Option<u16>,
     auth: photocraft_automation::args::ControlArgs,
@@ -331,7 +321,6 @@ fn control_setup_in(
     auth: photocraft_automation::args::ControlArgs,
     automation: &photocraft_automation::args::AutomationArgs,
 ) -> ControlSetup {
-    use photocraft_automation::agent_link;
     let (port, warning) = control_port_for(cli_port, prefs);
     if let Some(warning) = &warning {
         eprint!("{warning}");
@@ -339,7 +328,7 @@ fn control_setup_in(
     // A file a crashed (or, on macOS, quit) launch left behind names a port nothing serves. Before
     // binding, so this launch's own listener doesn't keep it.
     if let Some(dir) = &settings {
-        agent_link::remove_stale_connection(dir);
+        craft::automation::agents::remove_stale_connection(dir);
     }
     let Some(port) = port else {
         return ControlSetup { control: None, warning: None };
@@ -366,7 +355,7 @@ fn control_setup_in(
     } else {
         eprintln!("photocraft: using supplied control token");
     }
-    let (workspace, warning) = match automation_workspace(automation, prefs) {
+    let (workspace, warning) = match automation_workspace(automation, &prefs.agents) {
         Ok(workspace) => workspace,
         Err(error) => {
             eprintln!("photocraft: cannot configure automation workspace: {error}");
@@ -681,25 +670,25 @@ fn main() -> eframe::Result {
                     log::warn!("couldn't remember GPU backend {}: {e}", b.name());
                 }
             });
-            // Agents in the open window, unless the launch flags (`--control`) manage the
-            // connection. Behind the suite's AI-MCP feature flag, the ArtCraft Launcher's switch
-            // (Settings › AI agents) is the one consent; without it, as before, a Control Port.
-            let flags = craft_flags::load();
-            for problem in &flags.problems {
-                log::warn!("feature flags: {problem}");
-            }
-            app.agent_link.mcp_flag = flags.enabled(&craft_flags::AI_MCP);
-            if app.agent_link.mcp_flag {
-                app.services.launcher_agents = Some(agent_link::launcher_watch(&cc.egui_ctx));
-            }
-            if let Some((listener, token, _)) = control {
-                app.agent_link.launch_flags = true;
-                app.agent_link.port = listener.local_addr().ok().map(|a| a.port());
-                let rx = control_server::start(listener, token, cc.egui_ctx.clone());
-                app = app.with_control(rx);
+            // Agents in the open window. Behind the suite's AI-MCP flag the ArtCraft Launcher's
+            // switch (Settings › AI agents) is the one consent; without it, as before, a Control
+            // Port saved in the preferences. The launch flags (`--control`) manage the connection
+            // for the whole run instead.
+            app.services.agent_switch = Some(craft::automation::agents::AgentSwitch::watch(photocraft_automation::agent_link::LAUNCHER_APP_ID, {
+                let ctx = cc.egui_ctx.clone();
+                craft::host::Wake::new(move || ctx.request_repaint())
+            }));
+            let link = if let Some((listener, token, _)) = control {
+                let host = craft::ui::runtime::windows::WindowHost::of(&cc.egui_ctx);
+                let (requests, server) = craft::automation::server::serve(listener, token, host)?;
+                eprintln!("photocraft: control server listening on {}", server.addr);
+                app = app.with_control(requests);
+                craft::automation::agents::AgentLink::from_launch(server)
             } else {
-                app.services.agent_link = Some(agent_link::service(services::config_dir()));
-            }
+                app.services.agent_automation = Some(Box::new(services::agent_automation));
+                craft::automation::agents::AgentLink::new(services::config_dir(), photocraft_engine::build_info::long_version())
+            };
+            app.services.agent_link = Some(link);
             #[cfg(target_os = "macos")]
             {
                 app.services.os_events = Some(apple_events.connect(&cc.egui_ctx));
@@ -939,17 +928,14 @@ mod tests {
 
     #[test]
     fn integrations_preferences_decide_the_control_port() {
-        use photocraft_engine::prefs::Integrations;
-        let off = Integrations { allow_agent_control: false, control_port: 0, ..Default::default() };
-        let on = Integrations { allow_agent_control: true, control_port: 0, ..Default::default() };
-        let preferred = Integrations { allow_agent_control: true, control_port: 7878, ..Default::default() };
+        let (off, on, preferred) = (agent_prefs(false, 0), agent_prefs(true, 0), agent_prefs(true, 7878));
 
         // Nothing asked for, nothing listening.
         assert_eq!(super::control_port_for(None, &on), (None, None));
         // --control wins over the preference.
         assert_eq!(super::control_port_for(Some(9000), &preferred), (Some(9000), None));
-        // The preference alone opens nothing at launch: the agent connection starts it while
-        // the app runs (`agent_link`).
+        // The preference alone opens nothing at launch: the agent link starts it while the app
+        // runs.
         assert_eq!(super::control_port_for(None, &preferred), (None, None));
 
         // Allow Agent Control off refuses both, and says so when --control asked for one
@@ -958,8 +944,14 @@ mod tests {
         let (port, warning) = super::control_port_for(Some(9000), &off);
         assert_eq!(port, None);
         assert!(warning.is_some_and(|w| w.contains("Allow Agent Control") && w.contains("9000")), "the refusal names the port");
-        let off_with_port = Integrations { allow_agent_control: false, control_port: 7878, ..Default::default() };
-        assert_eq!(super::control_port_for(None, &off_with_port), (None, None), "off beats a preferred port");
+        assert_eq!(super::control_port_for(None, &agent_prefs(false, 7878)), (None, None), "off beats a preferred port");
+    }
+
+    fn agent_prefs(allow: bool, port: u32) -> photocraft_engine::prefs::Integrations {
+        let mut prefs = photocraft_engine::prefs::Integrations::default();
+        prefs.agents.allow_agent_control = allow;
+        prefs.agents.control_port = port;
+        prefs
     }
 
     #[test]
@@ -974,8 +966,8 @@ mod tests {
         assert_eq!(super::integrations(Some(&file)), default, "an unreadable file");
         std::fs::write(&file, r#"{"integrations":{"allowAgentControl":false,"controlPort":7878}}"#).unwrap();
         let read = super::integrations(Some(&file));
-        assert!(!read.allow_agent_control);
-        assert_eq!(read.control_port, 7878);
+        assert!(!read.agents.allow_agent_control);
+        assert_eq!(read.agents.control_port, 7878);
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -1000,25 +992,24 @@ mod tests {
         };
 
         let r = read(r#"{"interface":{"showTooltips":"nope"},"integrations":{"allowAgentControl":false,"controlPort":7878}}"#);
-        assert!(!r.allow_agent_control, "a bad value in another section");
-        assert_eq!(r.control_port, 7878);
+        assert!(!r.agents.allow_agent_control, "a bad value in another section");
+        assert_eq!(r.agents.control_port, 7878);
         let r = read(r#"{"integrations":{"allowAgentControl":false,"controlPort":"x"}}"#);
-        assert!(!r.allow_agent_control, "a bad port");
-        assert_eq!(r.control_port, 0, "the bad port alone takes its default");
+        assert!(!r.agents.allow_agent_control, "a bad port");
+        assert_eq!(r.agents.control_port, 0, "the bad port alone takes its default");
         // A bad Allow Agent Control alone takes its default.
         let r = read(r#"{"integrations":{"allowAgentControl":"no","controlPort":7878}}"#);
         // (A saved port from before the agents switch turns it on, in both reads.)
-        assert_eq!(r, photocraft_engine::prefs::Integrations { allow_agent_control: true, control_port: 7878, connect_agents: true, ..Default::default() });
+        assert_eq!(r, photocraft_engine::prefs::Integrations { connect_agents: true, ..agent_prefs(true, 7878) });
         read(r#"{"integrations":{"allowAgentControl":false,"controlPort":-1}}"#);
         read(r#"{"integrations":{"allowAgentControl":false,"controlPort":4294967296}}"#);
         read(r#"{"integrations":"off"}"#);
-        // serde reads a struct from a list too; the app does.
-        assert!(!read(r#"{"integrations":[false]}"#).allow_agent_control, "a list");
-        assert_eq!(read(r#"{"integrations":[false,7878]}"#).control_port, 7878);
+        // A section that isn't an object keeps the defaults, in both reads.
+        read(r#"{"integrations":[false,7878]}"#);
         // The automation folders: a bad one takes its default alone, too.
         let r = read(r#"{"integrations":{"allowAgentControl":false,"readRoot":5,"writeRoot":"/w"}}"#);
-        assert!(!r.allow_agent_control, "a bad folder");
-        assert_eq!((r.read_root.as_str(), r.write_root.as_str()), ("", "/w"));
+        assert!(!r.agents.allow_agent_control, "a bad folder");
+        assert_eq!((r.agents.read_root.as_str(), r.agents.write_root.as_str()), ("", "/w"));
         let _ = std::fs::remove_dir_all(&dir);
     }
 
@@ -1036,12 +1027,11 @@ mod tests {
         }
     }
 
-    fn roots(read: &std::path::Path, write: &std::path::Path) -> photocraft_engine::prefs::Integrations {
-        photocraft_engine::prefs::Integrations {
-            read_root: read.to_string_lossy().into_owned(),
-            write_root: write.to_string_lossy().into_owned(),
-            ..Default::default()
-        }
+    fn roots(read: &std::path::Path, write: &std::path::Path) -> craft::automation::agents::AgentSettings {
+        let mut prefs = craft::automation::agents::AgentSettings::default();
+        prefs.read_root = read.to_string_lossy().into_owned();
+        prefs.write_root = write.to_string_lossy().into_owned();
+        prefs
     }
 
     /// Preferences › AI Integrations' folders are the automation roots when no flag names one, and
@@ -1074,7 +1064,7 @@ mod tests {
         assert_eq!(ws.read_with_save_path("b.txt").unwrap().1.as_deref(), Some("b.txt"));
 
         // Empty preferences grant nothing, as no flags do.
-        let (ws, warning) = super::automation_workspace(&flags(None, None), &photocraft_engine::prefs::Integrations::default()).unwrap();
+        let (ws, warning) = super::automation_workspace(&flags(None, None), &craft::automation::agents::AgentSettings::default()).unwrap();
         assert_eq!(warning, None);
         assert!(ws.read("a.txt").is_err() && ws.write("c.txt", b"x").is_err());
         let _ = std::fs::remove_dir_all(&dir);
@@ -1102,7 +1092,8 @@ mod tests {
     #[test]
     fn a_relative_preference_folder_is_left_out() {
         let dir = temp_dir("automation-roots-relative");
-        let relative = photocraft_engine::prefs::Integrations { read_root: ".".into(), ..roots(&dir, &dir) };
+        let mut relative = roots(&dir, &dir);
+        relative.read_root = ".".into();
         let (ws, warning) = super::automation_workspace(&flags(None, None), &relative).unwrap();
         let warning = warning.expect("the relative read folder is named");
         assert!(warning.contains("Automation Read Folder") && warning.contains("not an absolute path"), "{warning}");

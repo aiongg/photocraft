@@ -1294,7 +1294,7 @@ fn a_saved_control_port_turns_the_agent_connection_on() {
     };
     let legacy = load(r#"{"integrations":{"allowAgentControl":true,"controlPort":7878}}"#);
     assert!(legacy.connect_agents);
-    assert_eq!(legacy.control_port, 7878);
+    assert_eq!(legacy.agents.control_port, 7878);
     assert!(!load(r#"{"integrations":{"controlPort":0}}"#).connect_agents);
     assert!(!load(r#"{"integrations":{"controlPort":70000}}"#).connect_agents, "not a usable port");
     assert!(!load(r#"{"integrations":{"controlPort":7878,"connectAgents":false}}"#).connect_agents, "an explicit choice wins");
