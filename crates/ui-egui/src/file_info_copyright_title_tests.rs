@@ -13,10 +13,9 @@ fn app() -> PhotocraftApp {
     app
 }
 
-/// The tab's name and detail as one line; the tab's modified mark is not part of the text.
+/// The tab's title; the tab's modified mark is not part of the text.
 fn title(app: &PhotocraftApp) -> String {
-    let (name, detail) = tab_title_at(app, 0, 100.0);
-    format!("{name} @ {detail}")
+    tab_title_at(app, 0, 100.0)
 }
 
 fn status(app: &mut PhotocraftApp, status: &str) {
