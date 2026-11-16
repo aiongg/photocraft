@@ -775,9 +775,11 @@ fn legacy_on(layout: &Layout<String>, panels: Option<&Value>, dock_tabs: Option<
     let flag = |key: &str| panels.and_then(|panels| panels.get(key)).and_then(Value::as_bool);
     for ((key, members), (_, first)) in LEGACY_GROUPS.iter().zip(shown.iter_mut()) {
         match flag(key) {
-            // A shown group stays as it is; a hidden one shows all of its panels at their places.
+            // A shown group stays as it is; a hidden one shows all of its panels at their places, with its first tab in
+            // front. Each open shows the panel it opens, so the first is shown again after the others.
             Some(true) if first.is_none() => {
                 actions.extend(members.iter().map(|panel| Action::open((*panel).to_owned(), None)));
+                actions.extend(members.first().map(|panel| Action::activate((*panel).to_owned())));
                 *first = members.first().map(|panel| (*panel).to_owned());
             }
             Some(false) => {
