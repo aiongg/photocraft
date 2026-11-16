@@ -242,7 +242,8 @@ fn mixer_release_includes_a_new_endpoint_and_deferred_frame_samples() {
         let id = app.session.active().unwrap().active_layer.unwrap();
         assert!(doc.layer(id).unwrap().surface().unwrap().rgba(92, 30)[3] > 0.0, "failed {failed}: the release point is painted");
         let params = app.session.journal.iter().rev().find(|(name, _)| name == "paint.mixerBrush").unwrap().1.clone();
-        let xs: Vec<f64> = params["points"].as_array().unwrap().iter().map(|q| q["x"].as_f64().expect("a point is an object with x")).collect();
+        // The live commit journals the engine's points (objects); the fallback journals the stroke's own ([x, y, ...]).
+        let xs: Vec<f64> = params["points"].as_array().unwrap().iter().map(|q| q["x"].as_f64().or_else(|| q[0].as_f64()).expect("a point has an x")).collect();
         for x in [35.0, 50.0, 65.0, 95.0] {
             assert!(xs.iter().any(|v| (v - x).abs() < 1.0), "failed {failed}: the point at {x} is in the commit: {xs:?}");
         }
