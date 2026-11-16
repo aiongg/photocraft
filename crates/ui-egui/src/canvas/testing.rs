@@ -244,6 +244,13 @@ pub(crate) fn frame(app: &mut PhotocraftApp) {
     run_frame(app);
 }
 
+/// Keeps the frames' clock still: a frame leaves the time where it is, so a held pen repeats no point (and no
+/// other timed behaviour fires) until the test advances `Frames`' clock.
+pub(crate) fn still_clock(app: &mut PhotocraftApp) {
+    let ctx = ctx(app);
+    app.canvas_tools.frames.get_or_insert_with(|| Frames::over(ctx)).still_clock();
+}
+
 /// The window the following frames run in is `size` points (at least 800 × 600); the document area and its canvas
 /// fill it as they fill the app's window.
 pub(crate) fn window(app: &mut PhotocraftApp, size: egui::Vec2) {

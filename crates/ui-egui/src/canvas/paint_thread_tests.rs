@@ -14,6 +14,7 @@ const M: egui::Modifiers = egui::Modifiers::NONE;
 /// A document with an empty layer and `tool` set up to paint a short stroke on it.
 fn app_for(tool: Tool) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    testing::still_clock(&mut app);
     app.run("file.new", json!({"width": 160, "height": 60, "background": "#00ff00"})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("tools.setColors", json!({"foreground": "#ff0000"})).unwrap();
@@ -86,6 +87,9 @@ fn pen_up_while_the_thread_is_busy_commits_the_whole_stroke() {
         assert!(!app.ui.status_error, "{what}: {}", app.ui.status);
         assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1, "{what}: one edit");
         let cmd = if tool == Tool::Brush { stroke_command(&app, tool) } else { "paint.mixerBrush" };
+        if tool == Tool::Brush {
+            assert!(app.committed_stroke.is_some(), "the commit took the live stroke's pixels");
+        }
         assert_commit_replays(&mut app, cmd, &what);
     }
 }
