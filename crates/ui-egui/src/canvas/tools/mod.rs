@@ -22,8 +22,8 @@ use craft::behavior::{CancelReason, Cursor, GesturePhase, PointerButton};
 use craft::draw::ui::{CropShown, CropToolPass};
 use craft::keymap::Mods;
 use craft::ui::canvas::{
-    Autoscroll, CanvasOutput, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims,
-    ToolContext, ToolHost, ToolHostResponse, ToolKey, ToolPath, ToolPointer, ZoomTool,
+    Autoscroll, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims,
+    ToolContext, ToolHost, ToolHostResponse, ToolKey, ToolPass, ToolPath, ToolPointer, ZoomTool,
 };
 use craft::ui::primitives::Draw;
 
@@ -612,10 +612,11 @@ fn with_rig<R>(
     result
 }
 
-/// Runs the tool host for the canvas `host` on the canvas's output `out`, and applies what it reports: the view a
-/// tool or the autoscroll moved (in the response's `view`), the Scroll All Windows follow, and each family's drain.
-/// Tools are active in the main window only.
-pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &CanvasOutput, shown: BodyShown) -> ToolHostResponse {
+/// Runs the tool host for the canvas `host` on the canvas's tool input `out`, in the canvas's body after its controls
+/// (`shown` is what they reported) and before its picture, and applies what it reports: the view a tool or the
+/// autoscroll moved (in the response's `view`), the Scroll All Windows follow, and each family's drain, which feeds
+/// the picture of the same pass. Tools are active in the main window only.
+pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &ToolPass, shown: BodyShown) -> ToolHostResponse {
     let ctx = ui.ctx().clone();
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
     let mut tools = std::mem::take(&mut app.canvas_tools);
