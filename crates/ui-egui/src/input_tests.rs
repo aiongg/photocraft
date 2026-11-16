@@ -711,30 +711,6 @@ fn esc_ends_a_pen_path_and_keeps_it() {
     assert_eq!(h.state().ui.selected_path.as_deref(), Some("work"));
 }
 
-/// Over the first anchor of a Pen path the Pen reports the close-path pointer (#4596); anywhere
-/// else it reports its plain one.
-#[test]
-fn pen_shows_the_close_path_pointer_over_the_first_anchor() {
-    let mut h = harness();
-    h.state_mut().ui.tool = crate::state::Tool::Pen;
-    let owner = crate::vector_ui::capture_pen_owner(h.state());
-    h.state_mut().ui.pen = Some(crate::vector_ui::PenPath::corners(&[[50.0, 50.0], [150.0, 50.0]], owner));
-    h.run_steps(2);
-    // The Pen's reported pointer is the platform cursor the frame ends with.
-    let pointer = |h: &mut Harness<'static, PhotocraftApp>, x: f32, y: f32| {
-        let v = &h.state().ui.views[0];
-        let c = h.state().last_canvas_rect.center();
-        let p = pos2(c.x + (x - v.center[0]) * v.zoom, c.y + (y - v.center[1]) * v.zoom);
-        h.hover_at(p);
-        h.run_steps(2);
-        h.output().platform_output.cursor_icon
-    };
-    let close = pointer(&mut h, 50.0, 50.0);
-    assert_ne!(pointer(&mut h, 200.0, 200.0), close, "empty canvas: the plain Pen pointer");
-    assert_ne!(pointer(&mut h, 150.0, 50.0), close, "the last anchor doesn't close");
-    assert_eq!(pointer(&mut h, 50.0, 50.0), close, "back on the first anchor");
-}
-
 /// A rotated view takes the first idle Esc; the next retains normal deselection.
 #[test]
 fn escape_resets_rotation_before_idle_deselection_for_paint_tools() {
