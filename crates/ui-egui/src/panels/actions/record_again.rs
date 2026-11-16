@@ -1,6 +1,5 @@
 //! One editor owns one original step; previews and confirmation retain its authority.
 use craft::ui::dialog::DialogId;
-use craft::ui::patterns::form_dialogs::{HostedCanvasSize, HostedImageSize, HostedParamDialog};
 use photocraft_engine::{
     actions_edit_cmds,
     doc::{DocId, LayerId},
@@ -71,23 +70,10 @@ pub(super) fn open(app: &mut PhotocraftApp, action: usize, step: usize) -> Resul
     app.session.precheck(&held.command, &resolved).map_err(|e| e.to_string())?;
     let dialog = super::open_recorded_editor(app, &held.command, &target.params)?;
     // The editor files its OK for `check` instead of closing, so a refusal reaches the caller and the editor stays.
-    hold_ok(app, dialog);
+    super::runner::hold_editor_ok(app, dialog);
     held.dialog = dialog;
     app.held_record_again = Some(held);
     Ok(json!({"dialog": dialog}))
-}
-
-/// Makes the open editor `dialog` hold its OK: a parameter form or a sizing dialog files it for [`check`]; an
-/// adjustment editor holds its own.
-fn hold_ok(app: &mut PhotocraftApp, dialog: DialogId) {
-    let dialogs = &mut app.framework.dialogs;
-    if let Some(form) = dialogs.get_mut_by_id::<HostedParamDialog>(dialog) {
-        form.hold_ok();
-    } else if let Some(size) = dialogs.get_mut_by_id::<HostedImageSize>(dialog) {
-        size.hold_ok();
-    } else if let Some(size) = dialogs.get_mut_by_id::<HostedCanvasSize>(dialog) {
-        size.hold_ok();
-    }
 }
 
 /// Guard both actual preview routes before parsing LUT files or evaluating a command.

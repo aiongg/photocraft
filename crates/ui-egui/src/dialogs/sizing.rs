@@ -198,19 +198,19 @@ fn seed(app: &mut PhotocraftApp, id: DialogId, image: bool, params: &Value) {
     }
 }
 
-/// Judges the held OK of the editor Record Again opened (the only sizing dialog that holds its OK): a stale step, a
-/// changed document or a denied size refuses it and the editor stays open.
+/// Judges the held OK of the sizing editor of Record Again or of a paused menu step (the only sizing dialogs that hold
+/// their OK): a stale step, a changed document or a denied size refuses it and the editor stays open.
 fn answer_held(app: &mut PhotocraftApp) {
     let id = dialog_id(HostedImageSize::KEY);
     if let Some(result) = app.framework.dialogs.get_mut_by_id::<HostedImageSize>(id).and_then(HostedImageSize::take_ok) {
-        let answer = crate::actions::record_again::check(app, id, IMAGE_COMMAND, &image_params(app, &result));
+        let answer = crate::actions::check_editor(app, id, IMAGE_COMMAND, &image_params(app, &result));
         if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedImageSize>(id) {
             dialog.answer_ok(answer.map_err(Label::from));
         }
     }
     let id = dialog_id(HostedCanvasSize::KEY);
     if let Some(result) = app.framework.dialogs.get_mut_by_id::<HostedCanvasSize>(id).and_then(HostedCanvasSize::take_ok) {
-        let answer = crate::actions::record_again::check(app, id, CANVAS_COMMAND, &canvas_params(&result));
+        let answer = crate::actions::check_editor(app, id, CANVAS_COMMAND, &canvas_params(&result));
         if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedCanvasSize>(id) {
             dialog.answer_ok(answer.map_err(Label::from));
         }

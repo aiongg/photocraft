@@ -30,8 +30,8 @@ pub(crate) mod record_again;
 pub(crate) mod runner;
 
 pub(crate) use runner::{
-    Gate, PausedPlayback, PausedPlaybacks, abandoned, authorize_owned, authorize_panel_preview, journal_view, open_recorded_editor, play, play_targets,
-    report_play, resume, resume_spelling, run_step_dialog, spelling_change, stopped, suspended_guard, token_of,
+    Gate, PausedPlayback, PausedPlaybacks, abandoned, authorize_owned, authorize_panel_preview, check_editor, is_editor, journal_view, open_recorded_editor,
+    play, play_targets, report_play, resume, resume_spelling, run_step_dialog, spelling_change, stopped, suspended_guard, token_of,
 };
 
 #[cfg(test)]
