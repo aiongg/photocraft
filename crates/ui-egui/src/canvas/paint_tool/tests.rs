@@ -242,7 +242,8 @@ fn mixer_release_includes_a_new_endpoint_and_deferred_frame_samples() {
         let id = app.session.active().unwrap().active_layer.unwrap();
         assert!(doc.layer(id).unwrap().surface().unwrap().rgba(92, 30)[3] > 0.0, "failed {failed}: the release point is painted");
         let params = app.session.journal.iter().rev().find(|(name, _)| name == "paint.mixerBrush").unwrap().1.clone();
-        let xs: Vec<f64> = params["points"].as_array().unwrap().iter().map(|q| q["x"].as_f64().expect("a point is an object with x")).collect();
+        // The live commit journals the engine's points (objects); the fallback journals the stroke's own ([x, y, ...]).
+        let xs: Vec<f64> = params["points"].as_array().unwrap().iter().map(|q| q["x"].as_f64().or_else(|| q[0].as_f64()).expect("a point has an x")).collect();
         for x in [35.0, 50.0, 65.0, 95.0] {
             assert!(xs.iter().any(|v| (v - x).abs() < 1.0), "failed {failed}: the point at {x} is in the commit: {xs:?}");
         }
@@ -444,7 +445,7 @@ fn smoothed_stroke_shows_its_catch_up_tail_while_drawing() {
     // #73: with smoothing the brush lags behind the pointer and catches up at the end; the
     // preview draws that tail live, so no frame after release is missing the end.
     let xs = [30.0, 50.0, 70.0, 90.0, 110.0, 130.0, 150.0, 170.0];
-    let (live, done, partial, _) = drag_frames(0.5, &xs);
+    let (live, done, partial, app) = drag_frames(0.5, &xs);
     assert!(same_pixels(&live, &done), "preview at the last move = committed stroke, tail included");
     assert!(partial);
     let end = |d: &Document| (0..200).rev().find(|&x| (0..80).any(|y| d.layers[0].surface().unwrap().rgba(x, y)[3] > 0.0)).unwrap();
@@ -452,14 +453,13 @@ fn smoothed_stroke_shows_its_catch_up_tail_while_drawing() {
     // The options-bar value reaches the stroke: 50 % smooths the wiggle, 0 % doesn't.
     let (_, rough, _, _) = drag_frames(0.0, &xs);
     assert!(!same_pixels(&rough, &done), "smoothing changes the stroke");
-    // And the commit is what `paint.stroke` gives with that smoothing.
+    // And the commit is what `paint.stroke` gives with that smoothing: the journaled stroke, replayed on a fresh
+    // session, paints the same pixels.
+    let journaled = app.session.journal.iter().rev().find(|(id, _)| id == "paint.stroke").map(|(_, p)| p.clone()).expect("the stroke is journaled");
     let mut s = photocraft_engine::Session::new();
     s.execute("file.new", json!({"width": 200, "height": 80, "background": "transparent"})).unwrap();
     s.execute("tools.setBrush", json!({"brush": {"size": 16, "hardness": 0.5, "smoothing": {"amount": 0.5, "catchUpOnEnd": true}}})).unwrap();
-    let mut pts = vec![json!([10.0, 40.0, 1.0])];
-    pts.extend(xs.iter().map(|&x| json!([x, 40.0 + (x / 7.0).sin() * 8.0, 1.0])));
-    // (Round tips without dynamics draw the same for any seed.)
-    s.execute("paint.stroke", json!({"points": pts, "seed": 0})).unwrap();
+    s.execute("paint.stroke", journaled).unwrap();
     assert!(same_pixels(&s.active().unwrap().doc, &done));
 }
 

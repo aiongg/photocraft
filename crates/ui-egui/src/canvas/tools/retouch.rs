@@ -318,7 +318,8 @@ impl CanvasTool for SourceTool<'_> {
     fn cancel(&mut self, _reason: CancelReason, _cx: &mut ToolContext<'_>) {}
 
     fn takes(&self, button: PointerButton, mods: Mods) -> bool {
-        button == PointerButton::Primary && mods.alt
+        // Control+Alt is the brush-resize drag, which the painting tool takes (`cursor_policy::alt_samples`).
+        button == PointerButton::Primary && mods.alt && !mods.ctrl
     }
 
     fn paint(&self, _draw: &Draw<'_>, _cx: &ToolContext<'_>) {}
