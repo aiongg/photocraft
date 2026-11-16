@@ -113,6 +113,10 @@ pub struct DirectSelection {
     /// only while they still hold.
     #[serde(skip)]
     pub(crate) editing: Option<Owner>,
+    /// The modifiers held when the running gesture began: the tool a gesture resolves to, and so the
+    /// name of its History step, is the one its press chose, not the one the release's modifiers pick.
+    #[serde(skip)]
+    pub(crate) editing_mods: Mods,
     #[serde(skip)]
     pub(crate) owner: Option<Owner>,
     /// The saved path whose anchors the first Escape hid (#13072): the next Escape deactivates it,

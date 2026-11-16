@@ -23,14 +23,19 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
     }
     let mut commit = false;
     let mut dragged = false;
+    let mut named_mods = mods;
     for event in &output.edit.events {
         match event {
-            EditEvent::Begin { .. } => app.ui.direct_selection.editing = Owner::current(app),
-            // A gesture runs only on the document, revision and target it began on.
+            EditEvent::Begin { .. } => {
+                app.ui.direct_selection.editing = Owner::current(app);
+                app.ui.direct_selection.editing_mods = mods;
+            }
+            // A gesture runs only on the document, revision and target it began on, with the modifiers it began with.
             EditEvent::Commit { .. } => {
                 let began = app.ui.direct_selection.editing.take();
                 commit = began.is_some() && began == Owner::current(app);
                 dragged = true;
+                named_mods = std::mem::take(&mut app.ui.direct_selection.editing_mods);
             }
             EditEvent::Cancel { .. } => app.ui.direct_selection.editing = None,
             EditEvent::Set { .. } => commit = true,
@@ -38,7 +43,7 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
         }
     }
     if commit && let Some(change) = &output.change {
-        change_path(app, change, refs, tool, mods, dragged);
+        change_path(app, change, refs, tool, named_mods, dragged);
     }
     if let Some(delete) = &output.delete
         && let Some(r) = known(delete.path, refs)
@@ -150,6 +155,7 @@ fn select(app: &mut PhotocraftApp, selection: &PathSelection) {
     let owner = Owner::current(app);
     let ds = &mut app.ui.direct_selection;
     let editing = ds.editing.take();
+    let editing_mods = ds.editing_mods;
     *ds = DirectSelection {
         target: selection.path.and_then(PathRef::from_key),
         anchors: selection.anchors.iter().map(|k| [k.subpath, k.knot]).collect(),
@@ -157,6 +163,7 @@ fn select(app: &mut PhotocraftApp, selection: &PathSelection) {
         shown: selection.shown.clone(),
         owner,
         editing,
+        editing_mods,
         ..Default::default()
     };
 }
