@@ -99,11 +99,11 @@ pub fn panel(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // The panel highlights the fallback target, but only a change the user made is stored as the selection.
     let shown = target(app).map(u64::from);
     let mut selected = shown;
-    let mut panel =
-        LayerCompsPanel::new(tl!("Layer Comps"), &rows, Bind::bound(&mut selected)).last_state_applied(last_state_applied).empty(tl!("No document"));
-    if let Some(document) = document {
-        panel = panel.document(document);
-    }
+    let mut panel = LayerCompsPanel::new(tl!("Layer Comps"), &rows, Bind::bound(&mut selected)).last_state_applied(last_state_applied);
+    panel = match document {
+        Some(document) => panel.document(document),
+        None => panel.empty(tl!("No document")),
+    };
     let events = panel.show(ui).events;
     if selected != shown {
         app.ui.layer_comp_selected = selected.map(|id| id as u32);
