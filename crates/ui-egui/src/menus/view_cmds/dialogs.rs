@@ -209,10 +209,16 @@ pub(super) fn params_for(app: &mut PhotocraftApp, id: &str) -> Option<(Vec<Param
         "file.fileInfo" => file_info_form(app),
         "file.automate.fitImage" => {
             let (w, h, _) = doc?;
+            // The values Fit Image last ran with, else the document's size (#13853). A stored value that isn't a
+            // usable size is ignored. The engine keeps them in the preferences, so the rows opt out of the
+            // dialog's own remembered values.
+            let kept = app.session.prefs().dialogs.get(photocraft_engine::file_cmds::FIT_IMAGE).cloned().unwrap_or_default();
+            let size = |key: &str| kept.get(key).and_then(Value::as_u64).filter(|v| (1..=300_000).contains(v)).and_then(|v| i64::try_from(v).ok());
+            let enlarge = kept.get("dontEnlarge").and_then(Value::as_bool).unwrap_or(false);
             plain(vec![
-                Param::new("width", tl!("Width"), ParamKind::int(Some(1), None, i64::from(w))),
-                Param::new("height", tl!("Height"), ParamKind::int(Some(1), None, i64::from(h))),
-                Param::new("dontEnlarge", tl!("Don't Enlarge"), ParamKind::bool(false)),
+                Param::new("width", tl!("Width"), ParamKind::int(Some(1), None, size("width").unwrap_or(i64::from(w)))).not_remembered(),
+                Param::new("height", tl!("Height"), ParamKind::int(Some(1), None, size("height").unwrap_or(i64::from(h)))).not_remembered(),
+                Param::new("dontEnlarge", tl!("Don't Enlarge"), ParamKind::bool(enlarge)).not_remembered(),
             ])
         }
         "file.automate.conditionalModeChange" => {
@@ -395,16 +401,24 @@ pub(super) fn params_for(app: &mut PhotocraftApp, id: &str) -> Option<(Vec<Param
             folder("input", tl!("Input Folder"), dir.clone()).visible_when("source", "folder"),
             Param::new("includeSubfolders", tl!("Include All Subfolders"), ParamKind::bool(false)).visible_when("source", "folder"),
             folder("output", tl!("Output Folder"), format!("{dir}/processed")),
-            choice(
-                "format",
-                tl!("File Type"),
-                opts(&[("jpg", tl!("JPEG")), ("png", tl!("PNG")), ("psd", tl!("PSD")), ("tiff", tl!("TIFF")), ("webp", tl!("WebP"))]),
-                "jpg",
-            ),
-            Param::new("quality", tl!("Quality"), ParamKind::int(Some(0), Some(12), 8)),
-            Param::new("width", tl!("Width"), ParamKind::int(Some(0), None, 0)),
-            Param::new("height", tl!("Height"), ParamKind::int(Some(0), None, 0)),
-            Param::new("convertToSrgb", tl!("Convert Profile to sRGB"), ParamKind::bool(true)),
+            Param::section(tl!("File Type")),
+            // One section per format: the checkbox that enables it, then its own options and size.
+            Param::new("jpeg/enabled", tl!("Save as JPEG"), ParamKind::bool(true)),
+            Param::new("jpeg/quality", tl!("Quality"), ParamKind::number(Some(1.0), Some(12.0), 5.0, 1.0, 2)).enabled_when("jpeg/enabled", true),
+            Param::new("jpeg/convertToSrgb", tl!("Convert Profile to sRGB"), ParamKind::bool(false)).enabled_when("jpeg/enabled", true),
+            Param::new("jpeg/resize", tl!("Resize to Fit"), ParamKind::bool(false)).enabled_when("jpeg/enabled", true),
+            Param::new("jpeg/width", tl!("W"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("jpeg/resize", true),
+            Param::new("jpeg/height", tl!("H"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("jpeg/resize", true),
+            Param::new("psd/enabled", tl!("Save as PSD"), ParamKind::bool(false)),
+            Param::new("psd/maximizeCompatibility", tl!("Maximize Compatibility"), ParamKind::bool(true)).enabled_when("psd/enabled", true),
+            Param::new("psd/resize", tl!("Resize to Fit"), ParamKind::bool(false)).enabled_when("psd/enabled", true),
+            Param::new("psd/width", tl!("W"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("psd/resize", true),
+            Param::new("psd/height", tl!("H"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("psd/resize", true),
+            Param::new("tiff/enabled", tl!("Save as TIFF"), ParamKind::bool(false)),
+            Param::new("tiff/lzw", tl!("LZW Compression"), ParamKind::bool(false)).enabled_when("tiff/enabled", true),
+            Param::new("tiff/resize", tl!("Resize to Fit"), ParamKind::bool(false)).enabled_when("tiff/enabled", true),
+            Param::new("tiff/width", tl!("W"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("tiff/resize", true),
+            Param::new("tiff/height", tl!("H"), ParamKind::int(Some(1), Some(30_000), 1)).enabled_when("tiff/resize", true),
         ]),
         "file.automate.batch" => batch_form(app, &dir),
         "select.saveSelection" | "select.loadSelection" | "image.applyImage" | "image.calculations" => channel_form(app, id),
@@ -436,184 +450,12 @@ fn file_info_form(app: &mut PhotocraftApp) -> Option<(Vec<Param>, DialogFields)>
         .iter()
         .filter_map(|(key, label)| info["camera"].get(*key).and_then(Value::as_str).map(|v| (*label, v.to_owned())))
         .collect();
-<<<<<<< HEAD
     if !camera.is_empty() {
         rows.push(Param::section(tl!("Camera Data")));
         let lang = crate::i18n::current();
         for (label, value) in camera {
             rows.push(Param::read_only_text(format!("camera/{label}"), crate::i18n::tr_ctx(lang, "cameraData", label), value));
         }
-=======
-    let rest: Vec<String> = f.keys().filter(|k| !k.starts_with("__") && !keys.contains(k)).cloned().collect();
-    keys.extend(rest);
-    keys
-}
-
-/// Batch keeps its normal caption fields. Only same-name actions in the chosen set need another selector.
-fn batch_occurrence_field(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    use crate::actions::{BATCH_OCCURRENCE, BATCH_OCCURRENCES};
-
-    let Some(choices) = f.get(BATCH_OCCURRENCES).and_then(Value::as_array) else { return };
-    let action = f.get("action");
-    let set = f.get("set").filter(|set| !set.is_null());
-    let mut choices: Vec<_> = choices
-        .iter()
-        .filter(|choice| choice.get("action") == action && choice.get("set").filter(|set| !set.is_null()) == set)
-        .filter_map(|choice| Some((Some(choice["row"].as_u64()?), choice["label"].as_str()?)))
-        .collect();
-    if choices.len() < 2 {
-        return;
-    }
-    let name = tl!("Occurrence");
-    let mut current = f.get(BATCH_OCCURRENCE).and_then(Value::as_u64).filter(|row| choices.iter().any(|(choice, _)| *choice == Some(*row)));
-    choices.insert(0, (None, tl!("By name")));
-    ui.label(name);
-    if crate::widgets::dropdown_literal(ui, "form-batch-occurrence", name, &mut current, &choices, 200.0) {
-        f.insert(BATCH_OCCURRENCE.into(), json!(current));
-    }
-    ui.end_row();
-}
-
-/// Body of a `__form` dialog: text fields, number fields, checkboxes and `__choices` dropdowns.
-pub fn form_body(ui: &mut egui::Ui, f: &mut Map<String, Value>) {
-    let choices = f.get("__choices").cloned().unwrap_or(Value::Null);
-    // Data-driven labels (a per-part checkbox shows the part's name, not a catalogue entry)
-    // come from `__labels` verbatim; everything else goes through the catalogue.
-    let labels = f.get("__labels").cloned().unwrap_or(Value::Null);
-    let command = f.get("__command").and_then(Value::as_str);
-    let file_info = command == Some("file.fileInfo");
-    let image_processor = command == Some("file.scripts.imageProcessor");
-    let label = |k: &str| {
-        if file_info {
-            match k {
-                "title" => return tl!("Document Title").to_owned(),
-                "copyright" => return tl!("Copyright Notice").to_owned(),
-                "copyrightUrl" => return tl!("Copyright Info URL").to_owned(),
-                _ => {}
-            }
-        }
-        labels.get(k).and_then(Value::as_str).map_or_else(|| label_of(k), str::to_string)
-    };
-    let keys = form_keys(f);
-    let mut browse: Option<String> = None;
-    egui::Grid::new("form-dialog").num_columns(2).spacing([12.0, 6.0]).show(ui, |ui| {
-        for k in keys {
-            if image_processor
-                && f.get("source").and_then(Value::as_str).is_some_and(|source| source != "folder")
-                && matches!(k.as_str(), "input" | "includeSubfolders")
-            {
-                continue;
-            }
-            let v = f.get(&k).cloned().unwrap_or(Value::Null);
-            if k == "naming" && f.get("__command").and_then(Value::as_str) == Some("file.automate.batch") {
-                let label = ui.label(tl!("File Naming"));
-                let mut naming = v.as_str().unwrap_or_default().to_owned();
-                ui.add(egui::TextEdit::singleline(&mut naming).desired_width(260.0).hint_text("{name}"))
-                    .labelled_by(label.id)
-                    .on_hover_text("{name} · {serial} · {date} (UTC)");
-                f.insert(k, json!(naming));
-                ui.end_row();
-                continue;
-            }
-            if k == "quality" && f.get("__command").and_then(Value::as_str) == Some("file.automate.batch") {
-                ui.label(label(&k));
-                let mut custom = v.as_f64().is_some();
-                let mut quality = v.as_f64().or_else(|| f.get(BATCH_QUALITY).and_then(Value::as_f64)).unwrap_or(8.0).clamp(0.0, 12.0) as f32;
-                custom_quality_row(ui, &mut custom, &mut quality, true);
-                // None preserves the command's existing JPEG and lossless WebP defaults.
-                // The inactive custom value is shell state, never a command parameter.
-                f.insert(BATCH_QUALITY.into(), json!(quality));
-                f.insert(k, if custom { json!(quality) } else { Value::Null });
-                ui.end_row();
-                continue;
-            }
-            if k == "quality" && f.contains_key(JPEG_QUALITY) {
-                ui.label(label(&k));
-                jpeg_quality_field(ui, f);
-                ui.end_row();
-                continue;
-            }
-            let new = match &v {
-                Value::Array(_) | Value::Object(_) | Value::Null => continue,
-                Value::Bool(b) => {
-                    ui.label("");
-                    let mut b = *b;
-                    // A checkbox named in `__enabledBy` is greyed while the checkbox it names is off.
-                    let on =
-                        f.get("__enabledBy").and_then(|m| m.get(&k)).and_then(Value::as_str).is_none_or(|by| f.get(by).and_then(Value::as_bool) != Some(false));
-                    let response = ui.add_enabled(on, egui::Checkbox::new(&mut b, label(&k)));
-                    if let Some(tip) = f.get("__tooltips").and_then(|m| m.get(&k)).and_then(Value::as_str) {
-                        response.on_hover_text(tip).on_disabled_hover_text(tip);
-                    }
-                    json!(b)
-                }
-                Value::String(s) => {
-                    ui.label(label(&k));
-                    let mut s = s.clone();
-                    match choices.get(&k).and_then(Value::as_array) {
-                        Some(opts) => {
-                            // Action and set names are the user's own text, never catalogue entries.
-                            let action_names = matches!(k.as_str(), "action" | "set")
-                                && matches!(f.get("__command").and_then(Value::as_str), Some("file.automate.batch" | "file.automate.createDroplet"));
-                            let opts: Vec<(String, String)> =
-                                opts.iter().filter_map(Value::as_str).map(|o| (o.to_string(), if action_names { o.to_string() } else { label(o) })).collect();
-                            let refs: Vec<(String, &str)> = opts.iter().map(|(a, b)| (a.clone(), b.as_str())).collect();
-                            if action_names {
-                                crate::widgets::dropdown_literal(ui, &format!("form-{k}"), &label(&k), &mut s, &refs, 200.0);
-                            } else {
-                                crate::widgets::dropdown(ui, &format!("form-{k}"), &label(&k), &mut s, &refs, 200.0);
-                            }
-                        }
-                        None => {
-                            if file_info && matches!(k.as_str(), "description" | "keywords" | "copyright") {
-                                egui::ScrollArea::vertical().id_salt(("form-text", &k)).max_height(80.0).show(ui, |ui| {
-                                    let response = ui.add(egui::TextEdit::multiline(&mut s).desired_rows(3).desired_width(260.0)).accessible_name(label(&k));
-                                    if response.has_focus() {
-                                        ui.input_mut(|input| input.consume_key(egui::Modifiers::NONE, egui::Key::Enter));
-                                    }
-                                });
-                            } else {
-                                ui.horizontal(|ui| {
-                                    let field = ui.add(egui::TextEdit::singleline(&mut s).desired_width(260.0)).accessible_name(label(&k));
-                                    if image_processor && crate::dialogs::is_folder_field(&k) {
-                                        crate::field_tab::register(ui.ctx(), field.id);
-                                        if crate::field_tab::reached(ui.ctx(), field.id) {
-                                            crate::field_tab::select_all(ui.ctx(), field.id, &s);
-                                        }
-                                    }
-                                    // A folder field gets the system folder picker (#7942, #9357).
-                                    if crate::dialogs::is_folder_field(&k) && crate::widgets::secondary_button(ui, tl!("Browse…"), 0.0).clicked() {
-                                        browse = Some(k.clone());
-                                    }
-                                });
-                            }
-                        }
-                    }
-                    json!(s)
-                }
-                Value::Number(n) => {
-                    ui.label(label(&k));
-                    if let Some(mut i) = n.as_i64() {
-                        ui.add(egui::DragValue::new(&mut i).custom_parser(crate::widgets::parse_num)).accessible_name(label(&k));
-                        json!(i)
-                    } else {
-                        let mut x = n.as_f64().unwrap_or(0.0);
-                        ui.add(egui::DragValue::new(&mut x).speed(0.5).custom_parser(crate::widgets::parse_num)).accessible_name(label(&k));
-                        json!(x)
-                    }
-                }
-            };
-            let batch_action = k == "action" && f.get("__command").and_then(Value::as_str) == Some("file.automate.batch");
-            f.insert(k, new);
-            ui.end_row();
-            if batch_action {
-                batch_occurrence_field(ui, f);
-            }
-        }
-    });
-    if let Some(key) = browse {
-        f.insert(crate::dialogs::BROWSE_FIELD.into(), json!(key));
->>>>>>> upstream/main
     }
     let status = info["copyrightStatus"].as_str().unwrap_or("unknown").to_owned();
     let fields = DialogFields::from_pairs([
@@ -875,7 +717,6 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
                 })
             }))
         }
-<<<<<<< HEAD
         "layer.lockLayers" => Some(Ok(opened(crate::layers_panel_ui::open_lock_layers(app)))),
         "view.newGuideLayout" => Some(crate::guide_layout_ui::open(app).map(opened).ok_or_else(|| "no document".into())),
         "type.warpText" => Some(crate::dialogs::open_command_dialog(app, id, label).map(opened)),
@@ -885,253 +726,6 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
         _ if is_form(id) => {
             let (rows, fields) = params_for(app, id)?;
             Some(Ok(opened(open_form(app, id, label, rows, fields, Value::Null))))
-=======
-        "layer.videoLayers.interpretFootage" => {
-            let st = app.session.active()?;
-            let id_layer = st.active_layer?;
-            let fps = st.doc.layer(id_layer).and_then(|l| l.video.as_ref()).map_or(30.0, |v| v.fps);
-            dialog(app, json!({"fps": fps}), json!({}))
-        }
-        "file.fileInfo" => {
-            let info = app.session.execute("file.fileInfo", json!({})).ok()?;
-            let kw = info["keywords"].as_array().map(|a| a.iter().filter_map(Value::as_str).collect::<Vec<_>>().join("; ")).unwrap_or_default();
-            dialog(
-                app,
-                json!({
-                    "title": info["title"],
-                    "author": info["author"],
-                    "authorTitle": info["authorTitle"],
-                    "description": info["description"],
-                    "keywords": kw,
-                    "copyrightStatus": info["copyrightStatus"],
-                    "copyright": info["copyright"],
-                    "copyrightUrl": info["copyrightUrl"],
-                    "__order": ["title", "author", "authorTitle", "description", "keywords", "copyrightStatus", "copyright", "copyrightUrl"],
-                    "__labels": {
-                        "title": tl!("Document Title"),
-                        "copyright": tl!("Copyright Notice"),
-                        "copyrightUrl": tl!("Copyright Info URL"),
-                    },
-                    "__camera": info["camera"]
-                }),
-                json!({"copyrightStatus": ["unknown", "copyrighted", "publicDomain"]}),
-            )
-        }
-        "file.automate.fitImage" => {
-            let (w, h, _) = doc?;
-            // The values Fit Image last ran with, else the document's size (#13853). A stored
-            // value that isn't a usable size is ignored.
-            let kept = app.session.prefs().dialogs.get(photocraft_engine::file_cmds::FIT_IMAGE).cloned().unwrap_or_default();
-            let size = |key: &str| kept.get(key).and_then(Value::as_u64).filter(|v| (1..=300_000).contains(v));
-            let enlarge = kept.get("dontEnlarge").and_then(Value::as_bool).unwrap_or(false);
-            dialog(
-                app,
-                json!({"width": size("width").unwrap_or(w.into()), "height": size("height").unwrap_or(h.into()), "dontEnlarge": enlarge, "__compact": true}),
-                json!({}),
-            )
-        }
-        "file.automate.conditionalModeChange" => dialog(
-            app,
-            json!({"from": "any", "to": "rgb"}),
-            json!({"from": ["any", "rgb", "grayscale", "cmyk", "lab", "indexed", "bitmap", "duotone", "multichannel"], "to": ["rgb", "grayscale", "cmyk", "lab"]}),
-        ),
-        "view.newGuideLayout" => Some(Ok(json!({"dialog": crate::guide_layout_ui::open(app)}))),
-        "type.warpText" => Some(Ok(json!({"dialog": crate::dialogs::open_command_dialog(app, id, label)}))),
-        "file.export.layersToFiles" => {
-            let (_, _, name) = doc?;
-            dialog(
-                app,
-                json!({"dir": dir, "prefix": name.rsplit_once('.').map_or(name.as_str(), |(a, _)| a), "format": "png", "quality": null, JPEG_CUSTOM: false,
-                    JPEG_QUALITY: 10, "visibleOnly": true, "trim": false, "__order": ["dir", "prefix", "visibleOnly", "format", "quality", "trim"]}),
-                json!({"format": ["png", "jpg", "psd", "tiff", "webp", "bmp"]}),
-            )
-        }
-        "file.export.layerCompsToFiles" | "file.export.artboardsToFiles" => {
-            let (_, _, name) = doc?;
-            let prefix = name.rsplit_once('.').map_or(name.as_str(), |(a, _)| a).to_string();
-            let fields = if id == "file.export.layerCompsToFiles" {
-                json!({"dir": dir, "prefix": prefix, "format": "png", "quality": null, JPEG_CUSTOM: false, JPEG_QUALITY: 10, "selectedOnly": false,
-                    "__order": ["dir", "prefix", "selectedOnly", "format", "quality"]})
-            } else {
-                json!({"dir": dir, "prefix": prefix, "format": "png", "quality": null, JPEG_CUSTOM: false, JPEG_QUALITY: 10, "__order": ["dir", "prefix", "format", "quality"]})
-            };
-            dialog(app, fields, json!({"format": ["png", "jpg", "psd", "tiff", "webp", "bmp"]}))
-        }
-        "file.export.artboardsToPdf" => {
-            let (_, _, name) = doc?;
-            let stem = name.rsplit_once('.').map_or(name.as_str(), |(a, _)| a).to_string();
-            dialog(app, json!({"path": format!("{dir}/{stem}.pdf"), "quality": 10}), json!({}))
-        }
-        "file.export.dataSetsAsFiles" => {
-            #[cfg(target_arch = "wasm32")]
-            {
-                let _ = (app, dir, doc);
-                Some(Err(tl!("Data Sets as Files is unavailable on the web").to_string()))
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            {
-                let (_, _, _) = doc?;
-                dialog(app, json!({"dir": dir, "naming": "{name}", "format": "png"}), json!({"format": ["png", "jpg", "psd", "tiff", "webp", "bmp"]}))
-            }
-        }
-        "layer.new.artboard" => {
-            let (w, h, _) = doc?;
-            let presets: Vec<&str> = std::iter::once("").chain(photocraft_engine::artboard_cmds::PRESETS.iter().map(|p| p.0)).collect();
-            dialog(
-                app,
-                json!({"name": "", "preset": "", "width": w, "height": h, "background": "white"}),
-                json!({"preset": presets, "background": ["white", "black", "transparent"]}),
-            )
-        }
-        "file.export.colorLookupTables" => {
-            let (_, _, name) = doc?;
-            let stem = name.rsplit_once('.').map_or(name.as_str(), |(a, _)| a).to_string();
-            // A selected adjustment is a common use case, but existing no-selection exports
-            // continue to bake the entire visible stack. The scope remains explicit in the UI.
-            let selected_adjustments = app.session.active().is_some_and(|st| {
-                let chosen = st.selected_layers();
-                !chosen.is_empty()
-                    && chosen.iter().all(|id| {
-                        st.doc.layers.iter().any(|root| root.id == *id)
-                            && st.doc.layer(*id).is_some_and(|layer| layer.visible && matches!(layer.content, photocraft_doc::LayerContent::Adjustment(_)))
-                    })
-            });
-            let scope = if selected_adjustments { "selected" } else { "all" };
-            dialog(app, json!({"path": format!("{dir}/{stem}.cube"), "size": 33, "title": stem, "scope": scope}), json!({"scope": ["all", "selected"]}))
-        }
-        "file.scripts.loadFilesIntoStack" => Some(Ok(json!({"dialog": crate::stack_dialog::open(app)}))),
-        // Photography automation (photo_cmds / lens_cmds): a folder (or the open documents).
-        "file.automate.photomerge" => dialog(
-            app,
-            json!({"paths": dir, "useOpenDocuments": false, "layout": "auto", "blend": true, "vignetteRemoval": false, "geometricCorrection": false, "contentAwareFill": false}),
-            json!({"layout": ["auto", "perspective", "cylindrical", "spherical", "collage", "reposition"]}),
-        ),
-        "file.automate.mergeToHdrPro" => dialog(
-            app,
-            json!({"paths": dir, "useOpenDocuments": false, "align": true, "removeGhosts": false, "mode": "32", "method": "localAdaptation", "radius": 7.0, "strength": 0.52, "gamma": 1.0, "exposure": 0.0, "detail": 30.0, "saturation": 20.0}),
-            json!({"mode": ["32", "16", "8"], "method": ["localAdaptation", "exposureGamma", "highlightCompression", "equalizeHistogram"]}),
-        ),
-        "file.automate.lensCorrection" => dialog(
-            app,
-            json!({"input": dir, "output": format!("{dir}/corrected"), "format": "same", "profile": "auto", "correctDistortion": true, "correctVignette": true, "correctCA": true, "autoScale": true, "edge": "transparency"}),
-            json!({"format": ["same", "png", "jpg", "psd", "tiff"], "profile": ["auto", "generic", "none"], "edge": ["transparency", "edgeExtension", "black", "white"]}),
-        ),
-        "file.scripts.imageProcessor" => dialog(
-            app,
-            json!({
-                "source": if doc.is_some() { "current" } else { "folder" },
-                "input": dir, "includeSubfolders": false, "output": format!("{dir}/processed"),
-                "jpeg": {"enabled": true, "quality": 5, "convertToSrgb": false, "resize": false, "width": 1, "height": 1},
-                "psd": {"enabled": false, "maximizeCompatibility": true, "resize": false, "width": 1, "height": 1},
-                "tiff": {"enabled": false, "lzw": false, "resize": false, "width": 1, "height": 1},
-                "__labels": {"current": tl!("Current document"), "open": tl!("All open documents"), "folder": tl!("Folder"), "includeSubfolders": tl!("Include All Subfolders")},
-                "__order": ["source", "input", "includeSubfolders", "output"]
-            }),
-            json!({"source": ["current", "open", "folder"]}),
-        ),
-        "file.automate.batch" => {
-            let Some(row) = crate::actions::selected_action_row(app) else {
-                return Some(Err("record an action in the Actions panel first".into()));
-            };
-            let action = &app.session.actions.list[row];
-            let (name, set) = (action.name.clone(), action.set.clone());
-            let (names, sets) = crate::actions::action_form_choices(app);
-            let mut fields = json!({
-                "action": name, "source": "folder", "input": dir,
-                "includeSubfolders": false, "__labels": subfolders_label(),
-                "output": format!("{dir}/batch"), "format": "same", "quality": null,
-                "__batchQuality": 8, "naming": "", "startingSerial": 1,
-                "stopOnError": false, "errorLog": "",
-                "__order": ["set", "action", "source", "input", "includeSubfolders", "output", "format", "naming", "startingSerial", "quality", "stopOnError", "errorLog"]
-            });
-            // The Set dropdown picks between same-named actions; an action outside any set has none.
-            if let Some(set) = set {
-                fields["set"] = json!(set);
-            }
-            let choices = json!({"set": sets, "action": names, "format": ["same", "png", "jpg", "psd", "tiff", "webp"], "source": ["folder", "open"]});
-            let dialog = form(app, id, label, fields, choices);
-            crate::actions::bind_batch_dialog(app, dialog, row);
-            Some(Ok(json!({"dialog": dialog})))
-        }
-        // Channel workflow dialogs (see channels_panel.rs for the channel references).
-        "select.saveSelection" | "select.loadSelection" | "image.applyImage" | "image.calculations" => {
-            let st = app.session.active()?;
-            let d = &st.doc;
-            let mode = d.pixel_format().mode;
-            let mut chans: Vec<String> = vec![photocraft_engine::channel_cmds::composite_name(mode).to_string()];
-            if mode.color_channels() > 1 {
-                chans.extend(photocraft_engine::channel_cmds::color_names(mode).iter().map(|n| n.to_string()));
-            }
-            chans.extend(d.channels.iter().map(|c| c.name.clone()));
-            let alphas: Vec<String> = std::iter::once("new".to_string()).chain(d.channels.iter().map(|c| c.name.clone())).collect();
-            let blends = [
-                "multiply",
-                "screen",
-                "normal",
-                "overlay",
-                "softLight",
-                "hardLight",
-                "darken",
-                "lighten",
-                "colorDodge",
-                "colorBurn",
-                "linearBurn",
-                "linearDodge",
-                "difference",
-                "exclusion",
-                "add",
-                "subtract",
-            ];
-            // The active layer's transparency, and its mask only when it has one.
-            let layer = st.active_layer.and_then(|l| d.layer(l));
-            let mut load = chans.clone();
-            if layer.is_some() {
-                load.push("transparency".into());
-            }
-            if layer.is_some_and(|l| l.mask.is_some()) {
-                load.push("mask".into());
-            }
-            load.push("selection".into());
-            match id {
-                "select.saveSelection" => dialog(
-                    app,
-                    json!({"channel": "new", "name": "", "operation": "new"}),
-                    json!({"channel": alphas, "operation": ["new", "replace", "add", "subtract", "intersect"]}),
-                ),
-                "select.loadSelection" => {
-                    let first = d.channels.first().map_or_else(|| chans[0].clone(), |c| c.name.clone());
-                    dialog(
-                        app,
-                        json!({"channel": first, "invert": false, "operation": "new"}),
-                        json!({"channel": load, "operation": ["new", "add", "subtract", "intersect"]}),
-                    )
-                }
-                "image.applyImage" => {
-                    let mut masks = vec!["none".to_string()];
-                    masks.extend(load.iter().cloned());
-                    // Source layer: Merged, then the pixel layers top to bottom (the engine takes
-                    // the topmost layer of a name), shown by their own names.
-                    let mut layers = vec!["merged".to_string()];
-                    for (_, _, l) in d.walk().into_iter().rev() {
-                        if l.surface().is_some() && !layers.contains(&l.name) {
-                            layers.push(l.name.clone());
-                        }
-                    }
-                    let names: Map<String, Value> = layers.iter().skip(1).map(|n| (n.clone(), json!(n))).collect();
-                    // Scale and Offset only affect Add and Subtract.
-                    dialog(
-                        app,
-                        json!({"sourceLayer": "merged", "sourceChannel": chans[0], "sourceInvert": false, "blending": "multiply", "opacity": 100.0, "scale": 1.0, "offset": 0, "preserveTransparency": false, "maskChannel": "none", "__labels": names}),
-                        json!({"sourceLayer": layers, "sourceChannel": load, "blending": blends, "maskChannel": masks}),
-                    )
-                }
-                _ => dialog(
-                    app,
-                    json!({"source1Channel": chans[0], "source1Invert": false, "source2Channel": chans[0], "source2Invert": false, "blending": "multiply", "opacity": 100.0, "result": "newChannel"}),
-                    json!({"source1Channel": load.clone(), "source2Channel": load, "blending": blends, "result": ["newChannel", "newDocument", "selection"]}),
-                ),
-            }
->>>>>>> upstream/main
         }
         _ => None,
     }

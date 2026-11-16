@@ -378,7 +378,7 @@ fn a_raw_open_decodes_the_file_once_and_frees_it_with_the_dialog() {
         app.open_bytes("IMG_0007.dng", &dng).unwrap();
         let raw = take_queued(&mut app).unwrap();
         open_raw(&mut app, &ctx, raw).unwrap();
-        let raw_open = app.camera_raw.as_mut().unwrap().raw_open.as_mut().unwrap();
+        let raw_open = app.raw.as_mut().unwrap().raw_open.as_mut().unwrap();
         let sensor = raw_open.decoded.as_ref().map(std::sync::Arc::downgrade).expect("the dialog holds the open's decode");
         if !reuse {
             raw_open.decoded = None;
@@ -386,7 +386,7 @@ fn a_raw_open_decodes_the_file_once_and_frees_it_with_the_dialog() {
         assert!(sensor.upgrade().is_some() || !reuse);
         let ui = if commit { json!({"set": {"exposure": 1.0, "temperature": 30}, "commit": true}) } else { json!({"cancel": true}) };
         menu(&mut app, &ctx, "filter.cameraRaw", &json!({"ui": ui})).unwrap().unwrap();
-        assert!(app.camera_raw.is_none());
+        assert!(app.raw.is_none());
         assert!(sensor.upgrade().is_none(), "the sensor data is freed when the dialog is closed");
         (decodes_on_this_thread() - before, if commit { pixels(&app) } else { Vec::new() })
     };

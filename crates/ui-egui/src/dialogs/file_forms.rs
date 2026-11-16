@@ -71,6 +71,12 @@ fn open_form(app: &mut PhotocraftApp, key: &'static str, title: &str, rows: Vec<
 pub(crate) fn open_contact_sheet(app: &mut PhotocraftApp) -> DialogId {
     let rows = vec![
         Param::new("input", tl!("Input"), ParamKind::text(default_dir(app))).browse(PathKind::Folder),
+        // Source Images: the folder, then Include Subfolders (on) and, right below it, Group Images by
+        // Folder (off, greyed while Include Subfolders is off).
+        Param::new("includeSubfolders", tl!("Include Subfolders"), ParamKind::bool(true)),
+        Param::new("groupByFolder", tl!("Group Images by Folder"), ParamKind::bool(false))
+            .enabled_when("includeSubfolders", true)
+            .tooltip(tl!("Images in subfolders will start on a new Contact Sheet")),
         Param::new("units", tl!("Units"), ParamKind::choice(ids(&["inches", "cm", "pixels"]), Some("inches".into()))),
         Param::new("width", tl!("Width"), ParamKind::number(Some(0.0), None, 8.0, 0.5, 2)),
         Param::new("height", tl!("Height"), ParamKind::number(Some(0.0), None, 10.0, 0.5, 2)),
@@ -134,16 +140,26 @@ pub(crate) fn open_package(app: &mut PhotocraftApp) -> DialogId {
 /// File › Export › Paths to Illustrator.
 pub(crate) fn open_paths_to_file(app: &mut PhotocraftApp) -> DialogId {
     let (dir, stem) = (default_dir(app), doc_stem(app));
-    let mut options = ids(&["all"]);
-    if let Some(d) = app.session.active() {
+    // Document Bounds comes first; a document without paths offers only it, selected (#13771).
+    let mut options = ids(&["documentBounds"]);
+    let mut selectable = vec!["documentBounds".to_string()];
+    if let Some(d) = app.session.active().filter(|d| d.doc.work_path.is_some() || !d.doc.paths.is_empty()) {
+        options.extend(ids(&["all"]));
+        selectable.push("all".into());
         if d.doc.work_path.is_some() {
             options.extend(ids(&["work"]));
+            selectable.push("work".into());
         }
         options.extend(names(&d.doc.paths.iter().map(|p| p.name.clone()).collect::<Vec<_>>()));
+        selectable.extend(d.doc.paths.iter().map(|p| p.name.clone()));
     }
+    let fallback = if selectable.len() > 1 { "all" } else { "documentBounds" };
+    // Opens on the Paths panel's selected row (#13777). A shape layer's path ("layer") is not an entry
+    // yet, and a row the document no longer has falls back to All Paths (Document Bounds without paths).
+    let selected = app.ui.selected_path.as_deref().filter(|s| *s != "layer" && selectable.iter().any(|n| n == s)).unwrap_or(fallback).to_string();
     let rows = vec![
         Param::new("path", tl!("Path"), ParamKind::text(format!("{dir}/{stem}.ai"))),
-        Param::new("paths", tl!("Paths"), ParamKind::choice(options, Some("all".into()))),
+        Param::new("paths", tl!("Paths"), ParamKind::choice(options, Some(selected))),
     ];
     open_form(app, PATHS_TO_FILE, tl!("Export Paths to File"), rows)
 }

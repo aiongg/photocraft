@@ -99,6 +99,7 @@ pub(super) fn open_raw_with(app: &mut PhotocraftApp, ctx: &egui::Context, mut ra
     let index = document_index(app, raw.document).ok_or("the raw document was closed")?;
     app.session.set_active(index);
     let (layer, surf, _) = crate::distort_ui::active_pixels(app)?;
+    attach_decode(&mut raw);
     if let Some((params, original)) = kept {
         return open_raw_pixels(app, ctx, layer, surf, params, RawStart { raw, original: Some(original), auto_tone: false });
     }
@@ -123,6 +124,24 @@ pub(super) fn open_raw_with(app: &mut PhotocraftApp, ctx: &egui::Context, mut ra
     // Camera Raw Defaults › Apply auto tone: a file without its own settings opens with Auto.
     let auto_tone = !from_sidecar && app.session.prefs().raw_defaults.apply_auto_tone;
     open_raw_pixels(app, ctx, layer, surf, params, RawStart { raw, original: None, auto_tone })
+}
+
+/// Gives `raw` the decode (the open's kept one, else one made now) the dialog's preview curve and Open's re-develop
+/// share, so the file is decoded once. A raw that already holds its decode, or whose file is gone, is left as it is.
+fn attach_decode(raw: &mut RawOpen) {
+    if raw.decoded.is_some() {
+        return;
+    }
+    let file = match (&raw.bytes, &raw.path) {
+        (Some(b), _) => Some(std::borrow::Cow::Borrowed(b.as_slice())),
+        #[cfg(not(target_arch = "wasm32"))]
+        (None, Some(p)) => std::fs::read(p).ok().map(std::borrow::Cow::Owned),
+        _ => None,
+    };
+    if let Some(b) = file {
+        raw.decoded = photocraft_io::raw::take_kept_decode(&b).or_else(|| photocraft_io::raw::RawDecode::new(&b).ok().map(std::sync::Arc::new));
+    }
+}
 }
 
 pub(super) fn document_index(app: &PhotocraftApp, id: photocraft_doc::DocId) -> Option<usize> {
