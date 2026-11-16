@@ -89,11 +89,6 @@ pub fn set_size(app: &mut PhotocraftApp, w: f32, h: f32) {
     (o.width, o.height) = (clamp(w), clamp(h));
 }
 
-/// The size preset the bar shows for board `id`: the name stored on the board ("" = Custom).
-pub fn board_preset(app: &PhotocraftApp, id: LayerId) -> String {
-    app.session.active().and_then(|st| st.doc.layer(id)).and_then(Layer::artboard).map(|a| a.preset.clone()).unwrap_or_default()
-}
-
 /// The selected boards: each selected layer's artboard, once, in document order.
 fn selected_boards(app: &PhotocraftApp) -> Vec<LayerId> {
     let Some(st) = app.session.active() else { return Vec::new() };
