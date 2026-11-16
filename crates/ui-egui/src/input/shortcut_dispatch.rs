@@ -269,6 +269,10 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
             def.has_alt_variant = true;
         }
     }
+    // Edit in Quick Mask Mode is a button in the tool rail's footer, which shows its command's icon.
+    if let Some(def) = rows.iter_mut().find(|d| d.command.id == crate::panels::QUICK_MASK) {
+        def.icon = Some("square-dashed".into());
+    }
     // Smart Objects › Reveal in Finder names this platform's file manager, in the list as in the menu.
     if let Some(def) = rows.iter_mut().find(|d| d.command.id == "layer.smartObjects.revealInFinder") {
         def.label = crate::menus::reveal_label().into();
