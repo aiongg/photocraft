@@ -50,7 +50,11 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             words.fill_help_content_aware_text.as_str()
         );
         let alert = Alert::new(words.fill_help_title.clone(), message);
-        let _ = app.framework.dialogs.open_unless_open(HostedAlert::new(alert));
+        // The alert takes the Escape of the pass it opens in, as an open dialog takes the one that closes it: the
+        // canvas, drawn after the bar, would otherwise cancel the pending crop with it.
+        if app.framework.dialogs.open_unless_open(HostedAlert::new(alert)).is_ok() {
+            crate::window_keys::take_escape(ui.ctx());
+        }
     }
     if let Some(range) = out.out_of_range {
         let alert = Alert::range(tl!("PhotoCraft").to_owned(), &range, &Env::of(ui));
