@@ -218,6 +218,11 @@ fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &craft::behavior::Ca
     if let Some(ed) = app.ui.text_edit.as_mut() {
         (ed.anchor, ed.caret) = (selection.anchor, selection.caret);
     }
+    // A caret move that edits no text (arrows, Home/End, a click) drops the pending font, even when the caret comes
+    // back to where the font was chosen. Typing keeps it (`insertion_style::replace` moves it with the caret).
+    if out.selection_changed && !out.changed {
+        app.ui.type_insertion_style = None;
+    }
     if out.character_panel {
         let _ = crate::menus::invoke(app, ui.ctx(), "window.panel.character", json!({}));
     }

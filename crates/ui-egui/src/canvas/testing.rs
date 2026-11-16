@@ -126,6 +126,13 @@ fn run_frame(app: &mut PhotocraftApp) {
 
 const OS_IME_RESETS: &str = "photocraft.test-os-ime-resets";
 
+/// Holds back the platform's answer to the IME reset the last pass asked for, until the next frame has run: events
+/// of the interrupted composition that are still on their way reach the framework before the answer, as they do on
+/// a platform. The request stays pending, so the answer follows that frame.
+pub(crate) fn hold_ime_reset_answer(app: &PhotocraftApp) {
+    let _ = ctx(app).data_mut(|d| d.remove_temp::<Vec<egui::Event>>(egui::Id::new(OS_IME_RESETS)));
+}
+
 /// Runs frames until the window host has delivered everything queued.
 fn settle(app: &mut PhotocraftApp) {
     let host = WindowHost::of(&ctx(app));

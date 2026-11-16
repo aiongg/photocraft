@@ -128,12 +128,11 @@ fn show_panels(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// assert the edits the bar makes, not what it shows for them.
 // PLAN: the "Toggle text orientation" button and the colour well's "Text color" label are assumed (TypeBar words)
 fn show_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let character = super::values::character_values(app);
+    let character = super::values::bar_character_values(app);
     let paragraph = super::values::paragraph_values(app);
     let unit = super::values::doc_unit(app);
     let families = super::fonts::families();
-    let family = character.family.clone().unwrap_or_else(|| app.ui.tool_options.type_font.clone());
-    let styles = super::fonts::styles(&family);
+    let styles = super::values::style_names(app, &character);
     let mut fonts = super::font_state(app);
     let mut bar = TypeBar::new(&character, &paragraph, &families, &styles)
         .unit(unit)
@@ -1204,7 +1203,9 @@ fn click_inside_the_paragraph_box_off_the_glyphs_moves_the_caret() {
     // "Hello é世界\n" is 10 characters: the start of the second line.
     assert_eq!((ed.layer, ed.caret, ed.anchor), (id.0, 10, 10));
     // Outside the box the edit commits, without starting new text.
-    click(&mut app, bx - 40.0, by + h - 8.0);
+    // 40 screen points out is past the move reach (38 pt), whatever the zoom.
+    let out = 40.0 / app.point_zoom().max(0.01);
+    click(&mut app, bx - out, by + h - 8.0);
     assert!(app.ui.text_edit.is_none());
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers);
 }
