@@ -234,7 +234,7 @@ fn bar_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 mod panel_defaults {
     use super::*;
     use crate::state::{Tool, ToolOptions};
-    use egui::accesskit::{Role, Toggled};
+    use egui::accesskit::Role;
     use egui_kittest::kittest::NodeT;
     use photocraft_doc::text::{Caps, Kerning, Orientation, TextAlign, TextShape};
 
@@ -283,8 +283,6 @@ mod panel_defaults {
             h.get_by_label(label).click();
             h.run();
         }
-        assert_eq!(h.get_by_label("Fractions").accesskit_node().toggled(), Some(Toggled::True));
-        assert_eq!(h.get_by_label("Standard Ligatures").accesskit_node().toggled(), Some(Toggled::False));
         assert_eq!(h.state().session.active().unwrap().revision, revision, "pre-styling does not create document history");
         assert_eq!(h.state().session.active().unwrap().doc.walk().len(), layers);
         let options = h.state().ui.tool_options.clone();

@@ -109,6 +109,18 @@ pub(crate) fn character_values(app: &PhotocraftApp) -> CharacterValues {
     v
 }
 
+/// The values the options bar shows: [`character_values`], with the style of the target's first run where the runs'
+/// styles differ (the family field stays blank for mixed families), as Photoshop's bar names the layer by its first run.
+pub(crate) fn bar_character_values(app: &PhotocraftApp) -> CharacterValues {
+    let mut v = character_values(app);
+    if v.style.is_none()
+        && let Some(first) = target_styles(app).0.first()
+    {
+        v.style = style_character_values(first).style;
+    }
+    v
+}
+
 /// The paragraph values at the target: equal values shown, differing ones mixed.
 pub(crate) fn paragraph_values(app: &PhotocraftApp) -> ParagraphValues {
     let (_, paras) = target_styles(app);

@@ -5,7 +5,7 @@ use craft::text::ui::type_bar::TypeBar;
 /// Photoshop's Type options bar: the members of the type tool, shown inside the host's options `Bar`, which adds
 /// the commit and cancel buttons while a type session is open.
 pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let character = values::character_values(app);
+    let character = values::bar_character_values(app);
     let paragraph = values::paragraph_values(app);
     let families = fonts::families();
     let styles = values::style_names(app, &character);
