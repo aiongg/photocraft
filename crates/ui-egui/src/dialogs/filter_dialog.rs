@@ -645,7 +645,9 @@ fn validate_match_color_source_layer(app: &PhotocraftApp, command: &str, fields:
 /// A filter dialog was cancelled: its preview goes, and the playing action it paused ends.
 pub(crate) fn cancel(app: &mut PhotocraftApp, _ctx: &egui::Context, dialog: DialogId) {
     app.filter_preview = None;
-    abandon(app, crate::actions::token_of(app, dialog));
+    if let Some(token) = crate::actions::token_of(app, dialog) {
+        crate::actions::stopped(app, token);
+    }
 }
 
 /// Keep Match Color's source choices live without reinterpreting a shifted document index.

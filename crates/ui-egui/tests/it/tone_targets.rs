@@ -76,7 +76,8 @@ fn harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 
 /// The whole app, canvas included: the pointer requests of a picker's samples reach the canvas pass only here.
 fn canvas_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
-    let mut h = Harness::builder().with_size(egui::vec2(1200.0, 900.0)).build_eframe(move |cc| {
+    // The app keeps the context it was made on: the harness runs the frames on it, so the canvas the app reads is the one drawn.
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(egui::vec2(1200.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         app
     });
