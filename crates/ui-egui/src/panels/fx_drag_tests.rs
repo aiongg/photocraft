@@ -18,7 +18,8 @@ fn harness() -> (Harness<'static, PhotocraftApp>, LayerId, LayerId) {
     s.execute("layer.layerStyle.dropShadow", json!({})).unwrap();
     s.execute("layer.layerStyle.colorOverlay", json!({"color": "#ff8000"})).unwrap();
     let b = s.execute("layer.new.layer", json!({"name": "b"})).unwrap()["layer"].as_u64().unwrap();
-    let mut h = Harness::builder().with_size(vec2(1440.0, 900.0)).with_max_steps(64).build_eframe(move |cc| {
+    // Tall enough that the Layers panel shows every row of the sample, the last effect row included.
+    let mut h = Harness::builder().with_size(vec2(1440.0, 1200.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
         PhotocraftApp::with_context(cc.egui_ctx.clone(), s, crate::Services::default())
     });
