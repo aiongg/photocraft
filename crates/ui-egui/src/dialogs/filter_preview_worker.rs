@@ -124,6 +124,7 @@ mod tests {
             revision,
             sources: Vec::new(),
             dialog: craft::ui::dialog::DialogId::new(dialog),
+            open: 0,
             active: None,
             target: Default::default(),
             command: "image.mode.indexedColor".into(),

@@ -1225,6 +1225,8 @@ pub struct FilterPreviewKey {
     pub revision: u64,
     pub sources: Vec<(photocraft_doc::DocId, u64)>,
     pub dialog: DialogId,
+    /// Which open of the dialog this is (`DialogHost::open_serial`): a dialog's id repeats at every open of its command.
+    pub open: u64,
     pub active: Option<photocraft_doc::LayerId>,
     pub target: photocraft_engine::channel_cmds::ChannelTarget,
     pub command: String,

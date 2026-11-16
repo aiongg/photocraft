@@ -116,6 +116,7 @@ fn every_filter_previews_off_the_ui_thread_and_a_newer_value_cancels_the_old() {
         revision: st.revision,
         sources: Vec::new(),
         dialog,
+        open: app.framework.dialogs.open_serial(dialog).unwrap_or(0),
         active: st.active_layer,
         target: st.channel_view.target,
         command: "filter.blur.gaussianBlur".into(),
@@ -171,6 +172,7 @@ fn gated_blur_preview(app: &mut PhotocraftApp, ctx: &egui::Context) -> (std::syn
         revision: st.revision,
         sources: Vec::new(),
         dialog,
+        open: app.framework.dialogs.open_serial(dialog).unwrap_or(0),
         active: st.active_layer,
         target: st.channel_view.target,
         command: command.into(),
@@ -572,6 +574,7 @@ fn a_mid_drag_empty_result_leaves_the_preview_alone() {
         revision: st.revision,
         sources: Vec::new(),
         dialog,
+        open: app.framework.dialogs.open_serial(dialog).unwrap_or(0),
         active: st.active_layer,
         target: st.channel_view.target,
         command: "filter.blur.gaussianBlur".into(),
@@ -610,6 +613,7 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
     open_filter(&mut app, "filter.blur.gaussianBlur");
     let ctx = app.ctx().clone();
     let first_dialog = top_dialog(&app);
+    let first_open = app.framework.dialogs.open_serial(first_dialog);
     let (release, _) = gated_blur_preview(&mut app, &ctx);
 
     // Close that dialog and open another one for the same layer and the same command. Only the
@@ -617,7 +621,8 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
     assert!(app.framework.dialogs.cancel_by_id(&ctx, first_dialog), "the first dialog closes");
     open_filter(&mut app, "filter.blur.gaussianBlur");
     let second_dialog = top_dialog(&app);
-    assert_ne!(second_dialog, first_dialog, "a reopened dialog gets a new id");
+    let (first_open, second_open) = (first_open.expect("the first dialog was open"), app.framework.dialogs.open_serial(second_dialog).expect("the second dialog is open"));
+    assert_ne!(second_open, first_open, "a reopened dialog is a new open, though its id repeats");
     release.send(()).expect("released");
 
     // The first dialog's frame arrives late and must not be painted under the second one.
@@ -627,7 +632,7 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
     // frame can still be replaced by the reopened dialog's own preview before we stop.
     drive_until(&mut app, &ctx, "the first dialog's frame to arrive", |a| {
         if let Some(preview) = &a.filter_preview {
-            assert_ne!(preview.key.dialog, first_dialog, "a reopened dialog painted the previous dialog's preview");
+            assert_ne!(preview.key.open, first_open, "a reopened dialog painted the previous dialog's preview");
         }
         !a.filter_preview_worker.busy()
     });

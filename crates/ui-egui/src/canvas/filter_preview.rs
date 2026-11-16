@@ -99,6 +99,7 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
         revision: st.revision,
         sources: crate::filter_dialog::preview_source_revisions(&app.session, &cmd, &params),
         dialog: id,
+        open: app.framework.dialogs.open_serial(id).unwrap_or(0),
         active: st.active_layer,
         target: st.channel_view.target,
         command: cmd,
@@ -221,13 +222,13 @@ pub(crate) fn ensure_filter_preview(app: &mut PhotocraftApp, idx: usize, ctx: &e
 const FADE: &str = "edit.fade";
 
 /// The preview session of `key`: everything that makes two requests the same target at any scale (document,
-/// revision, active layer, dialog, and the target, sources, command, tool colours and Match Color's source layer),
+/// revision, active layer, dialog and its open, and the target, sources, command, tool colours and Match Color's source layer),
 /// not the other parameters and not `k`. A frame of another session is foreign to the dialog's preview.
 pub(crate) fn session_of(key: &crate::filter_dialog::FilterPreviewKey) -> PreviewSession {
     let layer = key.active.map_or(0, |l| u64::from(l.0) + 1);
     let source_layer = key.params.get("sourceLayer");
     let target = format!("{:?}|{:?}|{}|{:?}|{:?}", key.target, key.sources, key.command, key.tool_colors, source_layer);
-    PreviewSession::new(key.doc.0, key.revision, layer).and(key.dialog.value()).and(settings_hash(&[target.as_bytes()]))
+    PreviewSession::new(key.doc.0, key.revision, layer).and(key.dialog.value()).and(key.open).and(settings_hash(&[target.as_bytes()]))
 }
 
 /// Whether `key` is a preview of the open dialog's target, at any proxy factor (a frame is drawn at its own factor,
