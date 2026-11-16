@@ -157,6 +157,10 @@ pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandSta
 /// Runs a fired settings command of the panel menu. `false` for every other command: PhotoCraft's `layer.arrange.*`
 /// bindings stay the one path of the stacking keys, and the catalogue commands run through the menus.
 pub(crate) fn run_fired(app: &mut PhotocraftApp, _ctx: &egui::Context, command: &CommandRef) -> bool {
+    if command.id == LOCK_LAYERS {
+        open_lock_layers(app);
+        return true;
+    }
     let Some(which) = LayersPanelCommands::from_ref(command) else { return false };
     // The field is set only in a panel pass, so it is read from the preference before a toggle.
     app.ui.layers_settings.options.thumbnail_contents = thumbnail_contents(app);
@@ -211,7 +215,7 @@ fn lock_params() -> Vec<Param> {
     ]
 }
 
-/// Opens the Lock Layers dialog (Layer › Lock Layers…, ⌘/ and the panel menu all open it).
+/// Opens the Lock Layers dialog (the Layers panel menu's Lock Layers… entry; the Layer menu and ⌘/ lock All directly).
 pub(crate) fn open_lock_layers(app: &mut PhotocraftApp) -> DialogId {
     let dialog = HostedParamDialog::new(app.ctx(), LOCK_LAYERS, DialogFields::new(), |fields| {
         ParamDialog::new(LOCK_LAYERS, tl!("Lock Layers"), lock_params()).values(Bind::bound(fields))

@@ -1,5 +1,5 @@
-//! Ctrl+/ (Cmd+/ on the Mac) opens Layer > Lock Layers..., the same dialog the Layer menu and the Layers panel menu
-//! open. Plain / still toggles Lock Transparent Pixels (#11397).
+//! Ctrl+/ (Cmd+/ on the Mac) runs Layer > Lock Layers..., which locks the layer's All without a dialog, as the Layer
+//! menu does. Plain / still toggles Lock Transparent Pixels (#11397).
 
 use egui::{Key, Modifiers};
 use serde_json::json;
@@ -23,13 +23,6 @@ fn locks(app: &PhotocraftApp) -> photocraft_doc::Locks {
     st.doc.layer(st.active_layer.unwrap()).unwrap().locks
 }
 
-/// OK in the open Lock Layers dialog.
-fn confirm_dialog(app: &mut PhotocraftApp) {
-    let ctx = app.ctx().clone();
-    let id = app.framework.dialogs.stack().top().expect("the Lock Layers dialog is open");
-    crate::dialogs::confirm(app, &ctx, id).unwrap();
-}
-
 #[test]
 fn command_slash_runs_what_the_menu_item_runs() {
     let mut via_key = app();
@@ -37,12 +30,10 @@ fn command_slash_runs_what_the_menu_item_runs() {
     let mut via_menu = app();
     crate::menus::invoke(&mut via_menu, &egui::Context::default(), "layer.lockLayers", json!({})).unwrap();
     for app in [&mut via_key, &mut via_menu] {
-        assert!(app.dialog_open(), "Lock Layers… asks first");
-        assert!(!locks(app).any(), "nothing is locked before OK");
-        confirm_dialog(app);
+        assert!(!app.dialog_open(), "Lock Layers… opens no dialog");
     }
     assert_eq!(locks(&via_key), locks(&via_menu));
-    assert!(locks(&via_key).all, "Lock Layers... with no choices locks the layer");
+    assert!(locks(&via_key).all, "Lock Layers... locks the layer");
 }
 
 #[test]
@@ -62,7 +53,6 @@ fn plain_slash_toggles_lock_transparency_and_command_slash_does_not() {
     press(&mut app, Key::Slash, Modifiers::NONE);
     assert!(!locks(&app).transparency);
     press(&mut app, Key::Slash, Modifiers::COMMAND);
-    confirm_dialog(&mut app);
     assert!(locks(&app).all);
     assert!(!locks(&app).transparency, "Ctrl+/ leaves Lock Transparent Pixels alone");
 }

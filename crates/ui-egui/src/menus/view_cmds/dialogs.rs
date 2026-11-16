@@ -46,7 +46,7 @@ fn opened(id: DialogId) -> Value {
 
 /// Opens the hosted parameter form of command `id`. `fixed` holds values the command needs that no row edits.
 fn open_form(app: &mut PhotocraftApp, id: &str, title: &str, params: Vec<Param>, fields: DialogFields, fixed: Value) -> DialogId {
-    let title = Label::from(crate::i18n::t(title).to_owned());
+    let title = crate::dialogs::filter_dialog::title_of(title);
     let key = id.to_owned();
     crate::dialogs::params::open_param(app, id, fields, fixed, move |fields: &mut DialogFields| {
         ParamDialog::command(key.clone(), title.clone(), params.clone()).values(Bind::bound(fields))
@@ -717,7 +717,6 @@ pub(super) fn front(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, para
                 })
             }))
         }
-        "layer.lockLayers" => Some(Ok(opened(crate::layers_panel_ui::open_lock_layers(app)))),
         "view.newGuideLayout" => Some(crate::guide_layout_ui::open(app).map(opened).ok_or_else(|| "no document".into())),
         "type.warpText" => Some(crate::dialogs::open_command_dialog(app, id, label).map(opened)),
         "file.scripts.loadFilesIntoStack" => Some(Ok(json!({"dialog": crate::stack_dialog::open(app).value().to_string()}))),

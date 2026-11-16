@@ -223,7 +223,6 @@ fn wraps(id: &str) -> bool {
             | "layer.new.artboard"
             | "file.export.colorLookupTables"
             | "view.newGuideLayout"
-            | "layer.lockLayers"
             | "type.warpText"
             | "type.pasteLoremIpsum"
             | "image.applyImage"

@@ -7,7 +7,6 @@ use craft::ui::contract::Bind;
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::{DialogFields, Param, ParamDialog, ParamKind, ParamResult};
 use craft::ui::runtime::env::{Label, UnitKind};
-use craft::ui::value_drag::SliderScale;
 use photocraft_doc::{BlendMode, LabelColor};
 use photocraft_engine::new_layer::neutral_color;
 use serde_json::{Value, json};
@@ -32,7 +31,7 @@ pub(crate) fn color_param() -> Param {
 
 /// The opacity row of New Layer and New Group, in percent.
 pub(crate) fn opacity_param() -> Param {
-    Param::new("opacity", tl!("Opacity:"), ParamKind::range(0.0, 100.0, 100.0, SliderScale::Linear)).unit(UnitKind::Percent)
+    Param::new("opacity", tl!("Opacity:"), ParamKind::number(Some(0.0), Some(100.0), 100.0, 1.0, 0)).unit(UnitKind::Percent)
 }
 
 /// Open the dialog for the active document, with the name the layer would get.
