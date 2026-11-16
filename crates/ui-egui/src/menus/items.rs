@@ -101,10 +101,11 @@ fn separator_in(path: &[String]) -> Row {
     Row::separator(&path)
 }
 
-/// A live row shows the shortcut that runs it (overrides included); a catalogue row shows its text.
+/// A live row shows the chord the runtime's keymap runs its command for (`commands::chord`: overrides included, a
+/// key another command wins left out); a catalogue row shows its text.
 fn shortcut_of(app: &PhotocraftApp, id: &str, catalogue: Option<&str>) -> Option<Chord> {
     if is_live(id) {
-        return crate::shortcuts::chord(app, id);
+        return craft::ui::runtime::commands::chord(app.ctx(), &crate::shortcut_dispatch::keymap_command(id));
     }
     let text = catalogue?;
     match Chord::parse(text) {
@@ -386,8 +387,8 @@ fn build(app: &PhotocraftApp, state: u64) -> MenuModel {
     let language = LanguageMenu::from_i18n(i18n, choice).submenu(&words.set::<LanguageLabels>()).platforms(Platforms::MAC);
     put_in_window(&mut bar, language);
     let label = |s: &'static str| crate::i18n::tr(lang, s).to_string();
-    let extras = crate::shortcut_dispatch::extra_shortcuts(app);
-    let options = LayoutOptions::new(crate::native_menu::APP_NAME).label(&label).extra_shortcuts(&extras);
+    let keys = |chord: &Chord| craft::ui::runtime::commands::holder(app.ctx(), chord);
+    let options = LayoutOptions::new(crate::native_menu::APP_NAME).label(&label).keys(&keys);
     let mut bar = layout(&bar, Target::current(), &options).bar;
     let mut english_titles = HashMap::new();
     translate_titles(&mut bar, lang, &mut english_titles);

@@ -3,6 +3,7 @@
 //! order, so [`show_in_canvas`] shows the preview first and the controls last.
 
 use craft::behavior::EditEvents;
+use craft::behavior::geometry::SnapLine;
 use craft::behavior::kurbo::{CubicBez, ParamCurve, Point, Rect};
 use craft::draw::ui::pen::{AnchorsShown, BezierOverlay, BezierTool, EditPath, EditSubpath, Knot, PathSelection};
 use craft::draw::ui::transform::{ApplyBy, Interpolation, TransformEdit, TransformOverlay, TransformPhase, TransformRequest};
@@ -28,6 +29,8 @@ const OUTLINE_STEPS: usize = 24;
 #[derive(Default)]
 struct Shown {
     edits: Vec<TransformEdit<SessionWarp>>,
+    /// The box's snap lines, for the session's canvas tool to hand to the host.
+    snapped: Vec<SnapLine>,
     apply: Option<ApplyBy>,
     discard: bool,
     /// The warp grid's events and whether it placed a split this pass.
@@ -44,14 +47,15 @@ struct Shown {
 /// Every control reads the frame's input once for its own pass, so a second pass of a frame
 /// reports no edit again and this applies only what the pass it ran in reported.
 ///
-/// Returns whether the session's box was shown in this pass, even if an edit then ended the session: the
-/// Move tool's transform controls share its id and must not open a second box in the same pass.
-pub fn show_in_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect, now: f64) -> bool {
+/// Returns whether the session's box was shown in this pass, even if an edit then ended the session (the Move tool's
+/// transform controls share its id and must not open a second box in the same pass), and the box's snap lines, which
+/// the session's canvas tool hands to the host in this frame's pass ([`super::canvas_tool`]).
+pub fn show_in_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Rect, now: f64) -> SessionShown {
     let shown = {
-        let (Some(t), Some(pv)) = (&app.ui.transform, &app.transform_preview) else { return false };
+        let (Some(t), Some(pv)) = (&app.ui.transform, &app.transform_preview) else { return SessionShown::default() };
         show_session(app, t, pv, ui, rect)
     };
-    let Shown { edits, apply, discard, mesh, cylinder, busy } = shown;
+    let Shown { edits, snapped, apply, discard, mesh, cylinder, busy } = shown;
     let mut need_warp = false;
     if let Some(t) = app.ui.transform.as_mut() {
         for edit in edits.iter().cloned() {
@@ -81,7 +85,7 @@ pub fn show_in_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: egui::Re
     if let Some(t) = app.ui.transform.as_mut() {
         t.session.settle(now, busy);
     }
-    true
+    SessionShown { shown: true, snapped }
 }
 
 /// The pass's shows, in paint order.
@@ -108,11 +112,21 @@ fn show_session(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
                 .id_salt(super::BOX_ID_SALT)
                 .show_at(ui, rect);
             out.edits = shown.edits;
+            out.snapped = shown.snapped;
             out.apply = shown.apply;
             out.discard = shown.discard;
         }
     }
     out
+}
+
+/// What [`show_in_canvas`] showed in one pass.
+#[derive(Default)]
+pub struct SessionShown {
+    /// A session was shown.
+    pub shown: bool,
+    /// The snap lines of the box's drag.
+    pub snapped: Vec<SnapLine>,
 }
 
 /// The moving pixels as the session maps them (warped, skewed or styled), then the layers above

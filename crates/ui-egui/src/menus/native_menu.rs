@@ -13,7 +13,7 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 
 use craft::menu::{Layout, LayoutOptions, NativeMenu, mac_layout};
-use craft::ui::runtime::commands::{FireSource, fire};
+use craft::ui::runtime::commands::{FireSource, fire, holder};
 use craft::ui::runtime::windows::WindowHost;
 
 use crate::PhotocraftApp;
@@ -28,10 +28,10 @@ pub const APP_NAME: &str = "PhotoCraft";
 /// use it. The model itself is the one menu definition both bars read.
 pub(crate) fn laid_out(app: &mut PhotocraftApp, ctx: &egui::Context) -> Layout {
     let lang = crate::i18n::current();
-    // The keys bound outside the menus (tool keys, canvas keys, commands without a row).
-    let extras = crate::shortcut_dispatch::extra_shortcuts(app);
     let label = |english: &'static str| crate::i18n::tr(lang, english).to_string();
-    let options = LayoutOptions::new(APP_NAME).label(&label).extra_shortcuts(&extras);
+    // The system items give way to the command the keymap gives a key to, in a menu or not (tool keys, canvas keys).
+    let keys = |chord: &craft::keymap::Chord| holder(ctx, chord);
+    let options = LayoutOptions::new(APP_NAME).label(&label).keys(&keys);
     mac_layout(&items::model(app, ctx).bar, &options)
 }
 
@@ -99,6 +99,8 @@ pub(crate) fn state_hash(app: &PhotocraftApp, input: Option<u64>) -> u64 {
     ui.text_edit.as_ref().map(|e| e.anchor != e.caret).hash(&mut h);
     (app.discard.is_some(), crate::distort_ui::modal_workspace(app)).hash(&mut h);
     crate::prefs_ui::recording(app).hash(&mut h);
+    // The rows show the keymap's chords; the keymap follows these from the frame they change.
+    app.framework.keymap_inputs().hash(&mut h);
     // Edit / Clear Selected Guides are enabled only while a guide is selected.
     crate::guide_select::selected(app).hash(&mut h);
     // The dock workspace's revision moves only on `replace`, so the arrangement is read as the panels in the layout and

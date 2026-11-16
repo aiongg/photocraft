@@ -6,7 +6,7 @@
 //! blur row.
 //!
 //! These rows keep values under keys no command parameter has (`matteColor`, `sampleTool`, `resultPicked`,
-//! `resultFrom`, `lutSize`, `lutError`, `sourceSeen`) and Lens Blur's `channel:N` sources and Match Color's textual
+//! `lutSize`, `lutError`) and Lens Blur's `channel:N` sources and Match Color's textual
 //! `source`; the family's `command_params` (dialogs-w24) maps them back and leaves the private ones out.
 
 use std::path::PathBuf;
@@ -46,14 +46,11 @@ const RADIAL_BLUR: &str = "filter.blur.radialBlur";
 pub(crate) const MATTE_COLOR: &str = "matteColor";
 /// The Replace Color dropper armed: `sample`, `add`, `subtract`, or empty when none is.
 pub(crate) const SAMPLE_TOOL: &str = "sampleTool";
-/// The colour the Result swatch's Color Picker answers into, and the Result it opened on.
+/// The colour the Result swatch's Color Picker answers into; it is there only from the answer to the next pass.
 const RESULT_PICKED: &str = "resultPicked";
-const RESULT_SHOWN: &str = "resultShown";
 /// The size and name of the LUT Load 3D LUT… embedded, and why one could not be read.
 const LUT_SIZE: &str = "lutSize";
 const LUT_ERROR: &str = "lutError";
-/// The Match Color source the layer row last saw, to drop a layer of another document.
-const SOURCE_SEEN: &str = "sourceSeen";
 
 /// Builds the rows `command`'s dialog shows from the rows `params` the spec parser made.
 pub(crate) fn custom_rows(app: &mut PhotocraftApp, command: &str, params: &mut Vec<Param>) {
@@ -377,6 +374,10 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
         options.extend(documents.iter().enumerate().map(|(i, st)| (i.to_string(), Label::from(st.doc.name.clone()))));
         params.push(Param::new("source", Label::from(tl!("Source")), ParamKind::choice(options, Some("-1".into()))));
     }
+    // A layer belongs to the document that was chosen: another source returns the layer to Merged.
+    if let Some(source) = row(params, "source") {
+        *source = source.clone().resets(["sourceLayer"]);
+    }
     let layers: Arc<Vec<Vec<(i64, String)>>> = Arc::new(
         documents
             .iter()
@@ -389,15 +390,6 @@ fn match_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
     let count = documents.len();
     params.push(Param::custom("sourceLayer", label, move |ui, fields, _| {
         let source = fields.text("source").map(str::to_owned);
-        // A layer belongs to the document that was chosen: another source drops it.
-        if fields.text(SOURCE_SEEN).map(str::to_owned) != source {
-            if fields.contains(SOURCE_SEEN) {
-                fields.remove("sourceLayer");
-            }
-            if let Some(source) = &source {
-                fields.set(SOURCE_SEEN, source.as_str());
-            }
-        }
         let listed = source.as_deref().and_then(|s| s.parse::<usize>().ok()).and_then(|i| layers.get(i));
         let shown = layer_ref(fields).filter(|id| listed.is_some_and(|l| l.iter().any(|(known, _)| known == id))).unwrap_or(-1);
         let mut entries = vec![Entry::new(-1i64, Label::from(tl!("Merged")))];
@@ -435,12 +427,9 @@ fn replace_color(app: &PhotocraftApp, params: &mut Vec<Param>) {
 }
 
 /// The three droppers (#6280), as Photoshop's: Eyedropper, Add to Sample and Subtract from Sample. Clicking
-/// the armed one puts it away. The dialog opens with the first armed (#6279).
+/// the armed one puts it away. The dialog opens with the first armed (#6279), and Reset arms it again.
 fn droppers_row() -> Param {
     Param::custom(SAMPLE_TOOL, Label::from(tl!("Eyedroppers")), |ui, fields, cx| {
-        if !fields.contains(SAMPLE_TOOL) {
-            fields.set(SAMPLE_TOOL, "sample");
-        }
         let armed = fields.text(SAMPLE_TOOL).unwrap_or_default().to_owned();
         // The body can run more than once in a pass and each run starts clean, so the request is filed on every run
         // while a dropper is armed: the host's arming is idempotent.
@@ -469,6 +458,7 @@ fn droppers_row() -> Param {
         cx.sampling(!fields.text(SAMPLE_TOOL).unwrap_or_default().is_empty());
         response
     })
+    .opens_with("sample")
 }
 
 /// The sampled colour after the Hue, Saturation and Lightness shift.
@@ -480,14 +470,10 @@ fn result_color(fields: &DialogFields) -> [f32; 3] {
 }
 
 /// Picking a Result in the Color Picker sets Hue, Saturation and Lightness so the sampled colour becomes it (#6278).
-/// `resultShown` is the result the row last drew and `resultPicked` is what the picker answers into, so a
-/// `resultPicked` that differs from `resultShown` is a pick; a slider edit made between passes changes neither.
+/// The picker's answer is the only write of `resultPicked`, and the pass that reads it removes it.
 fn apply_picked_result(fields: &mut DialogFields) {
     use photocraft_algo::tone;
     let Some(to) = fields.color(RESULT_PICKED) else { return };
-    if fields.color(RESULT_SHOWN).is_none_or(|shown| shown == to) {
-        return;
-    }
     let from = fields.color("color").unwrap_or([0.0; 3]);
     let (hue, saturation, lightness) = tone::replace_color_shift(from, to);
     for (key, v) in [("hue", hue), ("saturation", saturation), ("lightness", lightness)] {
@@ -509,12 +495,9 @@ fn result_row() -> Param {
                 swatch
             })
             .inner;
-        // The picker opens on the colour the form held at the start of the pass: `resultPicked` holds the shown
-        // Result and is what the picker answers into.
-        fields.set(RESULT_PICKED, FieldValue::Color(rgb));
-        fields.set(RESULT_SHOWN, FieldValue::Color(rgb));
+        // The row writes nothing itself: the picker opens on the shown Result and answers into `resultPicked`.
         if out.pick_color.is_some() {
-            cx.pick_color(RESULT_PICKED);
+            cx.pick_color(RESULT_PICKED, color);
         }
         out.response().clone()
     })

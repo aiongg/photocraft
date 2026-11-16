@@ -415,6 +415,11 @@ impl CanvasTool for WandPass<'_> {
 
     fn paint(&self, _draw: &Draw<'_>, _cx: &ToolContext<'_>) {}
 
+    /// The marquee's selection drag takes every move from the press, as the marquee's own does.
+    fn takes_every_move(&self) -> bool {
+        self.state.dragging
+    }
+
     fn command_form(&self) -> ToolPath {
         ToolPath::Freehand("the Magic Wand command takes the same point")
     }

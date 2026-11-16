@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 
-use craft::keymap::{Binding, Chord, CommandDef, CommandKind, Overrides, Scope};
+use craft::keymap::{Binding, CommandDef, CommandKind, Overrides, Scope};
 use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
 use craft::layers::ui::panel::LayersPanelCommands;
 use craft::ui::rails::{LastUsed, RailTool};
@@ -251,6 +251,15 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
     rows
 }
 
+/// The command of the runtime's keymap that menu row `id` runs: the framework command a row of [`RUNTIME_COMMANDS`]
+/// bridges, the shell command a Window panel item runs (`menus::panel_alias`), else the row's own.
+pub(crate) fn keymap_command(id: &str) -> CommandRef {
+    if let Some((_, bridged)) = RUNTIME_COMMANDS.iter().find(|(bridged, _)| *bridged == id) {
+        return bridged.command();
+    }
+    CommandRef::new(crate::menus::panel_alias(id).unwrap_or(id))
+}
+
 /// The rows of the commands the runtime defines ([`RUNTIME_COMMANDS`]) under their PhotoCraft ids, as the engine's
 /// catalog gives them with their default keys. The Keyboard Shortcuts dialog and a `.kys` import edit them with the
 /// rows of [`command_rows`]; the runtime's own catalog holds them under the framework commands.
@@ -264,19 +273,6 @@ pub(crate) fn bridged_rows() -> Vec<CommandDef> {
             def
         })
         .filter(|def| is_bridged(&def.command.id))
-        .collect()
-}
-
-/// The keys the app binds outside its menus, for the menu layout: the runtime keymap's keys (the user's overrides included) of
-/// every catalog row that is not a menu item (the tool letters, the held keys, the canvas keys, commands without a
-/// row), as chords with their command. A system menu item gives way to one of these as to a menu shortcut.
-pub(crate) fn extra_shortcuts(app: &PhotocraftApp) -> Vec<(Chord, CommandRef)> {
-    let in_menu: HashSet<&str> = crate::menu_catalog::CATALOG.iter().filter(|(_, label, ..)| *label != "---").map(|&(.., id)| id).collect();
-    let ctx = app.ctx();
-    command_rows(app)
-        .into_iter()
-        .filter(|def| !in_menu.contains(def.command.id.as_str()))
-        .flat_map(|def| craft::ui::runtime::commands::bindings(ctx, &def.command).into_iter().map(move |binding| (binding.trigger.chord, def.command.clone())))
         .collect()
 }
 

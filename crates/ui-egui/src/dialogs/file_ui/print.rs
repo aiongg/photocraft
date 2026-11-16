@@ -1,6 +1,7 @@
 use craft::behavior::EditEvent;
 use craft::ui::dialog::{DialogId, DialogResult};
-use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, Param, ParamKind};
+use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, NumberUnit, Param, ParamKind};
+use craft::ui::runtime::env::UnitKind;
 use craft::ui::runtime::requests::PathKind;
 use craft_print::ui::{Duplex, HostedPrint, PrintAnswer, PrintFinish, PrintMarks, PrintSection, PrintSheet, Printer, Settings, State};
 use serde_json::{Map, Value, json};
@@ -144,7 +145,11 @@ pub fn open_print(app: &mut PhotocraftApp) -> DialogId {
         }
     }
     let sections = sections(&fields);
-    app.framework.dialogs.open(HostedPrint::new(state, fields, sections))
+    app.framework.dialogs.open(HostedPrint::new(state, fields, sections).json_form(|fields, listing| {
+        if fields.text("paper") == Some("custom") {
+            listing.insert("paper".into(), print_params(fields)["paper"].clone());
+        }
+    }))
 }
 
 /// The dialog's sections under the printer panel, as rows over today's `file.print` keys.
@@ -183,8 +188,24 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
         photocraft_engine::print_cmds::PAPERS.iter().map(|p| (p.0.to_string(), print_paper_label(p.0).into())).collect();
     papers.push(("custom".into(), tl!("Custom").into()));
 
+    // The rows are shown in the section's Units menu; stored values keep their units (paper in points, position in
+    // inches). A typed zero reaches the value, and the engine refuses a paper that small.
+    let lengths = |per_unit: f64| {
+        vec![
+            NumberUnit::new("cm", UnitKind::Centimetres, tl!("Centimeters"), per_unit / 2.54),
+            NumberUnit::new("mm", UnitKind::Millimetres, tl!("Millimeters"), per_unit / 25.4),
+            NumberUnit::new("in", UnitKind::Inches, tl!("Inches"), per_unit),
+        ]
+    };
     let pt = |key: &str, label: &'static str| {
-        Param::new(key, label, ParamKind::number(Some(1.0), Some(14400.0), 612.0, 1.0, 2)).visible_when("paper", FieldValue::Text("custom".into()))
+        Param::number_in_units(key, label, 612.0, 1.0, 2, "units", lengths(72.0))
+            .bounds(Some(0.0), Some(14400.0))
+            .visible_when("paper", FieldValue::Text("custom".into()))
+    };
+    let position = |key: &str, label: &'static str| {
+        Param::number_in_units(key, label, 0.0, 0.1, 2, "units", lengths(1.0))
+            .bounds(Some(-limit), Some(limit))
+            .enabled_when("center", FieldValue::Bool(false))
     };
     let on = |key: &str| (key.to_string(), FieldValue::Text("photocraftManages".into()));
     let (on_key, on_value) = on("colorHandling");
@@ -228,15 +249,19 @@ pub(super) fn sections(fields: &DialogFields) -> Vec<PrintSection> {
         PrintSection {
             title: tl!("Position and Size").into(),
             params: vec![
+                Param::new(
+                    "units",
+                    tl!("Units"),
+                    choice(&[("cm", tl!("Centimeters")), ("mm", tl!("Millimeters")), ("in", tl!("Inches"))], "cm"),
+                ),
                 Param::new("paper", tl!("Paper"), ParamKind::choice(papers, Some("letter".into()))),
-                pt("paperWidth", tl!("Paper Width (pt)")),
-                pt("paperHeight", tl!("Paper Height (pt)")),
+                pt("paperWidth", tl!("Paper Width")),
+                pt("paperHeight", tl!("Paper Height")),
                 Param::new("orientation", tl!("Orientation"), choice(&[("portrait", tl!("Portrait")), ("landscape", tl!("Landscape"))], "portrait")),
                 Param::new("center", tl!("Center"), ParamKind::bool(true)),
                 // Shown while Center owns them, so choosing manual placement cannot resize the dialog.
-                Param::new("top", tl!("Top (in)"), ParamKind::number(Some(-limit), Some(limit), 0.0, 0.1, 2)).enabled_when("center", FieldValue::Bool(false)),
-                Param::new("left", tl!("Left (in)"), ParamKind::number(Some(-limit), Some(limit), 0.0, 0.1, 2))
-                    .enabled_when("center", FieldValue::Bool(false)),
+                position("top", tl!("Top")),
+                position("left", tl!("Left")),
                 Param::new("scaleToFit", tl!("Scale to Fit Media"), ParamKind::bool(false)),
                 Param::new("scale", tl!("Scale (%)"), ParamKind::number(Some(1.0), Some(1000.0), 100.0, 1.0, 2))
                     .enabled_when("scaleToFit", FieldValue::Bool(false)),
