@@ -617,10 +617,9 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     tools.zoom.out = !app.ui.tool_options.zoom_in && !crate::spring_tools::holds(app, Tool::Zoom);
     tools.zoom.options = navigation;
     tools.zoom.options.scrubby_zoom = app.ui.tool_options.zoom_scrubby;
-    let precise = app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise;
     let smart = super::snap_ui::smart_guide_color(app);
     let mut response = with_rig(app, &ctx, host, &mut tools, primary, shown, |selected, tool_host| {
-        tool_host.enabled(primary).smart_guide_color(smart).precise_cursors(precise).run(ui, out, selected)
+        tool_host.enabled(primary).smart_guide_color(smart).run(ui, out, selected)
     });
     // The autoscroll moves the view the pass ended with; the caller copies the response's view into its own.
     if let (Some(scroll), Some(space)) = (response.scroll, out.space.as_ref()) {

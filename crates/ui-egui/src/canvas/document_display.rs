@@ -261,7 +261,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         .snap(snap)
         .pasteboard(pasteboard)
         .navigation(navigation)
-        .view_follows_pointer(follows_pointer);
+        .view_follows_pointer(follows_pointer)
+        .precise_cursors(app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise);
     if let Some((from, anchor)) = ease {
         canvas = canvas.ease_from(from, anchor);
     }

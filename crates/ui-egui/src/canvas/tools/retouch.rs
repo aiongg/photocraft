@@ -6,7 +6,7 @@ use std::cell::RefCell;
 use craft::behavior::PointerButton;
 use craft::behavior::cursor::{Cursor, CursorIcon, PaintedCursor};
 use craft::behavior::value::CancelReason;
-use craft::imaging::ui::select::{LassoTool, SelectEvent, SelectPhase, SelectionShape};
+use craft::imaging::ui::select::{LassoTool, SelectEvent, SelectionShape};
 use craft::keymap::Mods;
 use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer};
 use craft::ui::primitives::Draw;
@@ -31,9 +31,6 @@ pub(crate) struct RetouchTools {
     shift: bool,
     /// The outline a Patch or Content-Aware Move press outside the selection draws.
     lasso: LassoTool,
-    /// The press that began the open outline: the outline keeps the operation it latched there, and
-    /// so does the cursor's badge.
-    outline_press: Option<PatchPress>,
 }
 
 impl RetouchTools {
@@ -150,12 +147,7 @@ impl CanvasTool for RetouchTool<'_> {
             return ToolAction::Claimed;
         }
         if self.lassos() {
-            let begins = matches!(state.lasso.phase(), SelectPhase::Idle);
-            let action = state.lasso.pass(&self.probe).press(pointer, cx);
-            if begins {
-                state.outline_press = Some(PatchPress::new(tool, at, mods));
-            }
-            return action;
+            return state.lasso.pass(&self.probe).press(pointer, cx);
         }
         ToolAction::Ignored
     }
@@ -223,15 +215,14 @@ impl CanvasTool for RetouchTool<'_> {
     /// outline's operation (`tool_feedback::patch_badge`). A gesture keeps what its press decided.
     fn cursor(&self, cx: &ToolContext<'_>) -> Cursor {
         let state = self.state.borrow();
-        let outline = state.outline_press.as_ref().filter(|_| matches!(state.lasso.phase(), SelectPhase::Outline { .. }));
-        let press = state.press.as_ref().or(outline).map(|p| (p.start, p.modifiers));
+        let press = state.press.as_ref().map(|p| (p.start, p.modifiers));
         let at = cx.pointer.as_ref().map(|pointer| doc_point(pointer, cx));
         let badge = self.scope.with_app(|app| match self.tool {
             Tool::ObjectSelection => {
                 let mods = press.map_or(cx.mods, |(_, mods)| mods);
                 tool_feedback::selection_op(Tool::ObjectSelection, app.ui.selection_mode, mods, tool_feedback::has_selection(app)).badge()
             }
-            Tool::Patch | Tool::ContentAwareMove => at.and_then(|at| tool_feedback::patch_badge(app, at, press, cx.mods)),
+            Tool::Patch | Tool::ContentAwareMove => state.lasso.outline_operation().map_or_else(|| at.and_then(|at| tool_feedback::patch_badge(app, at, press, cx.mods)), |op| op.badge()),
             _ => None,
         });
         badge.map_or(Cursor::Painted(PaintedCursor::Crosshair), |badge| PaintedCursor::badged(CursorIcon::Crosshair, badge).into())
