@@ -36,9 +36,8 @@ pub(crate) fn uses_default(app: &PhotocraftApp, tool: Tool) -> bool {
 
 /// One catalog row per tool: kind `Tool` in the group of its letter, so the tools that share a letter cycle, with the
 /// letter as the default key.
-// PLAN: `panels::tool_commands::ToolCommand` defines the same ids (`tools.select.*`, all in group "tools", no letters)
-// and the runtime keeps a registry def over a catalog row of one id (tp.T37); hub-w1 or panels-w22 must give those
-// commands the letter groups, or the catalog rows here never bind.
+// The runtime's own definition of each tool (`panels::tool_commands::ToolCommand`) carries the same letter and group, which is what binds the key
+// and shows in tooltips; these rows keep the Keyboard Shortcuts dialog's tool pages.
 pub(crate) fn defs(_app: &PhotocraftApp) -> Vec<CommandDef> {
     Tool::ALL
         .into_iter()
