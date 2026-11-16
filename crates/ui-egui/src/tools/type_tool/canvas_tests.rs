@@ -702,7 +702,13 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
             h.hover_at(field + vec2(8.0 * k as f32, 0.0));
             h.run_steps(1);
             let now = size_at(h.state(), id, 0);
-            assert!(now > last, "drag {d} step {k}: live size {last} → {now}");
+            // The pass that moves the pointer past the drag slop starts the gesture (its `DragStart` reads the value
+            // the scrub starts from); the value follows from the next pass on.
+            if k == 1 {
+                assert!(now >= last, "drag {d} step {k}: the gesture start keeps the size {last} → {now}");
+            } else {
+                assert!(now > last, "drag {d} step {k}: live size {last} → {now}");
+            }
             last = now;
         }
         press(&mut h, field + vec2(40.0, 0.0), false);
