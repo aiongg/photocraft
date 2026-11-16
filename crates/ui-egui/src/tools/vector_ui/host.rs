@@ -104,6 +104,9 @@ fn configure(app: &PhotocraftApp, state: &mut VectorTools) -> Which {
                 .pen
                 .mode(if curvature { PenMode::Curvature } else { PenMode::Pen })
                 .sensing(sensing)
+                // A draft the selected tool did not draw (a refused one kept after a tool switch) leaves Delete and
+                // Backspace to that tool, as it leaves Undo (`PenPath::owns_undo`).
+                .deletes(pen.is_none_or(|p| p.owns_undo(tool)))
                 .auto_add_delete(!curvature && o.pen_auto_add_delete)
                 .path_options(o.path_options.clone())
                 .ends(&if pen.is_none_or(|p| p.draft.knots.is_empty()) { pen::ends(app) } else { Vec::new() })

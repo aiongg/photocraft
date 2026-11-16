@@ -735,3 +735,17 @@ fn freeform_selection_does_not_claim_a_failed_pen_or_curvature_draft() {
         }
     }
 }
+
+/// a864229579: a draft kept under a tool that did not draw it leaves Delete to that tool, as it leaves Undo; back on
+/// its own tool, Delete takes its last anchor back again.
+#[test]
+fn a_kept_pen_draft_takes_delete_only_under_its_own_tool() {
+    let mut app = failed_library_draft(Tool::Pen, false);
+    let draft = app.ui.pen.clone();
+    switch_tool(&mut app, Tool::AddAnchorPoint);
+    press(&mut app, egui::Key::Delete, egui::Modifiers::NONE);
+    assert_eq!(app.ui.pen, draft, "Add Anchor Point does not take the draft's anchors back");
+    switch_tool(&mut app, Tool::Pen);
+    press(&mut app, egui::Key::Delete, egui::Modifiers::NONE);
+    assert_eq!(app.ui.pen.as_ref().map(|p| p.draft.knots.len()), Some(1));
+}
