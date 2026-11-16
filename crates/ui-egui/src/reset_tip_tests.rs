@@ -1,5 +1,5 @@
 //! Each painting tool's starting tip (#11810, #11911, #12099, #12548, #12601, #12671, #12684,
-//! #13029): Reset Tool and Reset All Tools (with the tool active, or picked later) give it
+//! #13029, #11936, #12200, #12964): Reset Tool and Reset All Tools (with the tool active, or picked later) give it
 //! `paint_mouse::fresh_brush`, and its first use follows the tool's own rule. Other tools keep
 //! their brushes.
 
@@ -14,7 +14,8 @@ use crate::state::Tool;
 /// What a tool's first use takes from the brush the previous tool left.
 #[derive(Clone, Copy, Debug)]
 enum FirstUse {
-    /// Its own starting brush (`fresh_brush`).
+    /// Its own starting brush (`fresh_brush`); the Pencil and the Eraser keep the previous
+    /// opacity (and the Eraser its flow), which `Tip` leaves out.
     Fresh,
     /// Its starting size; everything else from the previous brush.
     SizeOnly,
@@ -24,11 +25,12 @@ enum FirstUse {
 
 /// The painting tools with their first-use rule; `None` for the Brush, which owns the brush the
 /// app starts with, so it has no first use.
-const ROWS: [(Tool, Option<FirstUse>); 14] = [
+const ROWS: [(Tool, Option<FirstUse>); 16] = [
     (Tool::Burn, Some(FirstUse::Fresh)),
     (Tool::Dodge, Some(FirstUse::Fresh)),
     (Tool::Sponge, Some(FirstUse::Fresh)),
     (Tool::Blur, Some(FirstUse::Current)),
+    (Tool::Sharpen, Some(FirstUse::Current)),
     (Tool::CloneStamp, Some(FirstUse::Fresh)),
     (Tool::Brush, None),
     (Tool::BackgroundEraser, Some(FirstUse::Fresh)),
@@ -36,8 +38,9 @@ const ROWS: [(Tool, Option<FirstUse>); 14] = [
     (Tool::HistoryBrush, Some(FirstUse::Current)),
     (Tool::PatternStamp, Some(FirstUse::Current)),
     (Tool::Remove, Some(FirstUse::SizeOnly)),
-    (Tool::Pencil, Some(FirstUse::Current)),
-    (Tool::Eraser, Some(FirstUse::Current)),
+    (Tool::Pencil, Some(FirstUse::Fresh)),
+    (Tool::Eraser, Some(FirstUse::Fresh)),
+    (Tool::Smudge, Some(FirstUse::Fresh)),
     (Tool::SpotHealing, Some(FirstUse::Current)),
 ];
 

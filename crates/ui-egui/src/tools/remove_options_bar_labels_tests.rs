@@ -2,14 +2,13 @@
 //! "Create new layer", left to right, each with the reference tooltip.
 
 use egui::accesskit::Role;
+use egui::vec2;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::json;
 
-use super::burn_bar_tooltips_tests::{bar, control, hover};
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, tool_event};
-use crate::i18n::Lang;
 use crate::state::Tool;
 
 const BOXES: [(&str, &str); 3] = [
@@ -18,8 +17,38 @@ const BOXES: [(&str, &str); 3] = [
     ("Create new layer", "Create new layer with results"),
 ];
 
+/// A settled options bar with the Remove tool.
 fn remove_bar() -> Harness<'static, PhotocraftApp> {
-    bar(Tool::Remove, Lang::EN, 1600.0, 1.0, false)
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.run("file.new", json!({"width": 80, "height": 80})).unwrap();
+    app.ui.tool = Tool::Remove;
+    let mut h = Harness::builder().with_context(app.ctx().clone()).with_size(vec2(1600.0, 300.0)).with_step_dt(1.0 / 60.0).build_ui_state(
+        |ui, app: &mut PhotocraftApp| {
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            crate::panels::options_bar(app, ui);
+        },
+        app,
+    );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
+    h.run_steps(4);
+    h
+}
+
+/// The control named `label` with `role`, found by its accessibility role so tooltip text never matches.
+fn control<'a>(h: &'a Harness<'static, PhotocraftApp>, role: Role, label: &str) -> egui_kittest::Node<'a> {
+    h.query_all_by_role(role).find(|n| n.accesskit_node().label().as_deref() == Some(label)).unwrap_or_else(|| panic!("missing {role:?} {label:?}"))
+}
+
+/// Hovers the control until its tooltip shows, and asserts the tooltip text.
+fn hover(h: &mut Harness<'static, PhotocraftApp>, role: Role, label: &str, tip: &str) {
+    control(h, role, label).scroll_to_me();
+    h.run_steps(4);
+    let rect = control(h, role, label).rect();
+    h.hover_at(rect.center());
+    h.run_steps(60);
+    assert!(h.query_all_by_role(Role::Label).any(|n| n.accesskit_node().value().as_deref() == Some(tip)), "hovering {label:?} must display {tip:?}");
 }
 
 fn checked(h: &Harness<'static, PhotocraftApp>, label: &str) -> bool {

@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 
 use super::tests::{drag, harness, press};
 use crate::PhotocraftApp;
-use crate::control::{ControlRequest, Outcome, handle};
+use crate::control::{ControlRequest, Reply, handle};
 use crate::state::Tool;
 
 /// The Remove tool with Remove after each stroke off, nothing painted yet.
@@ -39,7 +39,7 @@ fn snapshot(app: &PhotocraftApp) -> (Vec<Value>, Option<Vec<u8>>, usize, usize) 
 }
 
 fn nothing_open(app: &PhotocraftApp) -> bool {
-    app.ui.brush_picker.is_none() && app.ui.brush_mode_menu.is_none() && app.ui.canvas_tool_menu.is_none() && !crate::color_hud::is_open(&app.ui)
+    crate::brush_picker::opened_at(app).is_none() && app.ui.canvas_tool_menu.is_none() && !crate::color_hud::is_open(&app.ui)
 }
 
 fn mouse_right_click(h: &mut Harness<'static, PhotocraftApp>) -> Pos2 {
@@ -56,7 +56,7 @@ fn pointer_right_click(h: &mut Harness<'static, PhotocraftApp>) {
     let ctx = h.ctx.clone();
     let events = json!([{"kind": "down", "x": 200, "y": 150}, {"kind": "up", "x": 200, "y": 150}]);
     let (req, _rx) = ControlRequest::new("ui.pointer", json!({"button": "secondary", "events": events}));
-    assert!(matches!(handle(h.state_mut(), &ctx, &req), Outcome::Done(v) if v["ok"] == true));
+    assert!(matches!(handle(h.state_mut(), &ctx, &req), Reply::Done(v) if v["ok"] == true));
     h.run_steps(2);
 }
 
@@ -91,12 +91,12 @@ fn key(h: &mut Harness<'static, PhotocraftApp>, key: egui::Key) {
 /// The mouse opens the picker at the pointer, Escape closes it, and `ui.pointer` opens it again.
 fn assert_picker_opens(h: &mut Harness<'static, PhotocraftApp>, case: &str) {
     let c = mouse_right_click(h);
-    assert_eq!(h.state().ui.brush_picker, Some([c.x, c.y]), "{case}: the mouse, at the pointer");
+    assert_eq!(crate::brush_picker::opened_at(h.state()), Some(c), "{case}: the mouse, at the pointer");
     h.key_press(egui::Key::Escape);
     h.run_steps(2);
-    assert!(h.state().ui.brush_picker.is_none(), "{case}: closed");
+    assert!(crate::brush_picker::opened_at(h.state()).is_none(), "{case}: closed");
     pointer_right_click(h);
-    assert!(h.state().ui.brush_picker.is_some(), "{case}: ui.pointer");
+    assert!(crate::brush_picker::opened_at(h.state()).is_some(), "{case}: ui.pointer");
 }
 
 #[test]

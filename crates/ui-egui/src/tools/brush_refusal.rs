@@ -108,16 +108,6 @@ fn locked(locks: photocraft_doc::Locks, tool: Tool) -> bool {
 #[cfg(test)]
 #[path = "../brush_refusal_alert_tests.rs"]
 pub(super) mod brush_refusal_alert_tests;
-<<<<<<< HEAD
-=======
-
-#[cfg(test)]
-#[path = "../sharpen_refusal_alert_tests.rs"]
-mod sharpen_refusal_alert_tests;
-
-#[cfg(test)]
-#[path = "../sponge_refusal_alert_tests.rs"]
-mod sponge_refusal_alert_tests;
 
 #[cfg(test)]
 #[path = "../retouch_mode_refusal_alert_tests.rs"]
@@ -128,14 +118,5 @@ mod retouch_mode_refusal_alert_tests;
 mod smudge_refusal_alert_tests;
 
 #[cfg(test)]
-#[path = "../bucket_bitmap_alert_tests.rs"]
-mod bucket_bitmap_alert_tests;
-
-#[cfg(test)]
-#[path = "remove_locked_alert_tests.rs"]
-mod remove_locked_alert_tests;
-
-#[cfg(test)]
 #[path = "remove_hidden_layer_tests.rs"]
 mod remove_hidden_layer_tests;
->>>>>>> upstream/main
