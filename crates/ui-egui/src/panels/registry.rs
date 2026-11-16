@@ -201,7 +201,8 @@ pub(crate) static PANELS: &[PanelEntry] = &[
             |app, ui| super::type_panels_ui::styles::panel(app, ui, true),
         )
     },
-    floating("glyphs", || tl!("Glyphs").to_string(), "text-cursor", [360.0, 320.0], |app, ui| scrolled(app, ui, super::type_panels_ui::glyphs::body)),
+    // Glyphs and Measurement Log hold collections that scroll themselves.
+    floating("glyphs", || tl!("Glyphs").to_string(), "text-cursor", [360.0, 320.0], super::type_panels_ui::glyphs::body),
     // The Timeline docks below the canvas; it lays out its own tracks.
     panel("timeline", || tl!("Timeline").to_string(), "square-split-vertical", LEAST, super::timeline_ui::body),
     PanelEntry {
@@ -217,7 +218,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         || tl!("Measurement Log").to_string(),
         "ruler",
         [620.0, 320.0],
-        |app, ui| scrolled(app, ui, crate::tools::analysis::log_panel::body),
+        crate::tools::analysis::log_panel::body,
     ),
     floating("notes", || tl!("Notes").to_string(), "square-plus", [260.0, 300.0], |app, ui| scrolled(app, ui, crate::tools::analysis::notes_panel::body)),
 ];
