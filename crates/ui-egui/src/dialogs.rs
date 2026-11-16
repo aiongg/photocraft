@@ -224,9 +224,15 @@ pub(crate) mod params {
     fn answer_held(app: &mut PhotocraftApp) {
         for id in hosted(app) {
             let Some(result) = dialog_mut(app, id).and_then(HostedParamDialog::take_ok) else { continue };
-            let answer = match family_for(&result.key).and_then(|family| family.check) {
-                Some(check) => check(app, &result),
-                None => Ok(()),
+            let answer = if crate::actions::record_again::owns_dialog(app, id) {
+                // The editor Record Again opened: its answer is judged as the step it replaces, with the values OK runs.
+                let params = crate::filter_dialog::command_params(&result.key, &result.fields);
+                crate::actions::record_again::check(app, id, &result.key, &params).map_err(Label::from)
+            } else {
+                match family_for(&result.key).and_then(|family| family.check) {
+                    Some(check) => check(app, &result),
+                    None => Ok(()),
+                }
             };
             if let Some(dialog) = dialog_mut(app, id) {
                 dialog.answer_ok(answer);
