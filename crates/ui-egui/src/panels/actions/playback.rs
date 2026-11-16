@@ -150,7 +150,7 @@ pub(super) fn open_dialog(app: &mut PhotocraftApp) -> Result<Value, String> {
     let saved = &app.session.prefs().actions;
     let (performance, seconds, single) = (saved.performance.name().to_owned(), f64::from(saved.pause_seconds()), saved.create_single_history_state);
     let id = params::open_param(app, KEY, DialogFields::new(), Value::Null, move |fields: &mut DialogFields| {
-        ParamDialog::command(KEY, tl!("Playback Options"), rows(&performance, seconds, single)).values(Bind::bound(fields))
+        ParamDialog::command(KEY, tl!("Playback Options"), rows(&performance, seconds, single)).values(Bind::bound(fields)).alert_title(tl!("PhotoCraft"))
     });
     Ok(json!({"dialog": id}))
 }

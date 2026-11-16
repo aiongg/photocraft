@@ -295,9 +295,11 @@ pub(crate) fn params(app: &mut PhotocraftApp, command: &str, spec: &str) -> Vec<
                 return Param::new(p.key, p.label, ParamKind::choice(options, Some("-1".into()))).not_remembered();
             }
             if uses_angle_dial(command, &p.key)
-                && let ParamKind::Range { default, .. } = p.kind
+                && let ParamKind::Range { min, max, default, .. } = p.kind
             {
-                p = Param::new(p.key, p.label, ParamKind::angle(default));
+                // Global Light's angle runs -360 to 360 in whole degrees; every other dial is one turn.
+                let kind = if command == "layer.layerStyle.globalLight" { ParamKind::angle_in(min, max, default, 0) } else { ParamKind::angle(default) };
+                p = Param::new(p.key, p.label, kind);
             }
             if let ParamKind::Range { max, .. } = p.kind {
                 if is_pixel_param_of(command, &p.key) {
@@ -503,8 +505,11 @@ fn builder(
     let key = command.to_owned();
     let canvas = app.session.active_index().map(|idx| crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
     move |fields: &mut DialogFields| {
-        let mut dialog =
-            ParamDialog::command(key.clone(), title.clone(), params.clone()).values(Bind::bound(fields)).reset_to(reset.clone()).previews(previews(&key));
+        let mut dialog = ParamDialog::command(key.clone(), title.clone(), params.clone())
+            .values(Bind::bound(fields))
+            .reset_to(reset.clone())
+            .previews(previews(&key))
+            .alert_title(tl!("PhotoCraft"));
         if let Some(canvas) = canvas {
             dialog = dialog.canvas(canvas);
         }

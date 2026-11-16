@@ -250,8 +250,11 @@ pub(crate) mod params {
         for id in hosted(app) {
             let key = key_of(app, id);
             let Some(dialog) = dialog_mut(app, id) else { continue };
-            let (colour, path, dropper, listing, footer) =
-                (dialog.pick_color(), dialog.pick_path(), dialog.take_eyedropper(), dialog.take_listing(), dialog.take_footer_action());
+            let (colour, path, dropper, listing, footer, range) =
+                (dialog.pick_color(), dialog.pick_path(), dialog.take_eyedropper(), dialog.take_listing(), dialog.take_footer_action(), dialog.take_range_alert());
+            if let Some(alert) = range {
+                let _ = alerts::show(app, alert);
+            }
             if let Some(request) = colour {
                 color_picker_ui::open_for_request(app, id, request);
             }
