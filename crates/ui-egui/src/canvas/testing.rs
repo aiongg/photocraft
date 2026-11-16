@@ -74,11 +74,10 @@ pub(crate) fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers
 /// pressure (a test's own reading, with its tilt and pen end); a mouse (pressure 1) feeds no pen.
 fn pen(app: &PhotocraftApp, pressure: f32) {
     let feed = &app.stylus.feed;
-    if pressure == 1.0 {
-        feed.set(None);
-    } else if feed.get().map(|s| s.pressure) != Some(pressure) {
-        feed.set(Some(PenSample { pressure, ..PenSample::default() }));
+    if feed.get().map(|s| s.pressure) == Some(pressure) {
+        return;
     }
+    feed.set((pressure != 1.0).then(|| PenSample { pressure, ..PenSample::default() }));
 }
 
 /// The context the canvas pass runs in: the app's own, which its code outside the pass reads too.
