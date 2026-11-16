@@ -106,7 +106,7 @@ fn shown_paths(app: &PhotocraftApp, doc: &Document) -> Vec<(PathRef, EditPath)> 
     }
     // The Pen path in progress, only on the document it is drawn on: a view of another document never shows it (#5373).
     if let Some(pen) = app.ui.pen.as_ref().filter(|p| !p.draft.knots.is_empty()).filter(|_| app.ui.pen_doc.is_none_or(|d| d == doc.id)) {
-        out.push((PathRef::Pen, EditPath::new(PathRef::Pen.key(), vec![pen.draft.clone()])));
+        out.push((PathRef::Pen, EditPath::new(PathRef::Pen.key(), vec![pen.draft.clone()]).copies(false)));
     }
     out
 }

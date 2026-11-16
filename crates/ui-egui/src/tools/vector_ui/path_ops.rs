@@ -276,7 +276,8 @@ pub(super) fn target_path(app: &PhotocraftApp) -> Option<(PathRef, Path)> {
 /// overlay's `is_straight` compares exactly, so such a handle is set equal to its anchor.
 const RETRACTED: f64 = 1e-9;
 
-/// The overlay's `EditPath` of a document path, keyed `key` (`PathRef::key`).
+/// The overlay's `EditPath` of a document path, keyed `key` (`PathRef::key`). A Type Path takes no copies of its
+/// subpaths: Direct Selection's ⌥ drag on its segment moves the subpath.
 pub(crate) fn edit_path(path: &Path, key: u64) -> EditPath {
     let point = |p: &photocraft_geom::Point| EditPoint::new(p.x, p.y);
     let handle = |anchor: EditPoint, h: &photocraft_geom::Point| {
@@ -298,7 +299,8 @@ pub(crate) fn edit_path(path: &Path, key: u64) -> EditPath {
             EditSubpath::new(knots, s.closed)
         })
         .collect();
-    EditPath::new(key, subpaths)
+    let copies = !matches!(PathRef::from_key(key), Some(PathRef::TypePath(_)));
+    EditPath::new(key, subpaths).copies(copies)
 }
 
 /// The document path of an edited `EditPath`, with each subpath's operation and the path's fill

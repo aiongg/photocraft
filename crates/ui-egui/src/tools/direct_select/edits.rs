@@ -54,6 +54,9 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
     if let Some((hit, at)) = &output.context {
         context(app, hit, *at, tool, mods);
     }
+    if output.pressed_empty && tool == Tool::DeleteAnchorPoint {
+        hide_anchors(app);
+    }
     if output.pressed_empty && mods.cmd && app.ui.pen.is_some() {
         // A ⌘-press off the path being drawn ends it, which becomes editable, as in Photoshop; a
         // refused commit keeps the draft and says why.
@@ -88,6 +91,11 @@ pub(crate) fn delete_anchors(app: &mut PhotocraftApp, path: PathRef, anchors: &[
         return;
     }
     let key = (order.len() > 1).then(|| format!("delete-anchor-{}", app.ui.alloc_id()));
+    // A Delete Anchor click on a saved path selects the anchor that followed the deleted one and shows only its
+    // subpath's anchors (#12769).
+    let follower = (app.ui.tool == Tool::DeleteAnchorPoint && matches!(path, PathRef::Saved(_)) && order.len() == 1)
+        .then(|| super::path_of(app, &path).map(|before| before.subpaths.len()))
+        .flatten();
     let mut deleted = false;
     for anchor in &order {
         let mut params = anchor_params(app, path, segments, anchor);
@@ -104,7 +112,30 @@ pub(crate) fn delete_anchors(app: &mut PhotocraftApp, path: PathRef, anchors: &[
     }
     // The anchors shift: a selection on this path would point at the wrong ones.
     if deleted {
-        app.ui.direct_selection = DirectSelection { target: Some(path), ..Default::default() };
+        let after = follower.and_then(|before| {
+            let [subpath, knot] = order[0];
+            let edit = crate::vector_ui::edit_path(&super::path_of(app, &path)?, path.key());
+            Some(PathSelection::after_delete(&edit, KnotRef::new(subpath, knot), before))
+        });
+        app.ui.direct_selection = match after {
+            Some(selection) => DirectSelection {
+                target: Some(path),
+                anchors: selection.anchors.iter().map(|k| [k.subpath, k.knot]).collect(),
+                shown: selection.shown,
+                owner: Owner::current(app),
+                ..Default::default()
+            },
+            None => DirectSelection { target: Some(path), ..Default::default() },
+        };
+    }
+}
+
+/// A Delete Anchor click on empty canvas hides the anchors of the selected saved path: its outline stays and it
+/// stays targeted (#12769).
+fn hide_anchors(app: &mut PhotocraftApp) {
+    if let Some((index, _)) = crate::vector_ui::selected_saved_path_index(app) {
+        let owner = Owner::current(app);
+        app.ui.direct_selection = DirectSelection { target: Some(PathRef::Saved(index)), shown: Some(Vec::new()), owner, ..Default::default() };
     }
 }
 
@@ -122,6 +153,7 @@ fn select(app: &mut PhotocraftApp, selection: &PathSelection) {
         target: selection.path.and_then(PathRef::from_key),
         anchors: selection.anchors.iter().map(|k| [k.subpath, k.knot]).collect(),
         segment: selection.segment.map(|k| [k.subpath, k.knot]),
+        shown: selection.shown.clone(),
         owner,
         editing,
         ..Default::default()
@@ -166,6 +198,12 @@ fn change_path(app: &mut PhotocraftApp, change: &PathEdit, refs: &[PathRef], too
                 params["stepName"] = json!("Drag Anchor Point");
             }
             command(app, r, "path.moveAnchors", params);
+        }
+        // Direct Selection's ⌥ drag on a segment: a copy of the subpath moves, the source stays (#13211).
+        PathEdit::DuplicateSubpath { subpath, by, .. } if moved(by.x, by.y) => {
+            let knots = super::path_of(app, &r).and_then(|path| path.subpaths.get(*subpath).map(|sub| sub.knots.len())).unwrap_or(0);
+            let anchors: Vec<[usize; 2]> = (0..knots).map(|k| [*subpath, k]).collect();
+            command(app, r, "path.moveAnchors", json!({"anchors": anchors, "move": [by.x, by.y], "duplicate": true, "stepName": "Drag Path"}));
         }
         PathEdit::MoveCurvature { anchors, by, .. } if moved(by.x, by.y) => {
             command(app, r, "path.moveAnchors", json!({"anchors": ids(anchors), "move": [by.x, by.y], "curvature": true}));
@@ -281,7 +319,7 @@ fn command(app: &mut PhotocraftApp, r: PathRef, id: &str, params: Value) -> Opti
 /// Edits the pen draft as a path of its own key and hands the result back to the pen.
 fn edit_draft(app: &mut PhotocraftApp, edit: impl FnOnce(&mut EditPath) -> bool) {
     let Some(draft) = app.ui.pen.as_ref().map(|pen| pen.draft.clone()) else { return };
-    let mut path = EditPath::new(PathRef::Pen.key(), vec![draft]);
+    let mut path = EditPath::new(PathRef::Pen.key(), vec![draft]).copies(false);
     if !edit(&mut path) {
         return;
     }

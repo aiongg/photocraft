@@ -106,6 +106,9 @@ pub struct DirectSelection {
     pub anchors: Vec<[usize; 2]>,
     /// A clicked segment (`[subpath, knot]` it leaves): its two handles show.
     pub segment: Option<[usize; 2]>,
+    /// The subpaths of the target whose anchors show; `None` shows every subpath's (a Delete Anchor click on a
+    /// saved path narrows it, #12769). Mirrors `PathSelection::shown`.
+    pub shown: Option<Vec<usize>>,
     /// The document, revision and target the running overlay gesture began on: its commit runs
     /// only while they still hold.
     #[serde(skip)]
@@ -311,9 +314,9 @@ pub(crate) fn selection(app: &PhotocraftApp, bezier: BezierTool) -> PathSelectio
     let knot = |&[s, k]: &[usize; 2]| KnotRef::new(s, k);
     let target = ds.target.as_ref().map(PathRef::key);
     if app.ui.tool == Tool::PathSelection && bezier == BezierTool::Direct {
-        return PathSelection::new(target, Vec::new(), None);
+        return PathSelection::new(target, Vec::new(), None).shown(ds.shown.clone());
     }
-    PathSelection::new(target, ds.anchors.iter().map(knot).collect(), ds.segment.as_ref().map(knot))
+    PathSelection::new(target, ds.anchors.iter().map(knot).collect(), ds.segment.as_ref().map(knot)).shown(ds.shown.clone())
 }
 
 /// The paths the overlay edits with `bezier`, back to front, and their refs in the same order. A
@@ -347,7 +350,7 @@ pub(crate) fn edit_paths(app: &PhotocraftApp, bezier: BezierTool) -> (Vec<EditPa
     let (mut paths, mut refs) = (Vec::new(), Vec::new());
     for (r, path) in front.into_iter().rev() {
         let edit = match (r, drafted(app)) {
-            (PathRef::Pen, Some(pen)) => EditPath::new(r.key(), vec![pen.draft.clone()]),
+            (PathRef::Pen, Some(pen)) => EditPath::new(r.key(), vec![pen.draft.clone()]).copies(false),
             _ => crate::vector_ui::edit_path(&path, r.key()),
         };
         paths.push(edit);
