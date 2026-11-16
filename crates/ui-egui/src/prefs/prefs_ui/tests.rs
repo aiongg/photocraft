@@ -43,7 +43,7 @@ fn app_on(files: &Arc<MemoryFiles>) -> PhotocraftApp {
     PhotocraftApp::new(photocraft_engine::Session::new(), services_on(files))
 }
 
-fn app_with_store() -> (PhotocraftApp, Arc<MemoryFiles>) {
+pub(super) fn app_with_store() -> (PhotocraftApp, Arc<MemoryFiles>) {
     let files = Arc::new(MemoryFiles::new());
     (app_on(&files), files)
 }
@@ -1709,4 +1709,45 @@ fn reset_section_on_type_keeps_the_favourite_fonts() {
     assert!(prefs.smart_quotes, "the Type settings are reset");
     assert_eq!(prefs.favorite_fonts, ["Bebas Neue"], "the favourites are kept");
     assert_eq!(stored(&store)["type"]["favoriteFonts"], json!(["Bebas Neue"]));
+}
+
+/// #13588: a scratch disk's Browse… asks for a folder and fills that disk's path in the window's draft only; a
+/// cancelled Browse keeps it, and the system's temporary folder has no Browse.
+#[test]
+fn scratch_disk_browse_sets_only_its_draft_entry_and_cancel_keeps_it() {
+    use craft::host::{PickKind, Picked, ScriptedFiles};
+    use egui_kittest::kittest::Queryable;
+    let scripted = Arc::new(ScriptedFiles::answering([Picked::Paths(vec!["/tmp/scratch".into()]), Picked::Cancelled]));
+    let (store, picks) = (Arc::new(MemoryFiles::new()), scripted.clone());
+    let mut h = egui_kittest::Harness::builder().with_size(vec2(1280.0, 800.0)).build_eframe(move |cc| {
+        PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
+        let services = crate::Services { files: Some(picks), ..services_on(&store) };
+        let mut app = PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), services);
+        open_prefs(&mut app, "scratchDisks");
+        app
+    });
+    h.run_steps(4);
+    assert!(h.query_by_label("Browse…").is_none(), "the system's temporary folder is not browsed for");
+    h.get_by_label("Add disk").click();
+    h.run_steps(3);
+    h.get_by_label("Browse…").click();
+    h.run_steps(4);
+    assert_eq!(h.state().session.prefs().scratch_disks.disks.len(), 1, "Browse edits only the draft");
+    h.get_by_label("Browse…").click();
+    h.run_steps(4);
+    h.get_by_label("OK").click();
+    h.run_steps(4);
+    let paths: Vec<String> = h.state().session.prefs().scratch_disks.disks.iter().map(|d| d.path.clone()).collect();
+    assert_eq!(paths, ["(system temp)", "/tmp/scratch"], "the pick lands in its own entry and a cancelled Browse keeps it");
+    let asked = scripted.requests();
+    assert_eq!(asked.iter().map(|r| r.kind).collect::<Vec<_>>(), [PickKind::Folder, PickKind::Folder]);
+}
+
+/// The agent settings apply at once, so none of them says "Applies at next launch." (they did before the agent link
+/// followed the preferences live).
+#[test]
+fn integrations_apply_without_a_restart() {
+    for key in ["allowAgentControl", "connectAgents", "controlPort", "readRoot", "writeRoot", "whenAppClosed"] {
+        assert!(!super::fields::read_at_launch(&format!("integrations.{key}")), "{key}");
+    }
 }

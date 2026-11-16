@@ -28,6 +28,8 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context, now: Instant) {
     presets_store(app);
     sync_tooltips(app, ctx);
     app.sync_recent();
+    #[cfg(not(target_arch = "wasm32"))]
+    super::agents::sync_agent_link(app, ctx);
     let save_at = store_preferences(app, now);
     let style = canvas_style(app);
     if let Some(gpu) = app.gpu.as_ref()

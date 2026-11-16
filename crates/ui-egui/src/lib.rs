@@ -234,21 +234,14 @@ pub(crate) use services::SAVE_OPTIONS_OPEN;
 #[cfg(test)]
 pub(crate) use services::saved_revision_after_write;
 pub use services::{
-<<<<<<< HEAD
-    AdoptAutosaveFn, AppendTextFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationWriteFn, AutosaveFn, AutosaveResultsFn, CapsLockFn,
-    ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, ExportFn, ExportSettings, ExternalSvgEditor,
-    ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox, LoadTextFn, OpenExternalSvgFn,
-    OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn, SameFileFn, SaveFileFn, SaveTextFn, Services,
-    SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
-=======
-    AdoptAutosaveFn, AgentLink, AgentLinkFn, AgentLinkStatus, AppendTextFn, AutomationAuthorizeFn, AutomationCommandFn, AutomationOpenPcraftFn,
-    AutomationReadFn, AutomationServices, AutomationWriteFn, AutosaveFn, AutosaveResultsFn, CapsLockFn, CaptionStyleFn, ClipboardGetFn, ClipboardGetSvgFn,
-    ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, EncodePngFn, ExportFn, ExportSettings, ExternalSvgEditor, ExternalSvgSession,
-    ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox, LastUpdateFn, LoadTextFn, OpenExternalSvgFn, OpenUrlFn,
-    OsEventsFn, PenEndFn, PenScreenFn, PhotoshopShortcutsFn, PlaceInbox, QuitFn, RecoverFn, Recoverable, RightButtonDownFn, SameFileFn, SaveFileFn, SaveTextFn,
-    Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
->>>>>>> upstream/main
+    AdoptAutosaveFn, AppendTextFn, AutomationAuthorizeFn, AutomationCommandFn, AutomationOpenPcraftFn, AutomationReadFn, AutomationServices, AutomationWriteFn,
+    AutosaveFn, AutosaveResultsFn, CapsLockFn, ClipboardGetFn, ClipboardGetSvgFn, ClipboardSetFn, ClipboardUnreadableFn, CursorPosFn, DiscardAutosaveFn, ExportFn,
+    ExportSettings, ExternalSvgEditor, ExternalSvgSession, ExternalVectorSave, ExternalVectorSource, FileStamp, FileStampFn, FormatChoices, ImportFn, Inbox,
+    LoadTextFn, OpenExternalSvgFn, OpenUrlFn, OsEventsFn, PenEndFn, PhotoshopShortcutsFn, PlaceInbox, RecoverFn, Recoverable, RightButtonDownFn, SameFileFn,
+    SaveFileFn, SaveTextFn, Services, SystemThemeFn, TabletPollFn, WindowFrameFn, WriteFn,
 };
+#[cfg(not(target_arch = "wasm32"))]
+pub use services::AgentAutomationFn;
 pub(crate) use services::{opaque_layer, saves_flat_in_place};
 pub use text::cjk_fonts;
 pub use text::direction;
@@ -394,25 +387,11 @@ pub struct PhotocraftApp {
     /// show the precise crosshair whatever the cursor preference (#1758).
     pub caps_lock: bool,
     /// The first digit of a two-digit opacity typed on the number keys (`opacity_keys`, #352).
-<<<<<<< HEAD
     pub(crate) opacity_keys: craft::behavior::DigitKeys,
     /// The control channel: requests from a transport, the replies waiting on input, jobs and
     /// screenshots, and the screenshot queue (`app/control.rs`).
     #[cfg(not(target_arch = "wasm32"))]
     control: Option<craft::automation::ControlChannel>,
-=======
-    pub(crate) opacity_keys: opacity_keys::Pending,
-    control_rx: Option<Receiver<ControlRequest>>,
-    /// Preferences › AI Integrations: the agent connection's state (see [`Services::agent_link`]).
-    pub agent_link: AgentLinkStatus,
-    /// `ui.screenshot` requests: bounded admission, a weak-slot callback per issuance, monotonic
-    /// deadlines and a capture-time geometry epoch (see `screenshot.rs`).
-    captures: screenshot::Captures,
-    /// The custom Type tool's IME owner/generation/receipt tracker (`type_tool::sync_ime`).
-    pub(crate) type_ime: type_tool::ImeState,
-    /// Control replies waiting for queued synthetic input to be processed.
-    input_waiters: Vec<Sender<ControlResponse>>,
->>>>>>> upstream/main
     /// Live (uncommitted) adjustment edit shown on canvas while a slider is dragged.
     pub live_adjust: Option<(photocraft_doc::LayerId, Value)>,
     /// Frames rendered (for tests and the status bar).

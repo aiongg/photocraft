@@ -1,6 +1,7 @@
 //! The Preferences rows the app draws itself (`RuleKind::Custom`): memory, graphics, scratch disks, the lists with a
-//! Clear button, the pressure curve, the tablet input and the Appearance page. Every row edits the window's draft;
-//! nothing is written before Apply or OK.
+//! Clear button, the pressure curve, the tablet input and the Appearance page; and the Agents page
+//! (`craft::automation::ui::agents`), drawn whole on the desktop. Every row edits the window's draft; nothing is
+//! written before Apply or OK.
 
 use craft::theme::variant::Tone;
 use craft::theme::{ModeChoice, ThemeId};
@@ -14,6 +15,7 @@ use craft::ui::form::Field;
 use craft::ui::pickers::Select;
 use craft::ui::runtime::env::system_appearance;
 use craft::ui::style::TypeRole;
+use craft::ui::patterns::preferences::PathSetting;
 use craft::ui::text::{NumberField, TextField};
 use serde_json::{Value, json};
 
@@ -32,6 +34,11 @@ const APPEARANCE_MODE: &str = "interface.appearanceMode";
 const LIGHT_THEME: &str = "interface.lightTheme";
 const DARK_THEME: &str = "interface.darkTheme";
 const FAVORITE_THEMES: &str = "interface.favoriteThemes";
+/// The page agents' settings live on, drawn whole by [`craft::automation::ui::agents::AgentsPage`].
+#[cfg(not(target_arch = "wasm32"))]
+pub(super) const AGENTS_PAGE: &str = "integrations";
+/// The scratch disk entry that names the system's temporary folder rather than a path.
+const SYSTEM_TEMP: &str = "(system temp)";
 
 /// The custom rows of the Preferences window. It copies what the rows read from the app when the window's pass
 /// starts, except the suite, which the Appearance page reads through a shared borrow of the framework's `suite` field.
@@ -42,6 +49,12 @@ pub(super) struct PrefsCustom<'a> {
     gpu_info: Vec<String>,
     adapters: Vec<String>,
     installed_ram: Option<u64>,
+    /// The agent link's state, for the Agents page.
+    #[cfg(not(target_arch = "wasm32"))]
+    agent_status: craft::automation::agents::AgentLinkStatus,
+    /// The suite's `AI-MCP` flag: the Agents page points to the ArtCraft Launcher's switch.
+    #[cfg(not(target_arch = "wasm32"))]
+    mcp_flag: bool,
 }
 
 impl<'a> PrefsCustom<'a> {
@@ -57,6 +70,10 @@ impl<'a> PrefsCustom<'a> {
             gpu_info,
             adapters: app.perf.gpu_info.adapters.clone(),
             installed_ram: crate::gpu_canvas::physical_memory().filter(|n| *n > 0),
+            #[cfg(not(target_arch = "wasm32"))]
+            agent_status: app.services.agent_link.as_ref().map(|link| link.status().clone()).unwrap_or_default(),
+            #[cfg(not(target_arch = "wasm32"))]
+            mcp_flag: app.services.agent_switch.as_ref().is_some_and(|switch| switch.mcp_flag()),
         }
     }
 }
@@ -74,6 +91,13 @@ impl CustomSettings<PrefPages> for PrefsCustom<'_> {
             "tools.tabletInput" => tablet_input_row(ui, draft),
             APPEARANCE_MODE => self.appearance_row(ui, draft),
             _ => {}
+        }
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    fn page(&mut self, ui: &mut egui::Ui, page: &str, draft: &mut SettingsDraft) {
+        if page == AGENTS_PAGE {
+            craft::automation::ui::agents::AgentsPage::new(AGENTS_PAGE, draft, &self.agent_status).mcp_flag(self.mcp_flag).show(ui);
         }
     }
 
@@ -298,20 +322,33 @@ fn rendering_mode_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
 
 /// Per disk a checkbox and a path, an Add disk button, and the warning when the scratch directory reports no free space.
 fn scratch_disks_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
-    let mut disks: Vec<Value> = draft.get(SCRATCH_DISKS).unwrap_or_default();
-    let before = disks.clone();
-    for (i, disk) in disks.iter_mut().enumerate() {
-        let mut on = disk.get("enabled").and_then(Value::as_bool).unwrap_or(false);
-        let mut path = disk.get("path").and_then(Value::as_str).unwrap_or("").to_string();
+    let disks: Vec<Value> = draft.get(SCRATCH_DISKS).unwrap_or_default();
+    for (i, disk) in disks.iter().enumerate() {
+        let on = disk.get("enabled").and_then(Value::as_bool).unwrap_or(false);
+        let path = disk.get("path").and_then(Value::as_str).unwrap_or("").to_string();
+        let path_key = format!("{SCRATCH_DISKS}[{i}].path");
         ui.horizontal(|ui| {
-            Checkbox::new(Bind::bound(&mut on)).label(tl!("Enabled")).id_salt(("disk-enabled", i)).show(ui);
-            TextField::new(tl!("Path"), Bind::bound(&mut path)).id_salt(("disk-path", i)).show(ui);
+            let mut next = on;
+            Checkbox::new(Bind::bound(&mut next)).label(tl!("Enabled")).id_salt(("disk-enabled", i)).show(ui);
+            if next != on {
+                draft.set(&format!("{SCRATCH_DISKS}[{i}].enabled"), &next);
+            }
+            // The system's temporary folder is named, not browsed for.
+            if path.trim() == SYSTEM_TEMP {
+                let mut typed = path.clone();
+                TextField::new(tl!("Path"), Bind::bound(&mut typed)).id_salt(("disk-path", i)).show(ui);
+                if typed != path {
+                    draft.set(&path_key, &typed);
+                }
+            } else {
+                PathSetting::new(tl!("Path"), &path_key, draft, craft::host::PickRequest::folder("scratch")).show(ui);
+            }
         });
-        disk["enabled"] = json!(on);
-        disk["path"] = json!(path);
     }
     if Button::new(tl!("Add disk")).show(ui).clicked() {
+        let mut disks: Vec<Value> = draft.get(SCRATCH_DISKS).unwrap_or_default();
         disks.push(json!({"enabled": true, "path": ""}));
+        draft.set(SCRATCH_DISKS, &disks);
     }
     let scratch = photocraft_raster::spill::stats();
     if scratch.free_space_unmeasured {
@@ -323,9 +360,6 @@ fn scratch_disks_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
             &[("path", &dir)],
         );
         Text::new(warning).tone(Tone::Warn).show(ui);
-    }
-    if disks != before {
-        draft.set(SCRATCH_DISKS, &disks);
     }
 }
 

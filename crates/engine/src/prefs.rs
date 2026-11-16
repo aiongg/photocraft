@@ -24,6 +24,8 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Map, Value, json};
 
 use crate::commands::CommandSpec;
+pub use craft::automation::agents::WhenAppClosed;
+use craft::automation::agents::AgentSettings;
 use crate::{EngineError, Result, Session};
 
 /// A string-valued choice enum with its JSON names (used to validate `prefs.set` and to fill
@@ -116,11 +118,6 @@ choice!(
     /// (Hirakawa–Parks) keeps edges cleanest, Malvar–He–Cutler is sharp and fast, bilinear is the
     /// fastest and softest. Photoshop's Camera Raw has no such choice.
     RawDemosaic { Ahd = "ahd", Mhc = "mhc", Bilinear = "bilinear" } default Ahd
-);
-choice!(
-    /// MCP › When PhotoCraft Is Closed: what `photocraft-cli mcp` does when an
-    /// agent calls a tool and the app isn't running.
-    WhenAppClosed { Launch = "launch", Headless = "headless", Error = "error" } default Launch
 );
 
 impl Unit {
@@ -1252,41 +1249,20 @@ pub fn read_integrations_section(mut section: Value) -> Integrations {
     read_section(section)
 }
 
-#[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
+/// Preferences › Agents: the framework's agent settings, saved flat in the `integrations` section
+/// (`allowAgentControl`, `controlPort`, `readRoot`, `writeRoot`, `whenAppClosed`), and PhotoCraft's
+/// consent from before the ArtCraft Launcher's switch.
+#[derive(Clone, Debug, Default, PartialEq, Serialize, Deserialize)]
 #[serde(default, rename_all = "camelCase")]
 pub struct Integrations {
-    /// Allow agents to drive the app over the loopback control channel / MCP bridge.
-    pub allow_agent_control: bool,
-    /// Port agents connect to (0 = any free port, published in the connection file).
-    pub control_port: u32,
-    /// The folder automation may read from when no `--automation-read-root` is given (empty =
-    /// none). Applied at once while agents are connected.
-    pub read_root: String,
-    /// The folder automation may write to when no `--automation-write-root` is given (empty =
-    /// none). Applied at once while agents are connected.
-    pub write_root: String,
+    #[serde(flatten)]
+    pub agents: AgentSettings,
     /// Without the suite's `AI-MCP` flag, agents may connect: the desktop app serves the control
     /// protocol on loopback for `photocraft-cli mcp` without `--control`, and starts or stops it at
     /// once when this changes (off by default; launch flags still win). Set from a saved Control
     /// Port ([`migrate_integrations`]); not in the dialog. With the flag the ArtCraft Launcher's
-    /// switch decides instead. After the older fields, so a
-    /// section saved as a list still reads them where they were.
+    /// switch decides instead.
     pub connect_agents: bool,
-    /// What `photocraft-cli mcp` does while agents may use the app but it is closed.
-    pub when_app_closed: WhenAppClosed,
-}
-
-impl Default for Integrations {
-    fn default() -> Self {
-        Self {
-            allow_agent_control: true,
-            control_port: 0,
-            read_root: String::new(),
-            write_root: String::new(),
-            connect_agents: false,
-            when_app_closed: WhenAppClosed::Launch,
-        }
-    }
 }
 
 choice!(
@@ -1893,6 +1869,9 @@ pub fn parse_prefs_json(s: &str) -> std::result::Result<(SavedPrefs, Vec<Invalid
         && language.as_str().is_some_and(|code| code.eq_ignore_ascii_case("sr"))
     {
         *language = json!("sr-latn");
+    }
+    if let Some(integrations) = v.get_mut("integrations") {
+        migrate_integrations(integrations);
     }
     remap_command_ids(&mut v);
     let color = v.as_object_mut().and_then(|m| m.remove("colorSettings"));
