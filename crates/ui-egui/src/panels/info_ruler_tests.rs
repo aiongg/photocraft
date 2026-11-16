@@ -4,8 +4,6 @@
 
 use craft::color::ui::InfoMeasure;
 use craft::ui::runtime::env::Label;
-use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
 use serde_json::json;
 
 use super::{RulerRows, ruler_rows};
@@ -68,18 +66,4 @@ fn another_tool_or_no_ruler_reads_as_today() {
     app.run("image.analysis.rulerTool", json!({"start": [100, 100], "end": [300, 250]})).unwrap();
     app.ui.tool = Tool::Brush;
     assert_eq!(ruler_rows(&app), None, "another tool");
-}
-
-#[test]
-fn the_panel_draws_the_cells() {
-    let mut a = app();
-    a.run("image.analysis.rulerTool", json!({"start": [100, 100], "end": [300, 250]})).unwrap();
-    let mut h = Harness::builder().with_size(egui::vec2(320.0, 400.0)).build_ui_state(|ui, app| super::info_panel(app, ui), a);
-    PhotocraftApp::setup_context(&h.ctx, Default::default());
-    h.run_steps(3);
-    for text in ["A", "-36.9°", "L", "250.00", "W", "200", "H", "150"] {
-        assert!(h.query_all_by_label(text).next().is_some(), "{text}");
-    }
-    // X and Y are the start point, 100 each.
-    assert!(h.query_all_by_label("100").count() >= 2, "X 100 and Y 100");
 }

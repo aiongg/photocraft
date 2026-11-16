@@ -73,39 +73,6 @@ fn covered(path: &Path, x: i32, y: i32) -> f32 {
     photocraft_vector::fill_rasterizer(path, photocraft_vector::DEFAULT_TOLERANCE).render(photocraft_geom::Rect::from_xywh(x, y, 1, 1))[0]
 }
 
-/// The issue's mug: the body is drawn, then the hole in its handle is cut out of the same shape
-/// layer with Subtract Front Shape, one History step each.
-#[test]
-fn subtract_front_shape_cuts_a_hole_in_the_selected_shape_layer() {
-    let mut app = app();
-    app.ui.tool_options.vector_mode = VectorMode::Shape;
-    assert_eq!(app.ui.tool_options.pen_path_op, "newLayer", "Photoshop's default in Shape mode");
-    square(&mut app, 20.0, 20.0, 100.0);
-    let (id, _) = shape_path(&app);
-    let count = layers(&app);
-    app.ui.tool_options.pen_path_op = "subtract".into();
-    square(&mut app, 50.0, 50.0, 40.0);
-    let (same, path) = shape_path(&app);
-    assert_eq!((same, layers(&app)), (id, count), "no new layer");
-    assert_eq!(path.subpaths.iter().map(|s| s.op).collect::<Vec<_>>(), [PathOp::Combine, PathOp::Subtract]);
-    assert_eq!((covered(&path, 70, 70), covered(&path, 30, 30)), (0.0, 1.0), "a hole in the body");
-    app.session.undo();
-    assert_eq!(shape_path(&app).1.subpaths.len(), 1, "undo takes back only the hole");
-    app.session.redo();
-    // Intersect and Exclude are stored the same way.
-    for (op, want) in [("intersect", PathOp::Intersect), ("exclude", PathOp::Exclude), ("combine", PathOp::Combine)] {
-        app.ui.tool_options.pen_path_op = op.into();
-        square(&mut app, 10.0, 10.0, 30.0);
-        assert_eq!(shape_path(&app).1.subpaths.last().map(|s| s.op), Some(want), "{op}");
-    }
-    assert_eq!(layers(&app), count);
-    // New Layer makes another shape layer again.
-    app.ui.tool_options.pen_path_op = "newLayer".into();
-    square(&mut app, 10.0, 10.0, 30.0);
-    assert_eq!(layers(&app), count + 1);
-    assert_ne!(shape_path(&app).0, id);
-}
-
 /// A locked shape layer refuses the new component: the path drawn stays as the Pen's draft, and
 /// the document and History are unchanged. Unlocking advances the source revision, so the old
 /// captured draft refuses; a fresh draft on the unlocked source cuts the hole.

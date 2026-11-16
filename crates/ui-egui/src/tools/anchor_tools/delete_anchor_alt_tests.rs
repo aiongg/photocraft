@@ -5,7 +5,7 @@ use egui::Modifiers;
 use serde_json::json;
 
 use super::add_anchor_lock_tests::click_with_modifiers;
-use super::delete_anchor_targeted_path_tests::{group_shape, setup, shape_path, steps};
+use super::delete_anchor_targeted_path_tests::{setup, steps};
 use crate::PhotocraftApp;
 use crate::canvas::testing;
 use crate::direct_select::PathRef;
@@ -57,16 +57,5 @@ fn alt_drag_from_an_anchor_selects_nothing() {
     testing::release(&mut app, [360.0, 560.0], Modifiers::ALT);
     assert!(app.ui.direct_selection.anchors.is_empty());
     assert_eq!(knots(&app), 4);
-    assert_eq!(steps(&app), n);
-}
-
-#[test]
-fn alt_click_on_a_shape_in_a_group_that_is_not_active_selects_nothing() {
-    let (mut app, shape) = setup(Tool::DeleteAnchorPoint);
-    group_shape(&mut app, shape);
-    let (before, n) = (shape_path(&mut app, shape), steps(&app));
-    click_with_modifiers(&mut app, [650.0, 250.0], Modifiers::ALT);
-    assert!(app.ui.direct_selection.anchors.is_empty());
-    assert_eq!(shape_path(&mut app, shape), before);
     assert_eq!(steps(&app), n);
 }

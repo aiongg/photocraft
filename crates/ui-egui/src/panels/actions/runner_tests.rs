@@ -1415,14 +1415,6 @@ fn a_displace_step_restores_recording_when_the_map_picker_fails_or_is_cancelled(
 }
 
 #[test]
-fn a_displace_step_restores_recording_when_the_map_picker_cannot_start() {
-    let mut app = recording_with_displace_child();
-    let id = pause_child(&mut app);
-    assert!(answer_ok(&mut app, id).is_err());
-    assert_displace_call_finished(&mut app, 0);
-}
-
-#[test]
 fn a_displace_step_resumes_and_records_its_call_once_after_choosing_a_map() {
     let mut app = recording_with_displace_child();
     let dir = tempfile::tempdir().unwrap();

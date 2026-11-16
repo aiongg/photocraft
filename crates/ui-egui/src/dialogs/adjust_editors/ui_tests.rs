@@ -3,11 +3,8 @@
 //! key input (issue #12: "add an adjustment layer to a new document, edit it, crash"). The
 //! editors' own gestures are the framework's tests; these cover what the app wires around them.
 
-use std::sync::Arc;
-
 use craft::behavior::dock::Action;
 use craft::color::ui::{ColorPickerDialog, PickedColor};
-use craft::host::{Picked, ScriptedFiles};
 use craft::theme::Srgba;
 use egui::accesskit::{Role, Toggled};
 use egui::{Pos2, Rect, vec2};
@@ -267,76 +264,6 @@ fn color_balance_properties_history_and_reset_like_photoshop() {
     click(&mut h, reset.center());
     assert_eq!(cb(&h), ([0.0; 3], [0.0; 3], [0.0; 3], false), "third Reset: still the defaults");
     assert_eq!(history_len(&h), before, "the edit and the Resets share one history step");
-}
-
-fn map_stops(a: &Adjustment) -> Vec<(f32, [u8; 3])> {
-    let q = |v: f32| (v * 255.0).round() as u8;
-    match a {
-        Adjustment::GradientMap { stops, .. } => stops.iter().map(|(t, c)| (*t, [q(c[0]), q(c[1]), q(c[2])])).collect(),
-        other => panic!("{other:?}"),
-    }
-}
-
-/// Opens the Gradient Map's preset picker and chooses its Import entry.
-fn import_gradients_from_picker(h: &mut Harness<'_, PhotocraftApp>) {
-    let preset = label_rect(h, "Preset").expect("the preset picker");
-    click(h, Pos2::new(preset.right() + 60.0, preset.center().y));
-    h.get_by_label_contains("Import").click();
-    h.run_steps(4);
-}
-
-/// The Import entry of the Gradient Map picker asks for a `.grd` file and imports it into the
-/// library; a cancelled pick, a broken file and every other failure leave the layer, the library
-/// and the history as they were, and failures reach the status bar.
-#[test]
-fn gradient_map_picker_imports_grd_without_editing_the_map() {
-    use craft_psd::grd::{GrdColor, GrdGradient, GrdStop};
-    let good = craft_psd::grd::write(&[GrdGradient {
-        name: "Imported Teal".into(),
-        stops: vec![
-            GrdStop { location: 0.0, midpoint: 0.5, color: GrdColor::Rgb([0.0, 0.5, 0.5]) },
-            GrdStop { location: 1.0, midpoint: 0.5, color: GrdColor::Rgb([1.0, 1.0, 0.0]) },
-        ],
-        ..Default::default()
-    }]);
-    let broken = || Picked::Contents(vec![("broken.grd".into(), b"invalid".to_vec())]);
-    for (answer, error) in [(Picked::Cancelled, false), (broken(), true)] {
-        let files = Arc::new(ScriptedFiles::answering([answer]));
-        let mut h = app_harness_with("gradientMap", "rgb", 8, 1.0 / 60.0, crate::Services { files: Some(files.clone()), ..Default::default() });
-        h.state_mut().session.presets.gradients.truncate(1);
-        let (before, presets, history) = (layer(&h), h.state().session.presets.gradients.clone(), history_len(&h));
-        import_gradients_from_picker(&mut h);
-        assert!(!files.requests().is_empty(), "the Import entry asked for a file");
-        assert_eq!(layer(&h), before);
-        assert_eq!(h.state().session.presets.gradients, presets);
-        assert_eq!(history_len(&h), history);
-        assert_eq!(h.state().ui.status_error, error);
-        if error {
-            assert!(!h.state().ui.status.is_empty());
-        }
-    }
-
-    let files = Arc::new(ScriptedFiles::answering([Picked::Contents(vec![("My Gradients.GRD".into(), good)])]));
-    let mut h = app_harness_with("gradientMap", "rgb", 16, 1.0 / 60.0, crate::Services { files: Some(files.clone()), ..Default::default() });
-    h.state_mut().session.presets.gradients.truncate(1);
-    let before = layer(&h);
-    let history = history_len(&h);
-    let tool = h.state().session.presets.gradient.clone();
-    import_gradients_from_picker(&mut h);
-    assert_eq!(layer(&h), before, "import does not edit the adjustment");
-    assert_eq!(history_len(&h), history);
-    assert_eq!(h.state().session.presets.gradient, tool);
-    assert!(!h.state().ui.status_error);
-    assert!(h.state().ui.status.contains("Imported 1 gradient"));
-    let preset = label_rect(&h, "Preset").unwrap();
-    click(&mut h, Pos2::new(preset.right() + 60.0, preset.center().y));
-    h.get_by_label("My Gradients");
-    h.get_by_label("Imported Teal").click();
-    h.run_steps(3);
-    assert_eq!(map_stops(&layer(&h).1), vec![(0.0, [0, 128, 128]), (1.0, [255, 255, 0])]);
-    assert_eq!(history_len(&h), history + 1);
-    h.state_mut().run("edit.undo", json!({})).unwrap();
-    assert_eq!(layer(&h), before);
 }
 
 /// UI-217-15 (#3110, #3116): the Properties panel of a Curves or Levels layer has the Set

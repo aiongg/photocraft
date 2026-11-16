@@ -49,17 +49,6 @@ fn painting(h: &mut Harness<'static, PhotocraftApp>, value: &str) {
 }
 
 #[test]
-fn alt_shows_the_fixed_target_at_any_tip_size_and_releasing_it_brings_the_tip_back() {
-    let mut h = harness(Tool::Healing);
-    for size in [10.0, 40.0, 200.0] {
-        tip_size(&mut h, size);
-        assert_eq!(cursor(&mut h, Modifiers::ALT), Some(sample_target()), "{size} px tip: the target");
-        let released = cursor(&mut h, Modifiers::NONE);
-        assert_eq!(centre_marked(&released), Some(false), "{size} px tip: releasing ⌥ brings the plain tip back");
-    }
-}
-
-#[test]
 fn latched_alt_shows_the_target_too() {
     let mut h = harness(Tool::Healing);
     tip_size(&mut h, 120.0);

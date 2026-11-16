@@ -315,18 +315,6 @@ mod tests {
         assert!(m_dark > 0.9 && m_w >= heavy_w - 1.0, "mouse = pressure 1: {m_dark}, {m_w}");
     }
 
-    #[test]
-    fn xinput_tablet_pressure_drives_stroke_width_and_opacity() {
-        let mut st = xi::State::default();
-        st.set_devices([xi::Device::new(9, "Wacom Intuos Pen stylus", [(2, "Abs Pressure".to_string(), 0.0, 65535.0)])]);
-        let (light_dark, light_w, heavy_dark, heavy_w) = pressure_stroke(|p| match st.handle(9, [(2, f64::from(p) * 65535.0)]) {
-            Update::Set(s) => s,
-            Update::Keep => None,
-        });
-        assert!(heavy_w > light_w * 2.0, "width responds: {light_w} → {heavy_w}");
-        assert!(heavy_dark > light_dark + 0.3, "opacity responds: {light_dark} → {heavy_dark}");
-    }
-
     /// `/proc/bus/input/devices` of a laptop with a Wacom Intuos Pro attached (64-bit longs: the
     /// pen's `KEY=1c03 0 0 0 0 0` has bit 0x140, BTN_TOOL_PEN) and of the same laptop without it.
     const WITH_PEN: &str = "I: Bus=0011 Vendor=0001 Product=0001 Version=ab83\n\

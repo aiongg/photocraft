@@ -224,7 +224,7 @@ pub(super) fn members(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) ->
     let mut values = before.clone();
     let mut eraser = eraser_mode_of(&app.ui.tool_options.eraser_mode);
     let modes = if matches!(tool, Tool::Brush | Tool::Pencil) { mode_entries(app) } else { Vec::new() };
-    let mut bar = PaintBar::new(paint, &mut values).max_size(f64::from(photocraft_engine::paint::MAX_BRUSH_SIZE)).modes(&modes);
+    let mut bar = PaintBar::new(paint, &mut values).modes(&modes);
     if tool == Tool::Eraser {
         bar = bar.eraser_mode(&mut eraser);
     }

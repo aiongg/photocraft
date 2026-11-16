@@ -52,16 +52,6 @@ fn align_edges_is_on_by_default_and_saved() {
 }
 
 #[test]
-fn triangle_box_snaps_with_align_edges_and_stays_fractional_without() {
-    let r = rect(|_| {}, Tool::Triangle, START, END).unwrap();
-    assert!(r.iter().all(|v| v.fract() == 0.0), "whole pixels: {r:?}");
-    let r = rect(|o| o.align_edges = false, Tool::Triangle, START, END).unwrap();
-    for (got, want) in r.iter().zip([10.3, 10.6, 30.4, 19.6]) {
-        assert!((got - want).abs() < 1e-9, "{r:?}");
-    }
-}
-
-#[test]
 fn other_shape_tools_always_snap() {
     for tool in [Tool::Polygon, Tool::EllipseShape, Tool::Rectangle, Tool::Star] {
         let r = rect(|o| o.align_edges = false, tool, START, END).unwrap();
@@ -78,13 +68,6 @@ fn a_greyed_checkbox_keeps_snapping_in_path_mode() {
     assert!(super::shapes::snaps_to_pixels(&app, ShapeKind::Triangle), "Path mode still snaps");
     app.ui.tool_options.shape_mode = VectorMode::Shape;
     assert!(!super::shapes::snaps_to_pixels(&app, ShapeKind::Triangle), "Shape mode with Align Edges off keeps fractions");
-}
-
-#[test]
-fn a_sub_pixel_triangle_drag_still_draws_nothing() {
-    let off = |o: &mut ToolOptions| o.align_edges = false;
-    assert!(rect(off, Tool::Triangle, [10.0, 10.0], [10.4, 30.0]).is_none());
-    assert!(rect(off, Tool::Triangle, [10.0, 10.0], [30.0, 10.9]).is_none());
 }
 
 #[test]

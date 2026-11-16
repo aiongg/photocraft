@@ -60,6 +60,7 @@ pub(crate) fn params(app: &PhotocraftApp) -> Vec<Param> {
     };
 
     vec![
+        Param::section(tl!("Resolution")),
         Param::read_only_text("inputResolution", tl!("Input:"), format!("{input} {}", tl!("Pixels/Inch"))),
         Param::number_with_units(
             "resolution",
@@ -73,6 +74,7 @@ pub(crate) fn params(app: &PhotocraftApp) -> Vec<Param> {
             ],
         )
         .bounds(Some(RESOLUTION.0), Some(RESOLUTION.1)),
+        Param::section(tl!("Method")),
         Param::new("method", tl!("Use:"), ParamKind::choice(choice(&METHODS), Some("diffusion".to_string()))),
         Param::new("pattern", tl!("Custom Pattern:"), ParamKind::pattern(None)).visible_when("method", "customPattern"),
         Param::number_with_units(

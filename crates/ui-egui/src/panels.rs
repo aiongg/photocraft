@@ -54,6 +54,7 @@ pub(crate) mod preset_browser;
 pub mod preset_panels;
 mod properties;
 pub(crate) mod rail_commands;
+pub(crate) mod region_versions;
 pub(crate) mod registry;
 pub mod smart_ui;
 mod status_bar;
@@ -74,6 +75,7 @@ pub(crate) use layers_tree::listed_filter;
 pub use options_bar::options_bar;
 pub use status_bar::status_bar;
 pub use title_bar::{title_bar, window_title};
+pub(crate) use toolbar::QUICK_MASK;
 pub use toolbar::toolbar;
 #[cfg(test)]
 use toolbar::{TOOL_SECTIONS, color_chips};

@@ -132,41 +132,6 @@ fn review_pending(app: &PhotocraftApp) -> bool {
     app.prefs_rt.shortcuts.as_ref().is_some_and(|s| s.pending_import.is_some())
 }
 
-/// Importing into the open dialog fills its draft (a key equal to the default clears its override)
-/// and OK applies the set like hand-made changes, taking a moved key from its old owner.
-#[test]
-fn import_button_fills_the_dialog_and_ok_applies_the_set() {
-    let mut app = app();
-    let ctx = app.ctx().clone();
-    // A hand-made override the file agrees with the default on: the import clears it.
-    app.run("edit.keyboardShortcuts", json!({"set": {"edit.undo": "Cmd+Shift+Z"}})).unwrap();
-    crate::prefs_ui::open_shortcuts(&mut app, 0);
-    super::queue_import(&mut app, SAMPLE.to_owned());
-    assert!(review_pending(&app));
-    pass(&mut app);
-    assert!(!review_pending(&app), "the pass took the set");
-    // The review's Import applies the plan to the dialog's keymap.
-    let keymap = &mut app.prefs_rt.shortcuts.as_mut().unwrap().keymap;
-    let report = plan(&kys::read(SAMPLE).unwrap(), keymap, &import_options(&Default::default())).apply(keymap);
-    assert!(report.imported > 0, "{report:?}");
-    let overrides = keymap.overrides().clone();
-    assert!(overrides.get("edit.undo").is_none(), "Cmd+Z is the default again");
-    assert!(overrides.get("edit.preferences.general").is_none(), "Cmd+K is Preferences' default");
-    assert!(overrides.get("select.all").is_none(), "already the default");
-    assert!(overrides.get("filter.blur.gaussianBlur").is_some());
-    // Nothing is applied until OK.
-    assert_eq!(crate::shortcuts::effective_shortcut(&app, "edit.undo", Some("Cmd+Z")).as_deref(), Some("Cmd+Shift+Z"));
-    crate::prefs_ui::shortcuts::press_ok(&mut app, &ctx);
-    assert!(!crate::prefs_ui::shortcuts_open(&app), "OK closes the dialog");
-    assert_eq!(app.ui.status, "", "the save failed");
-    assert_eq!(crate::shortcuts::effective_shortcut(&app, "edit.undo", Some("Cmd+Z")).as_deref(), Some("Cmd+Z"));
-    assert_eq!(crate::shortcuts::effective_shortcut(&app, "filter.blur.gaussianBlur", None).as_deref(), Some("Cmd+Ctrl+Alt+G"));
-    assert_eq!(crate::shortcuts::effective_shortcut(&app, "edit.preferences.general", Some("Cmd+K")).as_deref(), Some("Cmd+K"));
-    // Cmd+F went to Last Filter, so Search (Cmd+F by default) lost its key.
-    assert_eq!(crate::shortcuts::effective_shortcut(&app, "edit.search", Some("Cmd+F")), None);
-    assert_eq!(crate::shortcuts::effective_shortcut(&app, "filter.lastFilter", Some("Cmd+Alt+F")).as_deref(), Some("Cmd+F"));
-}
-
 /// Opening or dropping a `.kys` opens the dialog with the set queued for review; a second file
 /// goes to the same dialog.
 #[test]

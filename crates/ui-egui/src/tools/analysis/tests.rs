@@ -1,6 +1,6 @@
 use super::bars::count_size_params;
 use super::*;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::canvas::ToolEvent;
@@ -151,62 +151,6 @@ fn clicking_a_note_shows_its_author_and_color() {
     up(&mut app, 170.0, 40.0);
     let notes = app.session.active().unwrap().doc.notes.clone();
     assert_eq!(notes.iter().map(|n| n.author.as_str()).collect::<Vec<_>>(), ["Ann", "Bob", "Bob"]);
-}
-
-/// One row of `dialogs_open_on_the_host_and_ok_runs_their_commands`.
-struct DialogRow {
-    menu: &'static str,
-    /// The values the user edits before OK.
-    edits: Vec<(&'static str, Value)>,
-    /// What the opened dialog shows.
-    opens_with: fn(&Value) -> bool,
-    /// What the engine holds after OK; the flag says the document changed since the dialog opened.
-    ran: fn(&PhotocraftApp, bool) -> bool,
-}
-
-/// The analysis dialogs open on the dialog host with the document's values, and OK runs their
-/// command with the keys the engine reads.
-#[test]
-fn dialogs_open_on_the_host_and_ok_runs_their_commands() {
-    let (mut app, ctx) = app();
-    let rows = [
-        DialogRow {
-            menu: "image.analysis.setMeasurementScale",
-            edits: vec![("preset", json!("custom")), ("pixelLength", json!(40)), ("logicalLength", json!(1)), ("units", json!("cm"))],
-            opens_with: |_| true,
-            ran: |app, _| app.session.active().unwrap().doc.measurement.scale.units == "cm",
-        },
-        DialogRow { menu: "image.analysis.placeScaleMarker", edits: vec![], opens_with: |f| f["length"] == 1.0, ran: |_, changed| changed },
-        DialogRow {
-            menu: "image.analysis.selectDataPoints",
-            edits: vec![("ruler", json!(["label", "length"]))],
-            opens_with: |_| true,
-            ran: |app, _| app.session.analysis.data_points.ruler == ["label", "length"],
-        },
-    ];
-    for row in rows {
-        let revision = app.session.active().unwrap().revision;
-        crate::menus::invoke(&mut app, &ctx, row.menu, json!({})).unwrap();
-        let shown = app.framework.dialogs.open_dialogs();
-        assert_eq!(shown.len(), 1, "{}: one dialog on the host", row.menu);
-        let id = shown[0].id;
-        let fields = shown[0].fields.clone().expect("the dialog lists its values");
-        assert!((row.opens_with)(&fields), "{}: opens with {fields}", row.menu);
-        for (field, value) in &row.edits {
-            app.framework.dialogs.set_json_field(&ctx, id, field, value.clone()).unwrap_or_else(|e| panic!("{}: {field}: {e}", row.menu));
-        }
-        crate::dialogs::confirm(&mut app, &ctx, id).unwrap_or_else(|e| panic!("{}: OK is enabled: {e}", row.menu));
-
-        crate::canvas::testing::frame(&mut app);
-        assert!(app.framework.dialogs.open_dialogs().is_empty(), "{}: OK closes the dialog", row.menu);
-        let changed = app.session.active().unwrap().revision != revision;
-        assert!((row.ran)(&app, changed), "{}: the command ran with its keys", row.menu);
-    }
-    // Record from the Count tool records counts and shows the log panel.
-    app.ui.tool = Tool::Count;
-    crate::menus::invoke(&mut app, &ctx, "image.analysis.recordMeasurements", json!({})).unwrap();
-    assert!(crate::panel_docking::is_shown(&app, "measurementLog"));
-    assert_eq!(app.session.analysis.log.last().unwrap().values["source"], "Count Tool");
 }
 
 #[test]

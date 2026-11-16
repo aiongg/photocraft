@@ -603,12 +603,16 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, recorded: Value, smart: O
     let gray = gray_context(app, &kind, &seeded.target);
     let dynamic = app.session.prefs().interface.dynamic_color_sliders;
     let value = DialogValue { value: seeded.value, cx: seeded.cx };
-    let mut dialog =
-        HostedAdjustDialog::new(format!("photocraft.adjust.{kind}"), crate::i18n::t(spec.label).to_string(), value, shared_editor(kind.clone(), setup.clone()))
-            .context(dynamic, gray)
-            .reset_with(reset_target(kind.clone()))
-            .json_form(json_form)
-            .held_ok();
+    let mut dialog = HostedAdjustDialog::new(
+        format!("photocraft.adjust.{kind}"),
+        super::filter_dialog::title_of(spec.label),
+        value,
+        shared_editor(kind.clone(), setup.clone()),
+    )
+    .context(dynamic, gray)
+    .reset_with(reset_target(kind.clone()))
+    .json_form(json_form)
+    .held_ok();
     if let Some(idx) = app.session.active_index() {
         dialog = dialog.canvas(crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
     }

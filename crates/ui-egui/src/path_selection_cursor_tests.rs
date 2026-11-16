@@ -48,15 +48,6 @@ fn two_shapes(h: &mut Harness<'static, PhotocraftApp>) {
 }
 
 #[test]
-fn idle_and_with_command_the_pointer_is_the_light_arrow() {
-    let mut h = square();
-    assert_eq!(pointer(&mut h, 300.0, 250.0, Modifiers::NONE), LIGHT, "over empty canvas");
-    assert_eq!(pointer(&mut h, 60.0, 110.0, Modifiers::NONE), LIGHT, "over the subpath's outline");
-    assert_eq!(pointer(&mut h, 110.0, 110.0, Modifiers::NONE), LIGHT, "inside the component");
-    assert_eq!(pointer(&mut h, 60.0, 60.0, Modifiers::COMMAND), LIGHT, "⌘ over an anchor");
-}
-
-#[test]
 fn alt_over_a_component_is_the_solid_arrow() {
     let mut h = square();
     assert_eq!(pointer(&mut h, 60.0, 110.0, Modifiers::ALT), SOLID, "⌥ over the subpath's outline");

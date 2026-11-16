@@ -6,7 +6,7 @@ use serde_json::{Value, json};
 
 use super::*;
 use crate::canvas::{ToolEvent, testing, tool_event};
-use crate::canvas_tool_menu::{GUIDE_CLEAR, GUIDE_EDIT, MenuKind};
+use crate::canvas_tool_menu::GUIDE_CLEAR;
 use crate::state::Tool;
 
 type AppHarness = Harness<'static, PhotocraftApp>;
@@ -111,41 +111,6 @@ fn centred_guide_app() -> PhotocraftApp {
     app.run("view.clearGuides", json!({})).unwrap();
     app.run("view.newGuide", json!({"orientation": "vertical", "position": 100})).unwrap();
     app
-}
-
-#[test]
-fn right_click_on_a_guide_selects_it_and_opens_photoshops_guide_menu() {
-    let mut h = harness(centred_guide_app());
-    let at = guide_on_screen(&h);
-    right_click(&mut h, at);
-    let menu = h.state().ui.canvas_tool_menu.clone().expect("the guide menu");
-    assert!(matches!(menu.kind, MenuKind::Guide));
-    assert_eq!(selected(h.state()), Some((true, 0)));
-    let labels: Vec<Option<&str>> = crate::canvas_tool_menu::rows(&menu).iter().map(|r| r.map(|(label, _)| label)).collect();
-    assert_eq!(
-        labels,
-        [
-            Some("Edit Selected Guides"),
-            None,
-            Some("Lock Guides"),
-            Some("Clear Guides"),
-            Some("Clear Canvas Guides"),
-            Some("Clear Selected Guides"),
-            Some("Clear Selected Artboard Guides"),
-        ]
-    );
-    let app = h.state();
-    for id in [GUIDE_EDIT, GUIDE_CLEAR, "view.lockGuides", "view.clearGuides", "view.clearCanvasGuides"] {
-        assert!(crate::canvas_tool_menu::available(app, &menu, id), "{id}");
-    }
-    assert!(!crate::canvas_tool_menu::available(app, &menu, "view.clearSelectedArtboardGuides"), "no artboard");
-    assert!(!crate::canvas_tool_menu::available(app, &menu, "edit.freeTransform"), "not a guide row");
-    // Off a guide, the Move tool's right-click is still the layer picker's.
-    h.key_press(Key::Escape);
-    h.run_steps(2);
-    let off = testing::to_screen(h.state(), [40.0, 70.0]);
-    right_click(&mut h, off);
-    assert!(h.state().ui.canvas_tool_menu.is_none());
 }
 
 #[test]

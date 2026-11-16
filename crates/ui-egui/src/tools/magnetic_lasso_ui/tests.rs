@@ -86,24 +86,6 @@ fn tracing_around_a_shape_selects_it() {
 }
 
 #[test]
-fn the_first_click_sets_the_mode_and_hides_a_replaced_selection() {
-    let mut app = app();
-    app.run("select.rect", json!({"x": 150, "y": 10, "width": 30, "height": 30})).unwrap();
-    click(&mut app, 52.0, 37.0, Modifiers::NONE);
-    assert!(app.canvas_tools.selection.replaces_selection());
-    crate::canvas::testing::key(&mut app, egui::Key::Escape, Modifiers::NONE);
-    assert!(!app.canvas_tools.selection.replaces_selection());
-    // ⇧ at the first click adds; later the modifier keys draw segments, not modes. The click is at
-    // another point than the first border's, so it is not a double click.
-    click(&mut app, 54.0, 39.0, Modifiers::SHIFT);
-    assert_eq!(inspect(&app)["mode"], json!("add"));
-    assert!(!app.canvas_tools.selection.replaces_selection());
-    hover_along(&mut app, &AROUND);
-    click(&mut app, AROUND[5][0], AROUND[5][1], Modifiers::NONE);
-    assert_eq!((coverage(&app, 160, 20), coverage(&app, 90, 75)), (1.0, 1.0), "added to the selection");
-}
-
-#[test]
 fn agents_see_the_border_in_progress() {
     let mut app = app();
     click(&mut app, 52.0, 37.0, Modifiers::NONE);

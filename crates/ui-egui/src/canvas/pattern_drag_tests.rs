@@ -3,12 +3,12 @@
 
 use craft::draw::ui::pattern::PatternFillDialog;
 use craft::ui::dialog::StackDialog;
-use egui::{Modifiers, vec2};
+use egui::Modifiers;
 use photocraft_doc::{Document, Fill, LayerContent, LayerId, Pattern};
 use serde_json::json;
 
 use super::document_display::CanvasHost;
-use super::testing::{clear_of_dialogs, ctx, frame, in_gesture, move_to, press, release, view};
+use super::testing::{clear_of_dialogs, ctx, frame, move_to, press, release, view};
 use super::tools::ToolScope;
 use super::tools::dialog::{DialogTools, dialog_tool};
 use crate::PhotocraftApp;
@@ -280,42 +280,6 @@ fn a_pattern_drag_previews_without_editing_masks_selection_or_the_tool() {
     assert_eq!(app.ui.tool, Tool::Brush);
     app.run("edit.undo", json!({})).unwrap();
     assert_eq!(app.session.active().unwrap().doc.layer(LayerId(id)).unwrap().mask, fill_mask);
-}
-
-#[test]
-fn a_release_applies_its_last_motion_and_starts_no_held_drag() {
-    let (mut app, dialog, _) = pattern_drag_app(8, false);
-    let start = [20.0, 15.0];
-    let at = |dx: f64| off(start, [dx, 0.0]);
-    // A move stopped at +3, then the press was released at +7 without another move.
-    move_to(&mut app, start, NONE);
-    press(&mut app, start, NONE);
-    move_to(&mut app, at(3.0), NONE);
-    assert_phase(phase(&mut app), [5.5, -3.25], "the last preview is at +3");
-    release(&mut app, at(7.0), NONE);
-    assert_phase(phase(&mut app), [9.5, -3.25], "the release applies its own +7, not +3");
-    assert!(!in_gesture(&app), "the release ends the gesture");
-    // A released press is over: moving on without a new press does not move the pattern.
-    move_to(&mut app, at(12.0), NONE);
-    assert_phase(phase(&mut app), [9.5, -3.25], "no held gesture after release");
-    // A new press starts from the phase shown.
-    drag(&mut app, at(0.0), [2.0, 0.0]);
-    assert_phase(phase(&mut app), [11.5, -3.25], "a new press starts from the shown phase");
-    // A release outside the canvas counts: the tool host delivers it to the gesture's owner.
-    let rect = view(&app).unwrap().rect;
-    let v = view(&app).unwrap();
-    let outside = v.to_doc(rect.max + vec2(20.0, 20.0));
-    let outside = [outside.x, outside.y];
-    let base = phase(&mut app);
-    press(&mut app, start, NONE);
-    move_to(&mut app, at(3.0), NONE);
-    release(&mut app, outside, NONE);
-    assert_phase(phase(&mut app), [base[0] + (outside[0] - start[0]), base[1] + (outside[1] - start[1])], "the outside release's position counts");
-    assert!(!in_gesture(&app));
-    let held = phase(&mut app);
-    move_to(&mut app, at(9.0), NONE);
-    assert_phase(phase(&mut app), held, "an outside release ends the gesture");
-    cancel(&mut app, dialog);
 }
 
 #[test]

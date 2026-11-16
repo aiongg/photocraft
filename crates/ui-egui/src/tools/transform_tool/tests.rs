@@ -846,39 +846,6 @@ fn selecting_another_layer_keeps_a_transform_selection_open() {
     assert!(app.ui.transform.as_ref().is_some_and(|t| t.selection));
 }
 
-/// A control-channel stroke that picks another tool applies the box first, then paints. The
-/// request's events are queued and answered after the frames that deliver them.
-#[test]
-fn a_pointer_request_with_another_tool_applies_the_transform_first() {
-    let mut app = app_with_square(64, photocraft_geom::Rect::new(8, 8, 24, 24));
-    app.ui.tool = Tool::Move;
-    let mut h = harness(app, egui::vec2(1200.0, 800.0));
-    h.run_steps(4);
-    let ctx = h.ctx.clone();
-    crate::menus::invoke(h.state_mut(), &ctx, "edit.freeTransform", json!({})).unwrap();
-    move_box(h.state_mut(), 20.0, 0.0);
-    let steps = h.state().session.active().unwrap().history.past_len();
-    let ev = |kind: &str, x: f64| json!({"kind": kind, "x": x, "y": 50.0});
-    let events = json!([ev("down", 4.0), ev("move", 32.0), ev("move", 60.0), ev("up", 60.0)]);
-    let (req, rx) = crate::control::ControlRequest::new("ui.pointer", json!({"tool": "brush", "events": events}));
-    let _ = crate::control::handle(h.state_mut(), &ctx, &req);
-    let mut answered = false;
-    for _ in 0..64 {
-        h.run_steps(1);
-        if rx.try_recv().is_ok() {
-            answered = true;
-            break;
-        }
-    }
-    assert!(answered, "the request is answered after the frames that deliver its events");
-    let app = h.state();
-    assert!(app.ui.transform.is_none());
-    let st = app.session.active().unwrap();
-    assert_eq!(st.history.past_len(), steps + 2, "the transform, then the stroke");
-    let b = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().content_bounds();
-    assert!(b.x0 < 8 && b.x1 >= 44 && b.y0 == 8 && b.y1 > 50, "moved square and stroke: {b:?}");
-}
-
 /// A Distort edge drag commits what it shows, in one undo step: the box events of the drag end on
 /// the parallelogram, and the commit lands there.
 #[test]

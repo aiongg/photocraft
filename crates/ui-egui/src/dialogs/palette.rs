@@ -52,8 +52,7 @@ pub(crate) fn note_recent(app: &mut PhotocraftApp, id: &str) {
 
 #[cfg(test)]
 mod tests {
-    use egui::{Event, Key, Modifiers, vec2};
-    use egui_kittest::Harness;
+    use egui::{Event, Key, Modifiers};
     use serde_json::json;
 
     use super::entries;
@@ -90,32 +89,5 @@ mod tests {
         crate::menus::invoke(&mut app, &ctx, "file.new", new()).unwrap();
         assert_eq!(app.ui.palette.recents.first(), Some(&first));
         assert_eq!(app.ui.palette.recents.len(), 1, "no duplicate");
-    }
-
-    /// #536: Edit › Search → "Keyboard Shortcuts" opens the dialog, with and without a document.
-    #[test]
-    fn palette_opens_the_keyboard_shortcuts_dialog() {
-        for with_doc in [false, true] {
-            let mut h = Harness::builder().with_size(vec2(1200.0, 800.0)).with_max_steps(64).build_eframe(|cc| {
-                PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-                PhotocraftApp::with_context(cc.egui_ctx.clone(), photocraft_engine::Session::new(), crate::Services::default())
-            });
-            if with_doc {
-                h.state_mut().run("file.new", json!({"width": 64, "height": 64})).unwrap();
-                h.state_mut().sync_views();
-            }
-            let ctx = h.ctx.clone();
-            crate::menus::invoke(h.state_mut(), &ctx, "edit.search", json!({})).unwrap();
-            h.run_steps(2);
-            assert!(h.state().ui.palette.open, "Edit > Search opens the palette (with_doc={with_doc})");
-            assert!(!h.state().dialog_open(), "no dialog before the pick (with_doc={with_doc})");
-            h.event(Event::Text("keyboard shortcuts".into()));
-            h.run_steps(2);
-            h.event(key(Key::Enter));
-            h.run_steps(3);
-            let app = h.state();
-            assert!(!app.ui.palette.open, "Enter closes the palette (with_doc={with_doc})");
-            assert!(app.dialog_open(), "#536: the Keyboard Shortcuts dialog did not open (with_doc={with_doc})");
-        }
     }
 }

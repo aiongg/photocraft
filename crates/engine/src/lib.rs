@@ -169,7 +169,7 @@ pub use cmd::vp_cmds;
 pub use cmd::warp_cmds;
 pub use cmd::web_cmds;
 use cmd::wia_cmds;
-pub use doc_state::{CopiedStyle, DocState, PRECHECKED, ToolState};
+pub use doc_state::{CopiedStyle, DocState, PRECHECKED, ToolState, selected_in};
 pub use error::{EngineError, Result};
 pub use session::move_item;
 use session::restore_target;

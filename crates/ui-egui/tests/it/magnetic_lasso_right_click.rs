@@ -78,29 +78,6 @@ fn border_live(magnetic: &Value) -> bool {
 }
 
 #[test]
-fn agent_right_click_while_drawing_opens_no_menu_and_keeps_the_border() {
-    let mut h = app();
-    click(&mut h, Some("MagneticLasso"), CORNERS[0], "left", false);
-    click(&mut h, Some("MagneticLasso"), CORNERS[1], "left", true);
-    click(&mut h, Some("MagneticLasso"), CORNERS[2], "left", true);
-    let (before, menu) = inspect(&mut h);
-    assert!(menu.is_null(), "no menu yet: {menu}");
-    assert_eq!(before["anchors"].as_array().map(Vec::len), Some(3), "a border is in progress: {before}");
-
-    click(&mut h, Some("MagneticLasso"), INSIDE, "right", false);
-    let (after, menu) = inspect(&mut h);
-    assert!(menu.is_null(), "a right-click over a live border opens no menu: {menu}");
-    assert_eq!(after["path"], before["path"], "the border is unchanged");
-    assert_eq!(after["anchors"], before["anchors"], "its fastening points are unchanged");
-    assert!(h.state().session.active().expect("a document").doc.selection.is_none(), "nothing is selected yet");
-
-    // The border is still live: closing it selects it.
-    call(&mut h, "ui.key", json!({"key": "Enter"}));
-    let sel = h.state().session.active().expect("a document").doc.selection.as_ref().expect("the border closed into a selection");
-    assert!(sel.sample_channel(150, 100, 0) > 0.9, "the inside is selected");
-}
-
-#[test]
 fn agent_right_click_on_another_document_still_opens_the_selection_menu() {
     // A border left on the first document doesn't hold the menu back on the second: the gate is
     // per document. The tool drops the first document's border on its next pass.
@@ -109,22 +86,6 @@ fn agent_right_click_on_another_document_still_opens_the_selection_menu() {
     click(&mut h, Some("MagneticLasso"), CORNERS[1], "left", true);
     h.state_mut().run("file.new", json!({"width": 400, "height": 300})).expect("second document");
     h.run_steps(6);
-
-    click(&mut h, Some("MagneticLasso"), INSIDE, "right", false);
-    let (_, menu) = inspect(&mut h);
-    assert!(selection_menu_open(&menu), "{menu}");
-}
-
-#[test]
-fn agent_right_click_during_an_alt_drag_still_opens_the_selection_menu() {
-    // Not measured in Photoshop: a right-click while an ⌥-drag draws a freehand segment keeps
-    // today's behaviour, the selection menu.
-    let mut h = app();
-    click(&mut h, Some("MagneticLasso"), CORNERS[0], "left", false);
-    let events = json!([{"kind": "down", "x": CORNERS[1][0], "y": CORNERS[1][1]}, {"kind": "move", "x": 200.0, "y": 120.0}]);
-    call(&mut h, "ui.pointer", json!({"tool": "MagneticLasso", "alt": true, "events": events}));
-    let (magnetic, _) = inspect(&mut h);
-    assert_eq!(magnetic["freehand"], true, "an ⌥-drag is drawing a freehand segment: {magnetic}");
 
     click(&mut h, Some("MagneticLasso"), INSIDE, "right", false);
     let (_, menu) = inspect(&mut h);

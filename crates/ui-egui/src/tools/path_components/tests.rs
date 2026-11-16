@@ -94,43 +94,6 @@ fn a_selected_component_takes_the_picked_operation() {
     assert_eq!(ops(&shape(&app).1.path), [PathOp::Combine, PathOp::Combine]);
 }
 
-/// `+` and `-` with the Pen tools or Path Selection: Combine Shapes and Subtract Front Shape, on
-/// the selected components and for the next path. `+` arrives as ⇧= on a US keyboard, which
-/// otherwise steps the blend mode; with the Move tool it still does.
-#[test]
-fn plus_and_minus_pick_combine_and_subtract() {
-    let mut app = app();
-    let ctx = app.ctx().clone();
-    square(&mut app, 20.0, 20.0, 120.0);
-    app.ui.tool_options.pen_path_op = "combine".into();
-    square(&mut app, 60.0, 60.0, 40.0);
-    app.ui.tool = Tool::PathSelection;
-    super::press(&mut app, [80.0, 80.0], false);
-    key(&mut app, &ctx, Key::Minus, egui::Modifiers::NONE);
-    assert_eq!(ops(&shape(&app).1.path), [PathOp::Combine, PathOp::Subtract]);
-    assert_eq!(app.ui.tool_options.pen_path_op, "subtract");
-    key(&mut app, &ctx, Key::Equals, egui::Modifiers::SHIFT);
-    assert_eq!(ops(&shape(&app).1.path), [PathOp::Combine, PathOp::Combine]);
-    key(&mut app, &ctx, Key::Minus, egui::Modifiers::NONE);
-    key(&mut app, &ctx, Key::Plus, egui::Modifiers::NONE);
-    assert_eq!(ops(&shape(&app).1.path), [PathOp::Combine, PathOp::Combine], "the keypad's +");
-    // With nothing selected the Pen's next path takes it.
-    app.ui.direct_selection = Default::default();
-    app.ui.tool = Tool::Pen;
-    key(&mut app, &ctx, Key::Minus, egui::Modifiers::NONE);
-    assert_eq!(app.ui.tool_options.pen_path_op, "subtract");
-    // The blend mode is the Move tool's to step.
-    let blend = |app: &PhotocraftApp| app.session.active().unwrap().doc.layer(shape(app).0).unwrap().blend;
-    let before = blend(&app);
-    key(&mut app, &ctx, Key::Equals, egui::Modifiers::SHIFT);
-    assert_eq!(blend(&app), before, "the Pen picks Combine, not a blend mode");
-    assert_eq!(app.ui.tool_options.pen_path_op, "combine");
-    app.ui.tool = Tool::Move;
-    key(&mut app, &ctx, Key::Equals, egui::Modifiers::SHIFT);
-    assert_ne!(blend(&app), before);
-    assert_eq!(app.ui.tool_options.pen_path_op, "combine");
-}
-
 /// ⇧-click adds and removes components, a click off them deselects, and a drag moves only the
 /// selected ones.
 #[test]

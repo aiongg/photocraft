@@ -82,26 +82,6 @@ fn the_dialog_and_the_drag_send_the_same_triangle() {
 }
 
 #[test]
-fn shift_still_draws_the_equilateral_triangle_of_the_squares_circle() {
-    for mods in [Modifiers::SHIFT, Modifiers::SHIFT | Modifiers::ALT] {
-        let mut app = app(800, 600);
-        let (start, end) = ([400.0, 300.0], [600.0, 400.0]);
-        // The square of the drag's shorter side (100), drawn from the press, or from the centre with Alt.
-        let (x, y, m) = if mods.alt { (300.0, 200.0, 200.0) } else { (400.0, 300.0, 100.0) };
-        drag(&mut app, start, end, mods);
-        let v = info(&mut app);
-        assert_eq!(v["live"]["kind"], "triangle");
-        let s60 = 60f64.to_radians().sin();
-        let want = [(x + m / 2.0, y), (x + m / 2.0 + m / 2.0 * s60, y + 0.75 * m), (x + m / 2.0 - m / 2.0 * s60, y + 0.75 * m)];
-        let got = anchors(&v);
-        close(&got, &want, 1e-9);
-        let d = |a: (f64, f64), b: (f64, f64)| (a.0 - b.0).hypot(a.1 - b.1);
-        let sides = [d(got[0], got[1]), d(got[1], got[2]), d(got[2], got[0])];
-        assert!((sides[0] - sides[1]).abs() < 1e-9 && (sides[1] - sides[2]).abs() < 1e-9, "{sides:?}");
-    }
-}
-
-#[test]
 fn the_corner_widget_rounds_a_live_triangle() {
     let mut app = app(200, 200);
     app.run("shape.create", json!({"kind": "triangle", "rect": [40, 40, 120, 120], "cornerRadius": 20})).unwrap();

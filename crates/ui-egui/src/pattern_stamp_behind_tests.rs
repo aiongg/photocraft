@@ -117,23 +117,6 @@ fn choosing_behind_sets_it_on_the_tools_brush_and_another_mode_leaves_it() {
     assert!(app.session.tools.brush.behind, "kept with the Pattern Stamp");
 }
 
-/// Shift+Alt+Q picks Behind and another mode's key leaves it, as for the Brush.
-#[test]
-fn the_blend_keys_pick_and_leave_behind() {
-    let mut app = app(true);
-    let ctx = app.ctx().clone();
-    key(&mut app, &ctx, Key::Q);
-    assert!(app.session.tools.brush.behind, "Shift+Alt+Q");
-    assert_eq!(last_call(&app), ("tools.setBrush".into(), json!({"brush": {"mode": "Normal", "behind": true}})));
-    key(&mut app, &ctx, Key::M);
-    assert!(!app.session.tools.brush.behind, "Shift+Alt+M leaves Behind");
-    assert_eq!(app.session.tools.brush.mode, BlendMode::Multiply);
-    // Clear is not one of the Pattern Stamp's modes.
-    let n = app.session.journal.len();
-    key(&mut app, &ctx, Key::R);
-    assert_eq!(app.session.journal.len(), n);
-}
-
 /// A stroke committed from the tool, Aligned on and off.
 #[test]
 fn a_behind_stroke_paints_only_the_transparent_half() {

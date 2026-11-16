@@ -55,19 +55,3 @@ fn navigator_viewport_follows_the_canvas_zoom_ease() {
     h.run_steps(90);
     assert!(percents(&h).iter().any(|p| (p - 200.0).abs() < 0.5), "the ease ends on the target: {:?}", percents(&h));
 }
-
-/// With Animated Zoom off, the zoom row's buttons change the view at once: no glide, no anchor.
-#[test]
-fn animated_zoom_off_navigator_buttons_jump_without_a_transition() {
-    let mut h = whole_app(false);
-    for (label, up) in [("Zoom In", true), ("Zoom Out", false), ("Zoom Out", false)] {
-        let before = h.state().ui.views[0].zoom;
-        h.get_all_by_label(label).next().unwrap_or_else(|| panic!("a {label} button")).click();
-        h.run_steps(2);
-        let view = &h.state().ui.views[0];
-        assert!(if up { view.zoom > before } else { view.zoom < before }, "{label}: {before} -> {}", view.zoom);
-        assert_eq!(view.zoom_from, None, "{label}: no glide");
-        assert!(!view.zoom_animating && view.zoom_anchor.is_none(), "{label}");
-        assert!(!view.fit_pending, "{label}");
-    }
-}

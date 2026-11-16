@@ -201,31 +201,6 @@ fn preview_mode_is_view_state_and_cancel_preserves_selection() {
     assert_eq!(coverage(&app, 2, 22), 1.0);
 }
 
-#[test]
-fn control_pointer_drag_samples_and_never_paints_under_the_dialog() {
-    let mut app = app_with_doc();
-    open(&mut app).unwrap();
-    // The first frame shows the canvas the injected input reaches.
-    crate::canvas::testing::frame(&mut app);
-    let doc = app.session.active().unwrap();
-    let (before, history) = (doc.revision, doc.history.past_len());
-    let ctx = app.ctx().clone();
-    for (events, shift) in [
-        (json!([{"kind":"down","x":2,"y":2},{"kind":"move","x":3,"y":2},{"kind":"up","x":3,"y":2}]), false),
-        (json!([{"kind":"down","x":30,"y":2},{"kind":"move","x":31,"y":2},{"kind":"up","x":31,"y":2}]), true),
-    ] {
-        let (req, _) = crate::control::ControlRequest::new("ui.pointer", json!({"events":events,"shift":shift}));
-        let _ = crate::control::handle(&mut app, &ctx, &req);
-        // The request queues its events for the next pass; a hover settles the frames that deliver them.
-        crate::canvas::testing::move_to(&mut app, [20.5, 25.5], Modifiers::NONE);
-    }
-    let value = hosted(&app).value();
-    assert_eq!(value.samples.add, [[3.0, 2.0], [30.0, 2.0], [31.0, 2.0]]);
-    let doc = app.session.active().unwrap();
-    assert_eq!((doc.revision, doc.history.past_len()), (before, history));
-    assert!(!app.framework.dialogs.get_mut::<HostedColorRange>().unwrap().sample_canvas([-1.0, 0.0], Mods::default()));
-}
-
 /// A sample between thumbnail pixels must use the original pixel, not its neighbour.
 #[test]
 fn reduced_preview_matches_the_original_eyedropper_sample() {

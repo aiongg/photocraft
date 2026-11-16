@@ -17,7 +17,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // The bar runs `leading` in its body and `trailing` in its end region, one after the other, so the two borrows
     // of the app never overlap.
     let app = RefCell::new(app);
-    let out = TitleBar::new().separator().show_titled(
+    let out = TitleBar::new().show_titled(
         ui,
         Title::new(title),
         |ui, _| {
@@ -32,13 +32,13 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         |ui, _| {
             let mut guard = app.borrow_mut();
             let app = &mut **guard;
-            crate::workspace_ui::switcher(app, ui);
+            crate::prefs_ui::appearance_button(app, ui);
             let tip = crate::shortcuts::tip_label(app, "Search commands", "edit.search");
             let search = IconButton::new(IconId::new("search")).label(tip.clone()).tooltip(TooltipSpec::new(tip)).selected(app.ui.palette.open).show(ui);
             if search.clicked() {
                 app.ui.palette.open = !app.ui.palette.open;
             }
-            crate::prefs_ui::appearance_button(app, ui);
+            crate::workspace_ui::switcher(app, ui);
         },
     );
     // The bar never closes the window: File › Exit asks about unsaved work first.

@@ -10,8 +10,9 @@ use super::{PhotocraftApp, chrome_ui};
 
 // ----------------------------------------------------------------------------- status bar
 
-/// The status bar, in the shell's status slot: the zoom readout of the active document, the latest status
-/// message, the render-path note, and at the far end the background jobs' progress with Cancel (#210).
+/// The status bar, in the shell's status slot: the zoom readout of the active document and the latest status
+/// message, and at the far end the render-path note, the background redraw and the background jobs' progress with
+/// Cancel (#210).
 pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let values = chrome_ui::status_values(app);
     let item = chrome_ui::status_item(&app.ui.chrome);
@@ -31,12 +32,15 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let cell = RefCell::new(&mut *app);
     Bar::new("", BarKind::Status)
         .trailing(|ui, _| {
+            if let Some(shown) = &render_path {
+                shown.show(ui);
+            }
             let mut guard = cell.borrow_mut();
             let app = &mut **guard;
-            crate::jobs_ui::status_progress(app, ui);
             if let Some(progress) = crate::background_redraw::progress(app) {
                 progress.show(ui);
             }
+            crate::jobs_ui::status_progress(app, ui);
         })
         .show(ui, |ui, _| {
             match (document, view.as_mut()) {
@@ -52,7 +56,7 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 }
             }
             // A command run with no document open still reports here (#1567: File › Automate › Batch).
-            for shown in message.iter().chain(&render_path) {
+            if let Some(shown) = &message {
                 shown.show(ui);
             }
         });

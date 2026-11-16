@@ -248,7 +248,7 @@ fn magnetic_settings(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let frequency =
         number(ui, "magnetic-frequency", label("Frequency"), frequency, 0.0..=100.0, None, Some(label("How often fastening points are placed by themselves")));
     let toggled = ToggleButton::new(label("Use tablet pressure to change pen width"), Bind::given(pressure))
-        .icon(craft::behavior::IconId::new("circle-dot"))
+        .icon(craft::behavior::IconId::new("target"))
         .icon_only()
         .show(ui)
         .value()

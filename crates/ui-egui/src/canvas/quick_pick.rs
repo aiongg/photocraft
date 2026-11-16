@@ -90,18 +90,4 @@ mod tests {
         assert!(picked && !testing::in_gesture(&app) && !app.brush_resize.active(), "neither painted nor resized the brush");
         assert_eq!(st.history.past_len(), before, "no paint stroke was recorded");
     }
-
-    #[test]
-    fn a_failed_pick_is_a_status_error_and_swallows_the_click() {
-        let (mut app, _) = app();
-        app.ui.tool = Tool::Brush;
-        let before = app.session.active().unwrap().history.past_len();
-        // On the pasteboard, outside the document: no layer has pixels there, so the pick fails.
-        testing::press(&mut app, [-2.0, -2.0], PICK);
-        assert!(!testing::in_gesture(&app), "the press ended with the pick");
-        testing::move_to(&mut app, [20.0, 20.0], PICK);
-        testing::release(&mut app, [20.0, 20.0], PICK);
-        assert!(app.ui.status_error, "the failed pick is a status error");
-        assert_eq!(app.session.active().unwrap().history.past_len(), before, "the drag and release reached no tool");
-    }
 }

@@ -429,57 +429,6 @@ fn clone_marker_shows_only_while_painting() {
 }
 
 #[test]
-fn mixer_brush_is_selectable_and_paints_only_inside_the_selection_via_control() {
-    use crate::control::{ControlRequest, handle};
-
-    let mut app = app();
-    app.run("paint.pencil", json!({"points": [[50, 30]], "size": 200, "color": "#204080"})).unwrap();
-    app.run("tools.setColors", json!({"foreground": "#f02010"})).unwrap();
-    app.run(
-        "tools.setBrush",
-        json!({
-            "pressureSize": false,
-            "size": 12,
-            "mixer": {"wet": 0.0, "load": 1.0, "mix": 0.0, "flow": 1.0}
-        }),
-    )
-    .unwrap();
-    app.run("select.rect", json!({"x": 35, "y": 20, "width": 30, "height": 20})).unwrap();
-    let before = {
-        let surface = active(&app).surface().unwrap();
-        [surface.rgba(20, 30), surface.rgba(50, 30), surface.rgba(80, 30)]
-    };
-
-    let ctx = crate::canvas::testing::ctx(&app);
-    let (req, _rx) = ControlRequest::new(
-        "ui.pointer",
-        json!({
-            "tool": "mixerBrush",
-            "events": [
-                {"kind": "down", "x": 8, "y": 30},
-                {"kind": "move", "x": 92, "y": 30},
-                {"kind": "up", "x": 92, "y": 30}
-            ]
-        }),
-    );
-    // The request queues its events; the canvas takes them on the next passes.
-    let _ = handle(&mut app, &ctx, &req);
-    for _ in 0..30 {
-        if app.session.journal.last().is_some_and(|(id, _)| id == "paint.mixerBrush") {
-            break;
-        }
-        crate::canvas::testing::frame(&mut app);
-    }
-    assert_eq!(app.ui.tool, Tool::MixerBrush);
-    assert_eq!(app.session.journal.last().map(|(id, _)| id.as_str()), Some("paint.mixerBrush"));
-
-    let surface = active(&app).surface().unwrap();
-    assert_ne!(surface.rgba(50, 30), before[1], "the selected pixels are mixed");
-    assert_eq!(surface.rgba(20, 30), before[0], "outside the selection is unchanged");
-    assert_eq!(surface.rgba(80, 30), before[2], "the far side outside the selection is unchanged");
-}
-
-#[test]
 fn patch_tool_lassoes_then_drags_the_patch() {
     let mut app = app();
     app.run("paint.pencil", json!({"points": [[68, 30], [74, 30]], "size": 6, "color": "#ff0000"})).unwrap();

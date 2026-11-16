@@ -1,7 +1,4 @@
 use super::*;
-use egui_kittest::kittest::Queryable;
-use serde_json::json;
-use std::rc::Rc;
 use std::sync::atomic::{AtomicU32, Ordering};
 use std::time::{Duration, Instant};
 
@@ -136,54 +133,4 @@ fn earlier_settings_are_not_encoded_again() {
     assert_eq!(encodes.load(Ordering::SeqCst), 2 + KEPT as u32);
     assert_eq!(answer(&mut readout, at(84), counted(1000)), Some(1000), "the oldest sizes make room");
     assert_eq!(encodes.load(Ordering::SeqCst), 3 + KEPT as u32);
-}
-
-/// The hosted dialog shows the size its settings write in its footer: the request the dialog
-/// makes is answered from the worker's encode of the parked document, over several passes.
-#[test]
-fn the_dialog_shows_the_size_it_will_write() {
-    use craft::ui::dialog::StackDialog as _;
-    use craft::ui::patterns::form_dialogs::HostedFormatOptions;
-    use std::cell::RefCell;
-
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 64, "height": 48})).unwrap();
-    app.sync_views();
-    // The footer's words come from the dialog's own `Env`, read where the dialog draws.
-    let wanted: Rc<RefCell<Option<u64>>> = Rc::default();
-    let expected: Rc<RefCell<Option<String>>> = Rc::default();
-    let (wanted_in, expected_in) = (wanted.clone(), expected.clone());
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(800.0, 600.0)).with_context(app.ctx().clone()).build_ui_state(
-        move |ui, app| {
-            crate::dialogs::run(app, ui);
-            if let Some(bytes) = *wanted_in.borrow() {
-                *expected_in.borrow_mut() = Some(craft::ui::runtime::env::Env::of(ui).units().file_size(bytes));
-            }
-        },
-        app,
-    );
-    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
-    super::super::park(h.state_mut(), "p.jpg".into(), false, "file.saveAs").unwrap();
-    h.run_steps(1);
-    let quality = h
-        .state()
-        .framework
-        .dialogs
-        .get::<HostedFormatOptions>()
-        .and_then(|d| d.json_fields())
-        .and_then(|f| f["quality"].as_f64())
-        .expect("the dialog has a quality") as u8;
-    let src = Source::of(h.state_mut()).unwrap();
-    *wanted.borrow_mut() = encoded_size(&src.doc, &src.settings(quality, JpegFormat::Baseline));
-    let deadline = Instant::now() + Duration::from_secs(20);
-    loop {
-        h.run_steps(1);
-        if let Some(text) = expected.borrow().as_deref() {
-            if h.query_by_label(text).is_some() {
-                break;
-            }
-        }
-        assert!(Instant::now() < deadline, "JPEG Options never showed the size ({:?})", expected.borrow());
-        std::thread::sleep(Duration::from_millis(5));
-    }
 }

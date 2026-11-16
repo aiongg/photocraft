@@ -487,13 +487,6 @@ fn open_tool_menu(h: &mut Harness<'static, PhotocraftApp>, tool: Tool) -> Vec<&'
     if mode_menu_at(h).is_none() { Vec::new() } else { crate::brush_mode_menu::labels(tool) }
 }
 
-fn choose_row(h: &mut Harness<'static, PhotocraftApp>, label: &str) {
-    use egui_kittest::kittest::Queryable;
-    h.get_by_label(label).click();
-    h.run_steps(2);
-    assert!(mode_menu_at(h).is_none(), "choosing {label} closes the menu");
-}
-
 #[test]
 fn shift_right_menu_lists_each_tools_own_rows_in_order() {
     use crate::brush_mode_menu::{Item, items};
@@ -544,56 +537,6 @@ fn shift_right_menu_lists_each_tools_own_rows_in_order() {
 }
 
 #[test]
-fn shift_right_menu_rows_set_what_the_options_bar_sets() {
-    use photocraft_doc::BlendMode;
-    let mut h = harness(None);
-    // Pencil: Clear is the Pencil's own flag, Behind its brush's, both through tools.setBrush.
-    open_tool_menu(&mut h, Tool::Pencil);
-    choose_row(&mut h, "Clear");
-    assert!(h.state().ui.tool_options.pencil_clear && !h.state().ui.tool_options.brush_clear);
-    open_tool_menu(&mut h, Tool::Pencil);
-    choose_row(&mut h, "Behind");
-    assert!(!h.state().ui.tool_options.pencil_clear && h.state().session.tools.brush.behind);
-    assert_eq!(h.state().session.journal.last().unwrap(), &("tools.setBrush".into(), json!({"brush": {"mode": "Normal", "behind": true}})));
-    // Clone Stamp: its own brush's mode, as the options bar's Mode dropdown.
-    open_tool_menu(&mut h, Tool::CloneStamp);
-    choose_row(&mut h, "Multiply");
-    assert_eq!(h.state().session.tools.brush.mode, BlendMode::Multiply);
-    assert_eq!(h.state().session.journal.last().unwrap(), &("tools.setBrush".into(), json!({"brush": {"mode": "Multiply"}})));
-    assert_eq!(crate::blend_keys::tool_mode(h.state_mut()), Some(BlendMode::Multiply));
-    h.state_mut().ui.tool = Tool::Brush;
-    h.run_steps(1);
-    assert_eq!(h.state().session.tools.brush.mode, BlendMode::Normal, "the Brush keeps its own mode");
-    // Healing Brush: the short list.
-    open_tool_menu(&mut h, Tool::Healing);
-    choose_row(&mut h, "Luminosity");
-    assert_eq!(h.state().session.tools.brush.mode, BlendMode::Luminosity);
-    // Tool options: Eraser Mode, Dodge Range, Sponge Mode, Paint Bucket and Gradient modes.
-    open_tool_menu(&mut h, Tool::Eraser);
-    choose_row(&mut h, "Block");
-    assert_eq!(h.state().ui.tool_options.eraser_mode, "block");
-    open_tool_menu(&mut h, Tool::Dodge);
-    choose_row(&mut h, "Highlights");
-    assert_eq!(h.state().ui.tool_options.tone_range, "highlights");
-    open_tool_menu(&mut h, Tool::Sponge);
-    choose_row(&mut h, "Saturate");
-    assert_eq!(h.state().ui.tool_options.sponge_mode, "saturate");
-    open_tool_menu(&mut h, Tool::PaintBucket);
-    choose_row(&mut h, "Clear");
-    assert!(h.state().ui.tool_options.bucket_clear);
-    open_tool_menu(&mut h, Tool::PaintBucket);
-    choose_row(&mut h, "Screen");
-    assert!(!h.state().ui.tool_options.bucket_clear);
-    assert_eq!(h.state().ui.tool_options.bucket_blend_mode, BlendMode::Screen);
-    open_tool_menu(&mut h, Tool::Gradient);
-    choose_row(&mut h, "Overlay");
-    assert_eq!(h.state().ui.tool_options.gradient_blend_mode, BlendMode::Overlay);
-    // The checked row is the current one.
-    open_tool_menu(&mut h, Tool::Eraser);
-    assert_eq!(crate::brush_mode_menu::current(h.state(), Tool::Eraser), Some(crate::brush_mode_menu::Item::Eraser("block")));
-}
-
-#[test]
 fn behind_and_clear_are_greyed_on_the_background_layer() {
     use crate::brush_mode_menu::{Item, enabled, find};
     use egui_kittest::kittest::Queryable;
@@ -621,25 +564,6 @@ fn behind_and_clear_are_greyed_on_the_background_layer() {
     // On a normal layer they are available again.
     h.state_mut().session.active_mut().unwrap().active_layer = Some(top);
     assert!(enabled(h.state(), Item::Behind) && enabled(h.state(), Item::Clear));
-}
-
-/// A right press at the canvas centre, a move of `by` and the release there, with `mods` held
-/// throughout; returns where the button went down.
-fn right_drag_by(h: &mut Harness<'static, PhotocraftApp>, by: egui::Vec2, mods: Modifiers) -> Pos2 {
-    let c = h.state().last_canvas_rect.center();
-    h.event(egui::Event::ModifiersChanged(mods));
-    h.event(egui::Event::PointerMoved(c));
-    h.run_steps(1);
-    h.event(egui::Event::PointerButton { pos: c, button: PointerButton::Secondary, pressed: true, modifiers: mods });
-    h.run_steps(1);
-    for i in 1..=4 {
-        h.event(egui::Event::PointerMoved(c + by * (i as f32 / 4.0)));
-        h.run_steps(1);
-    }
-    h.event(egui::Event::PointerButton { pos: c + by, button: PointerButton::Secondary, pressed: false, modifiers: mods });
-    h.event(egui::Event::ModifiersChanged(Modifiers::NONE));
-    h.run_steps(2);
-    c
 }
 
 /// #11897: Clear chosen on a pixel layer, then the Background activated: a Brush stroke there

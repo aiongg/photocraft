@@ -116,46 +116,23 @@ fn ctrl_tab_records_a_relative_document_switch() {
     assert_eq!(steps, &[ActionStep::new("document.activate", json!({"offset": -1}))]);
 }
 
-/// One document: Ctrl+Tab stays on it quietly. Two documents: a focused text field lets the chord through.
-#[test]
-fn ctrl_tab_with_one_document_or_a_focused_field() {
-    let mut h = harness(1);
-    h.key_press_modifiers(ctrl(), egui::Key::Tab);
-    h.run_steps(2);
-    assert_eq!(h.state().session.active_index(), Some(0));
-    assert!(crate::shortcut_dispatch::take_log(&h.ctx).iter().all(|(_, o)| *o == crate::shortcut_dispatch::Outcome::Ran), "no disabled-shortcut report");
-    for (key, command) in [("Ctrl+Tab", "window.nextDocument"), ("Ctrl+Shift+Tab", "window.previousDocument")] {
-        assert_eq!(crate::shortcuts::chord(h.state(), command), craft::keymap::Chord::parse(key).ok(), "{command} is bound to {key}");
-    }
-
-    let mut h = harness(2);
-    assert_eq!(h.state().session.active_index(), Some(1));
-    h.query_all_by_role(Role::TextInput).next().expect("the window shows a text field").click();
-    h.run_steps(2);
-    assert!(h.query_all_by_role(Role::TextInput).any(|n| n.is_focused()), "the text field has focus");
-    h.key_press_modifiers(ctrl(), egui::Key::Tab);
-    h.run_steps(2);
-    assert_eq!(h.state().session.active_index(), Some(0), "Ctrl+Tab switches documents from a focused text field");
-}
-
 #[test]
 fn quick_mask_mode_names_the_quick_mask_in_the_tab() {
     let mut h = harness(1);
     h.state_mut().run("layer.new.layer", json!({})).unwrap();
     let title = |h: &Harness<'_, PhotocraftApp>| tab_title_at(h.state(), 0, 100.0);
 
-    let (name, detail) = title(&h);
-    assert_eq!(name, "ch1-p01.png");
-    assert!(detail.starts_with("100%"), "{detail}");
+    let detail = title(&h);
+    assert!(detail.starts_with("ch1-p01.png @ 100%"), "{detail}");
     assert!(detail.contains("Layer 1") && detail.contains("RGB"), "the active layer and the mode: {detail}");
-    assert!(!detail.contains('*') && !name.contains('*'), "the tab's modified mark shows unsaved changes, not the text");
+    assert!(!detail.contains('*'), "the tab's modified mark shows unsaved changes, not the text");
 
     h.state_mut().run("select.editInQuickMaskMode", json!({"on": true})).unwrap();
-    let (_, detail) = title(&h);
+    let detail = title(&h);
     assert!(detail.contains("Quick Mask"), "Quick Mask mode is named: {detail}");
     assert!(!detail.contains("Layer 1") && !detail.contains("RGB"), "the layer is not the target: {detail}");
 
     h.state_mut().run("select.editInQuickMaskMode", json!({"on": false})).unwrap();
-    let (_, detail) = title(&h);
+    let detail = title(&h);
     assert!(detail.contains("Layer 1") && detail.contains("RGB") && !detail.contains("Quick Mask"), "{detail}");
 }

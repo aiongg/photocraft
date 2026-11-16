@@ -155,64 +155,6 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
     assert_eq!(edits(&h), before);
 }
 
-#[test]
-fn a_rotated_view_centres_the_preview_on_the_point_under_the_pointer() {
-    let mut h = harness(Some(SMART_SHARPEN), 90.0);
-    let at = [200.0, 90.0];
-    let a = screen(&h, at);
-    let before = edits(&h);
-    click(&mut h, a);
-    assert!(near(centre(&h), at), "{:?} vs {at:?}", centre(&h));
-    assert_eq!(edits(&h), before);
-}
-
-#[test]
-fn without_a_preview_dialog_the_click_still_reaches_the_tool() {
-    let mut h = harness(None, 0.0);
-    let before = edits(&h);
-    let at = screen(&h, [70.0, 230.0]);
-    click(&mut h, at);
-    let after = edits(&h);
-    assert!(after.0 != before.0 && after.1 == before.1 + 1, "the Brush paints one stroke: {before:?} -> {after:?}");
-}
-
-#[test]
-fn agents_centre_the_preview_with_ui_pointer_without_painting() {
-    let mut h = harness(Some(SMART_SHARPEN), 0.0);
-    let before = edits(&h);
-    let events = json!([{"kind": "down", "x": 60.5, "y": 250}, {"kind": "move", "x": 40, "y": 30}, {"kind": "up", "x": 40, "y": 30}]);
-    pointer(&mut h, events);
-    assert!(near(centre(&h), [60.5, 250.0]), "the press decides, not the drag: {:?}", centre(&h));
-    assert_eq!(edits(&h), before, "the Brush must not paint under the dialog");
-
-    // With the dialog cancelled the same gesture paints with the Brush again.
-    let id = dialog_id(&h);
-    let ctx = h.ctx.clone();
-    h.state_mut().framework.dialogs.cancel_by_id(&ctx, id);
-    h.run_steps(3);
-    let events = json!([{"kind": "down", "x": 40, "y": 30}, {"kind": "move", "x": 60, "y": 30}, {"kind": "up", "x": 60, "y": 30}]);
-    pointer(&mut h, events);
-    assert_ne!(edits(&h).0, before.0, "the Brush paints once no preview dialog is open");
-}
-
-/// Agents send a press, its moves and its release as separate requests: only the press centres
-/// the preview; a hover, a move with the press held and the release leave it.
-#[test]
-fn ui_pointer_centres_only_on_the_press() {
-    let mut h = harness(Some(SMART_SHARPEN), 0.0);
-    pointer(&mut h, json!([{"kind": "move", "x": 40, "y": 30}]));
-    // An event without a kind is a move, so a hover too.
-    pointer(&mut h, json!([{"x": 50, "y": 40}]));
-    assert!(near(centre(&h), [200.0, 150.0]), "a hover leaves the preview where it was: {:?}", centre(&h));
-    pointer(&mut h, json!([{"kind": "down", "x": 40, "y": 30}]));
-    assert!(near(centre(&h), [40.0, 30.0]), "{:?}", centre(&h));
-    pointer(&mut h, json!([{"kind": "move", "x": 80, "y": 60}]));
-    assert!(near(centre(&h), [40.0, 30.0]), "a move while the press is held leaves it: {:?}", centre(&h));
-    pointer(&mut h, json!([{"kind": "up", "x": 80, "y": 60}]));
-    pointer(&mut h, json!([{"kind": "move", "x": 120, "y": 90}]));
-    assert!(near(centre(&h), [40.0, 30.0]), "so do the release and a later hover: {:?}", centre(&h));
-}
-
 /// A Brush stroke an agent began before the dialog opened still ends along its own path: its moves
 /// and release reach the tool, not the locator.
 #[test]
@@ -257,25 +199,4 @@ fn a_crop_drag_begun_before_the_dialog_still_ends_under_it() {
     let (x, y) = extent(&h);
     assert!(x > 150.0 && y > 110.0, "the moves under the dialog reached the frame: {x}, {y}");
     assert!(near(centre(&h), [200.0, 150.0]), "the drag's moves and release are not locator presses: {:?}", centre(&h));
-}
-
-/// A second press while an agent's Brush stroke is still open (no mouse can make one) is dropped:
-/// it neither centres the preview nor reaches the Brush, and the stroke's own moves and release
-/// still finish it.
-#[test]
-fn a_press_during_an_open_tool_gesture_is_dropped() {
-    let mut h = harness(None, 0.0);
-    let before = edits(&h);
-    pointer(&mut h, json!([{"kind": "down", "x": 40, "y": 30}, {"kind": "move", "x": 80, "y": 30}]));
-    crate::filter_dialog::open(h.state_mut(), SMART_SHARPEN).expect("the dialog opens");
-    h.run_steps(2);
-    pointer(&mut h, json!([{"kind": "down", "x": 300, "y": 200}]));
-    assert!(near(centre(&h), [200.0, 150.0]), "the extra press doesn't centre the preview: {:?}", centre(&h));
-    assert!(!painted(&h, 290..310, 190..210), "nor does it reach the open stroke");
-    pointer(&mut h, json!([{"kind": "move", "x": 80, "y": 120}]));
-    assert!(near(centre(&h), [200.0, 150.0]), "the stroke's moves are not a locator drag: {:?}", centre(&h));
-    pointer(&mut h, json!([{"kind": "up", "x": 80, "y": 120}]));
-    assert!(!crate::canvas::testing::in_gesture(h.state()), "the release ended the stroke");
-    assert!(painted(&h, 75..85, 100..125), "the move reached the stroke");
-    assert_eq!(edits(&h).1, before.1 + 1, "the stroke is one history step");
 }

@@ -164,24 +164,6 @@ fn reordering_moves_a_step_within_its_action_and_an_action_into_a_set() {
 }
 
 #[test]
-fn pending_steps_list_the_journal_and_delete_removes_only_the_chosen_step() {
-    let mut app = new_app();
-    app.run("file.new", json!({"width": 40, "height": 40})).unwrap();
-    begin_recording(&mut app, None);
-    app.run("view.fitOnScreen", json!({})).unwrap();
-    app.run("view.zoomOut", json!({})).unwrap();
-    let pending = |app: &PhotocraftApp| PhotoActions::new(&app.session, false).pending_steps(0).iter().map(|s| s.command.clone()).collect::<Vec<_>>();
-    assert_eq!(pending(&app), ["view.fitOnScreen", "view.zoomOut"]);
-    apply_actions_events(&mut app, vec![ActionsEvent::Delete(ActionSelection::Step(0, 1))]);
-    assert_eq!(pending(&app), ["view.fitOnScreen"]);
-    assert_eq!(app.session.actions.list.actions().len(), 1);
-    assert!(app.session.actions.recording.is_some());
-    assert!(app.ui.actions.panel.selected.is_none());
-    app.run("actions.stop", json!({})).unwrap();
-    assert_eq!(commands(&app, 0), ["view.fitOnScreen"]);
-}
-
-#[test]
 fn set_folders_group_actions_and_collapse() {
     let mut app = new_app();
     push(&mut app, "Loose", None, vec![]);

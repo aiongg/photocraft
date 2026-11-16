@@ -53,8 +53,7 @@ pub(super) fn tabs(app: &PhotocraftApp, ui: &mut egui::Ui) -> DocumentTabsOutput
         .filter_map(|i| {
             let st = docs.get(i)?;
             let zoom = app.ui.views.get(i).map_or(100.0, |v| v.zoom * 100.0);
-            let (name, detail) = tab_title_at(app, i, zoom);
-            Some(DocumentTab::new(DocTab::Doc(st.doc.id), name).detail(detail).modified(st.is_dirty()))
+            Some(DocumentTab::new(DocTab::Doc(st.doc.id), tab_title_at(app, i, zoom)).modified(st.is_dirty()))
         })
         .collect();
     tabs.extend(
@@ -214,12 +213,12 @@ pub(crate) fn tab_context_items(doc: DocId, count: usize, has_path: bool) -> [Ta
     ]
 }
 
-/// Photoshop's tab title as its two parts: the name, and "50% (Layer 1, RGB/8)" at `zoom` percent, with
-/// "(Layer 1, Layer Mask/8)" when the mask is targeted and "(Quick Mask/8)" in Quick Mask mode; the Background
-/// layer's name is omitted. The tab's modified mark shows unsaved changes, so the text carries none.
-pub(crate) fn tab_title_at(app: &PhotocraftApp, i: usize, zoom: f32) -> (String, String) {
+/// Photoshop's tab title: "name @ 50% (Layer 1, RGB/8)" at `zoom` percent, with "(Layer 1, Layer Mask/8)" when the
+/// mask is targeted and "(Quick Mask/8)" in Quick Mask mode; the Background layer's name is omitted. The tab's
+/// modified mark shows unsaved changes, so the text carries none.
+pub(crate) fn tab_title_at(app: &PhotocraftApp, i: usize, zoom: f32) -> String {
     use photocraft_engine::channel_cmds::ChannelTarget;
-    let Some(st) = app.session.documents().get(i) else { return (String::new(), String::new()) };
+    let Some(st) = app.session.documents().get(i) else { return String::new() };
     // Quick Mask mode targets the mask, not the layer (see `paint_target`): painting and Free
     // Transform change the red overlay, so the tab says so, as Photoshop's does.
     let quick_mask = st.doc.quick_mask.is_some() && st.channel_view.target == ChannelTarget::Composite;
@@ -233,9 +232,9 @@ pub(crate) fn tab_title_at(app: &PhotocraftApp, i: usize, zoom: f32) -> (String,
         mode_label(&st.doc).to_string()
     };
     let layer = active_layer.map(|l| format!("{}, ", l.name)).unwrap_or_default();
-    // A save in progress: "100% (Layer 1, RGB/16) - Saving 45%", as Photoshop does (#3389).
+    // A save in progress: "name @ 100% (Layer 1, RGB/16) - Saving 45%", as Photoshop does (#3389).
     let saving = crate::jobs_ui::save_progress(app, st.doc.id).map(|s| format!(" - {s}")).unwrap_or_default();
-    (titled_name(st), format!("{}% ({layer}{model}/{}){saving}", fmt_zoom(zoom), st.doc.depth.bits()))
+    format!("{} @ {}% ({layer}{model}/{}){saving}", titled_name(st), fmt_zoom(zoom), st.doc.depth.bits())
 }
 
 /// The document's name as its tab and window title show it: "© name" when File Info marks it

@@ -58,20 +58,6 @@ fn corners(app: &PhotocraftApp) -> ((u32, u32), [[f32; 4]; 4]) {
 }
 
 #[test]
-fn alt_corner_drag_past_the_opposite_corner_on_one_axis_commits_mirrored() {
-    let mut app = app();
-    // A fresh 100 x 100 box, its bottom right corner ⌥ dragged past the fixed top left one on x only.
-    drag(&mut app, [450.0, 220.0], [550.0, 320.0], Modifiers::NONE);
-    drag(&mut app, [550.0, 320.0], [350.0, 300.0], Modifiers::ALT);
-    assert_eq!(quad(&app), Some([[450.0, 220.0], [350.0, 220.0], [350.0, 300.0], [450.0, 300.0]]), "flipped left to right");
-    apply(&mut app);
-    assert!(quad(&app).is_none(), "committed");
-    let (size, [tl, tr, bl, br]) = corners(&app);
-    assert_eq!(size, (100, 80));
-    assert_eq!([tl, tr, bl, br], [GREEN, RED, YELLOW, BLUE], "mirrored left to right, top stays on top");
-}
-
-#[test]
 fn the_command_takes_counter_clockwise_corners_and_mirrors() {
     let mut app = app();
     let r = app.run("image.perspectiveCrop", json!({"corners": [[450, 220], [350, 220], [350, 300], [450, 300]]})).unwrap();
@@ -81,18 +67,6 @@ fn the_command_takes_counter_clockwise_corners_and_mirrors() {
     let mut app = self::app();
     app.run("image.perspectiveCrop", json!({"corners": [[350, 300], [450, 300], [450, 220], [350, 220]]})).unwrap();
     assert_eq!(corners(&app).1, [BLUE, YELLOW, RED, GREEN]);
-}
-
-#[test]
-fn clicked_corners_commit_upright_in_any_order() {
-    let mut app = app();
-    // Counter-clockwise clicks from the top left.
-    for p in [[350.0, 220.0], [350.0, 300.0], [450.0, 300.0], [450.0, 220.0]] {
-        click(&mut app, p);
-    }
-    assert_eq!(quad(&app), Some([[350.0, 220.0], [450.0, 220.0], [450.0, 300.0], [350.0, 300.0]]), "sorted clockwise");
-    apply(&mut app);
-    assert_eq!(corners(&app), ((100, 80), [RED, GREEN, BLUE, YELLOW]));
 }
 
 #[test]

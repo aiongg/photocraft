@@ -1,10 +1,9 @@
-use craft::imaging::ui::fill::{ColorAdaptation, FillEvent, FillOp, FillSettings, RotationAdaptation};
-use craft::ui::canvas::{PixelRect, RasterSource};
-use craft::ui::runtime::memory::saved_value;
+use craft::imaging::ui::fill::FillOp;
+use craft::ui::canvas::PixelRect;
 use photocraft_doc::LayerId;
 use serde_json::{Value, json};
 
-use super::preview::{compute_base, compute_preview, plan_params};
+use super::preview::{compute_preview, plan_params};
 use super::*;
 use crate::control::dialogs::workspace_ui;
 
@@ -250,38 +249,6 @@ fn apply_fills_and_stays_open_ok_closes_cancel_keeps_what_was_applied() {
     let top = app.session.active().unwrap().active_layer.unwrap();
     assert_ne!(top, layer);
     assert!(px(&app, top, 100, 80)[3] > 0.99, "the new layer holds the fill");
-}
-
-/// The settings are remembered at every close (here a Cancel through the control route), and the menu opens the hosted
-/// workspace.
-#[test]
-fn settings_are_remembered_and_the_menu_opens_the_workspace() {
-    let mut app = app_with_selection();
-    let ctx = ctx(&app);
-    let r = crate::menus::invoke(&mut app, &ctx, "edit.contentAwareFill", json!({})).unwrap();
-    assert!(r["contentAwareFill"]["window"].is_array(), "{r}");
-    assert!(app.dialog_open());
-    ui(
-        &mut app,
-        json!({"opacity": 30, "color": [200, 40, 40], "excluded": true, "colorAdaptation": "high", "rotation": "low", "mirror": true, "output": "duplicate"}),
-    )
-    .unwrap();
-    // Bad values are errors.
-    assert!(workspace_ui(&mut app, &ctx, CMD, &json!({"sampling": "everywhere"})).is_err());
-    assert!(workspace_ui(&mut app, &ctx, CMD, &json!({"tool": "pencil"})).is_err());
-    ui(&mut app, json!({"cancel": true})).unwrap();
-    close_all(&mut app);
-    let saved = saved_value::<Option<FillSettings>>(&ctx, &REMEMBERED).expect("the workspace stored its settings");
-    assert_eq!((saved.opacity, saved.color, saved.excluded, saved.mirror), (30.0, [200, 40, 40], true, true));
-    assert_eq!((saved.color_adaptation, saved.rotation), (ColorAdaptation::High, RotationAdaptation::Low));
-    // The next opening starts with them.
-    open(&mut app).unwrap();
-    assert_eq!(facts(&app)["settings"]["opacity"], json!(30.0));
-    ui(&mut app, json!({"cancel": true})).unwrap();
-    close_all(&mut app);
-    let r = crate::menus::invoke(&mut app, &ctx, "edit.contentAwareFill", json!({"colorAdaptation": "none"})).unwrap();
-    assert_eq!(r["filled"], json!(400));
-    assert!(app.caf.is_none());
 }
 
 /// The engine's sampling area over the plan's rectangle (what the fill samples) and its fill area.

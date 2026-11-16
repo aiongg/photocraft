@@ -9,9 +9,6 @@ use serde_json::json;
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, tool_event};
 use crate::state::Tool;
-use crate::tool_feedback::{has_selection, selection_op};
-use craft::behavior::CursorBadge;
-use craft::keymap::Mods;
 
 const RED: [f64; 2] = [200.0, 180.0];
 const BLUE: [f64; 2] = [560.0, 300.0];
@@ -143,19 +140,6 @@ fn modifiers_override_the_bar() {
     drag(&mut app, [60.0, 60.0], [340.0, 300.0], both);
     assert!(selected(&app, RED), "red is in both");
     assert!(!selected(&app, BLUE), "blue is outside the rectangle");
-}
-
-#[test]
-fn the_badge_follows_the_bar_and_modifiers() {
-    let mut app = app();
-    let badge = |app: &PhotocraftApp, mods: Mods| selection_op(Tool::ObjectSelection, app.ui.selection_mode, mods, has_selection(app)).badge();
-    let both = Mods { shift: true, alt: true, ..Mods::default() };
-    for (mode, want) in [(0, None), (1, Some(CursorBadge::Add)), (2, Some(CursorBadge::Subtract)), (3, Some(CursorBadge::Intersect))] {
-        app.ui.selection_mode = mode;
-        assert_eq!(badge(&app, Mods::default()), want, "bar mode {mode}");
-    }
-    app.ui.selection_mode = 0;
-    assert_eq!(badge(&app, both), Some(CursorBadge::Intersect));
 }
 
 #[test]

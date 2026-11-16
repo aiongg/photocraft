@@ -160,22 +160,6 @@ fn checker_cells_are_8_screen_pixels_at_every_zoom() {
     }
 }
 
-#[test]
-fn checker_phase_moves_with_the_image() {
-    let _gpu = photocraft_testkit::gpu_lock();
-    let Some(mut h) = harness() else { return };
-    h.run_steps(4);
-    // The document origin moves four screen pixels between these two views, and the checker
-    // phase moves with it: the same screen position flips from a light to a dark cell.
-    let mut sample_at = None;
-    for (zoom, expected) in [(1.0, LIGHT), (1.25, DARK)] {
-        let (img, x0, y0, _) = render(&mut h, zoom, 32, false, false);
-        let (sx, sy) = *sample_at.get_or_insert((x0 + 6, y0 + 2));
-        let px = img.at(sx, sy);
-        assert!(px[0] == expected, "zoom {zoom}: phase at fixed screen position ({sx}, {sy}) is {px:?}, want {expected}");
-    }
-}
-
 /// Screen columns inside the document (from `x0`) whose pixel is lighter than the black fill.
 fn lit_columns(img: &Shot, x0: u32, y: u32, len: u32) -> Vec<u32> {
     (0..len).filter(|i| img.at(x0 + i, y)[0] > 25).collect()

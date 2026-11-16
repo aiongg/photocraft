@@ -12,9 +12,11 @@
 
 use std::collections::HashSet;
 
+use craft::color::ui::SwatchesCommand;
 use craft::keymap::{Binding, Chord, CommandDef, CommandKind, Overrides, Scope};
 use craft::layers::ui::panel::LayersPanelCommands;
 use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
+use craft::ui::docking::WorkspaceCommands;
 use craft::ui::rails::{LastUsed, RailTool};
 use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, CommandSet, EditCommands, FirePhase, FireSource, Fired};
 use serde_json::json;
@@ -67,6 +69,11 @@ pub(crate) enum Bridged {
     /// A Layers panel stacking command that owns the chord of a `layer.arrange.*` action; PhotoCraft runs the
     /// action when it fires.
     Stack(LayersPanelCommands),
+    /// A Swatches panel menu command under the id the engine's command of that name has; the panel runs it
+    /// ([`crate::panels::swatches_ui::run_fired`]).
+    Swatches(SwatchesCommand),
+    /// A Window › Workspace command under its framework id; the shell runs it ([`crate::workspace_ui::run_fired`]).
+    Workspace(WorkspaceCommands),
 }
 
 impl Bridged {
@@ -78,6 +85,8 @@ impl Bridged {
             Bridged::Momentary(command) => CommandRef::from(command),
             Bridged::Edit(command) => CommandRef::from(command),
             Bridged::Stack(command) => CommandRef::from(command),
+            Bridged::Swatches(command) => CommandRef::from(command),
+            Bridged::Workspace(command) => CommandRef::from(command),
         }
     }
 }
@@ -106,6 +115,20 @@ pub(crate) const RUNTIME_COMMANDS: &[(&str, Bridged)] = &[
     ("tools.temporary.zoomIn", Bridged::Momentary(MomentaryCommands::ZoomIn)),
     ("tools.temporary.zoomOut", Bridged::Momentary(MomentaryCommands::ZoomOut)),
     ("select.all", Bridged::Edit(EditCommands::SelectAll)),
+    // The ids the framework's sets give these commands are PhotoCraft's own ids, so the engine's rows of the same
+    // names are not catalog rows either.
+    ("edit.undo", Bridged::Edit(EditCommands::Undo)),
+    ("edit.redo", Bridged::Edit(EditCommands::Redo)),
+    ("edit.cut", Bridged::Edit(EditCommands::Cut)),
+    ("edit.copy", Bridged::Edit(EditCommands::Copy)),
+    ("edit.paste", Bridged::Edit(EditCommands::Paste)),
+    ("swatches.reset", Bridged::Swatches(SwatchesCommand::Reset)),
+    ("swatches.import", Bridged::Swatches(SwatchesCommand::Import)),
+    ("swatches.export", Bridged::Swatches(SwatchesCommand::Export)),
+    ("workspace.new", Bridged::Workspace(WorkspaceCommands::New)),
+    ("workspace.delete", Bridged::Workspace(WorkspaceCommands::Delete)),
+    ("workspace.lock", Bridged::Workspace(WorkspaceCommands::Lock)),
+    ("workspace.reset", Bridged::Workspace(WorkspaceCommands::Reset)),
     ("layer.arrange.bringForward", Bridged::Stack(LayersPanelCommands::MoveUp)),
     ("layer.arrange.sendBackward", Bridged::Stack(LayersPanelCommands::MoveDown)),
     ("layer.arrange.bringToFront", Bridged::Stack(LayersPanelCommands::MoveToTop)),
@@ -245,6 +268,10 @@ pub(crate) fn command_rows(app: &PhotocraftApp) -> Vec<CommandDef> {
         if crate::adjust_dialog::has_dialog(&def.command.id) || def.command.id == crate::new_layer_ui::COMMAND {
             def.has_alt_variant = true;
         }
+    }
+    // Edit in Quick Mask Mode is a button in the tool rail's footer, which shows its command's icon.
+    if let Some(def) = rows.iter_mut().find(|d| d.command.id == crate::panels::QUICK_MASK) {
+        def.icon = Some("square-dashed".into());
     }
     // Smart Objects › Reveal in Finder names this platform's file manager, in the list as in the menu.
     if let Some(def) = rows.iter_mut().find(|d| d.command.id == "layer.smartObjects.revealInFinder") {
@@ -466,7 +493,8 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[F
             continue;
         }
         // The chrome toggles come back as the framework's command; the canvas runs its view commands itself.
-        if let Some((id, bridged)) = bridge_of(&f.command) {
+        // The Swatches and Workspace commands run through their sets' handlers (`run_pressed`).
+        if let Some((id, bridged)) = bridge_of(&f.command).filter(|(_, bridged)| !matches!(bridged, Bridged::Swatches(_) | Bridged::Workspace(_))) {
             if matches!(bridged, Bridged::Chrome(_) | Bridged::Edit(_) | Bridged::Stack(_)) && f.phase == FirePhase::Press {
                 dispatch(app, ctx, id);
             }
@@ -482,7 +510,9 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[F
         if crate::opacity_keys::fired(app, f, now) || crate::blend_keys::fired(app, f) {
             continue;
         }
-        if let Some(tool) = crate::tool_shortcuts::tool(id) {
+        // A tool command a key fired: its letter picks within the group; a click or a menu row selects the tool itself.
+        let keyed_tool = || (f.source == FireSource::Key).then(|| crate::panels::tool_commands::ToolCommand::from_ref(&f.command)).flatten();
+        if let Some(tool) = crate::tool_shortcuts::tool(id).or_else(|| keyed_tool().map(crate::panels::tool_commands::tool_of)) {
             match f.phase {
                 // A key the user gave this tool selects exactly it (#4086); its letter belongs to the group.
                 FirePhase::Press if !crate::tool_shortcuts::uses_default(app, tool) => crate::tool_memory::select(app, tool),

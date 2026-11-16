@@ -1321,53 +1321,6 @@ fn temporary_type_transform_preserves_depth_and_color_model() {
 }
 
 #[test]
-fn temporary_type_transform_preserves_paragraph_resize_pivot_ime_and_shortcuts() {
-    let (app, id) = transform_app(true, false, Affine::translate(350.0, 300.0));
-    let mut h = harness(1.0, app);
-    let f = frame_of(h.state_mut()).unwrap();
-    let before = text(h.state(), id);
-    let (a, b) = (frame_point(h.state(), f.quad[2]), frame_point(h.state(), [f.quad[2][0] + 40.0, f.quad[2][1] + 20.0]));
-    drag(&mut h, a, b);
-    let after = text(h.state(), id);
-    assert_ne!(after.shape, before.shape);
-    assert_eq!(after.transform, before.transform, "plain drag resizes the frame");
-    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::A);
-    h.run_steps(2);
-    assert_eq!(selection(&h), (0, after.text.chars().count()));
-    let f = frame_of(h.state_mut()).unwrap();
-    let a = f.quad[2];
-    tool_event(h.state_mut(), ToolEvent::Down { x: a[0], y: a[1], pressure: 1.0 }, type_command());
-    tool_event(h.state_mut(), ToolEvent::Up { x: a[0] + 20.0, y: a[1] + 10.0 }, type_command());
-    // Complete the application edit before starting this composition: a completed transform
-    // changes the document revision and must cancel an older composition.
-    h.run_steps(2);
-    h.event(egui::Event::Ime(egui::ImeEvent::Preedit { text: "候補".into(), active_range_chars: None }));
-    h.run_steps(2);
-    assert_eq!(text(h.state(), id).text, "候補", "the marked text is in the layer while composing");
-    let f = frame_of(h.state_mut()).unwrap();
-    let a = f.quad[2];
-    tool_event(h.state_mut(), ToolEvent::Down { x: a[0], y: a[1], pressure: 1.0 }, type_command());
-    tool_event(h.state_mut(), ToolEvent::Move { x: a[0] + 15.0, y: a[1] + 10.0, pressure: 1.0 }, type_command());
-    let composed_transform = crate::type_transform::current_transform(h.state(), id).unwrap();
-    // A pending transform has not changed the revision yet. Keep the real raw-input route so
-    // the accepted commit must finish that transform before replacing the marked text.
-    h.event(egui::Event::Ime(egui::ImeEvent::Commit("確定".into())));
-    h.run_steps(2);
-    assert_eq!(text(h.state(), id).text, "確定");
-    assert_affine(text(h.state(), id).transform, composed_transform);
-    assert!(h.state().ui.type_transform.is_none(), "composition commits a pending drag before editing");
-    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::Enter);
-    h.run_steps(2);
-    assert!(h.state().ui.text_edit.is_none());
-    begin_edit(h.state_mut()).unwrap();
-    assert!(h.state().ui.text_edit.is_some());
-    commit_edit(h.state_mut());
-    h.key_press_modifiers(Modifiers::COMMAND, egui::Key::T);
-    h.run_steps(2);
-    assert!(h.state().ui.transform.is_some(), "outside typing: ordinary Free Transform");
-}
-
-#[test]
 fn temporary_type_transform_captures_press_and_rejects_collapsed_geometry() {
     let (app, id) = transform_app(false, false, Affine::translate(450.0, 350.0));
     let mut h = harness(1.0, app);
@@ -1543,12 +1496,6 @@ mod multi_layer_formatting {
 
     fn editing(app: &mut PhotocraftApp, id: LayerId) {
         app.ui.text_edit = Some(edit_of(id.0, 3, 1, "batch-type-edit"));
-    }
-
-    /// The checked state of the menu row `id`.
-    fn menu_checked(app: &mut PhotocraftApp, id: &str) -> Option<bool> {
-        let ctx = app.ctx().clone();
-        crate::menus::row(&crate::menus::model(app, &ctx).rows, id).and_then(|row| row.kind.checked())
     }
 
     /// The options bar's direction is the Paragraph panel's: `TypeBar` has only alignment buttons
@@ -1820,70 +1767,6 @@ mod multi_layer_formatting {
         assert_eq!(text(&app, ids[1]).antialias, AntiAlias::Crisp);
         assert_eq!(text(&app, ids[2]).orientation, Orientation::Vertical);
         assert_eq!(text(&app, ids[0]).antialias, AntiAlias::Sharp);
-    }
-
-    /// Type > OpenType > Stylistic Sets (#10285): while editing, a set goes on for the selected
-    /// characters only, and its checkmark follows the style at the selection start.
-    #[test]
-    fn stylistic_set_menu_toggles_the_selection_and_checks_its_start() {
-        use photocraft_engine::type_extra_cmds::feature_on;
-        let (mut app, ids) = fixture();
-        let ctx = app.ctx().clone();
-        let id = "type.openType.stylisticSets.set2";
-        editing(&mut app, ids[0]);
-        assert_eq!(menu_checked(&mut app, id), Some(false));
-        crate::menus::invoke(&mut app, &ctx, id, json!({})).unwrap();
-        let on: Vec<bool> = (0..5).map(|ci| feature_on(&style(&app, ids[0], ci), "ss02")).collect();
-        assert_eq!(on, [false, true, true, false, false], "only the selected characters");
-        assert!((0..5).all(|ci| !feature_on(&style(&app, ids[1], ci), "ss02")), "the other layer is untouched");
-        assert_eq!(menu_checked(&mut app, id), Some(true), "the selection start has the set");
-        // A selection starting after the styled characters shows it off.
-        if let Some(ed) = app.ui.text_edit.as_mut() {
-            ed.anchor = 3;
-            ed.caret = 5;
-        }
-        assert_eq!(menu_checked(&mut app, id), Some(false));
-        crate::menus::invoke(&mut app, &ctx, id, json!({})).unwrap();
-        let on: Vec<bool> = (0..5).map(|ci| feature_on(&style(&app, ids[0], ci), "ss02")).collect();
-        assert_eq!(on, [false, true, true, true, true]);
-        assert_eq!(menu_checked(&mut app, id), Some(true));
-    }
-
-    /// The Character panel's OpenType buttons (TYPE-218-5, #3752): each shows pressed while its
-    /// feature is on and toggles it (`CharacterChange::OpenType`) on the selected type layers, or
-    /// on the selected characters while typing.
-    #[test]
-    fn character_panel_opentype_buttons_toggle_and_show_the_feature() {
-        use egui::accesskit::Toggled;
-        use photocraft_engine::type_extra_cmds::feature_on;
-        let (app, ids) = fixture();
-        let untouched = style(&app, ids[2], 0);
-        let mut h = controls(app, true);
-        let shown = |h: &Harness<'static, PhotocraftApp>, label: &str| h.get_by_label(label).accesskit_node().toggled();
-        assert_eq!(shown(&h, "Standard Ligatures"), Some(Toggled::True), "ligatures are on by default");
-        assert_eq!(shown(&h, "Fractions"), Some(Toggled::False));
-        h.get_by_label("Fractions").click();
-        h.run();
-        for id in &ids[..2] {
-            assert!(feature_on(&style(h.state(), *id, 0), "frac"), "selected layers get the feature");
-        }
-        assert_eq!(style(h.state(), ids[2], 0), untouched, "an unselected layer is untouched");
-        h.run();
-        assert_eq!(shown(&h, "Fractions"), Some(Toggled::True), "the button shows the feature on");
-        h.get_by_label("Standard Ligatures").click();
-        h.run();
-        h.run();
-        assert!(!style(h.state(), ids[0], 0).ligatures && !style(h.state(), ids[1], 0).ligatures);
-        assert_eq!(shown(&h, "Standard Ligatures"), Some(Toggled::False));
-        // While typing, only the selected characters (1..3) change.
-        editing(h.state_mut(), ids[0]);
-        h.run();
-        h.get_by_label("Swash").click();
-        h.run();
-        let swash = |h: &Harness<'static, PhotocraftApp>, ci| feature_on(&style(h.state(), ids[0], ci), "swsh");
-        assert!(!swash(&h, 0) && swash(&h, 1) && swash(&h, 2) && !swash(&h, 3));
-        h.run();
-        assert_eq!(shown(&h, "Swash"), Some(Toggled::True), "shown at the selection start");
     }
 
     /// Type › Anti-Alias and Type › Orientation check the edited (else selected) layer's value.

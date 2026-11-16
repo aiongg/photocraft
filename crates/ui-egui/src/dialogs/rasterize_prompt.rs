@@ -118,6 +118,7 @@ pub fn intercept(app: &mut PhotocraftApp, tool: Tool, x: f64, y: f64, pressure: 
 /// never replayed, so they change nothing.
 pub fn open(app: &mut PhotocraftApp, kind: Kind, layer: photocraft_doc::LayerId, _tool: Tool, _at: [f64; 3]) -> DialogId {
     let prompt = StandardPrompt::custom(tl!(kind.message()).to_owned())
+        .title(tl!("PhotoCraft").to_owned())
         .button(PromptChoice::Proceed, tl!("OK").to_owned())
         .button(PromptChoice::Cancel, tl!("Cancel").to_owned())
         .tag(Rasterize { kind, layer: layer.0, filter: None });
@@ -155,7 +156,9 @@ pub fn filter_needs(app: &PhotocraftApp, id: &str) -> Option<(photocraft_doc::La
 /// A filter chosen on a type layer: open the prompt instead and return its answer to the caller.
 pub fn intercept_filter(app: &mut PhotocraftApp, id: &str, params: &Value) -> Option<Result<Value, String>> {
     let (layer, smart) = filter_needs(app, id)?;
-    let mut prompt = StandardPrompt::custom(tl!(Kind::Type.message()).to_owned()).button(PromptChoice::Proceed, tl!("Rasterize").to_owned());
+    let mut prompt = StandardPrompt::custom(tl!(Kind::Type.message()).to_owned())
+        .title(tl!("PhotoCraft").to_owned())
+        .button(PromptChoice::Proceed, tl!("Rasterize").to_owned());
     if smart {
         prompt = prompt.button(PromptChoice::Alternate, tl!("Convert to Smart Object").to_owned());
     }

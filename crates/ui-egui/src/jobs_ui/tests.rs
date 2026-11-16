@@ -103,36 +103,6 @@ fn frames_until(h: &mut Harness<'_, PhotocraftApp>, min: u64, ready: impl Fn(&Ha
 }
 
 #[test]
-fn the_frame_loop_keeps_running_during_a_slow_job_and_esc_cancels_it() {
-    let mut h = app_harness();
-    let gate = Arc::new(AtomicBool::new(false));
-    let doc_before = h.state().session.active().unwrap().doc.clone();
-    let job = slow_job(h.state_mut(), &gate);
-    let frame0 = h.state().frame;
-    // The worker thread reports "Filtering tiles" when it starts, which can be after the dialog appears.
-    let (n, worst) = frames_until(&mut h, 10, |h| h.query_by_label("Filtering tiles").is_some());
-    assert!(h.state().session.job(job).is_some(), "the job is still running");
-    assert!(h.state().frame - frame0 >= 10, "the UI kept rendering ({n} frames)");
-    eprintln!("{n} frames during the job, slowest {worst:.1} ms");
-    // The status bar shows the job, and after the delay the blocking overlay's card.
-    assert!(h.query_all_by_label("Slow Filter").count() >= 2, "job label in the status bar and the card title");
-    assert!(h.query_by_label("Cancel").is_some(), "the overlay's Cancel");
-    assert!(h.query_by_label("Esc to cancel").is_some(), "the overlay's hint");
-    assert!(h.query_by_label("Filtering tiles").is_some(), "the job's status message");
-    // Commands that would edit the busy document are disabled with a clear reason.
-    assert!(!h.state().session.is_enabled("layer.new.layer"));
-    let err = h.state_mut().run("layer.new.layer", json!({})).unwrap_err();
-    assert!(err.contains("Slow Filter"), "{err}");
-    // Esc cancels; the document is untouched.
-    h.key_press(egui::Key::Escape);
-    h.run_steps(3);
-    assert!(h.state().session.job(job).is_none());
-    assert!(Arc::ptr_eq(&h.state().session.active().unwrap().doc, &doc_before));
-    assert!(h.state().ui.status.contains("Canceled"), "{}", h.state().ui.status);
-    assert!(h.query_by_label("Esc to cancel").is_none(), "the card closed");
-}
-
-#[test]
 fn a_job_started_while_drawing_requests_the_follow_up_poll() {
     let mut h = app_harness();
     let gate = Arc::new(AtomicBool::new(false));

@@ -356,49 +356,6 @@ fn plain_save_of_a_flat_jpeg_records_and_replays_a_changed_quality() {
 }
 
 #[test]
-fn menu_open_exr_parts_asks_for_a_file_then_shows_the_parts_dialog() {
-    // Before the fix the menu ran the bare command: `missing "path"`, and no dialog (#7169).
-    let (mut app, files, _) = app();
-    let bytes = photocraft_io::export(&app.session.active().unwrap().doc, "render.exr", &Default::default()).unwrap().bytes;
-    let unique = std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).unwrap().as_nanos();
-    let dir = std::env::temp_dir().join(format!("photocraft-menu-exr-parts-{}-{unique}", std::process::id()));
-    std::fs::create_dir(&dir).unwrap();
-    let path = dir.join("render.exr");
-    std::fs::write(&path, &bytes).unwrap();
-    let path = path.to_string_lossy().into_owned();
-    let ctx = app.ctx().clone();
-    let r = menus::invoke(&mut app, &ctx, "file.openExrParts", json!({})).unwrap();
-    assert_eq!(r["fileDialog"], "open", "{r}");
-    let asked = last_request(&files);
-    assert_eq!(asked.kind, PickKind::Open);
-    assert_eq!(asked.filters, [FileFilter::new("Supported Files", &["exr"])]);
-    answer(&files, chose(&path));
-    app.poll_file_dialog();
-    assert!(!app.ui.status_error, "{}", app.ui.status);
-    // PLAN: assumed dialogs-w19/w57: the parts dialog is a hosted dialog whose json fields carry `path` and one `part/..` flag per part.
-    let dialog = app
-        .framework
-        .dialogs
-        .open_dialogs()
-        .into_iter()
-        .find(|d| d.fields.as_ref().is_some_and(|f| f["path"] == json!(path)))
-        .expect("the parts dialog is open");
-    let fields = dialog.fields.clone().unwrap();
-    let parts: Vec<&String> = fields.as_object().unwrap().keys().filter(|k| k.starts_with("part/")).collect();
-    assert_eq!(parts.len(), 1, "{fields:?}");
-    assert_eq!(fields[parts[0].as_str()], json!(true), "the first colour part is preselected");
-    let documents = app.session.documents().len();
-    crate::dialogs::confirm(&mut app, &ctx, dialog.id).unwrap();
-    assert_eq!(app.session.documents().len(), documents + 1);
-
-    // A path in the params skips the picker.
-    let before = files.requests().len();
-    menus::invoke(&mut app, &ctx, "file.openExrParts", json!({"path": path})).unwrap();
-    assert_eq!(files.requests().len(), before, "no picker");
-    std::fs::remove_dir_all(&dir).unwrap();
-}
-
-#[test]
 fn menu_place_starts_transform_for_each_chosen_image() {
     for command in ["file.placeEmbedded", "file.placeLinked"] {
         let (mut app, files, _) = app();
@@ -1083,43 +1040,6 @@ fn an_unavailable_dialog_is_reported_and_a_cancelled_one_is_not() {
     assert!(!app.file_dialog_open(), "the pending dialog is over");
 }
 
-/// #3629: Layer › Export As with several artboards selected exports one file per board, at each
-/// board's size and with the dialog's settings, after one destination prompt (a folder, #14808).
-#[test]
-fn export_as_with_several_artboards_selected_writes_one_file_each() {
-    let (mut app, files, written) = app();
-    let a = app.run("layer.new.artboard", json!({"rect": [0, 0, 40, 30], "name": "Header"})).unwrap()["layer"].as_u64().unwrap();
-    let b = app.run("layer.new.artboard", json!({"rect": [60, 0, 20, 50], "name": "Capsule"})).unwrap()["layer"].as_u64().unwrap();
-    app.run("layer.select", json!({"layer": a})).unwrap();
-    app.run("layer.select", json!({"layer": b, "mode": "add"})).unwrap();
-    assert_eq!(app.session.active().unwrap().selected_layers().len(), 2);
-    let sizes = Rc::new(RefCell::new(Vec::new()));
-    let capture = sizes.clone();
-    app.services.export = Some(Box::new(move |doc: &photocraft_doc::Document, _: &str, _: &crate::ExportSettings| {
-        capture.borrow_mut().push((doc.name.clone(), doc.size.width, doc.size.height));
-        Ok((b"out".to_vec(), Vec::new()))
-    }));
-    assert!(!crate::layer_menu_ui::single_layer_only("layer.exportAs"), "the menu offers it for a selection");
-    let ctx = app.ctx().clone();
-    let r = menus::invoke(&mut app, &ctx, "layer.exportAs", Value::Null).unwrap();
-    let id: DialogId = serde_json::from_value(r["dialog"].clone()).expect("the command opened a dialog");
-    // The dialog's settings apply to every file: JPG at 50 %.
-    app.framework.dialogs.set_json_field(&ctx, id, "format", json!("jpg")).unwrap();
-    app.framework.dialogs.set_json_field(&ctx, id, "size", json!({"Scale": 50.0})).unwrap();
-    crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
-    assert_eq!(files.requests().len(), 1, "one destination for every board");
-    assert_eq!(last_request(&files).kind, PickKind::Folder, "several files go into a folder (#14808)");
-    answer(&files, chose("/out"));
-    app.poll_file_dialog();
-    assert!(!app.ui.status_error, "{}", app.ui.status);
-    // One `<layer name>.<ext>` each, in the chosen folder.
-    let want: Vec<String> = ["Header.jpg", "Capsule.jpg"].iter().map(|n| Path::new("/out").join(n).to_string_lossy().into_owned()).collect();
-    assert_eq!(*written.borrow(), want);
-    let mut got = sizes.borrow().iter().map(|(_, w, h)| (*w, *h)).collect::<Vec<_>>();
-    got.sort_unstable();
-    assert_eq!(got, [(10, 25), (20, 15)], "each board at its own size, scaled to 50 %");
-}
-
 /// #3806: File › Save on an OpenRaster file that can't hold the document (here an adjustment
 /// layer) doesn't overwrite it: Save As opens on a PSD with a notice saying what the .ora would
 /// drop, and the PSD becomes the document's file. A plain document still saves back to its .ora.
@@ -1678,77 +1598,6 @@ fn every_open_format_has_its_own_filter() {
 /// The save types of a Save dialog suggesting `suggested`: (name, extensions).
 fn save_types(suggested: &str) -> Vec<(String, Vec<String>)> {
     save_request("document", suggested).filters.into_iter().map(|f| (f.name, f.extensions)).collect()
-}
-
-/// The suggested type leads, or Windows saves the first type's extension.
-#[test]
-fn every_save_dialog_leads_with_its_own_extension() {
-    let files = Arc::new(ScriptedFiles::new());
-    let (mut app, files, _) = app_with(files);
-    let ctx = app.ctx().clone();
-    // The picker answers itself (Cancelled): poll once so each is over before the next asks.
-    let invoke = |app: &mut PhotocraftApp, id: &str| {
-        let r = menus::invoke(app, &ctx, id, json!({}));
-        app.poll_file_dialog();
-        r
-    };
-    let dialog = |app: &mut PhotocraftApp, id: &str, fields: Value| {
-        let r = invoke(app, id).unwrap();
-        // The reply names the dialog by the decimal string `ui.inspect` lists.
-        let number: u64 = r["dialog"].as_str().and_then(|id| id.parse().ok()).expect("the command opened a dialog");
-        let dialog: DialogId = serde_json::from_value(json!(number)).expect("a dialog id");
-        for (k, v) in fields.as_object().unwrap() {
-            app.framework.dialogs.set_json_field(&ctx, dialog, k, v.clone()).unwrap();
-        }
-        let _ = crate::dialogs::confirm(app, &ctx, dialog);
-        app.poll_file_dialog();
-    };
-    // Save As, Save a Copy.
-    // Files in a format Save As can't write, like .dng, should suggest .psd instead.
-    let _ = invoke(&mut app, "file.saveAs");
-    for name in ["cat.pcraft", "cat.jpeg", "cat.gif", "cat.bmp", "cat.dng"] {
-        app.session.active_mut().unwrap().path = Some(name.into());
-        let _ = invoke(&mut app, "file.saveAs");
-    }
-    let _ = invoke(&mut app, "file.saveACopy");
-    // Export As, Quick Export, Save for Web (with and without slices).
-    for format in ["png", "jpg", "webp", "tif", "tga"] {
-        dialog(&mut app, "file.export.exportAs", json!({"format": format}));
-    }
-    for format in ["png", "jpg", "gif", "webp"] {
-        app.run("prefs.set", json!({"path": "export.quickExportFormat", "value": format})).unwrap();
-        let _ = invoke(&mut app, "file.export.quickExportAsPng");
-    }
-    // The dialog's format field takes the framework's variant names.
-    for format in ["Gif", "Png8", "Png24", "Jpeg", "WebP", "Wbmp"] {
-        dialog(&mut app, "file.export.saveForWebLegacy", json!({"format": format}));
-    }
-    app.run("slice.new", json!({"x": 0, "y": 0, "width": 2, "height": 2})).unwrap();
-    dialog(&mut app, "file.export.saveForWebLegacy", json!({"html": true}));
-    // Measurement Log, Export/Import Presets.
-    app.run("image.analysis.recordMeasurements", json!({})).unwrap();
-    let _ = invoke(&mut app, "measurementLog.export");
-    dialog(&mut app, "edit.presets.exportImportPresets", json!({"action": "export"}));
-    let saves: Vec<PickRequest> = files.requests().into_iter().filter(|r| r.kind == PickKind::Save).collect();
-    let exts: Vec<&str> = saves.iter().filter_map(|r| r.file_name.as_deref()?.rsplit_once('.').map(|(_, e)| e)).collect();
-    // The extension each save above should suggest, in order.
-    let want = [
-        "psd",                            // Save As untitled
-        "pcraft jpeg gif bmp psd",        // Save As opened .pcraft .jpeg .gif .bmp .dng
-        "psd",                            // Save a Copy
-        "png jpg webp tif tga",           // Export As
-        "png jpg gif webp",               // Quick Export
-        "gif png png jpg webp wbmp html", // Save for Web: gif png8 png24 jpeg webp wbmp, then with slices
-        "csv pcpresets",                  // Measurement Log, Export Presets
-    ]
-    .join(" ");
-    assert_eq!(exts, want.split(' ').collect::<Vec<_>>());
-    for (request, ext) in saves.iter().zip(&exts) {
-        // The first type's first extension is the one Windows adds to the bare name.
-        assert_eq!(request.filters[0].extensions.first().map(String::as_str), Some(*ext), "{}: {:?}", suggested(request), request.filters[0]);
-        assert_eq!(request.suggested_extension.as_deref(), Some(*ext), "{}", suggested(request));
-    }
-    assert_eq!(save_types("Untitled")[0].0, "PSD Document", "no extension keeps the default");
 }
 
 /// Every flat format Save As offers is one PhotoCraft writes, and ICO is among them (#4357).

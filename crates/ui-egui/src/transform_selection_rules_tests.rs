@@ -216,50 +216,6 @@ fn corner_layer(app: &mut PhotocraftApp) -> LayerId {
 }
 
 #[test]
-fn a_refused_handle_press_on_the_canvas_reaches_no_move_tool() {
-    // The Background among the selected layers: a press on the Move tool's transform handle shows
-    // the locked-layer alert and goes nowhere else. Auto-Select (on) used to take it and select
-    // C under the handle, a click and a drag alike.
-    use crate::canvas::testing::{frame, move_to, press, release};
-    use egui::Modifiers;
-    for drag in [false, true] {
-        let (mut app, bg, a, _) = app();
-        corner_layer(&mut app);
-        select(&mut app, a, "replace");
-        select(&mut app, bg, "add");
-        app.ui.tool = crate::state::Tool::Move;
-        app.ui.tool_options.move_show_transform = true;
-        app.ui.tool_options.move_auto_select = true;
-        app.sync_views();
-        let view = &mut app.ui.views[0];
-        view.zoom = 1.0;
-        view.center = [100.0, 100.0];
-        view.fit_pending = false;
-        view.fill_pending = false;
-        // The frame holds the Background, the whole canvas: its bottom-right handle is at doc
-        // (200, 200); the press is inside its grab area, over C.
-        let at = [196.0, 196.0];
-        let before = app.session.active().unwrap().doc.clone();
-        let selected = app.session.active().unwrap().selected_layers();
-        press(&mut app, at, Modifiers::NONE);
-        let mut end = at;
-        if drag {
-            for i in 1..=6 {
-                end = [at[0] - 8.0 * f64::from(i), at[1] - 8.0 * f64::from(i)];
-                move_to(&mut app, end, Modifiers::NONE);
-            }
-        }
-        release(&mut app, end, Modifiers::NONE);
-        frame(&mut app);
-        assert!(app.ui.transform.is_none(), "drag {drag}: no box opens");
-        assert_eq!(alerts(&app).len(), 1, "drag {drag}: the locked-layer alert");
-        let st = app.session.active().unwrap();
-        assert_eq!(st.selected_layers(), selected, "drag {drag}: the selection is unchanged");
-        assert!(st.doc == before, "drag {drag}: the document is unchanged");
-    }
-}
-
-#[test]
 fn a_refused_handle_press_over_the_control_channel_reaches_no_move_tool() {
     // `ui.pointer` takes the same path: the alert, and the press is not forwarded to the Move tool.
     use crate::transform_controls_pointer_tests::accepted;

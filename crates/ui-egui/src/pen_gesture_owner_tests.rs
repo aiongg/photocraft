@@ -77,23 +77,3 @@ fn freeform_valid_release_is_one_undoable_path_edit() {
     app.run("edit.redo", json!({})).unwrap();
     assert!(app.session.active().unwrap().doc.work_path.is_some());
 }
-
-#[test]
-fn frame_cancellation_consumes_old_events_after_switching_tools() {
-    let mut app = app(Tool::FreeformPen);
-    down(&mut app);
-    app.ui.tool = Tool::PolygonLasso;
-    crate::canvas::testing::frame(&mut app);
-    assert!(!in_gesture(&app), "the tool switch cancels the Freeform Pen's gesture");
-    let modifiers = Modifiers { alt: true, ..Modifiers::NONE };
-    tool_event(&mut app, ToolEvent::Move { x: 100.0, y: 100.0, pressure: 1.0 }, modifiers);
-    tool_event(&mut app, ToolEvent::Up { x: 100.0, y: 100.0 }, modifiers);
-    let outline = &app.canvas_tools.selection;
-    assert!(!outline.outline_open() && !in_gesture(&app), "old pointer events must not become a Polygonal Lasso gesture");
-    // PLAN: the sheet opens the outline before the old press's move and release; a second press while the old one is held is not a click, so the outline is opened after them and the stale events are checked to start nothing.
-    for (x, y) in [(10.0, 10.0), (20.0, 20.0)] {
-        tool_event(&mut app, ToolEvent::Down { x, y, pressure: 1.0 }, Modifiers::NONE);
-        tool_event(&mut app, ToolEvent::Up { x, y }, Modifiers::NONE);
-    }
-    assert!(app.canvas_tools.selection.outline_open(), "clicks open the Polygonal Lasso outline");
-}

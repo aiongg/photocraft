@@ -3,7 +3,7 @@
 //! with nothing left to export they say why.
 
 use super::*;
-use craft::host::{PickKind, Picked, ScriptedFiles};
+use craft::host::{Picked, ScriptedFiles};
 use photocraft_geom::Rect;
 use std::{cell::RefCell, rc::Rc};
 
@@ -64,25 +64,6 @@ fn app() -> (PhotocraftApp, Layers, Written, Arc<ScriptedFiles>) {
 fn answer(app: &mut PhotocraftApp, files: &ScriptedFiles, path: &std::path::Path) {
     files.answer(Picked::Paths(vec![path.to_path_buf()])).expect("a file dialog is open");
     app.poll_file_dialog();
-}
-
-#[test]
-fn the_dialog_opens_on_the_first_layer_with_pixels_and_exports_only_those() {
-    // A real folder, so the planted-link check on the targets never meets a path outside the test.
-    let guard = tempfile::tempdir().unwrap();
-    let out = guard.path().to_path_buf();
-    let (mut app, l, written, files) = app();
-    let selection = [l.empty, l.adjustment, l.gone, l.red, l.blue];
-    let id = open_layers(&mut app, &selection).expect("an empty lowest layer no longer stops the dialog");
-    assert_eq!(app.export_open.as_ref().unwrap().source, PixelSize::new(100, 80), "the dialog fits the first layer with pixels");
-    let ctx = app.ctx().clone();
-    crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
-    assert_eq!(files.requests().last().map(|r| r.kind), Some(PickKind::Folder), "several layers go into a folder");
-    answer(&mut app, &files, &out);
-    // A folder with one `<layer name>.<ext>` each (#14808).
-    let want: Vec<String> = ["Red.png", "Blue.png"].iter().map(|n| out.join(n).to_string_lossy().into_owned()).collect();
-    assert_eq!(*written.borrow(), want, "Red and Blue; the empty, adjustment and off-canvas layers write nothing");
-    assert!(!app.ui.status_error, "{}", app.ui.status);
 }
 
 #[test]

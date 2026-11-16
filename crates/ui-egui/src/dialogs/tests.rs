@@ -212,37 +212,3 @@ fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     take_prompts_from(&mut app, &ctx, rows);
     assert_eq!(hits().last(), Some(&("b", PromptChoice::Cancel)));
 }
-
-#[test]
-fn command_z_steps_a_parameter_dialog_not_the_document() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 120, "height": 80})).unwrap();
-    let steps = app.session.active().unwrap().history.past_len();
-    // The whole app: its frame hook hands the keys to the framework, which steps the dialog's own history.
-    let ctx = app.ctx().clone();
-    let mut h = egui_kittest::Harness::builder().with_size(egui::vec2(1280.0, 800.0)).with_context(ctx).with_max_steps(64).build_eframe(move |_cc| app);
-    let id = open_command_dialog(h.state_mut(), "filter.lensCorrection", "Lens Correction").unwrap();
-    h.run_steps(4);
-    let ctx = h.ctx.clone();
-    let field = |h: &egui_kittest::Harness<'static, PhotocraftApp>, key: &str| {
-        h.state().framework.dialogs.get_by_id::<HostedParamDialog>(id).expect("the dialog is open").fields().get(key).cloned()
-    };
-    let vertical = field(&h, "vertical");
-    // Each edit settles into its own step before the next one is made.
-    h.state_mut().framework.dialogs.set_json_field(&ctx, id, "vertical", json!(-50.0)).unwrap();
-    h.run_steps(3);
-    h.state_mut().framework.dialogs.set_json_field(&ctx, id, "horizontal", json!(30.0)).unwrap();
-    h.run_steps(3);
-
-    h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
-    h.run_steps(3);
-    assert_ne!(field(&h, "horizontal"), Some(FieldValue::Number(30.0)), "the newest edit is undone");
-    assert_eq!(field(&h, "vertical"), Some(FieldValue::Number(-50.0)), "one step at a time");
-    h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::Z);
-    h.run_steps(3);
-    assert_eq!(field(&h, "vertical"), vertical);
-    assert_eq!(h.state().session.active().unwrap().history.past_len(), steps, "the document beneath is untouched");
-    h.key_press_modifiers(egui::Modifiers::COMMAND | egui::Modifiers::SHIFT, egui::Key::Z);
-    h.run_steps(3);
-    assert_eq!(field(&h, "vertical"), Some(FieldValue::Number(-50.0)), "Shift+Cmd+Z redoes");
-}

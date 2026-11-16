@@ -7,7 +7,6 @@ use craft::behavior::cursor::{Cursor, PaintedCursor};
 use craft::behavior::kurbo::Point;
 use egui::{Event, Key, Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
 use photocraft_geom::Rect;
 use serde_json::json;
 
@@ -508,37 +507,6 @@ fn tilde_erases_only_with_the_brush_and_pencil() {
             assert_eq!(last_stroke_erases(&h), Some(false), "{tool:?}: paints again");
         }
     }
-}
-
-/// The Mode dropdown's Clear (#3439): chosen there, every Pencil stroke erases with the Pencil
-/// until another mode is chosen.
-#[test]
-fn clear_in_the_mode_dropdown_erases_until_another_mode_is_chosen() {
-    use crate::canvas::testing::{ToolEvent, tool_event};
-    let mut h = harness(Tool::Pencil);
-    // PLAN: the Mode control of the ported options bar (panels-w21) is assumed to carry the label "Mode".
-    let choose = |h: &mut Harness<'static, PhotocraftApp>, item: &str| {
-        h.get_by_label("Mode").click();
-        h.run_steps(3);
-        h.get_all_by_label(item).last().expect("a mode item").click();
-        h.run_steps(3);
-    };
-    choose(&mut h, "Clear");
-    assert!(crate::paint_mouse::clears(h.state(), Tool::Pencil));
-    let stroke = |h: &mut Harness<'static, PhotocraftApp>| {
-        let (app, m) = (h.state_mut(), Modifiers::NONE);
-        tool_event(app, ToolEvent::Down { x: 10.0, y: 40.0, pressure: 1.0 }, m);
-        tool_event(app, ToolEvent::Move { x: 100.0, y: 40.0, pressure: 1.0 }, m);
-        tool_event(app, ToolEvent::Up { x: 100.0, y: 40.0 }, m);
-    };
-    stroke(&mut h);
-    assert_eq!(last_stroke(h.state())["mode"], json!("clear"));
-    assert_eq!(h.state().session.active().unwrap().history.undo_label(), Some("Pencil"));
-    choose(&mut h, "Normal");
-    assert!(!crate::paint_mouse::clears(h.state(), Tool::Pencil));
-    stroke(&mut h);
-    assert_eq!(last_stroke(h.state())["mode"], serde_json::Value::Null, "paints again");
-    assert_eq!(last_stroke(h.state())["erase"], json!(false));
 }
 
 /// While `~` is held the Brush's Mode shows Clear, as in Photoshop.

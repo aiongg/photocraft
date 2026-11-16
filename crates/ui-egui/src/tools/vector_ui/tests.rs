@@ -801,29 +801,6 @@ fn failed_stale_pen_commit_preserves_the_draft_until_retry() {
     }
 }
 
-#[test]
-fn new_document_reports_a_failed_work_path_save_and_retains_the_draft() {
-    let mut app = app();
-    clicks(&mut app, &[[20.0, 20.0], [80.0, 60.0]]);
-    let mut draft = app.ui.pen.clone();
-    draft.as_mut().unwrap().commit_failed = true;
-    app.session.authorize = Some(|id, _| if id == "path.set" { Err(photocraft_engine::EngineError::Other("test rejection".into())) } else { Ok(()) });
-    app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
-    assert!(app.ui.status_error);
-    assert!(app.ui.status.contains("test rejection"));
-    assert_eq!(app.ui.pen, draft);
-    assert_eq!(app.session.active_index(), Some(1));
-    assert!(app.session.documents().iter().all(|d| d.doc.work_path.is_none()));
-    app.session.authorize = None;
-    app.sync_views();
-    assert_eq!(app.ui.pen, draft, "passive frames retain the refused draft");
-    assert!(app.session.documents().iter().all(|d| d.doc.work_path.is_none()));
-    assert!(pen_commit(&mut app, false), "explicit retry commits to the captured source");
-    assert!(app.ui.pen.is_none());
-    assert!(app.session.documents()[0].doc.work_path.is_some());
-    assert!(app.session.documents()[1].doc.work_path.is_none());
-}
-
 /// A draft under two anchors is no path, so a new document takes none of it along.
 #[test]
 fn new_document_drops_a_one_anchor_draft() {

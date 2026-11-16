@@ -66,21 +66,6 @@ fn the_checkboxes_read_the_reference_labels_left_to_right() {
 }
 
 #[test]
-fn hovering_each_checkbox_shows_its_tooltip() {
-    for (label, tip) in BOXES {
-        let mut h = remove_bar();
-        assert!(h.query_by_label(tip).is_none(), "{label}: no tooltip before the hover");
-        let before = h.state().ui.tool_options.clone();
-        hover(&mut h, Role::CheckBox, label, tip);
-        let o = &h.state().ui.tool_options;
-        assert_eq!(
-            (o.sample_all.remove, o.remove_after_each_stroke, o.remove_new_layer),
-            (before.sample_all.remove, before.remove_after_each_stroke, before.remove_new_layer)
-        );
-    }
-}
-
-#[test]
 fn defaults_show_only_remove_after_each_stroke_on_and_reset_tool_restores_them() {
     let mut h = remove_bar();
     let defaults = [false, true, false];

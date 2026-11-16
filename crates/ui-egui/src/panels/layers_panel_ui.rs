@@ -21,6 +21,16 @@ const CLIP_PREF: &str = "interface.clipThumbnailsToLayerBounds";
 const LOCK_LAYERS: &str = "layer.lockLayers";
 const DUPLICATE: &str = "layer.duplicate";
 
+/// The Layers panel menu's own commands.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, craft::ui::contract::CommandSet)]
+#[command(prefix = "layers")]
+pub(crate) enum LayersMenuCommand {
+    /// Opens the Lock Layers dialog with All ticked, as production's panel and row menus do; Layer › Lock Layers… and
+    /// Cmd+/ (`layer.lockLayers`) lock All directly.
+    #[command(label = "Lock Layers…")]
+    LockLayersDialog,
+}
+
 /// The saved name of a thumbnail size: the one rule both the saved entry and the panel's row menu use.
 pub(crate) fn size_key(size: ThumbSize) -> &'static str {
     match size {
@@ -126,7 +136,7 @@ pub(crate) fn panel_rows(app: &PhotocraftApp) -> Vec<PanelRow> {
         PanelRow::Separator,
         command("layer.flattenImage"),
         PanelRow::Separator,
-        command(LOCK_LAYERS),
+        PanelRow::Command(CommandRef::from(LayersMenuCommand::LockLayersDialog)),
         command("layer.renameLayer"),
         command(if any_hidden { "layer.showLayers" } else { "layer.hideLayers" }),
         PanelRow::Separator,
@@ -146,6 +156,7 @@ pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandSta
         row(LayersPanelCommands::ShowFilters, CommandState::new().checked(app.ui.layers_settings.show_filters)),
         row(LayersPanelCommands::ClipThumbnails, CommandState::new().checked(thumbnail_contents(app) == ThumbContents::LayerBounds)),
         row(LayersPanelCommands::CollapseAll, CommandState::new().enabled(app.session.is_enabled("layer.setExpanded"))),
+        (CommandRef::from(LayersMenuCommand::LockLayersDialog), CommandState::new().enabled(app.session.is_enabled(LOCK_LAYERS))),
     ];
     if app.session.active().is_some_and(|st| st.selected_layers().len() > 1) {
         let duplicate = CommandState::new().enabled(crate::menus::is_enabled(app, DUPLICATE)).title(tl!("Duplicate Layers…"));
@@ -157,6 +168,10 @@ pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandSta
 /// Runs a fired settings command of the panel menu. `false` for every other command: PhotoCraft's `layer.arrange.*`
 /// bindings stay the one path of the stacking keys, and the catalogue commands run through the menus.
 pub(crate) fn run_fired(app: &mut PhotocraftApp, _ctx: &egui::Context, command: &CommandRef) -> bool {
+    if LayersMenuCommand::from_ref(command).is_some() {
+        open_lock_layers(app);
+        return true;
+    }
     let Some(which) = LayersPanelCommands::from_ref(command) else { return false };
     // The field is set only in a panel pass, so it is read from the preference before a toggle.
     app.ui.layers_settings.options.thumbnail_contents = thumbnail_contents(app);
@@ -211,7 +226,7 @@ fn lock_params() -> Vec<Param> {
     ]
 }
 
-/// Opens the Lock Layers dialog (Layer › Lock Layers…, ⌘/ and the panel menu all open it).
+/// Opens the Lock Layers dialog with All ticked ([`LayersMenuCommand::LockLayersDialog`]).
 pub(crate) fn open_lock_layers(app: &mut PhotocraftApp) -> DialogId {
     let dialog = HostedParamDialog::new(app.ctx(), LOCK_LAYERS, DialogFields::new(), |fields| {
         ParamDialog::new(LOCK_LAYERS, tl!("Lock Layers"), lock_params()).values(Bind::bound(fields))

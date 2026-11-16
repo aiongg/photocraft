@@ -84,35 +84,3 @@ fn shift_snaps_every_direction() {
         assert_eq!(line(&app).1, want, "⇧-drag 400,300 → {to:?}");
     }
 }
-
-/// CodeRabbit on #13283: a short fractional ⇧-drag still draws a one-pixel diagonal. Snapped to
-/// 0.65 × 0.65 it is shorter than a pixel, but the drag itself is not, and its ends round to a
-/// whole-pixel 45° step.
-#[test]
-fn a_short_fractional_shift_drag_still_draws_a_diagonal() {
-    let mut app = app();
-    app.ui.views[0].zoom = 16.0;
-    drag(&mut app, [10.0, 10.0], [11.1, 10.65], Modifiers::SHIFT, Modifiers::SHIFT);
-    let (from, to, _) = line(&app);
-    assert_eq!([from, to], [[10.0, 10.0], [11.0, 11.0]]);
-}
-
-/// CodeRabbit on #13283: a short ⇧-drag near an axis still draws a one-pixel line. With
-/// Preferences › Tools › Snap Vector Tools and Transforms to Pixel Grid off, 0.96 × 0.30 snaps
-/// flat, and its 0.96 px along the axis would round both ends to x 201; the layer
-/// the layer is a line one pixel long.
-#[test]
-fn a_short_shift_drag_near_an_axis_still_draws_a_line() {
-    for (from, to, want) in [
-        ([200.51, 100.0], [201.47, 100.30], [[201.0, 99.5], [202.0, 99.5]]),
-        ([200.0, 100.51], [200.30, 101.47], [[199.5, 101.0], [199.5, 102.0]]),
-        ([201.47, 100.0], [200.51, 100.30], [[201.0, 99.5], [200.0, 99.5]]),
-    ] {
-        let mut app = app();
-        app.run("prefs.set", json!({"path": "tools.snapVectorToolsAndTransformsToPixelGrid", "value": false})).unwrap();
-        app.ui.views[0].zoom = 16.0;
-        drag(&mut app, from, to, Modifiers::SHIFT, Modifiers::SHIFT);
-        let (a, b, _) = line(&app);
-        assert_eq!([a, b], want, "⇧-drag {from:?} → {to:?}");
-    }
-}

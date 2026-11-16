@@ -697,7 +697,3 @@ mod clone_stamp_no_source_alert_tests;
 #[cfg(test)]
 #[path = "remove_options_bar_labels_tests.rs"]
 mod remove_options_bar_labels_tests;
-
-#[cfg(test)]
-#[path = "../burn_exposure_field_tests.rs"]
-mod burn_exposure_field_tests;

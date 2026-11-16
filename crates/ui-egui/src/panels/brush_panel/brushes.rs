@@ -85,22 +85,25 @@ fn picture(cx: &ContentPainterCx, rect: Rect, key: impl Hash + 'static, image: i
 
 /// How one preset paints its tip and its stroke; the framework texture store caches both by signature.
 fn paint_of(b: &BrushSettings) -> BrushRowPaint {
+    let stroke_sig = brush_preview::preview_sig(b);
+    let brush = b.clone();
+    BrushRowPaint::new(tip_paint(b), move |cx, rect| {
+        let color = Tokens::get(cx.painter.ctx()).text;
+        let size = [rect.width().round().clamp(1.0, 1024.0) as usize, rect.height().round().clamp(1.0, 1024.0) as usize];
+        picture(cx, rect, ("brushes-stroke", stroke_sig, size, color), || brush_preview::stroke_image(&brush, size, color));
+    })
+}
+
+/// How the engine draws `b`'s tip (its falloff, angle and roundness, a sampled tip's shape) in the theme's text
+/// colour: a preset's thumbnail and the Brush Preset chip's current tip.
+pub(crate) fn tip_paint(b: &BrushSettings) -> impl Fn(&ContentPainterCx, Rect) + Send + Sync + 'static {
     let tip = b.tip.clone();
     let shape = (b.hardness, b.angle, b.roundness);
     let tip_key = brush_preview::tip_sig(&tip, shape.0, shape.1, shape.2, (false, false));
-    let stroke_sig = brush_preview::preview_sig(b);
-    let brush = b.clone();
-    BrushRowPaint::new(
-        move |cx, rect| {
-            let color = Tokens::get(cx.painter.ctx()).text;
-            picture(cx, rect, ("brushes-tip", tip_key, color), || brush_preview::tip_image(&tip, shape, 36, color));
-        },
-        move |cx, rect| {
-            let color = Tokens::get(cx.painter.ctx()).text;
-            let size = [rect.width().round().clamp(1.0, 1024.0) as usize, rect.height().round().clamp(1.0, 1024.0) as usize];
-            picture(cx, rect, ("brushes-stroke", stroke_sig, size, color), || brush_preview::stroke_image(&brush, size, color));
-        },
-    )
+    move |cx, rect| {
+        let color = Tokens::get(cx.painter.ctx()).text;
+        picture(cx, rect, ("brushes-tip", tip_key, color), || brush_preview::tip_image(&tip, shape, 36, color));
+    }
 }
 
 /// The rows of every preset in the engine's panel order (the order `,` and `.` step through): a

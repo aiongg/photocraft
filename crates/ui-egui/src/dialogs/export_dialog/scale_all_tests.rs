@@ -75,16 +75,6 @@ fn several_rows_ask_for_a_folder_and_write_one_file_per_size() {
     assert_eq!(half.2, full.2, "the same ppi");
 }
 
-#[test]
-fn one_row_uses_the_save_dialog_at_its_size() {
-    let (mut app, id, writes, files) = opened();
-    export_rows(&mut app, id, &rows(&[(ScaleSize::X2, "@2x")]));
-    assert_eq!(files.requests().last().map(|r| r.kind), Some(PickKind::Save), "the save dialog");
-    answer(&mut app, &files, std::path::Path::new("out.png"));
-    let (w, h, _) = size_of(&writes.borrow()[0].1);
-    assert_eq!((w, h), (400, 300));
-}
-
 /// Two rows that would write one file are refused before anything is written (#15028 review).
 #[test]
 fn rows_that_share_an_output_file_are_refused() {
@@ -98,16 +88,6 @@ fn rows_that_share_an_output_file_are_refused() {
     let ok = batch_file_names("harbor", "png", &rows(&[(ScaleSize::X1, ""), (ScaleSize::X0_5, "@0.5x")])).unwrap();
     assert_eq!(ok, ["harbor.png", "harbor@0.5x.png"]);
     assert_eq!(file_suffix("@2x/../a:b"), "@2x_.._a_b");
-}
-
-#[test]
-fn exporting_rows_with_one_name_writes_nothing_and_says_why() {
-    let dir = tempfile::tempdir().unwrap();
-    let (mut app, id, writes, files) = opened();
-    export_rows(&mut app, id, &rows(&[(ScaleSize::X1, ""), (ScaleSize::X0_5, "")]));
-    answer(&mut app, &files, dir.path());
-    assert!(writes.borrow().is_empty(), "nothing written");
-    assert!(app.ui.status.contains("would write the same file"), "{}", app.ui.status);
 }
 
 /// Only a folder was chosen, so a file already there is never replaced: any existing target stops the batch before

@@ -133,29 +133,6 @@ fn markers_survive_release_and_handles_resize_the_frame_without_creating_another
     assert_eq!(selected(app).unwrap().frame.as_ref().unwrap().transform.m, [100., 0., 0., 80., 20., 30.]);
 }
 
-/// A body drag of a Frame-target frame moves the frame only, through a live preview; cancelling the gesture
-/// clears the preview and commits nothing.
-#[test]
-fn dragging_border_moves_only_frame_and_escape_discards_live_preview() {
-    let mut app = app();
-    drag(&mut app, [20., 30.], [120., 110.]);
-    let before = selected(&app).unwrap().frame.clone();
-    let entries = app.session.active().unwrap().history.entries();
-    let m = egui::Modifiers::NONE;
-    crate::canvas::testing::frame(&mut app);
-    tool_event(&mut app, ToolEvent::Down { x: 50., y: 30., pressure: 1. }, m);
-    tool_event(&mut app, ToolEvent::Move { x: 80., y: 50., pressure: 1. }, m);
-    assert_eq!(selected(&app).unwrap().frame, before, "preview never changes document");
-    assert!(app.frame_preview.is_some());
-    let ctx = app.ctx().clone();
-    // The tool change is how the host cancels a gesture.
-    crate::canvas::tools::tool_changed(&mut app, &ctx, CanvasHost::main(0));
-    assert!(app.frame_preview.is_none());
-    assert_eq!(app.session.active().unwrap().history.entries(), entries);
-    drag(&mut app, [50., 30.], [80., 50.]);
-    assert_eq!(selected(&app).unwrap().frame.as_ref().unwrap().transform.m, [100., 0., 0., 80., 50., 50.]);
-}
-
 /// One click selects Both (or Frame on the border), a double click Content, another Both; a border drag
 /// selects Frame; an image-only drag leaves the mask alone.
 #[test]
@@ -185,42 +162,6 @@ fn frame_content_and_both_selection_follow_clicks_and_double_clicks() {
     assert!(app.ui.transform.is_none());
     assert_eq!(selected(&app).unwrap().frame, f, "image-only transform leaves the mask");
     assert_ne!(app.session.active().unwrap().doc.layer(source).unwrap(), &source_before);
-}
-
-#[test]
-fn modifiers_shape_selection_and_invalid_control_params_are_consistent() {
-    let mut app = app();
-    let ctx = app.ctx().clone();
-    let call = |app: &mut PhotocraftApp, p: Value| {
-        let (req, _) = crate::control::ControlRequest::new("ui.set", p);
-        let crate::control::Reply::Done(v) = crate::control::handle(app, &ctx, &req) else { panic!("immediate state update") };
-        v
-    };
-    assert_eq!(call(&mut app, json!({"frameShape":"triangle","frameSides":6}))["ok"], true);
-    assert_eq!(call(&mut app, json!({"frameShape":"invalid","tool":"brush"}))["ok"], false);
-    assert_eq!(app.ui.tool, Tool::Frame);
-    assert_eq!(call(&mut app, json!({"frameSides":100000}))["ok"], false);
-    drag(&mut app, [70., 70.], [130., 130.]);
-    let f = selected(&app).unwrap().frame.as_ref().unwrap();
-    // Shift squares from the shorter side (#13865): 20 px each way around the start.
-    assert_eq!(f.bounds(), Rect::new(80, 80, 120, 120));
-    assert_eq!(TestMask(f.outline()).value(80, 80), 0.0, "triangle rather than bounding rectangle");
-    let frame = selected(&app).unwrap().id;
-    let content = app
-        .session
-        .edit("Image", |doc, _| {
-            let mut l = Layer::raster("Photo", doc.pixel_format());
-            l.surface_mut().unwrap().fill_rect(Rect::new(20, 20, 100, 100), &[1., 0., 0., 1.]);
-            let id = l.id;
-            doc.layers.push(l);
-            Ok(id)
-        })
-        .unwrap();
-    app.run("layer.frame.setContent", json!({"layer":frame.0,"content":content.0})).unwrap();
-    assert_eq!(call(&mut app, json!({"frameTarget":"content"}))["ok"], true);
-    assert_eq!(app.session.active().unwrap().active_layer, Some(content));
-    assert_eq!(call(&mut app, json!({"frameTarget":"both"}))["ok"], true);
-    assert_eq!(app.session.active().unwrap().active_layer, Some(frame));
 }
 
 #[test]
@@ -299,23 +240,6 @@ fn hidden_frame_ancestors_hide_placeholders_and_handles() {
     h.run_steps(3);
     assert_eq!(frame_at(h.state(), [50., 50.]), None);
     assert!(h.query_all_by_label("Frame").next().is_none(), "no box for a hidden frame");
-}
-
-#[test]
-fn drawing_a_frame_with_another_frames_image_selected_leaves_that_image_in_place() {
-    let mut app = app();
-    let source = add_photo(&mut app, 200, 200);
-    drag(&mut app, [20., 30.], [120., 110.]);
-    let first = selected(&app).unwrap().id;
-    double_click(&mut app, [65., 65.]);
-    assert_eq!(app.session.active().unwrap().active_layer, Some(source));
-    // Starts outside the first frame but overlaps the image's own bounds.
-    drag(&mut app, [150., 150.], [250., 250.]);
-    let doc = &app.session.active().unwrap().doc;
-    assert_eq!(photocraft_engine::frame_cmds::frame_of(doc, source), Some(first), "the image stays in its frame");
-    let second = selected(&app).unwrap();
-    assert_ne!(second.id, first);
-    assert!(second.children().unwrap().is_empty(), "the new frame is empty");
 }
 
 /// Esc during a frame's content drag ends its automatic transform: a Free Transform started

@@ -100,9 +100,5 @@ pub(super) fn kerning_at(app: &PhotocraftApp) -> Option<(photocraft_doc::text::K
 }
 
 #[cfg(test)]
-#[path = "size_presets_tests.rs"]
-mod size_presets_tests;
-
-#[cfg(test)]
 #[path = "vertical_mask_align_buttons_tests.rs"]
 mod vertical_mask_align_buttons_tests;

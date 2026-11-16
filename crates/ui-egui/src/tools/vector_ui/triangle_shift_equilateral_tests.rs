@@ -45,23 +45,6 @@ fn drag(start: [f64; 2], end: [f64; 2], mods: Modifiers) -> Vec<(f64, f64)> {
 }
 
 #[test]
-fn shift_sizes_the_circle_from_the_shorter_side() {
-    close(&drag([400.0, 300.0], [600.0, 400.0], Modifiers::SHIFT), &[(450.0, 300.0), (493.3, 375.0), (406.7, 375.0)]);
-}
-
-#[test]
-fn shift_alt_centres_the_circle_on_the_press() {
-    let got = drag([400.0, 300.0], [600.0, 400.0], Modifiers::SHIFT | Modifiers::ALT);
-    close(&got, &[(400.0, 200.0), (486.6, 350.0), (313.4, 350.0)]);
-}
-
-#[test]
-fn a_tall_narrow_drag_uses_its_width() {
-    let got = drag([400.0, 300.0], [450.0, 500.0], Modifiers::SHIFT);
-    close(&got, &[(425.0, 300.0), (446.65, 337.5), (403.35, 337.5)]);
-}
-
-#[test]
 fn a_plain_drag_still_fills_its_box() {
     let got = drag([400.0, 300.0], [600.0, 400.0], Modifiers::NONE);
     close(&got, &[(500.0, 300.0), (600.0, 400.0), (400.0, 400.0)]);

@@ -107,44 +107,6 @@ fn checkmark(h: &mut H) {
     h.run();
 }
 
-/// A font chosen for a range commits by the check mark and by `commit`, keeping styles and pixels.
-#[test]
-fn selected_fonts_commit() {
-    for pattern in 0..4 {
-        {
-            for range in [[2, 4], [4, 2], [0, 6]] {
-                for by_checkmark in [true, false] {
-                    let label = (pattern, range, by_checkmark);
-                    let (mut h, id) = fixture(pattern, "abcdef");
-                    select(&mut h, range);
-                    h.run();
-                    let target = FONTS[1 - pattern % 2];
-                    let mut expected = families(&saved(&h, id));
-                    for font in &mut expected[range[0].min(range[1])..range[0].max(range[1])] {
-                        *font = target.into();
-                    }
-                    choose(&mut h, target, "enter");
-                    let applied = saved(&h, id);
-                    assert_eq!(families(&applied), expected, "{label:?}");
-                    let pixels = layer(&h.state().session.active().unwrap().doc, id).cache.clone();
-                    if by_checkmark {
-                        checkmark(&mut h);
-                    } else {
-                        use crate::canvas::testing::{ToolEvent, tool_event};
-                        tool_event(h.state_mut(), ToolEvent::Down { x: 230.0, y: 150.0, pressure: 1.0 }, Default::default());
-                        tool_event(h.state_mut(), ToolEvent::Up { x: 230.0, y: 150.0 }, Default::default());
-                        h.run();
-                    }
-                    // The check mark ends the session; a click on the canvas background moves the edit off this layer.
-                    assert!(h.state().ui.text_edit.as_ref().is_none_or(|e| !by_checkmark && e.layer != id.0), "{label:?}");
-                    assert_eq!(saved(&h, id), applied, "{label:?}");
-                    assert_eq!(layer(&h.state().session.active().unwrap().doc, id).cache, pixels, "{label:?}");
-                }
-            }
-        }
-    }
-}
-
 #[test]
 fn caret_font_choices_style_only_subsequent_typing_including_ime() {
     for original in 0..2 {

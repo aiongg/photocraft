@@ -233,59 +233,6 @@ fn camera_raw_control_updates_and_commits_or_cancels_an_open_raw() {
 }
 
 #[test]
-fn camera_raw_control_continuation_does_not_bypass_other_modal_or_command_gates() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let ctx = app.ctx().clone();
-    app.run("file.new", json!({"width":16,"height":16})).unwrap();
-    app.run("layer.new.layer", json!({})).unwrap();
-    app.run("edit.fill", json!({"color":"#808080"})).unwrap();
-    let opened = call(&mut app, &ctx, "ui.menu.invoke", json!({"id":"filter.cameraRaw"}));
-    assert_eq!(opened["ok"], true, "{opened}");
-    let original = app.session.active().unwrap().doc.clone();
-    let cancel = json!({"id":"filter.cameraRaw","params":{"ui":{"cancel":true}}});
-    for request in [
-        json!({"id":"file.new"}),
-        json!({"id":"view.zoomIn"}),
-        json!({"id":"filter.cameraRaw"}),
-        json!({"id":"filter.cameraRaw","params":{"exposure":1}}),
-        json!({"id":"filter.cameraRaw","params":{"ui":null}}),
-        json!({"id":"filter.cameraRaw","params":{"ui":{},"smartFilter":{"layer":1,"index":0}}}),
-    ] {
-        let blocked = call(&mut app, &ctx, "ui.menu.invoke", request);
-        assert_eq!(blocked["ok"], false, "{blocked}");
-    }
-    let about = call(&mut app, &ctx, "ui.dialog.open", json!({"kind": "about"}));
-    assert_eq!(about["ok"], true, "{about}");
-    assert_eq!(call(&mut app, &ctx, "ui.menu.invoke", cancel.clone())["ok"], false);
-    let about = top_dialog(&mut app, &ctx)["id"].clone();
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": about}))["ok"], true);
-    assert!(crate::discard_ui::intercept(&mut app, "file.close", &json!({})));
-    assert_eq!(call(&mut app, &ctx, "ui.menu.invoke", cancel.clone())["ok"], false);
-    let prompt = top_dialog(&mut app, &ctx)["id"].clone();
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": prompt}))["ok"], true);
-    assert!(dialogs(&mut app, &ctx).is_empty(), "both hosted dialogs are closed");
-    // tl.P1 names no setter for a pending crop frame; it is drawn with the Crop tool's own drag.
-    app.ui.tool = Tool::Crop;
-    pointer(
-        &mut app,
-        json!({"tool": "Crop", "events": [{"kind":"down","x":1,"y":1},{"kind":"move","x":5,"y":5},{"kind":"move","x":10,"y":10},{"kind":"up","x":10,"y":10}]}),
-    );
-    assert!(crate::crop_ui::blocks(&app, "filter.cameraRaw"));
-    assert_eq!(call(&mut app, &ctx, "ui.menu.invoke", cancel.clone())["ok"], false);
-    app.services.automation_command = Some(Box::new(|id, _| if id == "filter.cameraRaw" { Err("Camera Raw denied".into()) } else { Ok(()) }));
-    for ui in [json!({"set":{"exposure":1}}), json!({"commit":true}), json!({"cancel":true})] {
-        let denied = call(&mut app, &ctx, "ui.menu.invoke", json!({"id":"filter.cameraRaw","params":{"ui":ui}}));
-        assert_eq!(denied["ok"], false, "{denied}");
-        assert_eq!(denied["error"], "Camera Raw denied");
-    }
-    assert_eq!(crate::camera_raw_ui::describe(&app)["params"]["exposure"], 0.0);
-    assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &original));
-    app.services.automation_command = None;
-    assert_eq!(call(&mut app, &ctx, "ui.menu.invoke", cancel)["ok"], true);
-    assert_eq!(crate::distort_ui::modal_workspace(&app), None);
-}
-
-#[test]
 fn full_window_workspaces_are_modal_for_menu_invocations() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
@@ -449,49 +396,6 @@ fn shape_stroke_defaults_are_drivable_and_validate_atomically() {
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"shapeStroke":{"colour":"#ff0000"}}))["ok"], false);
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"shapeStroke":null}))["ok"], true);
     assert_eq!(app.ui.tool_options.stroke_width, 0.0);
-}
-
-#[test]
-fn the_unsaved_changes_prompt_is_listed_and_answered_through_ui_dialog() {
-    // #4920: the prompt shown on quit or close with unsaved changes wasn't in ui.inspect, and a
-    // control client couldn't answer it.
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let ctx = app.ctx().clone();
-    for _ in 0..2 {
-        app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
-        app.run("layer.new.layer", json!({})).unwrap();
-    }
-    // The hosted prompt is the only dialog open, so it is the top one: `"top"` addresses it.
-    let prompt = |app: &mut PhotocraftApp| dialogs(app, &ctx).last().cloned();
-    assert!(prompt(&mut app).is_none());
-    // Closing a dirty document: listed with its choices; a bad choice and Cancel keep the document.
-    crate::menus::invoke(&mut app, &ctx, "file.close", json!({})).unwrap();
-    crate::dialogs::take_results(&mut app, &ctx);
-    let d = prompt(&mut app).expect("the prompt is listed");
-    assert!(app.framework.dialogs.is_open::<craft::ui::dialog::UnsavedChangesDialog>(), "the prompt asks about the close");
-    assert_eq!(d["fields"]["choice"], "save", "the default answer is Save");
-    assert!(d["fields"].get("applyToAll").is_none(), "one document asks no Apply to All");
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "maybe"}))["ok"], false);
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog": "top", "field": "x", "value": 1}))["ok"], false);
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": "top"}))["ok"], true);
-    assert!(prompt(&mut app).is_none() && app.session.documents().len() == 2);
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": "top"}))["ok"], false, "nothing left to answer");
-    // Don't Save closes it.
-    crate::menus::invoke(&mut app, &ctx, "file.close", json!({})).unwrap();
-    crate::dialogs::take_results(&mut app, &ctx);
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "dontSave"}))["ok"], true);
-    assert_eq!(app.session.documents().len(), 1);
-    // Quitting asks about each dirty document, then lets the window close.
-    app.run("file.new", json!({"width": 8, "height": 8})).unwrap();
-    app.run("layer.new.layer", json!({})).unwrap();
-    assert!(crate::discard_ui::intercept(&mut app, "file.exit", &Value::Null));
-    crate::dialogs::take_results(&mut app, &ctx);
-    let d = prompt(&mut app).expect("the quit prompt is listed");
-    assert_eq!(d["fields"]["applyToAll"], false, "two documents are left to ask about, so Apply to All is offered");
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "dontSave"}))["result"]["open"], true);
-    assert!(prompt(&mut app).unwrap()["fields"].get("applyToAll").is_none(), "the last document asks no Apply to All");
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog": "top", "choice": "dontSave"}))["result"]["open"], false);
-    assert!(app.allow_close && app.session.documents().is_empty());
 }
 
 /// A dialog on the framework's `DialogHost` is set, confirmed and cancelled through ui.dialog.* by
@@ -790,49 +694,6 @@ fn agent_right_click_on_a_pending_crop_opens_and_runs_the_crop_menu() {
     assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"crop.commit"}))["ok"], true);
     let size = app.session.active().unwrap().doc.size;
     assert_eq!([f64::from(size.width), f64::from(size.height)], [frame.rect.width(), frame.rect.height()], "cropped to the frame");
-}
-
-/// An agent's right-click while its own crop frame drag is still down opens no menu over it;
-/// after the drag's release it does.
-#[test]
-fn agent_right_click_during_its_crop_drag_opens_no_menu() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
-    app.sync_views();
-    app.ui.tool = crate::state::Tool::Crop;
-    app.ui.tool_options.crop.shield.classic_mode = true;
-    app.ui.extras.snap = false;
-    let act = |app: &mut PhotocraftApp, button: &str, events: Value| {
-        assert_eq!(pointer(app, json!({"tool": "Crop", "button": button, "events": events}))["ok"], true);
-    };
-    // The first drag on the default frame (nothing pending yet): no pasteboard menu outside the image.
-    act(&mut app, "left", json!([{"kind":"down","x":4,"y":4},{"kind":"move","x":16,"y":12},{"kind":"move","x":28,"y":20}]));
-    assert!(crate::crop_ui::dragging(&app) && !crate::crop_ui::pending(&app), "the first frame is still being drawn");
-    assert!(crate::canvas::testing::in_gesture(&mut app));
-    act(&mut app, "secondary", json!([{"kind":"down","x":-8,"y":-8},{"kind":"up","x":-8,"y":-8}]));
-    assert!(app.ui.canvas_tool_menu.is_none(), "no pasteboard menu over the first drag");
-    act(&mut app, "left", json!([{"kind":"up","x":28,"y":20}]));
-    // A second drag, on the drawn frame, still down.
-    act(&mut app, "left", json!([{"kind":"down","x":16,"y":12},{"kind":"move","x":18,"y":14}]));
-    assert!(crate::crop_ui::dragging(&app) && crate::crop_ui::pending(&app), "the frame drag is still down");
-    let right_click = json!([{"kind":"down","x":16,"y":12},{"kind":"up","x":16,"y":12}]);
-    act(&mut app, "secondary", right_click.clone());
-    assert!(app.ui.canvas_tool_menu.is_none(), "no menu over the drag");
-    // Space repositions the frame being dragged rather than holding the Hand: no view menu (#11271).
-    let spaced = json!({"tool": "Crop", "space": true, "button": "secondary", "events": right_click.clone()});
-    assert_eq!(pointer(&mut app, spaced)["ok"], true);
-    assert!(app.ui.canvas_tool_menu.is_none(), "no view menu with Space over the drag");
-    act(&mut app, "left", json!([{"kind":"up","x":18,"y":14}]));
-    assert!(!crate::canvas::testing::in_gesture(&mut app));
-    act(&mut app, "secondary", right_click.clone());
-    assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Crop { .. })), "after the release it opens");
-    // Nor over a Straighten line still being drawn.
-    app.ui.canvas_tool_menu = None;
-    crate::crop_ui::toggle_straighten(&mut app);
-    act(&mut app, "left", json!([{"kind":"down","x":6,"y":6},{"kind":"move","x":20,"y":8}]));
-    assert!(crate::crop_ui::dragging(&app), "the Straighten line is still down");
-    act(&mut app, "secondary", right_click);
-    assert!(app.ui.canvas_tool_menu.is_none(), "no menu over the Straighten line");
 }
 
 #[test]

@@ -7,7 +7,9 @@
 use craft::behavior::Axis;
 use craft::behavior::dock::{Action, Column, DockEdge, Floating, Group, Layout, Node, Permissions, SplitSize, Workspace};
 use craft::color::ui::{ColorPanelCommand, ColorPanelMenu};
+use craft::ui::contract::{Scroll, ShowContainer as _};
 use craft::ui::docking::DockHeights;
+use craft::ui::layout_components::Stack;
 use craft::ui::menu::PanelRow;
 use craft::ui::runtime::commands::{CommandRef, CommandSet as _, CommandState};
 use egui::{Rect, pos2, vec2};
@@ -36,9 +38,6 @@ pub(crate) struct PanelEntry {
     pub states: fn(&PhotocraftApp) -> Vec<(CommandRef, CommandState)>,
     /// Runs a fired command of the panel's command set; `false` when the command is not the panel's.
     pub run: fn(&mut PhotocraftApp, &egui::Context, &CommandRef) -> bool,
-    /// The body lays out its own scrolling list or sizes itself to the group, so the dock does not wrap it in a
-    /// scroll area.
-    pub scrolls_itself: bool,
 }
 
 /// The panel that holds the document area. It never moves, floats or closes, and panels open beside it.
@@ -64,19 +63,7 @@ fn runs_nothing(_: &mut PhotocraftApp, _: &egui::Context, _: &CommandRef) -> boo
 
 /// A panel with no menu rows, a 220-point least width and `least` points of body height, docked by default.
 const fn panel(id: &'static str, label: fn() -> String, icon: &'static str, least: f32, body: fn(&mut PhotocraftApp, &mut egui::Ui)) -> PanelEntry {
-    PanelEntry {
-        id,
-        label,
-        icon,
-        heights: None,
-        min: [MIN_WIDTH, least],
-        float_size: None,
-        body,
-        rows: no_rows,
-        states: no_states,
-        run: runs_nothing,
-        scrolls_itself: false,
-    }
+    PanelEntry { id, label, icon, heights: None, min: [MIN_WIDTH, least], float_size: None, body, rows: no_rows, states: no_states, run: runs_nothing }
 }
 
 /// A panel that floats by default at `size`.
@@ -84,11 +71,17 @@ const fn floating(id: &'static str, label: fn() -> String, icon: &'static str, s
     PanelEntry { float_size: Some(size), ..panel(id, label, icon, LEAST, body) }
 }
 
+/// Shows `body`, whose content neither fills the group nor scrolls itself, in a stack that fills the group and scrolls
+/// vertically. Bodies whose root fills the group scroll themselves and are shown as they are.
+fn scrolled(app: &mut PhotocraftApp, ui: &mut egui::Ui, body: fn(&mut PhotocraftApp, &mut egui::Ui)) {
+    Stack::new().fill().scroll(Scroll::vertical()).show(ui, |ui, _| body(app, ui));
+}
+
 /// The least body height of a group other than Layers and Brushes.
 const LEAST: f32 = 50.0;
 
-// Group heights exclude the tab strip. A group's `fill` is what it asks for while it is the column's last expanded
-// group: Layers wants room for about ten rows at 900 points (#147).
+// Group heights exclude the tab strip. The dock fills each column with its last open group, which asks for its `fill`:
+// Layers wants room for about ten rows at 900 points (#147).
 const COLOR_HEIGHTS: DockHeights = DockHeights::new(160.0).compact(100.0).fill(LEAST);
 const PROPERTIES_HEIGHTS: DockHeights = DockHeights::new(220.0).compact(130.0).fill(LEAST);
 const CHARACTER_HEIGHTS: DockHeights = DockHeights::new(240.0).compact(130.0).fill(LEAST);
@@ -106,7 +99,6 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         rows: |_| ColorPanelMenu::rows(),
         states: color_states,
         run: color_run,
-        scrolls_itself: true,
         ..panel("color", || tl!("Color").to_string(), "palette", LEAST, super::color::panel)
     },
     PanelEntry {
@@ -116,44 +108,46 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         ..panel("swatches", || tl!("Swatches").to_string(), "swatch-book", LEAST, super::swatches_ui::panel)
     },
     panel("gradients", || tl!("Gradients").to_string(), "blend", LEAST, super::preset_panels::gradients_panel),
-    // Patterns lays out its own list and footer bar.
-    PanelEntry { scrolls_itself: true, ..panel("patterns", || tl!("Patterns").to_string(), "grid-3x3", LEAST, super::preset_panels::patterns_panel) },
-    PanelEntry {
-        heights: Some(PROPERTIES_HEIGHTS),
-        ..panel("properties", || tl!("Properties").to_string(), "sliders-horizontal", LEAST, super::properties::panel)
-    },
-    panel("adjustments", || tl!("Adjustments").to_string(), "contrast", LEAST, super::properties::adjustments::panel),
+    panel("patterns", || tl!("Patterns").to_string(), "grid", LEAST, super::preset_panels::patterns_panel),
+    PanelEntry { heights: Some(PROPERTIES_HEIGHTS), ..panel("properties", || tl!("Properties").to_string(), "adjustments", LEAST, super::properties::panel) },
+    panel("adjustments", || tl!("Adjustments").to_string(), "contrast", LEAST, |app, ui| scrolled(app, ui, super::properties::adjustments::panel)),
     PanelEntry {
         heights: Some(CHARACTER_HEIGHTS),
-        ..panel("character", || tl!("Character").to_string(), "type", LEAST, |app, ui| crate::type_tool::character_panel(app, ui, false))
+        ..panel(
+            "character",
+            || tl!("Character").to_string(),
+            "type",
+            LEAST,
+            |app, ui| scrolled(app, ui, |app, ui| crate::type_tool::character_panel(app, ui, false)),
+        )
     },
-    panel("paragraph", || tl!("Paragraph").to_string(), "pilcrow", LEAST, |app, ui| crate::type_tool::character_panel(app, ui, true)),
+    panel(
+        "paragraph",
+        || tl!("Paragraph").to_string(),
+        "pilcrow",
+        LEAST,
+        |app, ui| scrolled(app, ui, |app, ui| crate::type_tool::character_panel(app, ui, true)),
+    ),
     // The Navigator's preview grows with its group, as in Photoshop (#2726).
-    PanelEntry {
-        heights: Some(NAVIGATOR_HEIGHTS),
-        scrolls_itself: true,
-        ..panel("navigator", || tl!("Navigator").to_string(), "navigation", LEAST, super::navigator::navigator)
-    },
+    PanelEntry { heights: Some(NAVIGATOR_HEIGHTS), ..panel("navigator", || tl!("Navigator").to_string(), "navigation", LEAST, super::navigator::navigator) },
     PanelEntry {
         rows: super::histogram_panel::panel_rows,
         states: super::histogram_panel::command_states,
         run: super::histogram_panel::run_fired,
-        ..panel("histogram", || tl!("Histogram").to_string(), "chart-line", LEAST, super::histogram_panel::show)
+        ..panel("histogram", || tl!("Histogram").to_string(), "chart-line", LEAST, |app, ui| scrolled(app, ui, super::histogram_panel::show))
     },
-    panel("info", || tl!("Info").to_string(), "info", LEAST, super::info::info_panel),
+    panel("info", || tl!("Info").to_string(), "info", LEAST, |app, ui| scrolled(app, ui, super::info::info_panel)),
     PanelEntry {
         heights: Some(HISTORY_HEIGHTS),
         rows: super::history_menu_ui::panel_rows,
         states: super::history_menu_ui::command_states,
         run: super::history_menu_ui::run_fired,
-        scrolls_itself: true,
         ..panel("history", || tl!("History").to_string(), "clock", LEAST, super::history::history)
     },
     PanelEntry {
         rows: super::actions::menu::panel_rows,
         states: super::actions::menu::states,
         run: super::actions::menu::run_fired,
-        scrolls_itself: true,
         ..panel("actions", || tl!("Actions").to_string(), "play", LEAST, super::actions::panel)
     },
     PanelEntry {
@@ -161,34 +155,30 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         run: super::comps_ui::run_fired,
         ..panel("layerComps", || tl!("Layer Comps").to_string(), "copy", LEAST, super::comps_ui::panel)
     },
-    // Layers, Channels and Paths lay out their own scrolling list and footer: wrapped in the dock's scroll area as
-    // well, the two nested areas shared the wheel (#6238).
     PanelEntry {
         heights: Some(LAYERS_HEIGHTS),
         rows: super::layers_panel_ui::panel_rows,
         states: super::layers_panel_ui::command_states,
         run: super::layers_panel_ui::run_fired,
-        scrolls_itself: true,
         ..panel("layers", || tl!("Layers").to_string(), "layers", 110.0, super::layers::layers)
     },
     PanelEntry {
         rows: super::channels_panel::panel_rows,
         states: super::channels_panel::command_states,
         run: super::channels_panel::run_fired,
-        scrolls_itself: true,
         ..panel("channels", || tl!("Channels").to_string(), "squares-intersect", 110.0, super::channels_panel::show)
     },
-    PanelEntry { scrolls_itself: true, ..panel("paths", || tl!("Paths").to_string(), "pen-tool", 110.0, crate::vector_ui::paths_panel) },
+    panel("paths", || tl!("Paths").to_string(), "pen_tool", 110.0, crate::vector_ui::paths_panel),
     PanelEntry { heights: Some(BRUSHES_HEIGHTS), ..panel("brushes", || tl!("Brushes").to_string(), "brush", 70.0, super::brush_panel::brushes::panel) },
     PanelEntry {
         rows: super::preset_browser::styles_rows,
         states: super::preset_browser::styles_states,
         run: super::preset_browser::styles_run,
-        ..floating("styles", || tl!("Styles").to_string(), "sparkles", [300.0, 420.0], super::preset_panels::styles_panel)
+        ..floating("styles", || tl!("Styles").to_string(), "sparkles", [300.0, 420.0], |app, ui| scrolled(app, ui, super::preset_panels::styles_panel))
     },
     floating("shapes", || tl!("Shapes").to_string(), "square", [300.0, 420.0], super::preset_panels::shapes_panel),
-    floating("toolPresets", || tl!("Tool Presets").to_string(), "circle-dot", [300.0, 380.0], super::preset_panels::tool_presets_panel),
-    floating("cloneSource", || tl!("Clone Source").to_string(), "stamp", [300.0, 360.0], super::preset_panels::clone_source_panel),
+    floating("toolPresets", || tl!("Tool Presets").to_string(), "target", [300.0, 380.0], super::preset_panels::tool_presets_panel),
+    floating("cloneSource", || tl!("Clone Source").to_string(), "stamp", [300.0, 360.0], |app, ui| scrolled(app, ui, super::preset_panels::clone_source_panel)),
     PanelEntry {
         rows: super::type_panels_ui::styles::panel_rows,
         run: super::type_panels_ui::styles::run_fired,
@@ -211,19 +201,20 @@ pub(crate) static PANELS: &[PanelEntry] = &[
             |app, ui| super::type_panels_ui::styles::panel(app, ui, true),
         )
     },
+    // Glyphs and Measurement Log hold collections that scroll themselves.
     floating("glyphs", || tl!("Glyphs").to_string(), "text-cursor", [360.0, 320.0], super::type_panels_ui::glyphs::body),
     // The Timeline docks below the canvas; it lays out its own tracks.
-    PanelEntry { scrolls_itself: true, ..panel("timeline", || tl!("Timeline").to_string(), "square-split-vertical", LEAST, super::timeline_ui::body) },
+    panel("timeline", || tl!("Timeline").to_string(), "square-split-vertical", LEAST, super::timeline_ui::body),
     PanelEntry {
         rows: super::brush_panel::panel_rows,
         states: super::brush_panel::command_states,
         run: super::brush_panel::run_fired,
         ..floating("brushSettings", || tl!("Brush Settings").to_string(), "brush-cleaning", [520.0, 460.0], super::brush_settings::brush_settings)
     },
-    floating("modifierKeys", || tl!("Modifier Keys").to_string(), "keyboard", [240.0, 140.0], crate::modifier_keys::panel),
-    floating("gradientEditor", || tl!("Gradient Editor").to_string(), "blend", [520.0, 440.0], crate::gradient_ui::editor::show),
+    floating("modifierKeys", || tl!("Modifier Keys").to_string(), "keyboard", [240.0, 140.0], |app, ui| scrolled(app, ui, crate::modifier_keys::panel)),
+    floating("gradientEditor", || tl!("Gradient Editor").to_string(), "blend", [520.0, 440.0], |app, ui| scrolled(app, ui, crate::gradient_ui::editor::show)),
     floating("measurementLog", || tl!("Measurement Log").to_string(), "ruler", [620.0, 320.0], crate::tools::analysis::log_panel::body),
-    floating("notes", || tl!("Notes").to_string(), "square-plus", [260.0, 300.0], crate::tools::analysis::notes_panel::body),
+    floating("notes", || tl!("Notes").to_string(), "square-plus", [260.0, 300.0], |app, ui| scrolled(app, ui, crate::tools::analysis::notes_panel::body)),
 ];
 
 /// The Color panel menu's states, from the panel's own state.

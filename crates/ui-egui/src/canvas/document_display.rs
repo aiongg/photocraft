@@ -21,6 +21,7 @@ use egui::{Color32, Pos2, Rect};
 use super::gpu_picture::{GpuPicture, GpuRequest, gpu_picture};
 use super::raster_source::{CompositePrep, OverlayPrep};
 use super::{Document, PhotocraftApp, View, tools};
+use photocraft_doc::LayerId;
 use photocraft_geom::Rect as DRect;
 
 impl View {
@@ -137,14 +138,25 @@ pub(crate) fn checkerboard(app: &PhotocraftApp) -> Option<Checker> {
 }
 
 /// What the view commands fit and fill: the document, its artboard (the active board, else the last, production's
-/// Fit Artboard), the selected layers' content bounds (else the document's), and the resolutions Print Size and
-/// Actual Pixels read.
+/// Fit Artboard), and the resolutions Print Size and Actual Pixels read. Fit Layers asks [`layer_bounds`] itself.
 pub(crate) fn view_target(app: &PhotocraftApp, idx: usize) -> ViewTarget {
-    let state = &app.session.documents()[idx];
-    let doc = &state.doc;
-    let rect64 = |r: DRect| Rect64::new(f64::from(r.x0), f64::from(r.y0), f64::from(r.x1), f64::from(r.y1));
+    let doc = &app.session.documents()[idx].doc;
+    let pages = super::artboard_ui::pages(app, idx);
+    let mut target = ViewTarget::new(Size::new(f64::from(doc.size.width), f64::from(doc.size.height)))
+        .ppi(f64::from(doc.resolution_dpi))
+        .screen_ppi(app.session.prefs().units_and_rulers.screen_resolution);
+    if let Some(page) = pages.iter().find(|p| p.active == Some(true)).or_else(|| pages.last()) {
+        target = target.artboard(page.rect);
+    }
+    target
+}
+
+/// The bounds Fit Layers shows in `doc`, whose active layer is `active` and selection `selected`: the selected layers'
+/// content, else the document's. It walks the document and the layers' tiles, so the canvas asks for it only in the
+/// pass that runs the command.
+fn layer_bounds(doc: &Document, active: Option<LayerId>, selected: &[LayerId]) -> Rect64 {
     let mut layers = DRect::EMPTY;
-    for id in state.selected_layers() {
+    for id in photocraft_engine::selected_in(doc, active, selected) {
         if let Some(bounds) = doc.layer(id).and_then(|l| l.surface()).map(|s| s.content_bounds()) {
             layers = if layers.is_empty() { bounds } else { layers.union(&bounds) };
         }
@@ -152,15 +164,7 @@ pub(crate) fn view_target(app: &PhotocraftApp, idx: usize) -> ViewTarget {
     if layers.is_empty() {
         layers = doc.bounds();
     }
-    let pages = super::artboard_ui::pages(app, idx);
-    let mut target = ViewTarget::new(Size::new(f64::from(doc.size.width), f64::from(doc.size.height)))
-        .layers(rect64(layers))
-        .ppi(f64::from(doc.resolution_dpi))
-        .screen_ppi(app.session.prefs().units_and_rulers.screen_resolution);
-    if let Some(page) = pages.iter().find(|p| p.active == Some(true)).or_else(|| pages.last()) {
-        target = target.artboard(page.rect);
-    }
-    target
+    Rect64::new(f64::from(layers.x0), f64::from(layers.y0), f64::from(layers.x1), f64::from(layers.y1))
 }
 
 /// One document view's canvas this pass.
@@ -241,15 +245,15 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
             crate::render_path::view_cpu(app, doc.id.0);
         }
     }
-    let label = {
-        let (name, detail) = super::tabs::tab_title_at(app, idx, view.zoom * 100.0);
-        format!("{name} @ {detail}")
-    };
+    let label = super::tabs::tab_title_at(app, idx, view.zoom * 100.0);
     let navigation = navigation(app);
     let follows_pointer = view_follows_pointer(app);
     let checker = checkerboard(app);
     let snap = super::snap_ui::snap(app, idx);
     let target = view_target(app, idx);
+    let state = &app.session.documents()[idx];
+    let (fit_doc, active, selected) = (std::sync::Arc::clone(&state.doc), state.active_layer, state.selected_layers.clone());
+    let fit_layers = move || Some(layer_bounds(&fit_doc, active, &selected));
     let pasteboard = pasteboard_color(app);
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
 
@@ -258,6 +262,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         .id(id)
         .view(Bind::bound(&mut bound))
         .document(target)
+        .layer_bounds(&fit_layers)
         .snap(snap)
         .pasteboard(pasteboard)
         .navigation(navigation)

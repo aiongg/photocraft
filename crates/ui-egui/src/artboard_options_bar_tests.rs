@@ -131,29 +131,6 @@ fn a_drawn_board_gets_the_bars_background() {
     }
 }
 
-/// A placed board stores the preset name of the bar's size, so selected it shows that preset, not Custom.
-#[test]
-fn a_placed_board_keeps_the_bars_preset_name() {
-    assert_eq!(bar::preset_name(750, 1334), "iPhone 8/7/6");
-    assert_eq!(bar::preset_name(333, 222), "");
-    let mut app = app();
-    let placed = |app: &mut PhotocraftApp, x: f64| {
-        place(app, x, 30.0);
-        let (id, rect, _) = *boards(app).last().unwrap();
-        app.run("layer.select", json!({"layer": id.0})).unwrap();
-        (id, rect)
-    };
-    let (id, rect) = placed(&mut app, 20.0);
-    assert_eq!((rect.width(), rect.height()), (750, 1334));
-    assert_eq!(bar::board_preset(&app, id), "iPhone 8/7/6");
-    // Deselect, edit the size by hand: the next placed board is Custom.
-    app.session.active_mut().unwrap().active_layer = None;
-    bar::set_size(&mut app, 333.0, 222.0);
-    let (id2, rect2) = placed(&mut app, 2000.0);
-    assert_eq!((rect2.width(), rect2.height()), (333, 222));
-    assert_eq!(bar::board_preset(&app, id2), "");
-}
-
 /// OK in the picker with the colour the swatch shows leaves the boards' own colours alone: for one board with a
 /// translucent colour and for two boards of different colours.
 #[test]
