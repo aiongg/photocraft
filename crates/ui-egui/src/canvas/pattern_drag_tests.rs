@@ -191,7 +191,8 @@ fn a_pattern_drag_ends_on_a_nested_dialog_or_unlink_and_pan_wins() {
     move_to(&mut app, start, NONE);
     press(&mut app, start, NONE);
     move_to(&mut app, step(3.0), NONE);
-    let nested = crate::pattern_fill_ui::open_new(&mut app).unwrap();
+    // Another kind of dialog: a second Pattern Fill dialog would replace the one under the drag.
+    let nested = crate::dialogs::solid_fill_ui::open_new(&mut app).unwrap();
     frame(&mut app);
     move_to(&mut app, step(8.0), NONE);
     cancel(&mut app, nested);
