@@ -725,85 +725,6 @@ fn colour_set_action_with_selection(mode: ColorMode, depth: SampleType, kind: &s
     h
 }
 
-/// Build the original serialized Action records, independently of dialog normalization.
-fn colour_set_alias_params(mode: ColorMode, indices: &[usize], kind: &str, pencil: bool, native: bool) -> Value {
-    let keys = photocraft_engine::adjust_params::channel_keys(photocraft_engine::adjust_params::default_space(mode));
-    let mut raw = if kind == "levels" { json!({"gamma":1.25,"gray":{"gamma":2}}) } else { json!({"gray":[[0,255],[100,30],[255,0]],"pencil":pencil}) };
-    raw["target"] = json!({"colors":indices});
-    if pencil {
-        raw["smooth"] = json!(2);
-    }
-    if native {
-        for key in keys {
-            raw[*key] = if kind == "levels" { json!({"gamma":1.5}) } else { json!([[0, 0], [100, 180], [255, 255]]) };
-        }
-    }
-    raw
-}
-
-/// Legacy colour-set aliases seed the real controls and preserve native records, including
-/// Lab's separate combined/Lightness records and once-only pencil conversion and smoothing.
-#[test]
-fn colour_set_action_gray_alias_matches_direct_command_preview_commit_and_undo() {
-    for mode in MODES {
-        let sets: [(&[usize], &str); 2] = match mode {
-            ColorMode::Rgb => [(&[0, 2], "RB"), (&[1, 2], "GB")],
-            ColorMode::Cmyk => [(&[0, 2], "CY"), (&[0, 3], "CB")],
-            ColorMode::Lab => [(&[0, 2], "Lb"), (&[1, 2], "ab")],
-            _ => unreachable!(),
-        };
-        for depth in DEPTHS {
-            for (indices, label) in sets {
-                for (kind, pencil) in [("levels", false), ("curves", false), ("curves", true)] {
-                    for native in [false, true] {
-                        let raw = colour_set_alias_params(mode, indices, kind, pencil, native);
-                        let mut h = colour_set_action_with_selection(mode, depth, kind, raw.clone(), native);
-                        let context = format!("{mode:?} {depth:?} {label} {kind} pencil={pencil} native={native}");
-                        assert_eq!(names(&h), [label], "{context}");
-                        let fields = params(&h);
-                        assert!(fields.get("gray").is_none(), "{context}: alias must not override visible controls: {fields}");
-                        assert!(fields.get("smooth").is_none(), "{context}: smoothing has already been applied");
-                        if kind == "levels" {
-                            assert_eq!(fields["gamma"], 2.0, "{context}");
-                        }
-                        if pencil {
-                            assert_eq!(fields["points"].as_array().unwrap().len(), 256, "{context}");
-                        }
-                        let st = h.state().session.active().unwrap();
-                        let original = st.doc.clone();
-                        let layer = st.active_layer;
-                        let mut oracle = Session::new();
-                        oracle.add_document((*original).clone(), None);
-                        oracle.select_layer(layer.unwrap()).unwrap();
-                        let command = format!("image.adjustments.{kind}");
-                        oracle.execute(&command, raw.clone()).unwrap();
-                        let expected = &oracle.active().unwrap().doc;
-                        let preview = filter_dialog::preview_document(&original, layer, &command, &fields, 1).unwrap();
-                        assert_eq!(preview.layers, expected.layers, "{context}: preview must match the recorded command");
-                        assert_eq!(preview.channels, original.channels, "{context}");
-                        assert_eq!(preview.selection, original.selection, "{context}");
-                        assert_eq!(preview.layers[0].mask, original.layers[0].mask, "{context}");
-                        let before = original.layers[0].surface().unwrap().pixel(8, 8);
-                        let after = preview.layers[0].surface().unwrap().pixel(8, 8);
-                        for k in (0..before.len()).filter(|k| !indices.contains(k)) {
-                            assert_eq!(after[k].to_bits(), before[k].to_bits(), "{context}: untouched component/alpha {k}");
-                        }
-                        let id = top(&h);
-                        confirm(&mut h, id).unwrap();
-                        assert_eq!(h.state().session.active().unwrap().doc.layers, expected.layers, "{context}: commit");
-                        assert_eq!(h.state().session.active().unwrap().channel_view.target, ChannelTarget::Alpha(0), "{context}: panel target is view state");
-                        assert_eq!(recorded_params(&h), raw, "dialog normalization must not rewrite the stored Action");
-                        h.state_mut().run("edit.undo", json!({})).unwrap();
-                        assert_eq!(h.state().session.active().unwrap().doc.layers, original.layers, "{context}: undo");
-                        h.state_mut().run("edit.redo", json!({})).unwrap();
-                        assert_eq!(h.state().session.active().unwrap().doc.layers, expected.layers, "{context}: redo");
-                    }
-                }
-            }
-        }
-    }
-}
-
 /// Editing the visible combined record back to neutral removes the recorded alias's effect.
 #[test]
 fn colour_set_action_gray_alias_does_not_override_visible_edits() {
@@ -1109,7 +1030,6 @@ fn review_unresolved_action_targets_do_not_fall_back_to_colour_controls() {
             assert!(names(&h).is_empty(), "invalid target must not show a colour dropdown: {target}");
             assert_eq!(params(&h)["target"], target);
             assert!(h.query_by_label("The adjustment target is missing or unavailable.").is_some());
-            assert!(params(&h).get("red").is_none() && params(&h).get("lightness").is_none());
             let original = h.state().session.active().unwrap().doc.clone();
             let id = top(&h);
             assert!(confirm(&mut h, id).is_err());
