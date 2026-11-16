@@ -15,7 +15,7 @@ use craft::ui::style::DataColor;
 
 use super::defaults::default_style_params;
 use super::editing::begin_edit;
-use super::layout::{hit_layer, layout, offset_at, to_text};
+use super::layout::{hit_layer, offset_at};
 
 use super::{LayerId, PLACEHOLDER, PhotocraftApp, Point, TextEdit, active_doc_id, json, session_key, text_layer};
 use crate::canvas::document_display::CanvasHost;
@@ -26,15 +26,6 @@ pub(crate) fn box_shape(app: &PhotocraftApp, id: LayerId) -> Option<(f32, f32, f
         photocraft_doc::text::TextShape::Box { x, y, width, height } => Some((x, y, width, height)),
         _ => None,
     }
-}
-
-/// True when document point (`x`, `y`) lies inside the paragraph box of type layer `id` (false
-/// for point text).
-pub(crate) fn inside_box(app: &mut PhotocraftApp, id: LayerId, x: f64, y: f64) -> bool {
-    let Some((bx, by, w, h)) = box_shape(app, id) else { return false };
-    let Some((_, aff, _)) = layout(app, id) else { return false };
-    let (tx, ty) = to_text(&aff, x, y);
-    tx >= bx && tx <= bx + w && ty >= by && ty <= by + h
 }
 
 /// The Type family's state between passes, kept in `CanvasTools::type_tool`.
@@ -317,24 +308,19 @@ impl CanvasTool for TypeTool<'_> {
         draw.dashed(&closed, draw.dashes(), StrokeWidth::Thin, StrokeColor::Data(DataColor::new(egui::Color32::BLACK)));
     }
 
-    /// The I-beam (turned in vertical type), the path cursor over what a click would start text on or in, and the
-    /// move cursor in the move zone just outside the text being typed. The type transform's box and the text frame set
+    /// The I-beam (turned in vertical type) and the path cursor over what a click would start text on or in. The type
+    /// transform's box (the move cursor in its move reach just outside the text being typed) and the text frame set
     /// their own cursors over their parts. Type is not among the Other Cursors tools production swaps for the precise
     /// cursor (cw.C9).
     fn cursor(&self, cx: &ToolContext<'_>) -> Cursor {
         let (Some(pointer), Some(space)) = (cx.pointer, cx.space()) else { return Cursor::System(CursorIcon::Text) };
         let at = space.view.to_doc(pointer.pos);
         let press = self.state.press.map(|p| [p.x, p.y]);
-        self.scope.with_app(|app| {
-            if app.ui.text_edit.is_some() && crate::type_transform::move_zone(app, &space.view, [at.x, at.y]) {
-                return Cursor::System(CursorIcon::Move);
-            }
-            match hover_path_target(app, at.x, at.y, cx.mods.shift, press) {
-                Some(PathClick::Area { .. }) => Cursor::from(PaintedCursor::type_on(false)),
-                Some(PathClick::OnPath { .. }) => Cursor::from(PaintedCursor::type_on(true)),
-                None if app.ui.tool.is_vertical_type() => Cursor::System(CursorIcon::VerticalText),
-                None => Cursor::System(CursorIcon::Text),
-            }
+        self.scope.with_app(|app| match hover_path_target(app, at.x, at.y, cx.mods.shift, press) {
+            Some(PathClick::Area { .. }) => Cursor::from(PaintedCursor::type_on(false)),
+            Some(PathClick::OnPath { .. }) => Cursor::from(PaintedCursor::type_on(true)),
+            None if app.ui.tool.is_vertical_type() => Cursor::System(CursorIcon::VerticalText),
+            None => Cursor::System(CursorIcon::Text),
         })
     }
 

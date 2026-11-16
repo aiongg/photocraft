@@ -52,6 +52,8 @@ pub struct TypeTransform {
     pub original: photocraft_geom::Affine,
     /// The framework's transform session over the layer's text frame.
     pub session: craft::draw::ui::transform::TransformSession<()>,
+    /// The capture began on the move reach of the hidden box, which keeps it to the release.
+    pub from_reach: bool,
 }
 
 // The framework session has no `PartialEq`: the fields that decide what is shown are compared.
