@@ -55,4 +55,3 @@ fn navigator_viewport_follows_the_canvas_zoom_ease() {
     h.run_steps(90);
     assert!(percents(&h).iter().any(|p| (p - 200.0).abs() < 0.5), "the ease ends on the target: {:?}", percents(&h));
 }
-

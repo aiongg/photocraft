@@ -165,4 +165,3 @@ fn a_click_on_a_grouped_layer_covering_another_layer_keeps_the_box_open() {
     assert!(app.ui.transform.is_some(), "the box stays open");
     assert_eq!(steps(&app), before);
 }
-

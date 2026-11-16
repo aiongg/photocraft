@@ -67,4 +67,3 @@ fn another_tool_or_no_ruler_reads_as_today() {
     app.ui.tool = Tool::Brush;
     assert_eq!(ruler_rows(&app), None, "another tool");
 }
-

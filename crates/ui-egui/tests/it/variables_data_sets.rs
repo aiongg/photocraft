@@ -1,4 +1,3 @@
-
 use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use photocraft_ui_egui::PhotocraftApp;

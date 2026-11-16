@@ -188,5 +188,4 @@ mod tests {
         let kept = json!({"table": "custom", "colors": ["#ff0000"], "transparent": 0});
         assert_eq!(command_params(&loaded_fields("custom"), kept.clone()), kept);
     }
-
 }

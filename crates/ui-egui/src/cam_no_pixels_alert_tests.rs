@@ -120,4 +120,3 @@ fn app_over(files: &Arc<craft::settings::testing::MemoryFiles>) -> (PhotocraftAp
     app.ui.tool = Tool::ContentAwareMove;
     (app, path)
 }
-

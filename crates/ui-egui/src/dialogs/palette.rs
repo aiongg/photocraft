@@ -90,5 +90,4 @@ mod tests {
         assert_eq!(app.ui.palette.recents.first(), Some(&first));
         assert_eq!(app.ui.palette.recents.len(), 1, "no duplicate");
     }
-
 }

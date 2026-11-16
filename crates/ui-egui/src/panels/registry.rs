@@ -63,18 +63,7 @@ fn runs_nothing(_: &mut PhotocraftApp, _: &egui::Context, _: &CommandRef) -> boo
 
 /// A panel with no menu rows, a 220-point least width and `least` points of body height, docked by default.
 const fn panel(id: &'static str, label: fn() -> String, icon: &'static str, least: f32, body: fn(&mut PhotocraftApp, &mut egui::Ui)) -> PanelEntry {
-    PanelEntry {
-        id,
-        label,
-        icon,
-        heights: None,
-        min: [MIN_WIDTH, least],
-        float_size: None,
-        body,
-        rows: no_rows,
-        states: no_states,
-        run: runs_nothing,
-    }
+    PanelEntry { id, label, icon, heights: None, min: [MIN_WIDTH, least], float_size: None, body, rows: no_rows, states: no_states, run: runs_nothing }
 }
 
 /// A panel that floats by default at `size`.
@@ -120,21 +109,27 @@ pub(crate) static PANELS: &[PanelEntry] = &[
     },
     panel("gradients", || tl!("Gradients").to_string(), "blend", LEAST, super::preset_panels::gradients_panel),
     panel("patterns", || tl!("Patterns").to_string(), "grid", LEAST, super::preset_panels::patterns_panel),
-    PanelEntry {
-        heights: Some(PROPERTIES_HEIGHTS),
-        ..panel("properties", || tl!("Properties").to_string(), "adjustments", LEAST, super::properties::panel)
-    },
+    PanelEntry { heights: Some(PROPERTIES_HEIGHTS), ..panel("properties", || tl!("Properties").to_string(), "adjustments", LEAST, super::properties::panel) },
     panel("adjustments", || tl!("Adjustments").to_string(), "contrast", LEAST, |app, ui| scrolled(app, ui, super::properties::adjustments::panel)),
     PanelEntry {
         heights: Some(CHARACTER_HEIGHTS),
-        ..panel("character", || tl!("Character").to_string(), "type", LEAST, |app, ui| scrolled(app, ui, |app, ui| crate::type_tool::character_panel(app, ui, false)))
+        ..panel(
+            "character",
+            || tl!("Character").to_string(),
+            "type",
+            LEAST,
+            |app, ui| scrolled(app, ui, |app, ui| crate::type_tool::character_panel(app, ui, false)),
+        )
     },
-    panel("paragraph", || tl!("Paragraph").to_string(), "pilcrow", LEAST, |app, ui| scrolled(app, ui, |app, ui| crate::type_tool::character_panel(app, ui, true))),
+    panel(
+        "paragraph",
+        || tl!("Paragraph").to_string(),
+        "pilcrow",
+        LEAST,
+        |app, ui| scrolled(app, ui, |app, ui| crate::type_tool::character_panel(app, ui, true)),
+    ),
     // The Navigator's preview grows with its group, as in Photoshop (#2726).
-    PanelEntry {
-        heights: Some(NAVIGATOR_HEIGHTS),
-        ..panel("navigator", || tl!("Navigator").to_string(), "navigation", LEAST, super::navigator::navigator)
-    },
+    PanelEntry { heights: Some(NAVIGATOR_HEIGHTS), ..panel("navigator", || tl!("Navigator").to_string(), "navigation", LEAST, super::navigator::navigator) },
     PanelEntry {
         rows: super::histogram_panel::panel_rows,
         states: super::histogram_panel::command_states,
@@ -217,7 +212,13 @@ pub(crate) static PANELS: &[PanelEntry] = &[
     },
     floating("modifierKeys", || tl!("Modifier Keys").to_string(), "keyboard", [240.0, 140.0], |app, ui| scrolled(app, ui, crate::modifier_keys::panel)),
     floating("gradientEditor", || tl!("Gradient Editor").to_string(), "blend", [520.0, 440.0], |app, ui| scrolled(app, ui, crate::gradient_ui::editor::show)),
-    floating("measurementLog", || tl!("Measurement Log").to_string(), "ruler", [620.0, 320.0], |app, ui| scrolled(app, ui, crate::tools::analysis::log_panel::body)),
+    floating(
+        "measurementLog",
+        || tl!("Measurement Log").to_string(),
+        "ruler",
+        [620.0, 320.0],
+        |app, ui| scrolled(app, ui, crate::tools::analysis::log_panel::body),
+    ),
     floating("notes", || tl!("Notes").to_string(), "square-plus", [260.0, 300.0], |app, ui| scrolled(app, ui, crate::tools::analysis::notes_panel::body)),
 ];
 

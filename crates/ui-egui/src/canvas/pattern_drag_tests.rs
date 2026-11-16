@@ -1,8 +1,8 @@
 //! Canvas gesture tests for the linked Pattern Fill drag: the dialog tool under the hosted dialog, the release
 //! position, previews and the commit they match. They drive the canvas through `canvas::testing`.
 
-use craft::ui::dialog::StackDialog;
 use craft::draw::ui::pattern::PatternFillDialog;
+use craft::ui::dialog::StackDialog;
 use egui::Modifiers;
 use photocraft_doc::{Document, Fill, LayerContent, LayerId, Pattern};
 use serde_json::json;

@@ -188,4 +188,3 @@ fn every_edge_is_equally_thick_at_any_display_scale() {
         }
     }
 }
-

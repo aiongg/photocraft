@@ -68,4 +68,3 @@ fn brush_and_pencil_select_behind_in_one_command() {
         assert!(options_show_behind(&mut app, &ctx), "{tool:?}");
     }
 }
-

@@ -1,9 +1,9 @@
 //! The paint tool through the canvas test driver: the live stroke a drag shows, what the release
 //! commits, the Mixer Brush's cancel and release rules, and the presses the tool refuses.
 
-use craft::ui::canvas::RasterSource;
 use super::*;
 use crate::app::framework::BuildApp as _;
+use craft::ui::canvas::RasterSource;
 use craft::ui::primitives::Revision;
 use egui::{Pos2, vec2};
 use egui_kittest::Harness;

@@ -96,4 +96,3 @@ fn copy_takes_the_text_dragged_across_in_an_error_notice_not_the_layer() {
         assert_eq!(document(&h), before, "{how}");
     }
 }
-

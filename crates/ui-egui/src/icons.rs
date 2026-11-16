@@ -32,13 +32,8 @@ pub const FOOTER_DELETE: &str = "trash";
 /// The icon of tool `t`: the one its command names (`ToolCommand`'s `icon` attribute), which the tool rail also draws.
 pub fn tool_icon(t: Tool) -> IconId {
     static ICONS: OnceLock<HashMap<String, Cow<'static, str>>> = OnceLock::new();
-    let icons = ICONS.get_or_init(|| {
-        ToolCommand::defs()
-            .unwrap_or_default()
-            .into_iter()
-            .filter_map(|def| def.icon.map(|icon| (def.command.id, icon)))
-            .collect()
-    });
+    let icons =
+        ICONS.get_or_init(|| ToolCommand::defs().unwrap_or_default().into_iter().filter_map(|def| def.icon.map(|icon| (def.command.id, icon))).collect());
     icons.get(command_of(t).id()).map_or_else(|| IconId::new("more"), |name| IconId::from(name.clone()))
 }
 

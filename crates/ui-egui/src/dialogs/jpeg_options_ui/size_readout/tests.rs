@@ -134,4 +134,3 @@ fn earlier_settings_are_not_encoded_again() {
     assert_eq!(answer(&mut readout, at(84), counted(1000)), Some(1000), "the oldest sizes make room");
     assert_eq!(encodes.load(Ordering::SeqCst), 3 + KEPT as u32);
 }
-

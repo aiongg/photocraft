@@ -12,10 +12,10 @@
 
 use std::collections::HashSet;
 
+use craft::color::ui::SwatchesCommand;
 use craft::keymap::{Binding, Chord, CommandDef, CommandKind, Overrides, Scope};
 use craft::layers::ui::panel::LayersPanelCommands;
 use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
-use craft::color::ui::SwatchesCommand;
 use craft::ui::docking::WorkspaceCommands;
 use craft::ui::rails::{LastUsed, RailTool};
 use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, CommandSet, EditCommands, FirePhase, FireSource, Fired};

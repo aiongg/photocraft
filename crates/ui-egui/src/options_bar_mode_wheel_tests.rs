@@ -72,4 +72,3 @@ fn the_wheel_over_the_brush_mode_dropdown_steps_the_painting_mode() {
 fn combo(h: &Harness<'_, PhotocraftApp>, value: &str) -> Option<Pos2> {
     h.query_all_by_role(Role::ComboBox).find(|n| n.value().as_deref() == Some(value)).map(|n| n.rect().center())
 }
-

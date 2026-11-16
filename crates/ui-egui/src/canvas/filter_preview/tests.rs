@@ -632,4 +632,3 @@ fn a_reopened_dialog_never_paints_the_previous_dialogs_preview() {
         !a.filter_preview_worker.busy()
     });
 }
-

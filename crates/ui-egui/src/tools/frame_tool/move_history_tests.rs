@@ -80,4 +80,3 @@ fn a_bad_history_name_is_refused_and_changes_nothing() {
     app.run("layer.frame.set", json!({"layer":id.0,"transform":[100,0,0,80,20,30],"historyName":"Move"})).unwrap();
     assert_eq!(entries(&app).last().map(String::as_str), Some("Move"));
 }
-

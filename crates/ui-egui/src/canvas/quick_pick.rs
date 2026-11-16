@@ -90,5 +90,4 @@ mod tests {
         assert!(picked && !testing::in_gesture(&app) && !app.brush_resize.active(), "neither painted nor resized the brush");
         assert_eq!(st.history.past_len(), before, "no paint stroke was recorded");
     }
-
 }

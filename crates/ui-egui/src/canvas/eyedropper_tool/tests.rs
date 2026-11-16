@@ -37,4 +37,3 @@ fn eyedropper_drag_updates_the_sampled_colour() {
     assert_eq!(app.session.tools.background, [1.0, 0.0, 0.0, 1.0]);
     assert_eq!(app.session.tools.foreground, [0.0, 1.0, 0.0, 1.0]);
 }
-

@@ -1064,4 +1064,3 @@ fn free_transform_redraws_only_the_moving_layer_when_the_box_opens_and_closes() 
     assert!(committed.contains(20, 20) && committed.contains(139, 49), "{committed:?}");
     assert!(damage_since(&app, 0, (rev, key ^ dk), (rev + 2, 0), dk, (rev + 1, Some(moved))).is_none(), "a later revision isn't ours");
 }
-

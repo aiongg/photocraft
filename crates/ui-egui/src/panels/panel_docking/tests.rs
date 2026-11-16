@@ -326,4 +326,3 @@ fn main_workspace_file_loads_as_the_default_and_saves_as_a_workspace() {
     crate::dock::apply(&mut reloaded, &written);
     assert_eq!((&reloaded.ui.docking.layout, &reloaded.ui.docking.hidden), (&app.ui.docking.layout, &app.ui.docking.hidden));
 }
-

@@ -59,4 +59,3 @@ fn alt_drag_from_an_anchor_selects_nothing() {
     assert_eq!(knots(&app), 4);
     assert_eq!(steps(&app), n);
 }
-

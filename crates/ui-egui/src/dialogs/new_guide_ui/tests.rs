@@ -376,4 +376,3 @@ fn refused_edit_draft_cannot_follow_a_document_switch() {
     assert!(h.state().guide_edit.is_none());
     assert!(!h.state().framework.dialogs.is_open::<HostedNewGuideDialog>());
 }
-

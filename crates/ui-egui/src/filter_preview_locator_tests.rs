@@ -200,4 +200,3 @@ fn a_crop_drag_begun_before_the_dialog_still_ends_under_it() {
     assert!(x > 150.0 && y > 110.0, "the moves under the dialog reached the frame: {x}, {y}");
     assert!(near(centre(&h), [200.0, 150.0]), "the drag's moves and release are not locator presses: {:?}", centre(&h));
 }
-

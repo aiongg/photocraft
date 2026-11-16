@@ -87,4 +87,3 @@ fn key(h: &mut Harness<'static, PhotocraftApp>, key: egui::Key) {
     ctx.end_pass().textures_delta.clear();
     h.run_steps(2);
 }
-

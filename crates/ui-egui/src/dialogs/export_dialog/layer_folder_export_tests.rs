@@ -95,4 +95,3 @@ fn a_planted_link_is_replaced_not_followed() {
     assert!(written.borrow().contains(&link.to_string_lossy().into_owned()));
     assert!(!dir.join("victim").exists(), "nothing was written through the link");
 }
-

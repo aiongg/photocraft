@@ -3,7 +3,6 @@
 //! key input (issue #12: "add an adjustment layer to a new document, edit it, crash"). The
 //! editors' own gestures are the framework's tests; these cover what the app wires around them.
 
-
 use craft::behavior::dock::Action;
 use craft::color::ui::{ColorPickerDialog, PickedColor};
 use craft::theme::Srgba;

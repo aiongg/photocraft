@@ -505,4 +505,3 @@ fn a_shift_click_dodge_line_commits_its_live_pixels_unsmoothed() {
     assert!(app.retouch_from_live, "the release took the live pixels instead of rendering the line again");
     assert_eq!(app.session.tools.brush.smoothing.amount, 0.6);
 }
-

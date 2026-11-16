@@ -212,4 +212,3 @@ fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     take_prompts_from(&mut app, &ctx, rows);
     assert_eq!(hits().last(), Some(&("b", PromptChoice::Cancel)));
 }
-

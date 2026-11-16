@@ -81,4 +81,3 @@ pub fn rows(ui: &mut egui::Ui, brush: &mut BrushSettings, tolerance_control: &mu
     });
     key
 }
-

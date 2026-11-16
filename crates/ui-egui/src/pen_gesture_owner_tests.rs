@@ -77,4 +77,3 @@ fn freeform_valid_release_is_one_undoable_path_edit() {
     app.run("edit.redo", json!({})).unwrap();
     assert!(app.session.active().unwrap().doc.work_path.is_some());
 }
-

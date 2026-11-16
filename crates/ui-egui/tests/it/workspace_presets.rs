@@ -184,4 +184,3 @@ fn presets_preserve_shell_preferences_and_workspace_lock() {
         assert!(app.workspaces.set.locked);
     }
 }
-

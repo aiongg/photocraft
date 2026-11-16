@@ -152,4 +152,3 @@ fn a_shape_layer_active_does_not_sample() {
     tool_event(&mut app, ToolEvent::Up { x: ON_RED[0], y: ON_RED[1] }, Modifiers::ALT);
     assert_eq!(foreground(&app), BLACK);
 }
-

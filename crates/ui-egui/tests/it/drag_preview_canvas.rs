@@ -262,4 +262,3 @@ fn a_held_marquee_drag_keeps_requesting_frames() {
     assert!(d.is_some_and(|d| d <= Duration::from_millis(100)), "mid-drag repaint request: {d:?}");
     button(&mut h, 300.0, 220.0, false);
 }
-

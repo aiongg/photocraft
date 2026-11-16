@@ -84,4 +84,3 @@ fn shift_snaps_every_direction() {
         assert_eq!(line(&app).1, want, "⇧-drag 400,300 → {to:?}");
     }
 }
-

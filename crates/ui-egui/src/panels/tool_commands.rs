@@ -72,7 +72,14 @@ pub(crate) enum ToolCommand {
     VerticalType,
     #[command(label = "Horizontal Type Mask Tool", icon = "type_mask", kind = "tool", group = "T", default = "T", alias = "tools.select.horizontalTypeMask")]
     HorizontalTypeMask,
-    #[command(label = "Vertical Type Mask Tool", icon = "type_mask_vertical", kind = "tool", group = "T", default = "T", alias = "tools.select.verticalTypeMask")]
+    #[command(
+        label = "Vertical Type Mask Tool",
+        icon = "type_mask_vertical",
+        kind = "tool",
+        group = "T",
+        default = "T",
+        alias = "tools.select.verticalTypeMask"
+    )]
     VerticalTypeMask,
     #[command(label = "Hand Tool", icon = "hand", kind = "tool", group = "H", default = "H", alias = "tools.select.hand")]
     Hand,
@@ -114,7 +121,14 @@ pub(crate) enum ToolCommand {
     Sponge,
     #[command(label = "Quick Selection Tool", icon = "quick_selection", kind = "tool", group = "W", default = "W", alias = "tools.select.quickSelection")]
     QuickSelection,
-    #[command(label = "Object Selection Tool", icon = "square-dashed-mouse-pointer", kind = "tool", group = "W", default = "W", alias = "tools.select.objectSelection")]
+    #[command(
+        label = "Object Selection Tool",
+        icon = "square-dashed-mouse-pointer",
+        kind = "tool",
+        group = "W",
+        default = "W",
+        alias = "tools.select.objectSelection"
+    )]
     ObjectSelection,
     #[command(label = "Pen Tool", icon = "pen_tool", kind = "tool", group = "P", default = "P", alias = "tools.select.pen")]
     Pen,

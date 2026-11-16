@@ -87,14 +87,11 @@ fn picture(cx: &ContentPainterCx, rect: Rect, key: impl Hash + 'static, image: i
 fn paint_of(b: &BrushSettings) -> BrushRowPaint {
     let stroke_sig = brush_preview::preview_sig(b);
     let brush = b.clone();
-    BrushRowPaint::new(
-        tip_paint(b),
-        move |cx, rect| {
-            let color = Tokens::get(cx.painter.ctx()).text;
-            let size = [rect.width().round().clamp(1.0, 1024.0) as usize, rect.height().round().clamp(1.0, 1024.0) as usize];
-            picture(cx, rect, ("brushes-stroke", stroke_sig, size, color), || brush_preview::stroke_image(&brush, size, color));
-        },
-    )
+    BrushRowPaint::new(tip_paint(b), move |cx, rect| {
+        let color = Tokens::get(cx.painter.ctx()).text;
+        let size = [rect.width().round().clamp(1.0, 1024.0) as usize, rect.height().round().clamp(1.0, 1024.0) as usize];
+        picture(cx, rect, ("brushes-stroke", stroke_sig, size, color), || brush_preview::stroke_image(&brush, size, color));
+    })
 }
 
 /// How the engine draws `b`'s tip (its falloff, angle and roundness, a sampled tip's shape) in the theme's text
