@@ -24,17 +24,13 @@ fn set(app: &mut PhotocraftApp, id: DialogId, color: &str) {
     app.framework.dialogs.get_mut_by_id::<ColorPickerDialog>(id).unwrap().set_color(PickedColor::rgb(color));
 }
 
+/// OK, as the dialog's button gives it: the app's taker files the answer with [`answered`].
 fn confirm_picker(app: &mut PhotocraftApp, id: DialogId) {
     crate::dialogs::testing::confirm(app, id).expect("OK is enabled");
-    let result = app.framework.dialogs.take_by_id::<ColorPickerDialog>(id).unwrap();
-    answered(app, result);
 }
 
 fn cancel_picker(app: &mut PhotocraftApp, id: DialogId) {
-    let ctx = app.ctx().clone();
-    app.framework.dialogs.cancel_by_id(&ctx, id);
-    let result = app.framework.dialogs.take_by_id::<ColorPickerDialog>(id).unwrap();
-    answered(app, result);
+    crate::dialogs::testing::cancel(app, id).expect("Cancel is enabled");
 }
 
 #[test]
