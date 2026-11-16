@@ -69,6 +69,7 @@ pub(crate) mod params {
         },
         ParamFamily::new(new_layer_ui::owns, new_layer_ui::run),
         ParamFamily::new(new_group_ui::owns, new_group_ui::run),
+        ParamFamily { check: Some(count_group_name_ui::check), ..ParamFamily::new(count_group_name_ui::owns, count_group_name_ui::run) },
         ParamFamily { check: Some(duplicate_layer_ui::check), ..ParamFamily::new(duplicate_layer_ui::owns, duplicate_layer_ui::run) },
         ParamFamily::new(snapshot_dialog::owns, snapshot_dialog::run),
         ParamFamily::new(history_options_ui::owns, history_options_ui::run),

@@ -27,6 +27,13 @@ const MARKER_SIZE: std::ops::RangeInclusive<f64> = 1.0..=10.0;
 /// The Count bar's Label Size range.
 const LABEL_SIZE: std::ops::RangeInclusive<f64> = 8.0..=72.0;
 
+/// What the Count bar's group menu picks: a group, or the Rename… row after the groups.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum GroupPick {
+    Group(usize),
+    Rename,
+}
+
 /// `count.setGroup` params for the Marker Size and Label Size fields, sent as JSON integers (the fields hold
 /// floats; `8.0` is a float on the wire). NaN gives the range's low end.
 pub(super) fn count_size_params(marker: f32, label: f32) -> Value {
@@ -106,13 +113,19 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
     let next = photocraft_doc::CountGroup::default();
     let g = group.map_or(&next, |gi| &m.count_groups[gi]);
     if let Some(gi) = group {
-        let entries: Vec<Entry<usize>> = m.count_groups.iter().enumerate().map(|(i, g)| Entry::new(i, Label::from(g.name.clone()))).collect();
-        if let Some(picked) = Select::new(Label::from(tl!("Group")), Bind::given(gi), &entries).show(ui).value() {
-            run(app, "count.setGroup", json!({"group": *picked, "active": true}));
+        let mut entries: Vec<Entry<GroupPick>> = m.count_groups.iter().enumerate().map(|(i, g)| Entry::new(GroupPick::Group(i), Label::from(g.name.clone()))).collect();
+        entries.push(Entry::separator());
+        entries.push(Entry::new(GroupPick::Rename, Label::from(tl!("Rename…"))));
+        match Select::new(Label::from(tl!("Group")), Bind::given(GroupPick::Group(gi)), &entries).show(ui).value() {
+            Some(GroupPick::Group(picked)) => run(app, "count.setGroup", json!({"group": *picked, "active": true})),
+            Some(GroupPick::Rename) => {
+                crate::count_group_name_ui::open_rename(app, gi);
+            }
+            None => {}
         }
     } else {
-        let entries = [Entry::new(0usize, Label::from(tl!("Count Group")))];
-        Select::new(Label::from(tl!("Group")), Bind::given(0usize), &entries).enabled(false).show(ui);
+        let entries = [Entry::new(GroupPick::Group(0), Label::from(tl!("Count Group")))];
+        Select::new(Label::from(tl!("Group")), Bind::given(GroupPick::Group(0)), &entries).enabled(false).show(ui);
     }
     let eye = IconId::new(if g.visible { "eye" } else { "eye_off" });
     if IconButton::new(eye).label(Label::from(tl!("Toggle visibility of count group"))).show(ui).clicked()
@@ -121,7 +134,7 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
         run(app, "count.setGroup", json!({"group": gi, "visible": !g.visible}));
     }
     if IconButton::new(IconId::new("new_folder")).label(Label::from(tl!("Create a new count group"))).show(ui).clicked() {
-        run(app, "count.newGroup", json!({}));
+        crate::count_group_name_ui::open_new(app);
     }
     if IconButton::new(IconId::new("trash"))
         .label(Label::from(tl!("Delete the currently selected count group")))

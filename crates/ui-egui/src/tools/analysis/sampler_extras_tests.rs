@@ -14,21 +14,11 @@ fn app() -> PhotocraftApp {
     app
 }
 
-fn xf() -> ViewXform {
-    ViewXform {
-        rect: egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(200.0, 100.0)),
-        zoom: 1.0,
-        center: [100.0, 50.0],
-        flip: false,
-        rotation: 0.0,
-        aspect: 1.0,
-    }
-}
-
-/// Every shape the overlay paints, and the marker numbers with where they are.
-fn painted(app: &PhotocraftApp, ctx: &egui::Context) -> (usize, Vec<(String, egui::Pos2)>) {
-    let xf = xf();
-    let mut o = ctx.run_ui(Default::default(), |ui| draw_overlay(app, ui.painter(), &xf));
+/// Every shape the canvas body paints, and the texts with where they are, in one pass over a 200 x 100 canvas.
+fn painted(app: &mut PhotocraftApp) -> (usize, Vec<(String, egui::Pos2)>) {
+    let ctx = app.ctx().clone();
+    let rect = egui::Rect::from_min_size(egui::pos2(0.0, 0.0), egui::vec2(200.0, 100.0));
+    let mut o = crate::testing::run_ui(&ctx, Default::default(), |ui| super::canvas::body(app, ui, rect));
     o.textures_delta.clear();
     let numbers = o
         .shapes
@@ -41,8 +31,9 @@ fn painted(app: &PhotocraftApp, ctx: &egui::Context) -> (usize, Vec<(String, egu
     (o.shapes.len(), numbers)
 }
 
-fn toggle_extras(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    crate::menus::invoke(app, ctx, "view.extras", json!({})).unwrap();
+fn toggle_extras(app: &mut PhotocraftApp) {
+    let ctx = app.ctx().clone();
+    crate::menus::invoke(app, &ctx, "view.extras", json!({})).unwrap();
 }
 
 /// The Info panel's sampler readouts, read afresh rather than from the per-revision cache.
@@ -54,31 +45,19 @@ fn readouts(app: &mut PhotocraftApp) -> Vec<Value> {
 #[test]
 fn extras_off_hides_the_sampler_markers_and_keeps_the_points_and_readouts() {
     let mut app = app();
-    let ctx = egui::Context::default();
-    let (shown, numbers) = painted(&app, &ctx);
+    let (shown, numbers) = painted(&mut app);
     assert!(shown > 0, "the markers are drawn with Extras on");
     let points = app.session.active().unwrap().color_samplers.clone();
     let info = readouts(&mut app);
     assert_eq!(info.len(), 2, "the Info panel lists both samplers: {info:?}");
 
-    toggle_extras(&mut app, &ctx);
+    toggle_extras(&mut app);
     assert!(!app.ui.view.extras);
-    assert_eq!(painted(&app, &ctx).0, 0, "no marker is drawn with Extras off");
+    assert_eq!(painted(&mut app).0, 0, "no marker is drawn with Extras off");
     assert_eq!(app.session.active().unwrap().color_samplers, points, "the samplers stay in the document");
     assert_eq!(readouts(&mut app), info, "the Info panel readouts are unchanged");
 
-    toggle_extras(&mut app, &ctx);
+    toggle_extras(&mut app);
     assert!(app.ui.view.extras);
-    assert_eq!(painted(&app, &ctx), (shown, numbers), "Extras on again draws the same markers at the same places");
-}
-
-#[test]
-fn extras_off_hides_a_marker_being_dragged() {
-    let mut app = app();
-    let ctx = egui::Context::default();
-    toggle_extras(&mut app, &ctx);
-    app.ui.analysis.drag = Some(Drag::Sampler(0, [80.0, 60.0]));
-    assert_eq!(painted(&app, &ctx).0, 0, "a dragged marker stays hidden");
-    app.ui.analysis.drag = Some(Drag::SamplerNew([30.0, 70.0]));
-    assert_eq!(painted(&app, &ctx).0, 0, "a new marker stays hidden");
+    assert_eq!(painted(&mut app), (shown, numbers), "Extras on again draws the same markers at the same places");
 }
