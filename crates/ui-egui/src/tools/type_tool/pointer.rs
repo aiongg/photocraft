@@ -9,7 +9,7 @@
 use craft::behavior::kurbo;
 use craft::behavior::{CancelReason, Cursor, CursorIcon, PaintedCursor};
 use craft::keymap::Mods;
-use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer};
+use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer, ToolRegion};
 use craft::ui::primitives::{Draw, PaintShape, StrokeColor, StrokeWidth};
 use craft::ui::style::DataColor;
 
@@ -270,6 +270,20 @@ impl CanvasTool for TypeTool<'_> {
         let action = self.scope.with_app(|app| press_at(app, &ctx, at.x, at.y, pointer.mods));
         self.state.press = (action == ToolAction::Claimed).then_some(at);
         action
+    }
+
+    /// With an edit open and the type box hidden, another type layer is the tool's over the edit's move reach and
+    /// caret: a press there commits the edit (`claimed_regions`). With ⌘ held the box shows, and its own reach rules.
+    fn regions(&self) -> Vec<ToolRegion> {
+        let mods = craft::ui::runtime::pointer::frame(self.scope.ctx()).mods;
+        let regions = self.scope.with_app(|app| {
+            let box_shown = app.ui.tool.is_type() && crate::type_transform::whole_box(app, mods);
+            if crate::type_transform::active(app) || box_shown {
+                return Vec::new();
+            }
+            super::layout::claimed_regions(app)
+        });
+        regions.into_iter().map(ToolRegion::polygon).collect()
     }
 
     fn drag(&mut self, _pointer: &ToolPointer, _cx: &mut ToolContext<'_>) {}

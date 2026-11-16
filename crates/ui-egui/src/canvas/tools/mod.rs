@@ -23,7 +23,7 @@ use craft::draw::ui::{CropShown, CropToolPass};
 use craft::keymap::Mods;
 use craft::ui::canvas::{
     Autoscroll, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims,
-    ToolContext, ToolHost, ToolHostResponse, ToolKey, ToolPass, ToolPath, ToolPointer, ZoomTool,
+    ToolContext, ToolHost, ToolHostResponse, ToolKey, ToolPass, ToolPath, ToolPointer, ToolRegion, ZoomTool,
 };
 use craft::ui::primitives::Draw;
 
@@ -383,6 +383,10 @@ impl CanvasTool for Preflight<'_, '_> {
         self.inner.claims()
     }
 
+    fn regions(&self) -> Vec<ToolRegion> {
+        self.inner.regions()
+    }
+
     fn key(&mut self, key: &ToolKey, cx: &mut ToolContext<'_>) -> bool {
         if self.inner.key(key, cx) {
             return true;
@@ -679,6 +683,20 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     }
     app.canvas_tools = tools;
     response
+}
+
+/// The regions the tool of the canvas `host`'s next pass claims over the canvas controls (`CanvasTool::regions`), for
+/// `Canvas::tool_regions`: asked before the canvas shows, from the same pick as the pass (`with_rig`). Tools run in the
+/// main window only, so the other canvases claim nothing.
+pub(crate) fn claimed_regions(app: &mut PhotocraftApp, ctx: &egui::Context, host: CanvasHost) -> Vec<ToolRegion> {
+    let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
+    if !primary {
+        return Vec::new();
+    }
+    let mut tools = std::mem::take(&mut app.canvas_tools);
+    let regions = with_rig(app, ctx, host, &mut tools, primary, BodyShown::default(), |selected, _| selected.regions());
+    app.canvas_tools = tools;
+    regions
 }
 
 /// Ends a gesture that began on another document than the one the canvas `host` shows now: a document switch while the
