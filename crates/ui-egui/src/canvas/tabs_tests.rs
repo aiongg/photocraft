@@ -122,18 +122,17 @@ fn quick_mask_mode_names_the_quick_mask_in_the_tab() {
     h.state_mut().run("layer.new.layer", json!({})).unwrap();
     let title = |h: &Harness<'_, PhotocraftApp>| tab_title_at(h.state(), 0, 100.0);
 
-    let (name, detail) = title(&h);
-    assert_eq!(name, "ch1-p01.png");
-    assert!(detail.starts_with("100%"), "{detail}");
+    let detail = title(&h);
+    assert!(detail.starts_with("ch1-p01.png @ 100%"), "{detail}");
     assert!(detail.contains("Layer 1") && detail.contains("RGB"), "the active layer and the mode: {detail}");
-    assert!(!detail.contains('*') && !name.contains('*'), "the tab's modified mark shows unsaved changes, not the text");
+    assert!(!detail.contains('*'), "the tab's modified mark shows unsaved changes, not the text");
 
     h.state_mut().run("select.editInQuickMaskMode", json!({"on": true})).unwrap();
-    let (_, detail) = title(&h);
+    let detail = title(&h);
     assert!(detail.contains("Quick Mask"), "Quick Mask mode is named: {detail}");
     assert!(!detail.contains("Layer 1") && !detail.contains("RGB"), "the layer is not the target: {detail}");
 
     h.state_mut().run("select.editInQuickMaskMode", json!({"on": false})).unwrap();
-    let (_, detail) = title(&h);
+    let detail = title(&h);
     assert!(detail.contains("Layer 1") && detail.contains("RGB") && !detail.contains("Quick Mask"), "{detail}");
 }

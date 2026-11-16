@@ -3,7 +3,8 @@
 
 use craft::draw::ui::gradient::{GradientFillWords, GradientStyle, GradientSwatch};
 use craft::ui::choice::{Checkbox, Segmented};
-use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};
+use craft::ui::contract::{Bind, Entry, LabelKind, Props as _, Show as _, ShowContainer as _, SideLabel};
+use craft::ui::display::Divider;
 use craft::ui::form::Field;
 use craft::ui::patterns::blend_keys::{BlendKeyEntry, blend_entries};
 use craft::ui::pickers::Select;
@@ -44,13 +45,14 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     {
         let o = &mut app.ui.tool_options;
         let mut classic = o.gradient_classic && !locked_live;
-        labelled(ui, tl!("Gradient mode"), |ui| {
+        Field::new(tl!("Gradient mode").to_owned()).side(SideLabel::new().kind(LabelKind::Hidden)).show(ui, |ui, _| {
             Select::new(tl!("Gradient mode").to_owned(), Bind::bound(&mut classic), &modes).enabled(!locked_live).show(ui);
         });
         if !locked_live {
             o.gradient_classic = classic;
         }
         open_editor = GradientSwatch::new(tl!("Gradient picker").to_string(), &tool_stops).sampler(&sampler).show(ui).clicked;
+        Divider::vertical().show(ui);
         let style = stops::style_named(&o.gradient_style);
         if let Some(next) = Segmented::new(Label::from(tl!("Gradient style").to_string()), Bind::given(style), &styles).show(ui).value().copied() {
             o.gradient_style = stops::style_name(next).to_owned();

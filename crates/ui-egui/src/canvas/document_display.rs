@@ -241,10 +241,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
             crate::render_path::view_cpu(app, doc.id.0);
         }
     }
-    let label = {
-        let (name, detail) = super::tabs::tab_title_at(app, idx, view.zoom * 100.0);
-        format!("{name} @ {detail}")
-    };
+    let label = super::tabs::tab_title_at(app, idx, view.zoom * 100.0);
     let navigation = navigation(app);
     let follows_pointer = view_follows_pointer(app);
     let checker = checkerboard(app);
