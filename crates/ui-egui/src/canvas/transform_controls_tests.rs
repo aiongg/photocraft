@@ -130,7 +130,9 @@ fn a_press_in_the_margin_of_a_floating_piece_starts_a_new_selection() {
         app.ui.extras.snap = false;
         app.ui.view.show.smart_guides = false;
         let bounds = |app: &PhotocraftApp| app.session.active().unwrap().doc.selection.as_ref().map(|s| s.content_bounds());
-        let outline = bounds(&app).expect("the piece's outline");
+        // The ants outline the moved pixels, at the piece's offset; a press on them drops the piece and drags that outline.
+        let (dx, dy) = float_offset(&app).expect("the piece floats");
+        let outline = super::tools::selection::floating_outline(&app, 0).expect("the piece's outline").content_bounds().translate(dx, dy);
         drag(&mut app, [70.0, 60.0], [80.0, 60.0], none);
         assert_eq!(float_offset(&app), None, "{tool:?}: on the square the press drops the piece (#11368)");
         assert_eq!(bounds(&app), Some(outline.translate(10, 0)), "{tool:?}: and drags its outline");

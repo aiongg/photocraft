@@ -79,11 +79,12 @@ mod tests {
             harness.run_steps(2);
             harness.query_by_label_contains("Open…").is_some()
         };
-        // Without the hook the second press closes the menu the first opened.
-        assert!(!tap(&mut harness, false), "the cause: the twin press closes the menu");
-        assert!(tap(&mut harness, true), "the first tap opens File");
+        // The press machine ignores a press of a button that is held, so the twin press never closes the menu,
+        // with the hook or without it.
+        assert!(tap(&mut harness, false), "a tap without the hook opens File");
         assert!(!tap(&mut harness, true), "a second tap closes it");
         assert!(tap(&mut harness, true), "a third tap opens it again");
+        assert!(!tap(&mut harness, true), "a fourth tap closes it");
     }
 
     /// A fast double tap delivered in one frame: each event changes the button's state, so none is
