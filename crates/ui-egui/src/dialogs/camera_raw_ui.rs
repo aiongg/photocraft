@@ -512,16 +512,16 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Value {
         "hasScopeSelection": source.selection.is_some(),
     });
     drop(detail);
-    // PLAN: assumed (dialogs-w51 names): `vectorscope_reply` is the vectorscope's counts for the Before/region pair, `readout` is
-    // today's `CameraRawDialog::readout` over `PcRawSource`. The workspace exposes neither the samplers' points nor the pointer, so
-    // the two readout keys stay empty until the framework's `json_fields` carries them (owner: dialogs-w17).
+    // The vectorscope's counts for the Before/region pair; the workspace's own fields carry the pointer readout and the samplers' readouts.
     result["vectorscope"] = developed.as_ref().map_or(Value::Null, |d| scope_ui::vectorscope_reply(&d.scope, before, region));
-    result["pointerReadout"] = Value::Null;
-    result["samplerReadouts"] = json!([]);
     if let (Value::Object(out), Value::Object(own)) = (&mut result, fields) {
         for (key, value) in own {
             out.entry(key).or_insert(value);
         }
+    }
+    if let Value::Object(out) = &mut result {
+        out.entry("pointerReadout").or_insert(Value::Null);
+        out.entry("samplerReadouts").or_insert(json!([]));
     }
     result
 }

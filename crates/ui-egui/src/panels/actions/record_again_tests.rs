@@ -68,9 +68,9 @@ fn cancel(h: &mut Harness<'static, PhotocraftApp>, id: DialogId) {
     control(h, "ui.dialog.cancel", json!({"dialog": id}));
 }
 
-/// The number a hosted dialog holds under `key`.
+/// The number the open dialog `id` lists under `key`, whatever kind of hosted dialog it is.
 fn number(h: &Harness<'static, PhotocraftApp>, id: DialogId, key: &str) -> Option<f64> {
-    h.state().framework.dialogs.get_by_id::<HostedParamDialog>(id)?.fields().number(key)
+    h.state().framework.dialogs.open_dialogs().into_iter().find(|d| d.id == id)?.fields?.get(key)?.as_f64()
 }
 
 /// Whether dialog `id` is still open.

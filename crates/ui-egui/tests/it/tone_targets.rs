@@ -82,6 +82,12 @@ fn canvas_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
         app
     });
     h.run_steps(3);
+    // A 32 px document at 100 % sits under the dialog's centred window, which stops the picker's press: zoom to 12x so the left part of the image lies clear of the dialog (no animation, so the view is final at once).
+    h.state_mut().run("prefs.set", json!({"values": {"general.animatedZoom": false}})).unwrap();
+    for _ in 0..8 {
+        h.state_mut().run("view.zoomIn", json!({})).unwrap();
+        h.run_steps(2);
+    }
     h
 }
 
@@ -416,7 +422,7 @@ fn grayscale_picker_controls_sample_the_plane_and_change_the_visible_curve() {
                     assert!(picker_armed(&h));
                     let before = params(&h);
                     let original = h.state().session.active().unwrap().doc.clone();
-                    sample_at(&mut h, 8.0, 8.0);
+                    sample_at(&mut h, 4.0, 4.0);
                     let after = params(&h);
                     let key = if kind == "curves" { "points" } else { "inWhite" };
                     assert_ne!(before[key], after[key], "{kind} {mode:?} {depth:?} {target:?}");
@@ -511,7 +517,7 @@ fn action_mask_target_survives_reset_pencil_and_picker() {
         }
         h.get_by_label("Set White Point").click();
         h.run_steps(2);
-        sample_at(&mut h, 8.0, 8.0);
+        sample_at(&mut h, 4.0, 4.0);
         assert_eq!(params(&h)["target"], "mask");
         let alpha = h.state().session.active().unwrap().doc.channels[0].clone();
         confirm(&mut h, id).unwrap();
@@ -551,21 +557,22 @@ fn explicit_pixels_action_bypasses_current_alpha_target() {
     for key in ["red", "green", "blue"] {
         assert_eq!(params(&h)[key], json!([[0.0, 255.0], [255.0, 255.0]]), "pixel targets retain their recorded {key} curve");
     }
-    h.get_by_label("Set White Point").click();
+    // Black and white points sampled on the black pixel leave these curves as recorded; the gray point moves them.
+    h.get_by_label("Set Neutral Gray Point").click();
     h.run_steps(2);
     let base = params(&h);
     let expected = photocraft_engine::adjust_params::adjustment_eyedropper(
         "curves",
         &base,
-        photocraft_engine::adjust_params::CurvesEyedropper::White,
+        photocraft_engine::adjust_params::CurvesEyedropper::NeutralGray,
         [0.0; 3],
         ColorMode::Rgb,
     )
     .unwrap();
-    sample_at(&mut h, 8.0, 8.0);
+    sample_at(&mut h, 4.0, 4.0);
     let sampled = photocraft_engine::adjust_params::from_params("curves", &params(&h), None, ColorMode::Rgb).unwrap();
     assert_eq!(sampled, expected, "the picker writes the curve for the committed black pixel");
-    assert_ne!(params(&h)["points"], base["points"], "the sample cannot silently do nothing");
+    assert_ne!(params(&h)["red"], base["red"], "the sample cannot silently do nothing");
     assert_eq!(params(&h)["target"], "pixels");
     let before = h.state().session.active().unwrap().doc.clone();
     let id = top(&h);
@@ -612,10 +619,10 @@ fn resetting_an_armed_picker_does_not_restore_its_old_curve() {
     set(&mut h, id, "points", json!([[0, 64], [255, 255]]));
     h.get_by_label("Set White Point").click();
     h.run_steps(2);
-    sample_at(&mut h, 8.0, 8.0);
+    sample_at(&mut h, 4.0, 4.0);
     reset(&mut h);
     assert!(picker_armed(&h), "Reset keeps the picker armed");
-    sample_at(&mut h, 8.0, 8.0);
+    sample_at(&mut h, 4.0, 4.0);
     let points = params(&h)["points"].clone();
     assert_eq!(points[0][1], 0.0, "{points}");
     let white = points.as_array().unwrap().last().unwrap()[0].as_f64().unwrap();
@@ -979,7 +986,7 @@ fn filter_mask_tone_dialogs_preserve_the_target_and_sample_its_own_levels() {
                     assert_eq!(params(&h)["target"], "filterMask");
                     let id = top(&h);
                     arm(&mut h, "white");
-                    sample_at(&mut h, 8.0, 8.0);
+                    sample_at(&mut h, 4.0, 4.0);
                     assert!(picker_armed(&h), "the picker stays armed on {mode:?} {depth:?} stored={stored}");
                     assert!(std::sync::Arc::ptr_eq(&before, &h.state().session.active().unwrap().doc), "sampling is read-only");
                     assert_eq!(params(&h)["target"], "filterMask");
@@ -1031,7 +1038,7 @@ fn colour_set_action_gray_alias_precedence_and_cancel() {
         let raw = json!({"target":{"colors":[0,2]},"points":[[0,20],[255,240]],"gray":"ignored"});
         let mut h = colour_set_action(mode, SampleType::U8, "curves", raw.clone());
         assert!(params(&h).get("gray").is_none());
-        assert_eq!(params(&h)["points"], json!([[0.0, 20.0], [255.0, 240.0]]));
+        assert_eq!(params(&h)["points"], json!([[0.0, 20.0], [255.0, 240.0]]), "{mode:?}");
         let original = h.state().session.active().unwrap().doc.clone();
         let id = top(&h);
         cancel(&mut h, id);
@@ -1210,7 +1217,7 @@ fn review_mask_action_context_matches_the_addressed_layer() {
                         assert_eq!(names(&h), [if filter { "Receiver Filter Mask" } else { "Receiver Mask" }]);
                         let id = top(&h);
                         arm(&mut h, "white");
-                        sample_at(&mut h, 8.0, 8.0);
+                        sample_at(&mut h, 4.0, 4.0);
                         let p = params(&h);
                         let want = photocraft_engine::adjust_params::adjustment_eyedropper(
                             kind,

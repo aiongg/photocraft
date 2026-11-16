@@ -481,7 +481,7 @@ fn apply_field(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, field
 }
 
 /// A `{ui:{…}}` request on the open hosted workspace `key`: the keys apply in order with `commit` and `cancel` last (a
-/// JSON object keeps no order of its own), a refused key stops the request (its error names the key; earlier keys stay
+/// JSON object keeps no order of its own), each key is applied or refused on its own (the error names every refused key; the others stay
 /// applied), and the reply is the workspace's fields with its `describe` facts.
 pub(crate) fn workspace_ui(app: &mut PhotocraftApp, ctx: &egui::Context, key: &str, ui: &Value) -> Result<Value, String> {
     let Some(id) = host(app).open_dialogs().into_iter().find(|d| d.key.as_deref() == Some(key)).map(|d| d.id) else {
@@ -489,6 +489,9 @@ pub(crate) fn workspace_ui(app: &mut PhotocraftApp, ctx: &egui::Context, key: &s
     };
     let Some(request) = ui.as_object() else { return Err("`ui` must be an object".into()) };
     let mut committed = None;
+    // Each key is applied or refused on its own: a refused key leaves its own value, the keys after it still apply and
+    // the reply names every refusal.
+    let mut refusals = Vec::new();
     let (ends, edits): (Vec<_>, Vec<_>) = request.iter().partition(|(name, _)| matches!(name.as_str(), "commit" | "cancel"));
     for (name, value) in edits.into_iter().chain(ends) {
         let step = match name.as_str() {
@@ -502,16 +505,24 @@ pub(crate) fn workspace_ui(app: &mut PhotocraftApp, ctx: &egui::Context, key: &s
                 Ok(())
             }
             "set" if value.is_object() => {
-                value.as_object().into_iter().flatten().try_for_each(|(field, value)| apply_field(app, ctx, id, field, value))
+                for (field, value) in value.as_object().into_iter().flatten() {
+                    if let Err(e) = apply_field(app, ctx, id, field, value) {
+                        refusals.push(format!("`{field}`: {e}"));
+                    }
+                }
+                Ok(())
             }
             "commit" | "cancel" => Ok(()),
             field => apply_field(app, ctx, id, field, value),
         };
         if let Err(e) = step {
-            return Err(format!("`{name}`: {e}"));
+            refusals.push(format!("`{name}`: {e}"));
         }
     }
     crate::dialogs::take_results(app, ctx);
+    if !refusals.is_empty() {
+        return Err(refusals.join("; "));
+    }
     Ok(match committed {
         Some(result) => json!({"committed": true, "result": result}),
         None => workspace_reply(app, key, id),
