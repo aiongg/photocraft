@@ -286,13 +286,22 @@ fn take_printer_lists(app: &mut PhotocraftApp) -> Vec<Printer> {
 }
 
 /// Answers the dialog's request for a printer list. The list goes through a channel to
-/// `HostedPrint::listen`, so `State::poll`'s choice rule picks the printer.
-fn refresh_printers(app: &mut PhotocraftApp) {
-    let list = take_printer_lists(app);
+/// `HostedPrint::listen`, so `State::poll`'s choice rule picks the printer. While another print holds the spooler the
+/// list is the cached one (or empty), and the dialog asks again on its next pass, after a short wait, so the real
+/// list arrives once the spooler is free.
+fn refresh_printers(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let (list, listed) = match photocraft_engine::print_cmds::try_with_spooler(|| take_printer_lists(app)) {
+        Some(list) => (list, true),
+        None => (take_printer_lists(app), false),
+    };
     let (tx, rx) = std::sync::mpsc::channel();
     let _ = tx.send(list);
     if let Some(dialog) = app.framework.dialogs.get_mut::<HostedPrint>() {
         dialog.listen(rx);
+        if !listed {
+            dialog.request_refresh();
+            ctx.request_repaint_after(std::time::Duration::from_millis(100));
+        }
     }
 }
 
@@ -448,7 +457,7 @@ pub(super) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let browse = dialog.requests_mut().take_path();
     let mut fields = dialog.fields_mut().clone();
     if refresh {
-        refresh_printers(app);
+        refresh_printers(app, ctx);
     }
     let Some((doc, revision)) = app.session.active().map(|d| (d.doc.clone(), d.revision)) else { return };
     let mut moved = false;
