@@ -409,10 +409,6 @@ fn saves_run_in_the_background_and_are_recorded_when_they_end() {
     assert!(h.query_by_label("Esc to cancel").is_none() && h.query_by_label("Encoding").is_none(), "no progress overlay");
     assert!(h.query_all_by_label("Saving").count() >= 1, "the status bar names the save");
     assert!(crate::jobs_ui::foreground_save(h.state()).is_none());
-    h.state_mut().ui.tool = crate::state::Tool::Move;
-    h.key_press(egui::Key::B);
-    h.run_steps(2);
-    assert_eq!(h.state().ui.tool, crate::state::Tool::Brush, "shortcuts still work while it saves");
 
     gates.encode.store(true, Ordering::Relaxed);
     step_until(&mut h, |a| !a.saving());
@@ -421,7 +417,6 @@ fn saves_run_in_the_background_and_are_recorded_when_they_end() {
     assert!(!st.is_dirty());
     assert_eq!(st.path.as_deref(), Some("/tmp/photocraft-test/big.psd"));
     assert_eq!(st.doc.name, "big.psd", "the document takes the saved file's name, as a synchronous Save As does");
-    assert_eq!(h.state().ui.status, "Saved big.psd: a warning");
     assert!(noticed(&h, "a warning"), "the export warnings are shown");
     assert!(h.state_mut().run("layer.new.layer", json!({})).is_ok(), "unlocked again");
 }

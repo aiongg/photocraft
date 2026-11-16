@@ -1698,11 +1698,27 @@ pub fn entries(app: &PhotocraftApp, menu: &CanvasToolMenu) -> Vec<Entry<String>>
 
 /// Runs every pass of the canvas that owns the menu. Closes a menu whose reason is gone, opens the
 /// one a request asks for (a secondary press the tool did not take, the Menu key, or a guide's
-/// context request), and shows the open menu on the framework's menu layer at its press point, then
-/// the Brush Preset picker. A pass applies only its own requests: `host.context` and
-/// `guides.context` are this pass's, so a second pass in a frame opens nothing twice.
-pub(crate) fn run(ui: &mut egui::Ui, app: &mut PhotocraftApp, canvas: &CanvasOutput, host: &ToolHostResponse, guides: Option<&GuidesOutput>) {
+/// context request, or a secondary press on the Crop frame's overlay), and shows the open menu on the framework's menu layer at its press point, then
+/// the Brush Preset picker. A pass applies only its own requests: `host.context`,
+/// `guides.context` and `crop_context` are this pass's, so a second pass in a frame opens nothing twice.
+pub(crate) fn run(
+    ui: &mut egui::Ui,
+    app: &mut PhotocraftApp,
+    canvas: &CanvasOutput,
+    host: &ToolHostResponse,
+    guides: Option<&GuidesOutput>,
+    crop_context: Option<(Pos2, Mods)>,
+) {
     close_stale(app);
+    if let Some((at, mods)) = crop_context
+        && let Some(view) = crate::canvas::document_display::active_view(app)
+    {
+        // The overlay takes the press the tool host would have reported, so the Space-held Hand's menu is picked here
+        // the way the host picks it.
+        let tool = if crate::hold_keys::reposition_held(app) { Tool::Hand } else { app.ui.tool };
+        let doc = view.to_doc(at);
+        open_at(app, tool, mods, at, [doc.x, doc.y], None);
+    }
     if let Some(request) = host.context {
         // A Space-held Hand opens the Hand's menu over the current tool. A momentary Zoom opens no menu of its own, but
         // with ⌘ held the right-click is still the one that lists the layers under the pointer (#307).

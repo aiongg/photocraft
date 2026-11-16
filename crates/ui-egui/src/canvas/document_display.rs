@@ -190,6 +190,9 @@ pub(crate) struct Shown {
     pub response: ToolHostResponse,
     /// The guides' output (their context request), when the body showed them.
     pub guides: Option<GuidesOutput>,
+    /// Where the Crop frame's overlay was asked for its menu (a secondary press on one of its parts) and the modifiers
+    /// held then: the overlay takes that press, so the tool host never reports it.
+    pub crop_context: Option<(Pos2, craft::keymap::Mods)>,
 }
 
 /// The document's picture as prepared for this pass, before the app is borrowed shared.
@@ -277,6 +280,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let mut cpu_read: Option<(PixelRect, f64)> = None;
     // What the tool host did; none in a measuring run, where it does not run.
     let mut hosted: Option<ToolHostResponse> = None;
+    let mut crop_context = None;
     let shown = canvas.show_at(ui, rect, |ui, body| {
         let Some(space) = canvas_space(&body.env) else { return };
         pasteboards(app, ui, body.rect, idx, border, label.clone());
@@ -304,6 +308,10 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         // What the controls report for the host's pass.
         let mut body_shown = tools::BodyShown::default();
         let live = canvas_controls(app, ui, body.rect, host, &space, &mut turned, &mut body_shown);
+        // The body can run more than once in a frame; a report from any of its runs counts.
+        if let Some(context) = body_shown.crop.as_mut().and_then(craft::draw::ui::CropShown::take_context) {
+            crop_context = Some(context);
+        }
         // The tools run after the controls, which take a press first, and before the picture, which shows the stroke
         // or edit they made from this pass's input.
         if let Some(input) = tool_pass(&body.env) {
@@ -404,7 +412,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         view.set_from(next, ppp);
     }
     let view = canvas_output.space.map_or(given, |space| space.view);
-    Shown { view, output: canvas_output, response, guides }
+    Shown { view, output: canvas_output, response, guides, crop_context }
 }
 
 /// The document's pasteboard, and for an artboard document a second one over the boards that leaves the shown layers

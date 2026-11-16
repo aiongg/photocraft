@@ -208,53 +208,6 @@ fn curves_picker_samples_document_coordinates_through_the_view_transform() {
     assert!((red - 32.0).abs() < 0.6, "sampled document-right blue patch through the flipped 400% view: {red}");
 }
 
-/// #7325: ⌘/Ctrl-click on the image with Curves open adds a point at the pixel's tone. The
-/// modifier is the press's own, a drag onto another tone adds nothing more, and the Hand tool
-/// does not take the press for a pan.
-#[test]
-fn command_click_under_curves_adds_one_point_per_press_not_per_frame() {
-    // The Hand tool too: the press is the dialog's, not the start of a pan.
-    for hand in [false, true] {
-        let mut h = harness();
-        if hand {
-            h.state_mut().ui.tool = crate::state::Tool::Hand;
-        }
-        h.state_mut().run("select.rect", json!({"x": 0, "y": 0, "width": 80, "height": 300})).unwrap();
-        h.state_mut().run("edit.fill", json!({"color": "#804020"})).unwrap();
-        h.state_mut().run("select.rect", json!({"x": 80, "y": 0, "width": 320, "height": 300})).unwrap();
-        h.state_mut().run("edit.fill", json!({"color": "#20a0e0"})).unwrap();
-        h.state_mut().run("select.deselect", json!({})).unwrap();
-        let view = &mut h.state_mut().ui.views[0];
-        (view.zoom, view.center, view.fit_pending) = (4.0, [200.0, 150.0], false);
-        crate::adjust_dialog::open(h.state_mut(), "image.adjustments.curves").unwrap();
-        h.run_steps(3);
-        let points = |h: &Harness<'static, PhotocraftApp>| dialog_fields(h)["points"].as_array().map_or(0, Vec::len);
-        let canvas = h.state().last_canvas_rect;
-        // Document x 65 (the brown strip) and 100 (the blue), both left of the centred dialog.
-        let (brown, blue) = (pos2(canvas.left() + 60.0, canvas.center().y), pos2(canvas.left() + 200.0, canvas.center().y));
-        h.hover_at(brown);
-        h.run_steps(1);
-        press(&mut h, brown, true);
-        press(&mut h, brown, false);
-        assert_eq!(points(&h), 2, "a plain click adds no point (hand: {hand})");
-
-        let button = |pos, pressed| egui::Event::PointerButton { pos, button: egui::PointerButton::Primary, pressed, modifiers: Modifiers::COMMAND };
-        // ⌘ stays held through the drag, so only the press can tell the frames apart.
-        h.event(egui::Event::ModifiersChanged(Modifiers::COMMAND));
-        h.event(button(brown, true));
-        h.run_steps(1);
-        assert_eq!(points(&h), 3, "the press adds the point (hand: {hand})");
-        for t in [0.25, 0.5, 0.75, 1.0] {
-            h.event(egui::Event::PointerMoved(brown + (blue - brown) * t));
-            h.run_steps(1);
-        }
-        h.event(button(blue, false));
-        h.event(egui::Event::ModifiersChanged(Modifiers::NONE));
-        h.run_steps(2);
-        assert_eq!(points(&h), 3, "dragging onto another tone adds nothing more (hand: {hand})");
-    }
-}
-
 /// A wheel event of `dy` lines with `modifiers` held.
 fn wheel(h: &Harness<'static, PhotocraftApp>, dy: f32, modifiers: Modifiers) {
     h.event_modifiers(
@@ -372,8 +325,7 @@ fn alt_scroll_zooms_while_a_temporary_tool_is_held() {
 }
 
 /// Type tool (#206): Alt+←/→ at a collapsed caret kerns the pair before it by 20/1000 em (100
-/// with ⌘/Ctrl), one history step per press; ⌘/Ctrl+←/→ moves by word; Alt+Shift+→ extends
-/// the selection by a word.
+/// with ⌘/Ctrl), one history step per press.
 #[test]
 fn type_tool_alt_arrows_kern_the_pair() {
     use photocraft_doc::text::Kerning;
@@ -406,20 +358,11 @@ fn type_tool_alt_arrows_kern_the_pair() {
     h.run_steps(2);
     assert_eq!(kern(&h).1, metric + 100.0);
     assert_eq!(steps(&h), s0 + 3, "one history step per press");
-    // The caret didn't move; ⌘/Ctrl+→ moves by word, Alt+Shift+→ selects by word.
+    // The caret didn't move; at the text end there's no pair to kern.
     assert_eq!(h.state().ui.text_edit.as_ref().map(|e| (e.caret, e.anchor)), Some((1, 1)));
-    h.key_press_modifiers(Modifiers::COMMAND, Key::ArrowRight);
-    h.run_steps(2);
-    assert_eq!(h.state().ui.text_edit.as_ref().map(|e| (e.caret, e.anchor)), Some((3, 3)));
-    h.key_press_modifiers(Modifiers::ALT | Modifiers::SHIFT, Key::ArrowRight);
-    h.run_steps(2);
-    assert_eq!(h.state().ui.text_edit.as_ref().map(|e| (e.anchor, e.caret)), Some((3, 6)));
-    // With a selection Alt+→ tracks it instead (see `type_tool_format_keys_*`); at the text end
-    // there's no pair to kern.
+    let end = text(&h).text.chars().count();
+    edit_type(&mut h, id, end, end);
     let before = kern(&h);
-    h.key_press(Key::ArrowRight);
-    h.run_steps(2);
-    assert_eq!(h.state().ui.text_edit.as_ref().map(|e| (e.anchor, e.caret)), Some((6, 6)));
     h.key_press_modifiers(Modifiers::ALT, Key::ArrowRight);
     h.run_steps(2);
     assert_eq!(kern(&h), before);

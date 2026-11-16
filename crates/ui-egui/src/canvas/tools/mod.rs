@@ -626,7 +626,9 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
         tools.selection.end_outlines_but(tool);
     }
     let navigation = document_display::navigation(app);
-    tools.momentary.hand_selected(tool == Tool::Hand && app.ui.transform.is_none());
+    // A pick a dialog arms on the canvas stands in for the selected tool, so the Hand's Cmd and Alt zoom is not in effect.
+    let dialog_picks = app.session.active_index() == Some(host.idx) && crate::dialogs::canvas_input::armed(app).is_some();
+    tools.momentary.hand_selected(tool == Tool::Hand && app.ui.transform.is_none() && !dialog_picks);
     tools.momentary.set_options(navigation.clone());
     tools.hand.options = navigation.clone();
     // Zoom In or Out and Scrubby Zoom are the selected Zoom tool's own options, never the momentary Zoom's.

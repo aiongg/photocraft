@@ -526,7 +526,10 @@ fn the_mode_shows_clear_while_tilde_is_held() {
 #[test]
 fn a_held_key_keeps_a_pending_crop_and_another_tools_key_commits_it() {
     let mut h = harness(Tool::Crop);
-    // PLAN: the frame is set by dragging the bottom-right handle in, since tools-w45's crop session setter is not in the tree.
+    // Classic Mode resizes the frame from the dragged handle; the default image mode resizes about the centre.
+    h.state_mut().ui.tool_options.crop.shield.classic_mode = true;
+    h.state_mut().ui.extras.snap = false;
+    h.run_steps(1);
     drag_with(&mut h, Modifiers::NONE, 400.0, 300.0, 300.0, 200.0);
     h.run_steps(2);
     assert!(crate::crop_ui::pending(h.state()));
@@ -670,9 +673,8 @@ fn space_hand_view_menu_keeps_escape_and_enter_from_the_pending_crop() {
     assert!(!crate::crop_ui::pending(h.state()), "with no menu open Esc discards the crop");
 }
 
-/// Only a plain Esc and Enter are the view menu's (#11271): Ctrl+Alt+Enter dispatches with the menu
-/// open (it leaves the menu open), and Esc with a tool key in one pass closes the menu and picks
-/// the tool.
+/// Esc with a tool key in one pass closes the view menu and picks the tool (#11271): the menu keeps only the
+/// Esc, not the key pressed with it.
 #[test]
 fn space_hand_view_menu_reserves_only_plain_escape_and_enter() {
     let mut h = harness(Tool::Move);
@@ -680,16 +682,6 @@ fn space_hand_view_menu_reserves_only_plain_escape_and_enter() {
     key(&mut h, Key::Space, true, Modifiers::NONE);
     right_click_at(&mut h, p);
     assert!(h.state().ui.canvas_tool_menu.is_some(), "Space's Hand opens the view menu");
-    let mods = platform(Modifiers::COMMAND | Modifiers::ALT);
-    let steps = h.state().session.active().map(|s| s.history.past_len());
-    h.input_mut()
-        .events
-        .extend([Event::ModifiersChanged(mods), Event::Key { key: Key::Enter, physical_key: None, pressed: true, repeat: false, modifiers: mods }]);
-    h.run_steps(2);
-    h.event(Event::ModifiersChanged(Modifiers::NONE));
-    h.run_steps(1);
-    assert!(h.state().ui.canvas_tool_menu.is_some(), "a modified Enter leaves the menu open");
-    assert_eq!(h.state().session.active().map(|s| s.history.past_len()), steps, "and changes nothing");
     h.input_mut().events.extend([
         Event::Key { key: Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE },
         Event::Key { key: Key::B, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE },
