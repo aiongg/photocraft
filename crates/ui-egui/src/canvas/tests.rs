@@ -1010,11 +1010,8 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
     assert_eq!(h.state().session.active_index(), Some(0), "the floating document is active");
     // The status bar's zoom field (bottom left) and the Navigator's.
     let fields = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
-        let mut f: Vec<egui::Rect> = h
-            .query_all_by_role(egui::accesskit::Role::SpinButton)
-            .filter(|n| n.accesskit_node().label().as_deref() == Some("Zoom"))
-            .map(|n| n.rect())
-            .collect();
+        // The fields are the nodes named Zoom that show the percentage as their value (a field's group carries the name too).
+        let mut f: Vec<egui::Rect> = h.query_all_by_label("Zoom").filter(|n| n.accesskit_node().value().is_some()).map(|n| n.rect()).collect();
         f.sort_by(|a, b| a.left().total_cmp(&b.left()));
         f
     };

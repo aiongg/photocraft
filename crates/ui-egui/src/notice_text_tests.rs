@@ -36,7 +36,8 @@ fn app_harness() -> Harness<'static, PhotocraftApp> {
 
 /// The notice's message (the status bar shows it too, on one line: the notice wraps it).
 fn notice_text(h: &Harness<'static, PhotocraftApp>) -> egui::Rect {
-    let rects: Vec<egui::Rect> = h.get_all_by_label(MESSAGE).map(|n| n.rect()).collect();
+    // The notice card's node names its message together with its title, so the label is matched in part.
+    let rects: Vec<egui::Rect> = h.get_all_by_label_contains("1073741824 px limit").map(|n| n.rect()).collect();
     rects.into_iter().max_by(|a, b| a.height().total_cmp(&b.height())).unwrap()
 }
 

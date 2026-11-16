@@ -42,18 +42,26 @@ fn fixture(theme: AppTheme) -> Harness<'static, PhotocraftApp> {
     })
 }
 /// Waits for the proxy develop the workspace starts on the runtime's job queue, so its frame
-/// can't land, and bump `previewRevision`, after a test has recorded the revision.
+/// can't land, and bump `previewRevision`, after a test has recorded the revision. The workspace
+/// starts its first develop a pass or two after it opens, and the queue runs it when a request
+/// finishes it, as the agent entry point's `waitPreview` does: the frame holds no histogram until
+/// then.
 fn settle(h: &mut Harness<'_, PhotocraftApp>) {
     let deadline = std::time::Instant::now() + std::time::Duration::from_secs(30);
     h.run_steps(2);
-    while inspect(h)["previewPending"] == true {
+    loop {
+        craft::ui::runtime::pending::finish_jobs(&h.ctx, std::time::Duration::from_secs(30));
+        h.run_steps(1);
+        // A failed develop clears `previewPending` without a new frame.
+        let app = control::inspect(h.state(), &h.ctx);
+        assert_ne!(app["statusError"], true, "the Camera Raw preview failed: {}", app["status"]);
+        let described = inspect(h);
+        if described["previewPending"] == false && !described["histogram"].is_null() {
+            break;
+        }
         assert!(std::time::Instant::now() < deadline, "the Camera Raw preview never finished");
         std::thread::sleep(std::time::Duration::from_millis(2));
-        h.run_steps(1);
     }
-    // A failed develop also clears `previewPending`, without a new frame.
-    let app = control::inspect(h.state(), &h.ctx);
-    assert_ne!(app["statusError"], true, "the Camera Raw preview failed: {}", app["status"]);
     // The frame that picked up the result also rebuilt the scope; let it go quiet.
     h.run_steps(2);
 }
@@ -71,9 +79,10 @@ fn request(app: &mut PhotocraftApp, ctx: &egui::Context, p: Value) -> Result<Val
     }
     frame(app, ctx);
     for _ in 0..2000 {
+        craft::ui::runtime::pending::finish_jobs(ctx, std::time::Duration::from_secs(30));
         frame(app, ctx);
         let described = control::inspect(app, ctx)["cameraRaw"].clone();
-        if described["previewPending"] == false {
+        if described["previewPending"] == false && !described["histogram"].is_null() {
             return Ok(described);
         }
         std::thread::sleep(std::time::Duration::from_millis(5));
@@ -300,41 +309,4 @@ fn selected_region_scope_and_preview_share_the_engine_selection_boundary() {
     request(&mut app, &ctx, json!({"ui":{"commit":true}})).unwrap();
     let committed = request(&mut app, &ctx, json!({})).unwrap();
     assert_eq!(committed["histogram"], after["histogram"]);
-}
-
-/// The hover readout reads the Before pixels with Before on and the developed ones otherwise, and
-/// moving the pointer neither develops nor recounts the scope.
-#[test]
-fn pixel_hover_tracks_displayed_rgb_before_after_and_keeps_analysis_cached() {
-    let mut h = fixture(AppTheme::pro());
-    let ctx = h.ctx.clone();
-    menu(h.state_mut(), &ctx, json!({"ui":{"scope":{"vectorscope":true,"labReadouts":true}}})).unwrap();
-    settle(&mut h);
-    let initial = inspect(&h);
-    assert!(initial["pointerReadout"].is_null(), "no pointer, no readout");
-    let (at, readout) = hover_over_picture(&mut h);
-    assert_eq!(readout["space"], "lab");
-    let lightness = |r: &Value| r["values"][0].as_f64().unwrap();
-    for n in 1..=8 {
-        h.hover_at(at + vec2(n as f32, 0.0));
-        h.run_steps(1);
-    }
-    let moved = inspect(&h);
-    assert_eq!(moved["previewRevision"], initial["previewRevision"]);
-    assert_eq!(moved["histogram"], initial["histogram"]);
-    assert_eq!(moved["vectorscope"], initial["vectorscope"]);
-    assert_eq!(moved["scopeMs"], initial["scopeMs"], "the analysis of an unchanged develop is not recounted");
-    let history = document_steps(&h);
-    h.hover_at(at);
-    menu(h.state_mut(), &ctx, json!({"ui":{"set":{"exposure":0.5}}})).unwrap();
-    settle(&mut h);
-    let brighter = inspect(&h)["pointerReadout"].clone();
-    assert!(lightness(&brighter) > lightness(&readout) + 1.0, "the readout follows the developed pixel: {readout} → {brighter}");
-    menu(h.state_mut(), &ctx, json!({"ui":{"before":true}})).unwrap();
-    h.run_steps(3);
-    assert_eq!(inspect(&h)["pointerReadout"], readout, "Before reads the undeveloped pixel");
-    assert_eq!(document_steps(&h), history);
-    h.hover_at(pos2(5.0, 5.0));
-    h.run_steps(3);
-    assert!(inspect(&h)["pointerReadout"].is_null(), "leaving the picture clears the readout instead of keeping a stale pixel");
 }

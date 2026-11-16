@@ -81,7 +81,7 @@ fn export_both_ways(snapshots: Option<&Path>) {
     let (mut h, writes) = harness(snapshots.is_some());
     let source = h.state().session.active().unwrap().doc.clone();
     open_dialog(&mut h);
-    h.get_by_label("Color Space");
+    assert!(h.query_all_by_label("Color Space").next().is_some(), "the dialog shows the Color Space section");
     assert_eq!(checkbox(&h, CONVERT), Toggled::True);
     assert_eq!(checkbox(&h, EMBED), Toggled::True);
     snapshot(&mut h, snapshots, "export-as-default.png");

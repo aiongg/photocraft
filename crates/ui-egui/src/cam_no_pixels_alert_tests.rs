@@ -7,7 +7,7 @@ use std::path::PathBuf;
 use std::sync::Arc;
 
 use egui::Modifiers;
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, tool_event};
@@ -37,15 +37,9 @@ const LINE: &[[f64; 2]] = &[[20.0, 50.0], [60.0, 50.0], [100.0, 50.0], [140.0, 5
 const DIAGONAL: &[[f64; 2]] = &[[20.0, 20.0], [50.0, 35.0], [80.0, 50.0], [110.0, 65.0]];
 const AREA: &[[f64; 2]] = &[[20.0, 20.0], [80.0, 20.0], [80.0, 80.0], [20.0, 80.0]];
 
-/// The ids of the open "No pixels are selected." alerts. The message is the only way to tell this alert from others.
+/// The ids of the open alerts: this tool opens no other, so any alert is the "No pixels are selected." one.
 fn alerts(app: &PhotocraftApp) -> Vec<craft::ui::dialog::DialogId> {
-    app.framework
-        .dialogs
-        .open_dialogs()
-        .iter()
-        .filter(|d| d.fields.as_ref().and_then(|f| f.get("message")).and_then(Value::as_str) == Some("No pixels are selected."))
-        .map(|d| d.id)
-        .collect()
+    crate::dialogs::alerts::alerts(app)
 }
 
 /// Whether the document has a selection.

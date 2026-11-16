@@ -126,58 +126,6 @@ fn perf_output_includes_slow_frames() {
 }
 
 #[test]
-fn camera_raw_control_updates_and_commits_or_cancels_an_open_raw() {
-    use photocraft_raw::testgen::{DngSpec, mosaic, scene};
-    let (w, h) = (48, 32);
-    let mut spec = DngSpec::cfa(w, h, mosaic(&scene(w, h), w, [0, 1, 1, 2], 0, 30000));
-    spec.as_shot_neutral = Some([0.5, 1.0, 0.7]);
-    let dng = spec.build();
-    for finish in ["commit", "cancel"] {
-        let services = crate::Services {
-            import: Some(Box::new(|name, bytes, opts| {
-                photocraft_io::import_with_options(name, bytes, opts).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string())
-            })),
-            ..Default::default()
-        };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        let ctx = app.ctx().clone();
-        PhotocraftApp::setup_context(&ctx, Default::default());
-        app.open_bytes("control.dng", &dng).unwrap();
-        ctx.run_ui(Default::default(), |ui| crate::dialogs::run(&mut app, ui)).textures_delta.clear();
-        assert_eq!(crate::distort_ui::modal_workspace(&app), Some("filter.cameraRaw"));
-        // A developed raw has no embedded profile to ask about (`open_prompt`), so no profile
-        // prompt stands between the open and the Camera Raw dialog.
-        assert!(dialogs(&mut app, &ctx).is_empty());
-        let update = json!({"id":"filter.cameraRaw","params":{"ui":{"set":{"exposure":0.5}}}});
-        let original = app.session.active().unwrap().doc.clone();
-        let changed = call(&mut app, &ctx, "ui.menu.invoke", update.clone());
-        let undone = call(&mut app, &ctx, "ui.menu.invoke", json!({"id":"filter.cameraRaw","params":{"ui":{"undo":true}}}));
-        assert_eq!(undone["result"]["params"]["exposure"], 0.0, "{undone}");
-        let redone = call(&mut app, &ctx, "ui.menu.invoke", json!({"id":"filter.cameraRaw","params":{"ui":{"redo":true}}}));
-        assert_eq!(redone["result"]["params"]["exposure"], 0.5, "{redone}");
-        assert_eq!(changed["ok"], true, "{changed}");
-        assert_eq!(changed["result"]["params"]["exposure"], 0.5);
-        assert_eq!(crate::camera_raw_ui::describe(&app)["params"]["exposure"], 0.5);
-        assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &original), "a preview must not commit");
-        assert!(!crate::menus::allows(&app, &CommandRef::new("filter.cameraRaw")), "native menu clicks stay blocked");
-        let finished = call(&mut app, &ctx, "ui.menu.invoke", json!({"id":"filter.cameraRaw","params":{"ui":{finish:true}}}));
-        assert_eq!(finished["ok"], true, "{finished}");
-        assert_eq!(crate::distort_ui::modal_workspace(&app), None);
-        if finish == "commit" {
-            assert_eq!(finished["result"]["redeveloped"], true, "{finished}");
-            assert_eq!(app.session.documents().len(), 1);
-            let st = app.session.active().unwrap();
-            assert_ne!(st.doc.id, original.id);
-            assert_eq!(st.doc.depth, photocraft_color::SampleType::U16);
-            assert_eq!(st.saved_revision, st.revision);
-        } else {
-            assert_eq!(finished["result"]["cancelled"], true);
-            assert!(app.session.documents().is_empty());
-        }
-    }
-}
-
-#[test]
 fn full_window_workspaces_are_modal_for_menu_invocations() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();

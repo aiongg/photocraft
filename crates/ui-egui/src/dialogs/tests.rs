@@ -178,6 +178,11 @@ fn row_b(_: &mut PhotocraftApp, _: &egui::Context, answer: &mut PromptAnswer) ->
     })
 }
 
+/// A custom prompt answers a programmatic OK only through a button that takes it.
+fn with_buttons(prompt: StandardPrompt) -> StandardPrompt {
+    prompt.button(PromptChoice::Proceed, "OK").button(PromptChoice::Cancel, "Cancel")
+}
+
 #[test]
 fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -187,7 +192,7 @@ fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     let hits = || HITS.lock().unwrap().clone();
 
     // A dialog can be answered once a pass has shown it.
-    let first = app.framework.dialogs.open(StandardPrompt::custom("A").tag(MarkA));
+    let first = app.framework.dialogs.open(with_buttons(StandardPrompt::custom("A")).tag(MarkA));
     testing::show(&mut app);
     assert!(app.framework.dialogs.confirm_by_id(&ctx, first));
     take_prompts_from(&mut app, &ctx, rows);
@@ -195,8 +200,8 @@ fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     assert_eq!(hits(), vec![("a", PromptChoice::Proceed)], "A's answer reached A's row, once");
 
     // A prompt opened over another of its type replaces it: the replaced one's host Cancel acts on nothing.
-    app.framework.dialogs.open(StandardPrompt::custom("A again").tag(MarkA));
-    let second = app.framework.dialogs.open(StandardPrompt::custom("B").tag(MarkB));
+    app.framework.dialogs.open(with_buttons(StandardPrompt::custom("A again")).tag(MarkA));
+    let second = app.framework.dialogs.open(with_buttons(StandardPrompt::custom("B")).tag(MarkB));
     testing::show(&mut app);
     take_prompts_from(&mut app, &ctx, rows);
     assert_eq!(hits().len(), 1, "a host Cancel reaches no row");
@@ -205,7 +210,7 @@ fn a_prompt_answer_reaches_its_own_entry_once_and_a_host_cancel_reaches_none() {
     assert_eq!(hits(), vec![("a", PromptChoice::Proceed), ("b", PromptChoice::Proceed)], "the loop went on past the host Cancel");
 
     // A prompt's own Cancel button answers `Ok` with `Cancel`, and its row acts on it.
-    let third = app.framework.dialogs.open(StandardPrompt::custom("B").tag(MarkB));
+    let third = app.framework.dialogs.open(with_buttons(StandardPrompt::custom("B")).tag(MarkB));
     app.framework.dialogs.get_mut_by_id::<StandardPrompt>(third).unwrap().set_choice(PromptChoice::Cancel);
     testing::show(&mut app);
     assert!(app.framework.dialogs.confirm_by_id(&ctx, third));
