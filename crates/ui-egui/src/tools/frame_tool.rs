@@ -12,7 +12,7 @@ use crate::{
     theme::Tokens,
 };
 use craft::behavior::{
-    CancelReason, Cursor, CursorIcon, EditEvent, GestureId, IconId, Mixed,
+    CancelReason, Cursor, CursorIcon, EditEvent, GestureId, IconId, Mixed, PointerButton,
     geometry::{BoxAllow, BoxPart, BoxRules, BoxState, ConstrainStyle, Directions, MoveGesture, ScaleRule, drag as box_drag},
     kurbo::{Point as KPoint, Rect as KRect},
 };
@@ -596,6 +596,11 @@ impl CanvasTool for FramePass<'_> {
             }
         });
         self.state.draw.cancel(reason, cx);
+    }
+
+    /// ⌘ is the Move tool's stand-in: with it held the press belongs to the stand-in, not to a frame.
+    fn takes(&self, button: PointerButton, mods: Mods) -> bool {
+        button == PointerButton::Primary && !mods.cmd
     }
 
     fn claims(&self) -> ToolClaims {
