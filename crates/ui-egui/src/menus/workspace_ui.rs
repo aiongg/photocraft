@@ -11,7 +11,7 @@ use craft::ui::contract::{Bind, CommandSet as _};
 use craft::ui::dialog::DialogResult;
 use craft::ui::docking::{WorkspaceAsk, WorkspaceCommands, run_workspace, workspace_states};
 use craft::ui::patterns::dock::{HostedDeleteWorkspace, HostedNewWorkspace, NewWorkspace, WorkspaceSwitcher};
-use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, Param, ParamDialog, ParamKind, ParamResult};
+use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, Param, ParamDialog, ParamKind, ParamLayout, ParamResult};
 use craft::ui::runtime::commands::CommandState;
 use craft::ui::value_drag::SliderScale;
 use photocraft_engine::prefs::Preferences;
@@ -359,7 +359,7 @@ fn open_form(app: &mut PhotocraftApp, key: &'static str, title: &'static str, fi
     // with a name check for Save Pixel Aspect Ratio needs a `ParamFamily::check` row (dialogs-w19); `custom_par`
     // refuses an empty name and the status line shows it.
     let id = crate::dialogs::params::open_param(app, key, fields, Value::Null, move |fields| {
-        ParamDialog::new(key, tl!(title), params.clone()).values(Bind::bound(fields))
+        ParamDialog::new(key, tl!(title), params.clone()).values(Bind::bound(fields)).layout(ParamLayout::Stacked)
     });
     Ok(json!({"dialog": id.value().to_string()}))
 }
