@@ -16,7 +16,6 @@ mod crop_ctrl_straighten;
 mod crop_defaults;
 mod crop_options_bar_chrome;
 mod crop_task_bar;
-mod crop_turn_keeps_frame_inside;
 mod display_shadows;
 mod drag_preview_canvas;
 mod eraser_reset_defaults;
