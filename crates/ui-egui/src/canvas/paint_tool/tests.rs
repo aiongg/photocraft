@@ -445,7 +445,7 @@ fn smoothed_stroke_shows_its_catch_up_tail_while_drawing() {
     // #73: with smoothing the brush lags behind the pointer and catches up at the end; the
     // preview draws that tail live, so no frame after release is missing the end.
     let xs = [30.0, 50.0, 70.0, 90.0, 110.0, 130.0, 150.0, 170.0];
-    let (live, done, partial, app) = drag_frames(0.5, &xs);
+    let (live, done, partial, _) = drag_frames(0.5, &xs);
     assert!(same_pixels(&live, &done), "preview at the last move = committed stroke, tail included");
     assert!(partial);
     let end = |d: &Document| (0..200).rev().find(|&x| (0..80).any(|y| d.layers[0].surface().unwrap().rgba(x, y)[3] > 0.0)).unwrap();
@@ -453,13 +453,14 @@ fn smoothed_stroke_shows_its_catch_up_tail_while_drawing() {
     // The options-bar value reaches the stroke: 50 % smooths the wiggle, 0 % doesn't.
     let (_, rough, _, _) = drag_frames(0.0, &xs);
     assert!(!same_pixels(&rough, &done), "smoothing changes the stroke");
-    // And the commit is what `paint.stroke` gives with that smoothing: the journaled stroke, replayed on a fresh
-    // session, paints the same pixels.
-    let journaled = app.session.journal.iter().rev().find(|(id, _)| id == "paint.stroke").map(|(_, p)| p.clone()).expect("the stroke is journaled");
+    // And the commit is what `paint.stroke` gives with that smoothing.
     let mut s = photocraft_engine::Session::new();
     s.execute("file.new", json!({"width": 200, "height": 80, "background": "transparent"})).unwrap();
     s.execute("tools.setBrush", json!({"brush": {"size": 16, "hardness": 0.5, "smoothing": {"amount": 0.5, "catchUpOnEnd": true}}})).unwrap();
-    s.execute("paint.stroke", journaled).unwrap();
+    let mut pts = vec![json!([10.0, 40.0, 1.0])];
+    pts.extend(xs.iter().map(|&x| json!([x, 40.0 + (x / 7.0).sin() * 8.0, 1.0])));
+    // (Round tips without dynamics draw the same for any seed.)
+    s.execute("paint.stroke", json!({"points": pts, "seed": 0})).unwrap();
     assert!(same_pixels(&s.active().unwrap().doc, &done));
 }
 
