@@ -7,7 +7,7 @@
 use craft::behavior::Axis;
 use craft::behavior::dock::{Action, Column, DockEdge, Floating, Group, Layout, Node, Permissions, SplitSize, Workspace};
 use craft::color::ui::{ColorPanelCommand, ColorPanelMenu};
-use craft::ui::contract::{Props as _, Scroll, ShowContainer as _};
+use craft::ui::contract::{Scroll, ShowContainer as _};
 use craft::ui::docking::DockHeights;
 use craft::ui::layout_components::Stack;
 use craft::ui::menu::PanelRow;
