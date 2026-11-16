@@ -213,13 +213,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
     },
     floating("modifierKeys", || tl!("Modifier Keys").to_string(), "keyboard", [240.0, 140.0], |app, ui| scrolled(app, ui, crate::modifier_keys::panel)),
     floating("gradientEditor", || tl!("Gradient Editor").to_string(), "blend", [520.0, 440.0], |app, ui| scrolled(app, ui, crate::gradient_ui::editor::show)),
-    floating(
-        "measurementLog",
-        || tl!("Measurement Log").to_string(),
-        "ruler",
-        [620.0, 320.0],
-        crate::tools::analysis::log_panel::body,
-    ),
+    floating("measurementLog", || tl!("Measurement Log").to_string(), "ruler", [620.0, 320.0], crate::tools::analysis::log_panel::body),
     floating("notes", || tl!("Notes").to_string(), "square-plus", [260.0, 300.0], |app, ui| scrolled(app, ui, crate::tools::analysis::notes_panel::body)),
 ];
 
