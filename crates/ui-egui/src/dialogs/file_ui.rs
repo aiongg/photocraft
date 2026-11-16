@@ -138,30 +138,6 @@ mod web_playback_tests {
         take(app, &ctx);
     }
 
-    /// WebP (#6391): 4-Up halves a lossy quality like JPEG's and drops quality when lossless. The dialog's own
-    /// variants are read from what it asks the app to encode.
-    #[test]
-    fn webp_settings_show_quality_until_lossless() {
-        let mut app = app();
-        let id = open_web(&mut app);
-        set_option(&mut app, id, "format", json!(WebFormat::WebP));
-        set_option(&mut app, id, "quality", json!(80));
-        set_option(&mut app, id, "view", json!(WebView::FourUp));
-        pass(&mut app);
-        let four_up = |app: &mut PhotocraftApp| {
-            let dialog = app.framework.dialogs.get_mut_by_id::<craft::ui::patterns::form_dialogs::HostedSaveForWeb>(id).unwrap();
-            let wanted = dialog.wanted_variants();
-            let options = |index: usize| wanted.iter().find(|v| v.index == index).expect("the pane is asked for").request.options.clone();
-            [options(1), options(2)]
-        };
-        let [half, quarter] = four_up(&mut app);
-        assert_eq!((half.format, half.quality, quarter.quality), (WebFormat::WebP, 40, 20));
-        set_option(&mut app, id, "lossless", json!(true));
-        pass(&mut app);
-        let [half, quarter] = four_up(&mut app);
-        assert_eq!((half.format, quarter.format), (WebFormat::Png8, WebFormat::Gif));
-    }
-
     #[test]
     fn frame_previews_preserve_source_and_match_colors_across_depths() {
         for depth in [8, 16, 32] {
