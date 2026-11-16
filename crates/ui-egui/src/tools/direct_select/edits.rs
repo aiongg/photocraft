@@ -29,6 +29,7 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
             EditEvent::Begin { .. } => {
                 app.ui.direct_selection.editing = Owner::current(app);
                 app.ui.direct_selection.editing_mods = mods;
+                app.ui.direct_selection.editing_overlay = Some(output.edit.response.id);
             }
             // A gesture runs only on the document, revision and target it began on, with the modifiers it began with.
             EditEvent::Commit { .. } => {
@@ -156,6 +157,7 @@ fn select(app: &mut PhotocraftApp, selection: &PathSelection) {
     let ds = &mut app.ui.direct_selection;
     let editing = ds.editing.take();
     let editing_mods = ds.editing_mods;
+    let editing_overlay = ds.editing_overlay;
     *ds = DirectSelection {
         target: selection.path.and_then(PathRef::from_key),
         anchors: selection.anchors.iter().map(|k| [k.subpath, k.knot]).collect(),
@@ -164,6 +166,7 @@ fn select(app: &mut PhotocraftApp, selection: &PathSelection) {
         owner,
         editing,
         editing_mods,
+        editing_overlay,
         ..Default::default()
     };
 }

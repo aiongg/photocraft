@@ -117,9 +117,9 @@ pub struct DirectSelection {
     /// name of its History step, is the one its press chose, not the one the release's modifiers pick.
     #[serde(skip)]
     pub(crate) editing_mods: Mods,
-    /// `cancel_stale` ended a running gesture: the overlay cancels its open press in the next pass it shows.
+    /// The overlay whose press runs the `editing` gesture: `cancel_stale` ends that press with the gesture.
     #[serde(skip)]
-    pub(crate) cancel_press: bool,
+    pub(crate) editing_overlay: Option<egui::Id>,
     #[serde(skip)]
     pub(crate) owner: Option<Owner>,
     /// The saved path whose anchors the first Escape hid (#13072): the next Escape deactivates it,
@@ -275,7 +275,10 @@ pub(crate) fn cancel_stale(app: &mut PhotocraftApp) -> bool {
         return false;
     }
     let was_editing = ds.editing.is_some();
-    app.ui.direct_selection = DirectSelection { cancel_press: was_editing, ..Default::default() };
+    if let Some(overlay) = ds.editing_overlay.filter(|_| was_editing) {
+        craft::ui::primitives::cancel_press_of(app.ctx(), overlay);
+    }
+    app.ui.direct_selection = DirectSelection::default();
     was_editing
 }
 
