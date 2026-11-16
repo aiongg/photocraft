@@ -85,7 +85,7 @@ fn other_tools_keep_their_plain_right_click() {
 fn a_right_click_on_the_pasteboard_opens_its_colour_menu() {
     let mut app = bucket();
     testing::secondary_click(&mut app, [-8.0, 32.0], Modifiers::NONE);
-    assert!(app.ui.canvas_tool_menu.as_ref().is_some_and(|m| m.pasteboard), "the pasteboard colour menu");
+    assert!(app.ui.canvas_tool_menu.as_ref().is_some_and(|m| matches!(m.kind, MenuKind::Pasteboard)), "the pasteboard colour menu");
     assert!(mode_menu(&app).is_none(), "not the Mode list");
 }
 
@@ -100,6 +100,7 @@ fn a_right_click_on_a_free_transform_box_opens_only_the_transform_menu() {
     let ctx = testing::ctx(&app);
     crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({})).unwrap();
     testing::secondary_click(&mut app, [32.0, 32.0], Modifiers::NONE);
-    assert!(app.ui.canvas_tool_menu.as_ref().is_some_and(|m| m.transform), "the transform menu");
+    // The box's own menu is the framework transform overlay's context menu, not a canvas tool menu.
+    assert!(app.ui.canvas_tool_menu.is_none(), "no canvas tool menu over the box");
     assert!(mode_menu(&app).is_none(), "not the Mode list");
 }
