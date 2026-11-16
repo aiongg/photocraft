@@ -152,6 +152,12 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut VectorTools, _response:
     for event in state.path_selection.take_events() {
         match event {
             PathSelectionEvent::Press { at, shift } => {
+                // A press on a shape layer, off every component of the targeted saved path, targets
+                // the shape: the press and the drag act on it, not on the saved path (#13270).
+                let tol = crate::path_components::press_tolerance(app);
+                if app.session.active().is_some_and(|st| super::pick_shape_at(&st.doc, at, tol).is_some()) {
+                    crate::path_components::untarget_saved_path_off(app, at, tol);
+                }
                 crate::path_components::press(app, at, shift);
                 if let Some(owner) = VectorOwner::capture(app) {
                     state.path_selection.owned_by(owner);

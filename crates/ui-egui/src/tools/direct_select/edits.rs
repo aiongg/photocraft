@@ -22,6 +22,7 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
         select(app, selection);
     }
     let mut commit = false;
+    let mut dragged = false;
     for event in &output.edit.events {
         match event {
             EditEvent::Begin { .. } => app.ui.direct_selection.editing = Owner::current(app),
@@ -29,6 +30,7 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
             EditEvent::Commit { .. } => {
                 let began = app.ui.direct_selection.editing.take();
                 commit = began.is_some() && began == Owner::current(app);
+                dragged = true;
             }
             EditEvent::Cancel { .. } => app.ui.direct_selection.editing = None,
             EditEvent::Set { .. } => commit = true,
@@ -36,7 +38,7 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
         }
     }
     if commit && let Some(change) = &output.change {
-        change_path(app, change, refs, tool, mods);
+        change_path(app, change, refs, tool, mods, dragged);
     }
     if let Some(delete) = &output.delete
         && let Some(r) = known(delete.path, refs)
@@ -142,8 +144,9 @@ fn moved(x: f64, y: f64) -> bool {
     x != 0.0 || y != 0.0
 }
 
-/// Runs the command a finished edit stands for.
-fn change_path(app: &mut PhotocraftApp, change: &PathEdit, refs: &[PathRef], tool: Tool, mods: Mods) {
+/// Runs the command a finished edit stands for. `dragged` is whether a pointer gesture made it:
+/// an arrow-key nudge (`Set`) keeps the command's own step name.
+fn change_path(app: &mut PhotocraftApp, change: &PathEdit, refs: &[PathRef], tool: Tool, mods: Mods, dragged: bool) {
     let Some(r) = known(change.path(), refs) else { return };
     if r == PathRef::Pen {
         edit_draft(app, |path| change.apply(path));
@@ -157,6 +160,10 @@ fn change_path(app: &mut PhotocraftApp, change: &PathEdit, refs: &[PathRef], too
             let mut params = json!({"anchors": ids(anchors), "move": [by.x, by.y]});
             if convert_tool {
                 params["stepName"] = json!("Drag Path");
+            } else if dragged && anchors.len() == 1 {
+                // One anchor is "Drag Anchor Point" in History, two or more the command's
+                // default "Drag Anchor Points", as in Photoshop (#13205).
+                params["stepName"] = json!("Drag Anchor Point");
             }
             command(app, r, "path.moveAnchors", params);
         }

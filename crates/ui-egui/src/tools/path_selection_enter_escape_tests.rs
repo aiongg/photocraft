@@ -30,11 +30,7 @@ fn app() -> PhotocraftApp {
 }
 
 fn press(app: &mut PhotocraftApp, key: Key, modifiers: Modifiers) {
-    let ctx = egui::Context::default();
-    let ev = egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers };
-    ctx.begin_pass(egui::RawInput { events: vec![ev], ..Default::default() });
-    crate::shortcuts::handle(app, &ctx);
-    ctx.end_pass().textures_delta.clear();
+    crate::canvas::testing::key(app, key, modifiers);
 }
 
 fn path_1(app: &PhotocraftApp) -> Path {
