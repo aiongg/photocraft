@@ -62,7 +62,7 @@ impl CanvasTool for DialogTool<'_> {
         let state = &mut *self.state;
         // `(took the press, the press is the whole gesture)`
         let (took, click) = self.scope.with_app(|app| {
-            let follows = canvas_input::follows_drag(app, pick, mods);
+            let follows = canvas_input::follows_drag(app, pick);
             match pick {
                 DialogPick::TonePicker(_) => (canvas_input::pick_tone(app, at), !follows),
                 DialogPick::CurvesPoint => (canvas_input::add_curve_point(app, at, mods.shift), true),
