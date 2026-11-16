@@ -21,10 +21,8 @@ fn harness() -> Harness<'static, PhotocraftApp> {
             if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
                 return;
             }
-            egui::CentralPanel::default().show(ui, |ui| {
-                crate::canvas::document_area(app, ui);
-                crate::brush_picker::show_at(ui, app);
-            });
+            // The canvas shows the picker itself (`canvas_tool_menu::run`); a second `show_at` would show it twice.
+            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
         },
         app,
     );
