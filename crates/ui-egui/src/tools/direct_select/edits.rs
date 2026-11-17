@@ -24,15 +24,6 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
     let mut commit = false;
     let mut dragged = false;
     let mut named_mods = mods;
-    if !output.edit.events.is_empty() {
-        eprintln!(
-            "DIAG {}: ds events {:?} mods {mods:?} editing_mods {:?} tool {tool:?} change {:?}",
-            crate::diag_test(),
-            output.edit.events,
-            app.ui.direct_selection.editing_mods,
-            output.change
-        );
-    }
     for event in &output.edit.events {
         match event {
             EditEvent::Begin { .. } => {
