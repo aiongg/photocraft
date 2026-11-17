@@ -620,17 +620,18 @@ fn a_secondary_canvas_does_not_overwrite_the_main_canvas_scale() {
     app.run("view.actualPixels", json!({})).unwrap();
     app.sync_views();
     let view = app.ui.views[0].clone();
-    let frame = |app: &mut PhotocraftApp, ppp: f32, primary: bool| {
+    let frame = |app: &mut PhotocraftApp, ppp: f32, host: CanvasHost, primary: bool| {
         let mut input = egui::RawInput::default();
         input.viewports.entry(egui::ViewportId::ROOT).or_default().native_pixels_per_point = Some(ppp);
         let mut out = ctx.run_ui(input, |ui| {
-            canvas_view(app, ui, CanvasHost::main(0), Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0)), view.clone(), primary);
+            canvas_view(app, ui, host, Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0)), view.clone(), primary);
         });
         out.textures_delta.clear();
     };
-    frame(&mut app, 2.0, true);
+    frame(&mut app, 2.0, CanvasHost::main(0), true);
     assert_eq!(app.ppp, 2.0);
-    frame(&mut app, 1.0, false);
+    // The secondary canvas is a document window's, a canvas of its own beside the main one.
+    frame(&mut app, 1.0, CanvasHost { idx: 0, window: Some(1) }, false);
     assert_eq!(app.ppp, 2.0, "a secondary window's scale doesn't replace the main canvas's");
     // The main canvas mapping still uses its own scale: 100 % is 1 doc px per physical px.
     let shown = active_view(&app).unwrap();
