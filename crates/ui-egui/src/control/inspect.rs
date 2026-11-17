@@ -54,7 +54,7 @@ fn rects(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     let rect = |id: egui::Id| bounds(ctx, id).map(|r| json!([r.min.x, r.min.y, r.max.x, r.max.y]));
     let mut out = serde_json::Map::new();
     for idx in 0..app.session.documents().len() {
-        if let Some(r) = rect(crate::canvas::document_display::CanvasHost::main(idx).canvas_id()) {
+        if let Some(r) = rect(crate::canvas::document_display::CanvasHost::primary(app, idx).canvas_id()) {
             out.insert(format!("canvas.{idx}"), r);
         }
     }

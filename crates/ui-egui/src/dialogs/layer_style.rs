@@ -511,7 +511,7 @@ pub fn open(app: &mut PhotocraftApp, select: Option<&str>) -> Option<DialogId> {
         .style_presets(style_rows(app), style_thumb(app))
         .gradient_presets(gradient_presets(app))
         .preview_thumb(preview_thumb(app))
-        .canvas(crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
+        .canvas(crate::canvas::document_display::CanvasHost::primary(app, idx).canvas_id());
     let id = app.framework.dialogs.open(hosted);
     app.layer_style_target = Some((id, doc, layer_id));
     Some(id)

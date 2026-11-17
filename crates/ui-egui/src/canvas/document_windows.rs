@@ -80,7 +80,7 @@ pub fn extra_windows(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
             // compares with the view the window started the pass with, so both runs file the same ask.
             let (after, canvas) = document_window_canvas(app, ui, id, doc, view.clone(), focused);
             // The view the window's canvas showed this pass, kept by the tool host that ran in it.
-            let host = CanvasHost { idx: doc, viewport: ui.ctx().viewport_id(), window: Some(id) };
+            let host = CanvasHost { idx: doc, window: Some(id) };
             if wants_wrap(preference, &start, &after)
                 && let Some(drawn) = ToolHost::shown_space(ui.ctx(), host.canvas_id()).map(|space| space.view)
             {
@@ -123,7 +123,7 @@ pub(super) fn document_window_canvas(app: &mut PhotocraftApp, ui: &mut egui::Ui,
     let mut out = (view.clone(), Rect::NOTHING);
     egui::CentralPanel::default().frame(egui::Frame::NONE.fill(crate::theme::Tokens::get(ui.ctx()).canvas)).show(ui, |ui| {
         let rect = ui.available_rect_before_wrap();
-        let host = CanvasHost { idx: doc, viewport: ui.ctx().viewport_id(), window: Some(window) };
+        let host = CanvasHost { idx: doc, window: Some(window) };
         out = (canvas_view(app, ui, host, rect, view, focused).0, rect);
     });
     out

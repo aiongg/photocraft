@@ -1238,7 +1238,7 @@ fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     // instead of growing. Like a modifier flag, it may be top-level or grouped under "modifiers"; it is a held key
     // for the length of the request, and the tool host's momentary tools read it from the held keys.
     let space = p.get("modifiers").unwrap_or(p).get("space").and_then(Value::as_bool).unwrap_or(false);
-    let canvas = crate::canvas::document_display::CanvasHost::main(idx).canvas_id();
+    let canvas = crate::canvas::document_display::CanvasHost::primary(app, idx).canvas_id();
     if space {
         ToolHost::inject(ctx, canvas, ToolInput::hold(Key::Space));
     }

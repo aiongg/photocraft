@@ -503,7 +503,7 @@ fn builder(
     reset: DialogFields,
 ) -> impl for<'b> Fn(&'b mut DialogFields) -> ParamDialog<'b> + Send + 'static {
     let key = command.to_owned();
-    let canvas = app.session.active_index().map(|idx| crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
+    let canvas = app.session.active_index().map(|idx| crate::canvas::document_display::CanvasHost::primary(app, idx).canvas_id());
     move |fields: &mut DialogFields| {
         let mut dialog = ParamDialog::command(key.clone(), title.clone(), params.clone())
             .values(Bind::bound(fields))

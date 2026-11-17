@@ -81,7 +81,7 @@ fn start(app: &mut PhotocraftApp, idx: usize, document: DocId, target: Target, o
                 cx.picture(*texture, rect, egui::Rect::from_min_max(egui::Pos2::ZERO, egui::pos2(1.0, 1.0)), 0.0);
             }
         })
-        .canvas(CanvasHost::main(idx).canvas_id());
+        .canvas(CanvasHost::primary(app, idx).canvas_id());
     let id = app.framework.dialogs.open(dialog);
     app.pattern_fill.session = Some(Session { serial, document, target, opened: options, preview: None });
     id

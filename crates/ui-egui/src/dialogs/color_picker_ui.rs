@@ -158,7 +158,7 @@ fn converter(app: &PhotocraftApp) -> CmykConverter {
 fn launch(app: &mut PhotocraftApp, dialog: ColorPickerDialog, parent: Option<DialogId>, target: PickTarget) -> DialogId {
     let mut dialog = dialog.cmyk(&converter(app)).canvas_samples(true).eyedropper(true).add_to_swatches(true).instance(target.identity());
     if let Some(idx) = app.session.active_index() {
-        dialog = dialog.canvas(crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
+        dialog = dialog.canvas(crate::canvas::document_display::CanvasHost::primary(app, idx).canvas_id());
     }
     let id = match parent {
         Some(parent) => app.framework.dialogs.open_child(dialog, parent),

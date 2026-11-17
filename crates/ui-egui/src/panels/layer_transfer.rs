@@ -106,7 +106,7 @@ fn layer_drag(app: &PhotocraftApp) -> Option<MoveLayerDrag> {
 fn move_drag(app: &PhotocraftApp, ctx: &egui::Context) -> Option<[f64; 2]> {
     let d = layer_drag(app)?;
     let st = app.session.active()?;
-    let canvas = CanvasHost::main(app.session.active_index()?).canvas_id();
+    let canvas = CanvasHost::primary(app, app.session.active_index()?).canvas_id();
     let plain = app.ui.transform.is_none()
         && craft::ui::canvas_controls::reading::running(ctx, canvas).is_none()
         && ((st.doc.selection.is_none() && st.floating.is_none()) || d.moves_selection);
@@ -152,7 +152,8 @@ fn arm_move_transfer(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize)
         // The Move drag ends without moving anything (the tool also drops its preview); an ⌥-drag's
         // copy is taken back.
         if let Some(index) = app.session.active_index() {
-            crate::canvas::tools::tool_changed(app, ctx, CanvasHost::main(index));
+            let host = CanvasHost::primary(app, index);
+            crate::canvas::tools::tool_changed(app, ctx, host);
         }
         crate::move_mods::abandon(app);
         // The rollback raised the revision; the restored document is the one the float was
