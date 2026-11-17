@@ -23,14 +23,20 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
     }
     let mut commit = false;
     let mut dragged = false;
+    let mut named_mods = mods;
     for event in &output.edit.events {
         match event {
-            EditEvent::Begin { .. } => app.ui.direct_selection.editing = Owner::current(app),
-            // A gesture runs only on the document, revision and target it began on.
+            EditEvent::Begin { .. } => {
+                app.ui.direct_selection.editing = Owner::current(app);
+                app.ui.direct_selection.editing_mods = mods;
+                app.ui.direct_selection.editing_overlay = Some(output.edit.response.id);
+            }
+            // A gesture runs only on the document, revision and target it began on, with the modifiers it began with.
             EditEvent::Commit { .. } => {
                 let began = app.ui.direct_selection.editing.take();
                 commit = began.is_some() && began == Owner::current(app);
                 dragged = true;
+                named_mods = std::mem::take(&mut app.ui.direct_selection.editing_mods);
             }
             EditEvent::Cancel { .. } => app.ui.direct_selection.editing = None,
             EditEvent::Set { .. } => commit = true,
@@ -38,7 +44,7 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
         }
     }
     if commit && let Some(change) = &output.change {
-        change_path(app, change, refs, tool, mods, dragged);
+        change_path(app, change, refs, tool, named_mods, dragged);
     }
     if let Some(delete) = &output.delete
         && let Some(r) = known(delete.path, refs)
@@ -54,7 +60,8 @@ pub(crate) fn apply(app: &mut PhotocraftApp, output: &BezierOutput, refs: &[Path
     if let Some((hit, at)) = &output.context {
         context(app, hit, *at, tool, mods);
     }
-    if output.pressed_empty && tool == Tool::DeleteAnchorPoint {
+    // With ⌘ the press is Direct Selection's marquee, which hides nothing.
+    if output.pressed_empty && tool == Tool::DeleteAnchorPoint && !mods.cmd {
         hide_anchors(app);
     }
     if output.pressed_empty && mods.cmd && app.ui.pen.is_some() {
@@ -150,6 +157,8 @@ fn select(app: &mut PhotocraftApp, selection: &PathSelection) {
     let owner = Owner::current(app);
     let ds = &mut app.ui.direct_selection;
     let editing = ds.editing.take();
+    let editing_mods = ds.editing_mods;
+    let editing_overlay = ds.editing_overlay;
     *ds = DirectSelection {
         target: selection.path.and_then(PathRef::from_key),
         anchors: selection.anchors.iter().map(|k| [k.subpath, k.knot]).collect(),
@@ -157,6 +166,8 @@ fn select(app: &mut PhotocraftApp, selection: &PathSelection) {
         shown: selection.shown.clone(),
         owner,
         editing,
+        editing_mods,
+        editing_overlay,
         ..Default::default()
     };
 }

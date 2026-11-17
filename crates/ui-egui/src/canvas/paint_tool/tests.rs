@@ -85,6 +85,7 @@ fn smoothing_preview_redraws_the_tail_each_step() {
     // The tail drawn at one step must not linger once the brush moves on: a sharp turn would
     // leave a stale tail behind if it weren't restored.
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    testing::still_clock(&mut app);
     app.run("file.new", json!({"width": 200, "height": 120, "background": "transparent"})).unwrap();
     app.run("tools.setBrush", json!({"brush": {"size": 10, "hardness": 1.0, "smoothing": {"amount": 0.6}}})).unwrap();
     app.ui.tool = Tool::Brush;
@@ -174,6 +175,7 @@ fn spot_healing_trail_is_the_coverage_the_heal_uses() {
 #[test]
 fn mixer_drag_shows_actual_mixed_paint_before_release_and_alt_never_paints() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    testing::still_clock(&mut app);
     app.run("file.new", json!({"width":120,"height":60,"background":"#00ff00"})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.run("tools.setColors", json!({"foreground":"#ff0000"})).unwrap();
@@ -240,7 +242,8 @@ fn mixer_release_includes_a_new_endpoint_and_deferred_frame_samples() {
         let id = app.session.active().unwrap().active_layer.unwrap();
         assert!(doc.layer(id).unwrap().surface().unwrap().rgba(92, 30)[3] > 0.0, "failed {failed}: the release point is painted");
         let params = app.session.journal.iter().rev().find(|(name, _)| name == "paint.mixerBrush").unwrap().1.clone();
-        let xs: Vec<f64> = params["points"].as_array().unwrap().iter().map(|q| q[0].as_f64().unwrap()).collect();
+        // The live commit journals the engine's points (objects); the fallback journals the stroke's own ([x, y, ...]).
+        let xs: Vec<f64> = params["points"].as_array().unwrap().iter().map(|q| q["x"].as_f64().or_else(|| q[0].as_f64()).expect("a point has an x")).collect();
         for x in [35.0, 50.0, 65.0, 95.0] {
             assert!(xs.iter().any(|v| (v - x).abs() < 1.0), "failed {failed}: the point at {x} is in the commit: {xs:?}");
         }
@@ -398,6 +401,7 @@ fn live_stroke_uses_pen_tilt_and_redraws_partially() {
 fn drag_frames(smoothing: f32, xs: &[f64]) -> (std::sync::Arc<Document>, std::sync::Arc<Document>, bool, PhotocraftApp) {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = app.ctx().clone();
+    testing::still_clock(&mut app);
     app.run("file.new", json!({"width": 200, "height": 80, "background": "transparent"})).unwrap();
     app.run("tools.setBrush", json!({"brush": {"size": 16, "hardness": 0.5}})).unwrap();
     // What the options bar's Smoothing field writes.
@@ -457,7 +461,15 @@ fn smoothed_stroke_shows_its_catch_up_tail_while_drawing() {
     pts.extend(xs.iter().map(|&x| json!([x, 40.0 + (x / 7.0).sin() * 8.0, 1.0])));
     // (Round tips without dynamics draw the same for any seed.)
     s.execute("paint.stroke", json!({"points": pts, "seed": 0})).unwrap();
-    assert!(same_pixels(&s.active().unwrap().doc, &done));
+    // The drag reaches the tool through the pointer, as f32 screen points, so its points carry f32 rounding that
+    // these f64 points don't: the two strokes may differ by one 8-bit level where a dab edge falls.
+    assert!(within_a_level(&s.active().unwrap().doc, &done));
+}
+
+/// Whether `a` and `b` differ by at most one 8-bit level in every channel of every pixel.
+fn within_a_level(a: &Document, b: &Document) -> bool {
+    let (a, b) = (a.layers[0].surface().unwrap(), b.layers[0].surface().unwrap());
+    (0..80).all(|y| (0..200).all(|x| a.rgba(x, y).iter().zip(b.rgba(x, y)).all(|(p, q)| (p - q).abs() <= 1.0 / 255.0 + 1e-6)))
 }
 
 /// #10074: painting a group looked as if it worked (the stroke's trail followed the pointer) and

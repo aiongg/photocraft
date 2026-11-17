@@ -331,10 +331,14 @@ fn footer_buttons_run_photocraft_commands() {
     }
 }
 
-/// The prompt a drop on the trash opened, with `message`; nothing changed before the answer.
-fn trash_prompt(h: &H, message: &str) -> craft::ui::dialog::DialogId {
+/// The prompt a drop on the trash opened: the layer mask's apply-or-delete question, or with `vector` the vector
+/// mask's delete question. Nothing changed before the answer.
+fn trash_prompt(h: &H, vector: bool) -> craft::ui::dialog::DialogId {
+    use craft::ui::dialog::{PromptKind, StandardPrompt};
     let id = crate::dialogs::alerts::prompt_tagged::<crate::mask_trash_prompt::MaskTrash>(h.state()).expect("the prompt is open");
-    assert!(h.query_by_label_contains(message).is_some(), "the prompt asks: {message}");
+    let kind = h.state().framework.dialogs.get::<StandardPrompt>().map(|prompt| prompt.kind().clone());
+    let want = if vector { PromptKind::TrashVectorMask } else { PromptKind::TrashMask };
+    assert!(kind == Some(want), "the prompt asks the {} question", if vector { "vector mask" } else { "layer mask" });
     let l = layer(h, "Masked").expect("the layer stays");
     assert!(l.mask.is_some() && l.vector_mask.is_some(), "nothing changes before the answer");
     id
@@ -354,7 +358,7 @@ fn dropping_onto_the_trash() {
         ("the layer mask asks to apply or delete it", Some(LayerPart::LayerMask), "Delete Layer Mask", |h| {
             let pixels = |h: &H| layer(h, "Masked").unwrap().content;
             let (before, steps) = (pixels(h), past(h));
-            let id = trash_prompt(h, "Apply mask to layer before removing?");
+            let id = trash_prompt(h, false);
             confirm(h, id);
             assert!(layer(h, "Masked").unwrap().mask.is_none());
             assert_ne!(pixels(h), before, "applied, not deleted");
@@ -366,23 +370,23 @@ fn dropping_onto_the_trash() {
             let at = thumb(h, "Masked", LayerPart::LayerMask).center();
             let to = h.get_by_label("Delete Layer Mask").rect().center();
             crate::layers_panel_nodes::drag(h, at, to, Modifiers::NONE);
-            let id = trash_prompt(h, "Apply mask to layer before removing?");
+            let id = trash_prompt(h, false);
             let ctx = h.ctx.clone();
-            h.state_mut().framework.dialogs.set_json_field(&ctx, id, "choice", json!("delete")).unwrap();
+            h.state_mut().framework.dialogs.set_json_field(&ctx, id, "choice", json!("alternate")).unwrap();
             confirm(h, id);
             assert!(layer(h, "Masked").unwrap().mask.is_none());
             assert_eq!(pixels(h), before, "deleted, not applied");
         }),
         ("the vector mask asks to delete just the mask", Some(LayerPart::VectorMask), "Delete Vector Mask", |h| {
             let steps = past(h);
-            let id = trash_prompt(h, "Delete the vector mask?");
+            let id = trash_prompt(h, true);
             cancel(h, id);
             assert!(layer(h, "Masked").unwrap().vector_mask.is_some(), "Cancel keeps it");
             assert_eq!(past(h), steps);
             let at = thumb(h, "Masked", LayerPart::VectorMask).center();
             let to = h.get_by_role_and_label(egui::accesskit::Role::Button, "Delete Vector Mask").rect().center();
             crate::layers_panel_nodes::drag(h, at, to, Modifiers::NONE);
-            let id = trash_prompt(h, "Delete the vector mask?");
+            let id = trash_prompt(h, true);
             confirm(h, id);
             let l = layer(h, "Masked").unwrap();
             assert!(l.vector_mask.is_none() && l.mask.is_some(), "only the vector mask goes");

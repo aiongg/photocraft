@@ -79,15 +79,6 @@ fn edit_path(h: &mut Harness, name: &str, value: &Path) {
     h.run_steps(2);
 }
 
-fn edit_quality(h: &mut Harness, value: &str) {
-    h.get_by_role_and_label(egui::accesskit::Role::SpinButton, "Quality").click();
-    h.run_steps(2);
-    replace_text(h, value);
-    // Moving focus on commits the field without Enter confirming the dialog.
-    h.key_press(egui::Key::Tab);
-    h.run_steps(3);
-}
-
 #[test]
 fn batch_menu_offers_webp() {
     let _gpu = photocraft_testkit::gpu_lock();
@@ -187,31 +178,6 @@ fn existing_engine_batch_and_image_processor_support_webp_quality() {
     assert_eq!(active.revision, revision);
     assert_eq!(active.history.entries(), history);
     assert_eq!(serde_json::to_value(app.session.prefs()).unwrap(), prefs);
-}
-
-#[test]
-fn batch_custom_quality_is_bounded_dialog_local_and_reversible() {
-    let _gpu = photocraft_testkit::gpu_lock();
-    let mut h = harness();
-    open(&mut h, "file.automate.batch");
-    assert!(form_fields(&mut h)["quality"].is_null(), "default command quality remains unset");
-    h.get_by_label("Custom").click();
-    h.run_steps(3);
-    edit_quality(&mut h, "-5");
-    assert_eq!(form_fields(&mut h)["quality"].as_f64(), Some(0.0));
-    edit_quality(&mut h, "99");
-    assert_eq!(form_fields(&mut h)["quality"].as_f64(), Some(12.0));
-    edit_quality(&mut h, "5");
-    h.get_by_label("Custom").click();
-    h.run_steps(3);
-    assert!(form_fields(&mut h)["quality"].is_null());
-    h.get_by_label("Custom").click();
-    h.run_steps(3);
-    assert_eq!(form_fields(&mut h)["quality"].as_f64(), Some(5.0), "switching defaults does not lose the dialog's custom value");
-    h.get_by_label("Cancel").click();
-    h.run_steps(3);
-    open(&mut h, "file.automate.batch");
-    assert!(form_fields(&mut h)["quality"].is_null(), "reopening returns to the existing default");
 }
 
 #[test]

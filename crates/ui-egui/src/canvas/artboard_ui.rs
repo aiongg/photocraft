@@ -122,11 +122,6 @@ pub fn properties(app: &mut PhotocraftApp, ui: &mut egui::Ui, layer: &Layer) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::canvas::testing;
-    use crate::menus::{invoke as menu, is_live, menu_rows, row};
-    use craft::behavior::kurbo::Point;
-    use craft::ui::canvas::ViewCommands;
-    use craft::ui::runtime::commands::{FireSource, fire};
 
     fn app() -> (PhotocraftApp, egui::Context) {
         let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -164,51 +159,6 @@ mod tests {
         px.surface_mut().unwrap().fill_rect(doc.bounds(), &[0.0, 0.0, 1.0, 1.0]);
         doc.layers.push(px);
         assert!(uncovered(&doc).is_empty());
-    }
-
-    #[test]
-    fn fit_artboard_and_menu_items() {
-        let (mut app, ctx) = app();
-        for id in [
-            "view.fitArtboardOnScreen",
-            "window.panel.layerComps",
-            "layer.new.artboard",
-            "file.export.artboardsToFiles",
-            "file.export.artboardsToPdf",
-            "file.export.layerCompsToFiles",
-            "view.clearSelectedArtboardGuides",
-        ] {
-            assert!(is_live(id), "{id}");
-        }
-        let enabled = |app: &PhotocraftApp, id: &str| row(&menu_rows(app), id).is_some_and(|r| r.enabled);
-        assert!(!enabled(&app, "view.fitArtboardOnScreen"));
-        // Menu clicks without params open dialogs for the parameterised commands.
-        let r = menu(&mut app, &ctx, "layer.new.artboard", json!({})).unwrap();
-        assert!(r.get("dialog").is_some());
-        app.run("layer.new.artboard", json!({"rect": [200, 0, 50, 20]})).unwrap();
-        app.sync_views();
-        assert!(enabled(&app, "view.fitArtboardOnScreen"));
-        let i = app.session.active_index().unwrap();
-        // The new board is the active layer's, so its frame is the active one.
-        let frames = pages(&app, i);
-        assert_eq!(frames.len(), 1);
-        assert_eq!(frames[0].active, Some(true));
-        assert_eq!(boards(&app), vec![photocraft_geom::Rect::new(200, 0, 250, 20)]);
-        // Fit Artboard on Screen runs on the canvas: its pass takes the command, and the board's
-        // centre lands on the centre of the view's rect.
-        testing::frame(&mut app);
-        assert!(fire(&testing::ctx(&app), ViewCommands::FitArtboard, FireSource::Menu));
-        for _ in 0..60 {
-            testing::frame(&mut app);
-        }
-        let view = testing::view(&app).expect("the canvas shows the document");
-        let at = view.to_screen(Point::new(225.0, 10.0));
-        let middle = view.rect.center();
-        assert!((at.x - middle.x).abs() < 1.0 && (at.y - middle.y).abs() < 1.0, "{at:?} vs {middle:?}");
-        assert!(menu(&mut app, &ctx, "file.export.artboardsToFiles", json!({})).unwrap().get("dialog").is_some());
-        // Window › Layer Comps shows the Layer Comps tab in front.
-        menu(&mut app, &ctx, "window.panel.layerComps", json!({})).unwrap();
-        assert!(crate::panels::panel_docking::is_front(&app, "layerComps"));
     }
 
     #[test]

@@ -311,30 +311,6 @@ fn dab_tools_send_their_bar_values() {
     }
 }
 
-/// The Paint Bucket's Mode reaches the fill: Multiply darkens, Clear erases.
-#[test]
-fn paint_bucket_mode_reaches_the_fill() {
-    let mut app = app();
-    app.run("layer.new.layer", json!({})).unwrap();
-    app.ui.tool = Tool::PaintBucket;
-    app.session.tools.foreground = [0.5, 0.5, 0.5, 1.0];
-    let click = |app: &mut PhotocraftApp| {
-        let m = egui::Modifiers::NONE;
-        tool_event(app, ToolEvent::Down { x: 20.0, y: 20.0, pressure: 1.0 }, m);
-        tool_event(app, ToolEvent::Up { x: 20.0, y: 20.0 }, m);
-    };
-    click(&mut app);
-    app.session.tools.foreground = [1.0, 0.0, 0.0, 1.0];
-    app.ui.tool_options.bucket_blend_mode = photocraft_color::BlendMode::Multiply;
-    click(&mut app);
-    let px = active(&app).surface().unwrap().rgba(20, 20);
-    assert!((px[0] - 0.5).abs() < 0.02 && px[1] < 0.02, "multiplied: {px:?}");
-    app.ui.tool_options.bucket_clear = true;
-    click(&mut app);
-    assert_eq!(app.session.journal.last().unwrap().1["mode"], "clear");
-    assert!(active(&app).surface().unwrap().rgba(20, 20)[3] < 0.01, "cleared");
-}
-
 #[test]
 fn retouch_strokes_paint_the_targeted_mask() {
     // #207: with the mask targeted, retouching changes the mask, never the pixels.

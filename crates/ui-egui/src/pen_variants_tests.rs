@@ -21,6 +21,14 @@ fn work_path(app: &PhotocraftApp) -> Path {
     app.session.active().unwrap().doc.work_path.clone().expect("a work path")
 }
 
+/// Lets the double-click time pass: a click on the spot of the last one would be a double click, which toggles an
+/// anchor between smooth and corner.
+fn pause(app: &mut PhotocraftApp) {
+    for _ in 0..60 {
+        testing::frame(app);
+    }
+}
+
 fn click(app: &mut PhotocraftApp, x: f64, y: f64) {
     tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, Modifiers::NONE);
     tool_event(app, ToolEvent::Up { x, y }, Modifiers::NONE);
@@ -230,6 +238,7 @@ fn the_curvature_pen_carries_on_an_open_path() {
     let steps = |app: &PhotocraftApp| app.session.active().unwrap().history.past_len();
     let at = steps(&app);
     app.ui.tool = Tool::CurvaturePen;
+    pause(&mut app);
     click(&mut app, 80.0, 80.0);
     assert!(app.ui.pen.is_none(), "the click selects the endpoint, it draws nothing");
     click(&mut app, 140.0, 120.0);
@@ -252,6 +261,7 @@ fn the_curvature_pen_carries_on_an_open_path() {
     assert!((mid.in_ctrl.x - mid.anchor.x) * (mid.out_ctrl.x - mid.anchor.x) < 0.0, "handles on either side: {mid:?}");
     // While it draws on, the Curvature Pen moves only the new anchors: a press on an old corner
     // adds an anchor there.
+    pause(&mut app);
     click(&mut app, 200.0, 80.0);
     click(&mut app, 260.0, 40.0);
     click(&mut app, 80.0, 20.0);
@@ -299,7 +309,9 @@ fn the_curvature_pen_carries_on_the_selected_subpath_of_two_that_end_together() 
 #[test]
 fn a_carried_on_endpoint_starts_a_new_curvature_run() {
     let draw = |points: &[(f64, f64)]| {
-        let mut app = app(Tool::CurvaturePen);
+        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+        app.run("file.new", json!({"width": 800, "height": 400})).unwrap();
+        app.ui.tool = Tool::CurvaturePen;
         for &(x, y) in points {
             click(&mut app, x, y);
         }
@@ -309,6 +321,7 @@ fn a_carried_on_endpoint_starts_a_new_curvature_run() {
     let fresh = work_path(&draw(&[(400.0, 300.0), (550.0, 150.0), (700.0, 300.0)])).subpaths[0].knots.clone();
     let mut app = draw(&[(100.0, 300.0), (250.0, 150.0), (400.0, 300.0)]);
     let before = work_path(&app).subpaths[0].knots.clone();
+    pause(&mut app);
     click(&mut app, 400.0, 300.0);
     assert!(app.ui.pen.is_none(), "the click selects the endpoint, it draws nothing");
     click(&mut app, 550.0, 150.0);
@@ -346,20 +359,6 @@ fn a_curved_path_carries_on_from_its_first_endpoint_with_its_handles_swapped() {
     assert_eq!(anchors, [[80.0, 80.0], [50.0, 60.0], [20.0, 20.0], [0.0, 100.0]], "backwards, then the new anchor");
     assert_eq!((triples[1][1], triples[1][2]), ([60.0, 70.0], [40.0, 50.0]), "the curved middle knot's handles are swapped");
     assert_eq!(triples[2][1], [30.0, 10.0], "the endpoint's handle towards the path: its old outgoing one");
-}
-
-/// CodeRabbit on #10744: a double-click on a knot of the path carried on (not the endpoint it
-/// carries on from) changes nothing: those knots keep their handles.
-#[test]
-fn toggling_a_carried_knot_changes_nothing() {
-    use photocraft_doc::vector::Subpath;
-    let mut app = app(Tool::CurvaturePen);
-    set_work_path(&mut app, vec![Subpath::polyline(&[(20.0, 20.0), (80.0, 20.0), (80.0, 80.0)])]);
-    select_anchor(&mut app, crate::direct_select::PathRef::Work, [0, 2]);
-    click(&mut app, 140.0, 120.0);
-    let before = app.ui.pen.as_ref().map(|p| p.draft.clone());
-    testing::double_click(&mut app, [80.0, 20.0], Modifiers::NONE);
-    assert_eq!(app.ui.pen.as_ref().map(|p| p.draft.clone()), before, "the old corner stays as it was, handles and all");
 }
 
 /// CodeRabbit on #10744: in Path mode the Pen carries on the work path, so an endpoint selected

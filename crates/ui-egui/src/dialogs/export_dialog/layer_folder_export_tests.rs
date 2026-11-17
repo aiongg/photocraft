@@ -79,6 +79,8 @@ fn export_layers_to(app: &mut PhotocraftApp, files: &ScriptedFiles, ids: &[Layer
     let request = files.requests().last().cloned().expect("Export asks for a destination");
     files.answer(Picked::Paths(vec![path.to_path_buf()])).expect("the destination dialog is open");
     app.poll_file_dialog();
+    // The dialog's next pass takes the answered path and exports.
+    crate::dialogs::confirm(app, &ctx, id).unwrap();
     request
 }
 

@@ -9,13 +9,13 @@
 use craft::behavior::kurbo;
 use craft::behavior::{CancelReason, Cursor, CursorIcon, PaintedCursor};
 use craft::keymap::Mods;
-use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer};
+use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer, ToolRegion};
 use craft::ui::primitives::{Draw, PaintShape, StrokeColor, StrokeWidth};
 use craft::ui::style::DataColor;
 
 use super::defaults::default_style_params;
 use super::editing::begin_edit;
-use super::layout::{hit_layer, layout, offset_at, to_text};
+use super::layout::{hit_layer, offset_at};
 
 use super::{LayerId, PLACEHOLDER, PhotocraftApp, Point, TextEdit, active_doc_id, json, session_key, text_layer};
 use crate::canvas::document_display::CanvasHost;
@@ -28,15 +28,6 @@ pub(crate) fn box_shape(app: &PhotocraftApp, id: LayerId) -> Option<(f32, f32, f
     }
 }
 
-/// True when document point (`x`, `y`) lies inside the paragraph box of type layer `id` (false
-/// for point text).
-pub(crate) fn inside_box(app: &mut PhotocraftApp, id: LayerId, x: f64, y: f64) -> bool {
-    let Some((bx, by, w, h)) = box_shape(app, id) else { return false };
-    let Some((_, aff, _)) = layout(app, id) else { return false };
-    let (tx, ty) = to_text(&aff, x, y);
-    tx >= bx && tx <= bx + w && ty >= by && ty <= by + h
-}
-
 /// The Type family's state between passes, kept in `CanvasTools::type_tool`.
 #[derive(Debug, Default)]
 pub(crate) struct TypeState {
@@ -46,6 +37,15 @@ pub(crate) struct TypeState {
     /// The press of this pass ended an open session (the editor commits on a background press): it starts no new
     /// text, as in Photoshop. Set by the canvas controls before the tool runs, taken by the press, cleared by `drain`.
     pub(super) began_with_session: bool,
+    /// Where a secondary press on the text editor was released and the modifiers held then, taken once by the canvas
+    /// body for the canvas menu (the editor's part takes the press, so the host never reports it).
+    pub(super) context: Option<(egui::Pos2, Mods)>,
+}
+
+impl TypeState {
+    pub(crate) fn take_context(&mut self) -> Option<(egui::Pos2, Mods)> {
+        self.context.take()
+    }
 }
 
 /// The Type tool for a pass (`tools::run`), for the four type tools.
@@ -281,6 +281,20 @@ impl CanvasTool for TypeTool<'_> {
         action
     }
 
+    /// With an edit open and the type box hidden, another type layer is the tool's over the edit's move reach and
+    /// caret: a press there commits the edit (`claimed_regions`). With ⌘ held the box shows, and its own reach rules.
+    fn regions(&self) -> Vec<ToolRegion> {
+        let mods = craft::ui::runtime::pointer::frame(self.scope.ctx()).mods;
+        let regions = self.scope.with_app(|app| {
+            let box_shown = app.ui.tool.is_type() && crate::type_transform::whole_box(app, mods);
+            if crate::type_transform::active(app) || box_shown {
+                return Vec::new();
+            }
+            super::layout::claimed_regions(app)
+        });
+        regions.into_iter().map(ToolRegion::polygon).collect()
+    }
+
     fn drag(&mut self, _pointer: &ToolPointer, _cx: &mut ToolContext<'_>) {}
 
     fn release(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) {
@@ -317,24 +331,19 @@ impl CanvasTool for TypeTool<'_> {
         draw.dashed(&closed, draw.dashes(), StrokeWidth::Thin, StrokeColor::Data(DataColor::new(egui::Color32::BLACK)));
     }
 
-    /// The I-beam (turned in vertical type), the path cursor over what a click would start text on or in, and the
-    /// move cursor in the move zone just outside the text being typed. The type transform's box and the text frame set
+    /// The I-beam (turned in vertical type) and the path cursor over what a click would start text on or in. The type
+    /// transform's box (the move cursor in its move reach just outside the text being typed) and the text frame set
     /// their own cursors over their parts. Type is not among the Other Cursors tools production swaps for the precise
     /// cursor (cw.C9).
     fn cursor(&self, cx: &ToolContext<'_>) -> Cursor {
         let (Some(pointer), Some(space)) = (cx.pointer, cx.space()) else { return Cursor::System(CursorIcon::Text) };
         let at = space.view.to_doc(pointer.pos);
         let press = self.state.press.map(|p| [p.x, p.y]);
-        self.scope.with_app(|app| {
-            if app.ui.text_edit.is_some() && crate::type_transform::move_zone(app, &space.view, [at.x, at.y]) {
-                return Cursor::System(CursorIcon::Move);
-            }
-            match hover_path_target(app, at.x, at.y, cx.mods.shift, press) {
-                Some(PathClick::Area { .. }) => Cursor::from(PaintedCursor::type_on(false)),
-                Some(PathClick::OnPath { .. }) => Cursor::from(PaintedCursor::type_on(true)),
-                None if app.ui.tool.is_vertical_type() => Cursor::System(CursorIcon::VerticalText),
-                None => Cursor::System(CursorIcon::Text),
-            }
+        self.scope.with_app(|app| match hover_path_target(app, at.x, at.y, cx.mods.shift, press) {
+            Some(PathClick::Area { .. }) => Cursor::from(PaintedCursor::type_on(false)),
+            Some(PathClick::OnPath { .. }) => Cursor::from(PaintedCursor::type_on(true)),
+            None if app.ui.tool.is_vertical_type() => Cursor::System(CursorIcon::VerticalText),
+            None => Cursor::System(CursorIcon::Text),
         })
     }
 

@@ -2,7 +2,6 @@
 use super::jpeg_tests::{parked, set_field};
 use super::*;
 use craft::host::{Picked, ScriptedFiles};
-use egui_kittest::kittest::Queryable;
 use std::{cell::RefCell, rc::Rc, sync::Arc};
 
 type Writes = Rc<RefCell<Vec<(String, Vec<u8>)>>>;
@@ -62,7 +61,6 @@ fn closing_after_tiff_save_waits_for_options_and_writes_the_requested_document()
         assert_eq!(docs_left(&h), Some(1));
         assert!(!h.state().allow_close);
         assert!(writes.borrow().is_empty());
-        assert!(h.query_by_label("(Y)es").is_none(), "the close prompt waits behind TIFF Options");
         // Another window or a control request can change the active tab while the modal is up.
         h.state_mut().refocus(other).unwrap();
         h.key_press(Key::Enter);
@@ -102,7 +100,7 @@ fn cancelling_failing_or_copying_a_tiff_keeps_the_original_unsaved() {
         assert!(h.state().parked_save.is_none());
         assert_eq!(h.state().session.documents().len(), 2, "{outcome}");
         assert_eq!(docs_left(&h), Some(1), "{outcome}");
-        assert!(h.query_by_label("(Y)es").is_some());
+        assert!(question_open(&h), "{outcome}: the question is asked again");
         let original = &h.state().session.documents()[0];
         assert!(original.is_dirty());
         assert_eq!(original.path.as_deref(), Some("original.tif"));

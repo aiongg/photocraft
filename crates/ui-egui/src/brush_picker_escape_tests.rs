@@ -18,13 +18,15 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     app.sync_views();
     let mut h = Harness::builder().with_size(vec2(1200.0, 800.0)).with_step_dt(1.0 / 60.0).with_context(app.ctx().clone()).build_app(
         |ui, app: &mut PhotocraftApp| {
-            egui::CentralPanel::default().show(ui, |ui| {
-                crate::canvas::document_area(app, ui);
-                crate::brush_picker::show_at(ui, app);
-            });
+            if !ui.ctx().fonts(|f| f.families().contains(&egui::FontFamily::Name("medium".into()))) {
+                return;
+            }
+            // The canvas shows the picker itself (`canvas_tool_menu::run`); a second `show_at` would show it twice.
+            egui::CentralPanel::default().show(ui, |ui| crate::canvas::document_area(app, ui));
         },
         app,
     );
+    PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let c = h.state().last_canvas_rect.center();
     crate::brush_picker::open(h.state_mut(), [c.x, c.y]);

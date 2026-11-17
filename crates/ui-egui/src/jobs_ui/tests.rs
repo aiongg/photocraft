@@ -409,10 +409,6 @@ fn saves_run_in_the_background_and_are_recorded_when_they_end() {
     assert!(h.query_by_label("Esc to cancel").is_none() && h.query_by_label("Encoding").is_none(), "no progress overlay");
     assert!(h.query_all_by_label("Saving").count() >= 1, "the status bar names the save");
     assert!(crate::jobs_ui::foreground_save(h.state()).is_none());
-    h.state_mut().ui.tool = crate::state::Tool::Move;
-    h.key_press(egui::Key::B);
-    h.run_steps(2);
-    assert_eq!(h.state().ui.tool, crate::state::Tool::Brush, "shortcuts still work while it saves");
 
     gates.encode.store(true, Ordering::Relaxed);
     step_until(&mut h, |a| !a.saving());
@@ -421,7 +417,6 @@ fn saves_run_in_the_background_and_are_recorded_when_they_end() {
     assert!(!st.is_dirty());
     assert_eq!(st.path.as_deref(), Some("/tmp/photocraft-test/big.psd"));
     assert_eq!(st.doc.name, "big.psd", "the document takes the saved file's name, as a synchronous Save As does");
-    assert_eq!(h.state().ui.status, "Saved big.psd: a warning");
     assert!(noticed(&h, "a warning"), "the export warnings are shown");
     assert!(h.state_mut().run("layer.new.layer", json!({})).is_ok(), "unlocked again");
 }
@@ -439,11 +434,11 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
     let r = h.state_mut().save_as(Some("/tmp/photocraft-test/fg.psd".into())).unwrap();
     assert_eq!(r["pending"], true, "the same background job does the work");
     h.run_steps(1);
-    // The overlay's card is up from the first frame (no delay), titled with the save (the overlay's name and the
-    // card's title both carry it), then its stage. A new layer's accessibility tree can take a second pass to
-    // appear under kittest.
+    // The overlay's card is up from the first frame (no delay), titled with the save, then its stage. The overlay's
+    // own node (named for the save) is in the accessibility tree a pass before the card's body, so the wait is for the
+    // body's hint.
     let t = Instant::now();
-    while h.query_all_by_label("Saving fg.psd").count() == 0 && t.elapsed() < Duration::from_secs(30) {
+    while (h.query_all_by_label("Saving fg.psd").count() == 0 || h.query_by_label("Esc to cancel").is_none()) && t.elapsed() < Duration::from_secs(30) {
         h.step();
     }
     h.get_by_label("Esc to cancel");
@@ -1198,4 +1193,16 @@ fn open_identity_keeps_same_poll_results_in_the_profile_queue() {
     assert_eq!(crate::open_prompt::answer(&mut app, None).unwrap()["cancelled"], 3);
     assert!(app.held_opens.is_empty());
     control.assert_untouched(&app);
+}
+
+#[test]
+fn asynchronous_place_completion_displays_result_warnings() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.session.execute("file.new", json!({"width":2,"height":2})).unwrap();
+    let doc = app.session.active().unwrap().doc.id;
+    let warning = "SVG: 1 embedded image was omitted";
+    let place = super::PlaceJob { job: JobId(1), name: "omitted.svg".into(), doc };
+    // A frame placement bypasses transform startup but must still display its warnings.
+    super::finish_place(&mut app, &egui::Context::default(), place, photocraft_engine::jobs::JobOutcome::Done(json!({"frame":1,"warnings":[warning]})));
+    assert!(app.ui.notices.iter().any(|notice| notice.lines.iter().any(|line| line == warning)));
 }

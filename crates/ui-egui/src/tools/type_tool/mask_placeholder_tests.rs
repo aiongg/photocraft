@@ -73,6 +73,8 @@ fn committing_the_untouched_placeholder_selects_its_outline() {
         // `new_app` starts with a selection at x 600, away from the text; the commit replaces it.
         assert!(bounds(&selection(&app)).is_some_and(|r| r.x0 == 600), "{:?}", bounds(&selection(&app)));
         click(&mut app, AT.0, AT.1, Modifiers::NONE);
+        // The editor shows and takes the keyboard in the next pass, so the Escape below reaches it.
+        crate::canvas::testing::frame(&mut app);
         app
     };
     let mut app = start();

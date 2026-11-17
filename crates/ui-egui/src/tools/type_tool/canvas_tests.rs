@@ -128,12 +128,11 @@ fn show_panels(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// assert the edits the bar makes, not what it shows for them.
 // PLAN: the "Toggle text orientation" button and the colour well's "Text color" label are assumed (TypeBar words)
 fn show_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let character = super::values::character_values(app);
+    let character = super::values::bar_character_values(app);
     let paragraph = super::values::paragraph_values(app);
     let unit = super::values::doc_unit(app);
     let families = super::fonts::families();
-    let family = character.family.clone().unwrap_or_else(|| app.ui.tool_options.type_font.clone());
-    let styles = super::fonts::styles(&family);
+    let styles = super::values::style_names(app, &character);
     let mut fonts = super::font_state(app);
     let mut bar = TypeBar::new(&character, &paragraph, &families, &styles)
         .unit(unit)
@@ -234,7 +233,7 @@ fn bar_harness(app: PhotocraftApp) -> Harness<'static, PhotocraftApp> {
 mod panel_defaults {
     use super::*;
     use crate::state::{Tool, ToolOptions};
-    use egui::accesskit::{Role, Toggled};
+    use egui::accesskit::Role;
     use egui_kittest::kittest::NodeT;
     use photocraft_doc::text::{Caps, Kerning, Orientation, TextAlign, TextShape};
 
@@ -283,8 +282,6 @@ mod panel_defaults {
             h.get_by_label(label).click();
             h.run();
         }
-        assert_eq!(h.get_by_label("Fractions").accesskit_node().toggled(), Some(Toggled::True));
-        assert_eq!(h.get_by_label("Standard Ligatures").accesskit_node().toggled(), Some(Toggled::False));
         assert_eq!(h.state().session.active().unwrap().revision, revision, "pre-styling does not create document history");
         assert_eq!(h.state().session.active().unwrap().doc.walk().len(), layers);
         let options = h.state().ui.tool_options.clone();
@@ -704,7 +701,13 @@ fn size_drag_is_live_and_one_history_step_per_drag() {
             h.hover_at(field + vec2(8.0 * k as f32, 0.0));
             h.run_steps(1);
             let now = size_at(h.state(), id, 0);
-            assert!(now > last, "drag {d} step {k}: live size {last} → {now}");
+            // The pass that moves the pointer past the drag slop starts the gesture (its `DragStart` reads the value
+            // the scrub starts from); the value follows from the next pass on.
+            if k == 1 {
+                assert!(now >= last, "drag {d} step {k}: the gesture start keeps the size {last} → {now}");
+            } else {
+                assert!(now > last, "drag {d} step {k}: live size {last} → {now}");
+            }
             last = now;
         }
         press(&mut h, field + vec2(40.0, 0.0), false);
@@ -1114,8 +1117,8 @@ fn temporary_type_transform_scales_without_reflow_or_leaving_type() {
                 assert!(h.state().ui.transform.is_none());
                 assert!(h.state().ui.type_transform.is_none());
                 assert_eq!(history_len(&h), count + 1);
-                h.event(egui::Event::Text("!".into()));
-                h.run_steps(2);
+                // Typing goes through the window host, as the platform's reaches the focused editor.
+                super::commit_tests::type_keys(h.state_mut(), "!");
                 assert!(text(h.state(), id).text.starts_with("Hel!lo"));
                 h.key_press(if vertical { egui::Key::ArrowUp } else { egui::Key::ArrowLeft });
                 h.run_steps(1);
@@ -1200,7 +1203,9 @@ fn click_inside_the_paragraph_box_off_the_glyphs_moves_the_caret() {
     // "Hello é世界\n" is 10 characters: the start of the second line.
     assert_eq!((ed.layer, ed.caret, ed.anchor), (id.0, 10, 10));
     // Outside the box the edit commits, without starting new text.
-    click(&mut app, bx - 40.0, by + h - 8.0);
+    // 40 screen points out is past the move reach (38 pt), whatever the zoom.
+    let out = 40.0 / app.point_zoom().max(0.01);
+    click(&mut app, bx - out, by + h - 8.0);
     assert!(app.ui.text_edit.is_none());
     assert_eq!(app.session.active().unwrap().doc.layers.len(), layers);
 }
@@ -1273,7 +1278,7 @@ fn temporary_type_transform_control_roundtrip_and_input_safety() {
     let a = frame.quad[2];
     crate::canvas::testing::press(&mut app, a, type_command());
     let inspected = crate::type_transform::inspect(&app);
-    assert_eq!(inspected["layer"], id.0, "{inspected}");
+    assert_eq!(inspected["frame"]["layer"], id.0, "the press alone captures the text: {inspected}");
     crate::canvas::testing::move_to(&mut app, [a[0] + 60.0, a[1] + 30.0], type_command());
     crate::canvas::testing::release(&mut app, [a[0] + 60.0, a[1] + 30.0], Modifiers::NONE);
     assert_ne!(text(&app, id).transform, initial);

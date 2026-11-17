@@ -3,7 +3,9 @@
 //! realistic layered document, from the places focus usually is.
 
 use craft::keymap::Chord;
+use craft::ui::runtime::focus;
 use craft::ui::runtime::keys::focus_holds;
+use craft::ui::runtime::windows::WindowHost;
 use egui::accesskit::Role;
 use egui::{Key, Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
@@ -149,14 +151,14 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
                 .expect("Layers opacity field")
                 .center();
             click(h, at);
-            assert!(h.ctx.text_edit_focused(), "clicking a value field edits it");
+            assert!(WindowHost::of(&h.ctx).typing(), "clicking a value field edits it");
         }
         Place::FocusedWidget => {
             h.get_by_role_and_label(Role::TreeItem, "paint").scroll_to_me();
             h.run_steps(4);
             h.get_by_role_and_label(Role::TreeItem, "paint").focus();
             h.run_steps(2);
-            assert!(h.ctx.egui_wants_keyboard_input() && !h.ctx.text_edit_focused(), "a widget is focused");
+            assert!(focus::focused_rec(&h.ctx).is_some() && !WindowHost::of(&h.ctx).typing(), "a widget is focused");
         }
     }
     take_log(&h.ctx);
@@ -199,7 +201,7 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
         let mut h = harness();
         set_dry_run(&h.ctx, true);
         put_focus(&mut h, place);
-        let typing = h.ctx.text_edit_focused();
+        let typing = WindowHost::of(&h.ctx).typing();
         let items = crate::menus::menu_rows(h.state());
         for (id, sc, live) in displayed(h.state()) {
             if !live {

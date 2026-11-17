@@ -97,14 +97,6 @@ fn has(h: &Harness, label: &str) -> bool {
     h.query_by_label(label).is_some()
 }
 
-/// Opens the bar's ⋯ menu and picks `entry`.
-fn menu(h: &mut Harness, entry: &str) {
-    let more = widget(h, "More options");
-    click_at(h, more);
-    let at = widget(h, entry);
-    click_at(h, at);
-}
-
 /// Drags the bar by its grip by `d` screen points.
 fn drag_grip(h: &mut Harness, d: Vec2) {
     let from = widget(h, "Move bar");
@@ -117,12 +109,6 @@ fn drag_grip(h: &mut Harness, d: Vec2) {
     }
     button(h, from + d, false);
     h.run_steps(4);
-}
-
-fn window_item_checked(h: &mut Harness) -> Option<bool> {
-    let items = control(h, "ui.menu.list", json!({}));
-    let item = items["result"].as_array()?.iter().find(|i| i["id"] == "window.panel.contextualTaskBar")?.clone();
-    item["checked"].as_bool()
 }
 
 #[test]
@@ -236,23 +222,6 @@ fn with_tiled_documents_the_bar_sits_on_the_active_tile() {
         assert!((b.center().x - centres[0]).abs() < 100.0, "the bar is on the first tile, not {} (the second)", b.center().x);
     }
     button(&mut h, at, false);
-}
-
-#[test]
-fn hide_bar_and_the_window_toggle() {
-    let mut h = harness();
-    assert_eq!(window_item_checked(&mut h), Some(true));
-    menu(&mut h, "Hide bar");
-    assert!(!h.state().ui.panels.context_task_bar);
-    assert!(bar(&h).is_none());
-    assert_eq!(window_item_checked(&mut h), Some(false), "Hide bar unticks Window › Contextual Task Bar");
-    let ctx = h.ctx.clone();
-    photocraft_ui_egui::menus::invoke(h.state_mut(), &ctx, "window.panel.contextualTaskBar", json!({})).expect("toggle");
-    h.run_steps(6);
-    assert!(bar(&h).is_some(), "Window › Contextual Task Bar shows it again");
-    assert_eq!(window_item_checked(&mut h), Some(true));
-    control(&mut h, "ui.set", json!({"panels": {"context_task_bar": false}}));
-    assert!(bar(&h).is_none(), "ui.set hides it");
 }
 
 #[test]

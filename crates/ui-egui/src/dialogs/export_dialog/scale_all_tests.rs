@@ -45,10 +45,12 @@ fn export_rows(app: &mut PhotocraftApp, id: DialogId, list: &[ScaleRow]) {
     crate::dialogs::confirm(app, &ctx, id).unwrap();
 }
 
-/// The user answers the open file dialog with `path`, and the app takes the answer.
-fn answer(app: &mut PhotocraftApp, files: &ScriptedFiles, path: &std::path::Path) {
+/// The user answers the open file dialog with `path`, the app takes the answer, and the dialog's next pass exports.
+fn answer(app: &mut PhotocraftApp, id: DialogId, files: &ScriptedFiles, path: &std::path::Path) {
     files.answer(Picked::Paths(vec![path.to_path_buf()])).expect("a file dialog is open");
     app.poll_file_dialog();
+    let ctx = app.ctx().clone();
+    crate::dialogs::confirm(app, &ctx, id).unwrap();
 }
 
 /// The decoded file's pixel size and resolution.
@@ -63,7 +65,7 @@ fn several_rows_ask_for_a_folder_and_write_one_file_per_size() {
     let (mut app, id, writes, files) = opened();
     export_rows(&mut app, id, &rows(&[(ScaleSize::X1, ""), (ScaleSize::X0_5, "@0.5x")]));
     assert_eq!(files.requests().last().map(|r| r.kind), Some(PickKind::Folder), "a folder choice");
-    answer(&mut app, &files, dir.path());
+    answer(&mut app, id, &files, dir.path());
     assert!(!app.ui.status_error, "{}", app.ui.status);
     let writes = writes.borrow();
     let paths: Vec<&str> = writes.iter().map(|(p, _)| p.as_str()).collect();
@@ -98,7 +100,7 @@ fn a_file_already_in_the_folder_stops_the_batch_before_any_write() {
     std::fs::write(dir.path().join("harbor@0.5x.png"), b"keep me").unwrap();
     let (mut app, id, writes, files) = opened();
     export_rows(&mut app, id, &rows(&[(ScaleSize::X1, ""), (ScaleSize::X0_5, "@0.5x")]));
-    answer(&mut app, &files, dir.path());
+    answer(&mut app, id, &files, dir.path());
     assert!(writes.borrow().is_empty(), "not even the first row (harbor.png) was written");
     assert!(app.ui.status.contains("already exists"), "{}", app.ui.status);
     assert_eq!(std::fs::read(dir.path().join("harbor@0.5x.png")).unwrap(), b"keep me");

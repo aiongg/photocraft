@@ -1371,6 +1371,8 @@ fn shortcut_dialog_moves_and_keeps_alternate_keys() {
     use super::shortcuts::{assign, press_ok};
     let (mut app, _) = app_with_store();
     let ctx = egui::Context::default();
+    // The menus show the runtime keymap's chords, which a frame of the app publishes.
+    crate::canvas::testing::frame(&mut app);
     let cut = menu_shortcut(&app, "edit.cut");
     let paste = menu_shortcut(&app, "edit.paste");
     assert!(cut.is_some() && paste.is_some());
@@ -1380,6 +1382,7 @@ fn shortcut_dialog_moves_and_keeps_alternate_keys() {
     // F4 added to Paste is a further key: the menu keeps showing ⌘V.
     assign(&mut app, &CommandRef::new("edit.paste"), Binding::parse("F4").unwrap(), Policy::Steal).unwrap();
     press_ok(&mut app, &ctx);
+    crate::canvas::testing::frame(&mut app);
     assert_eq!(menu_shortcut(&app, "layer.renameLayer"), Some(chord("F2")));
     assert_eq!(menu_shortcut(&app, "edit.cut"), cut, "Cut keeps its main key");
     assert_eq!(menu_shortcut(&app, "edit.paste"), paste, "the menu shows only the main key");

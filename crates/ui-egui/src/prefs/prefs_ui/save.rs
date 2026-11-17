@@ -174,7 +174,7 @@ fn link_updates(app: &mut PhotocraftApp, ctx: &egui::Context) {
         None => {}
     }
     let (last_key, focus_key) = (egui::Id::unique("linkWatch.lastScan"), egui::Id::unique("linkWatch.focused"));
-    let now = crate::gpu_canvas::now_ms() / 1000.0;
+    let now = ctx.input(|i| i.time);
     let focused = ctx.input(|i| i.focused);
     let was_focused: bool = ctx.data(|d| d.get_temp(focus_key)).unwrap_or(focused);
     ctx.data_mut(|d| d.insert_temp(focus_key, focused));

@@ -383,10 +383,12 @@ fn image_processor_document_sources_wait_for_the_transform() {
                 let result: Result<(), String> = if through_dialog {
                     // The menu's own dialog holds the Source row; the bare command dialog has only the engine's fields.
                     let reply = crate::menus::invoke(&mut app, &ctx, "file.scripts.imageProcessor", json!({})).unwrap();
-                    let id: craft::ui::dialog::DialogId = serde_json::from_value(reply["dialog"].clone()).expect("the menu opened the dialog");
+                    let id =
+                        craft::automation::dialogs::dialog_id(&app.framework.dialogs, &json!({"dialog": reply["dialog"]})).expect("the menu opened the dialog");
                     app.framework.dialogs.set_json_field(&ctx, id, "source", json!(source)).unwrap();
                     app.framework.dialogs.set_json_field(&ctx, id, "output", json!(output.path())).unwrap();
-                    app.framework.dialogs.set_json_field(&ctx, id, "format", json!("png")).unwrap();
+                    // The dialog picks its file types by ticking them; OK is refused while none is ticked.
+                    app.framework.dialogs.set_json_field(&ctx, id, "jpeg/enabled", json!(true)).unwrap();
                     crate::dialogs::confirm(&mut app, &ctx, id)
                 } else {
                     app.run("file.scripts.imageProcessor", params.clone()).map(|_| ())
@@ -1482,9 +1484,11 @@ fn a_thin_layer_scaled_then_warped_commits_the_curve() {
         s.read_pixel(x, y, &mut p);
         p[3]
     };
-    // The middle sags below the band's old bottom edge (y 60); near the end the edge hangs less.
+    // The middle sags below the band's old bottom edge (y 60). The pulled edge is a cubic with its inner points 40 px
+    // down: it hangs 30 px in the middle and about 8 px at x 80, a tenth of the band's 90 px from its right end, so
+    // y 70 is below it there.
     assert!(alpha(41, 70) > 0.99, "middle {}", alpha(41, 70));
-    assert!(alpha(2, 70) < 0.01 && alpha(2, 40) > 0.99, "end {} {}", alpha(2, 70), alpha(2, 40));
+    assert!(alpha(80, 70) < 0.01 && alpha(80, 40) > 0.99, "end {} {}", alpha(80, 70), alpha(80, 40));
 }
 
 /// #7885: a surface drag (a press inside a cell, on no anchor or handle) commits exactly as

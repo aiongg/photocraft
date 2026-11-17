@@ -706,7 +706,7 @@ mod tests {
                     _ => {}
                 }
                 let after = to_params(&AdjustValue::Curves { curves: curves.clone() }, &cx, true);
-                assert_eq!(after["pencil"], json!(pencil));
+                assert_eq!(after.get("pencil").and_then(Value::as_bool).unwrap_or(false), pencil, "only a freehand curve says so");
                 if channel == 0 {
                     assert_ne!(after["points"], before["points"]);
                     assert_eq!(after["b"], before["b"]);

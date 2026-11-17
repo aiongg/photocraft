@@ -99,14 +99,19 @@ fn configure(app: &PhotocraftApp, state: &mut VectorTools) -> Which {
             // The anchor tools run the Pen only to show the open draft (`AnchorTool::draft`).
             let anchors = crate::direct_select::path_tool(tool, Mods::NONE).filter(|t| !matches!(t, PathTool::Pen | PathTool::Curvature));
             // ⌘ makes the pointer Direct Selection: the draft is drawn and keeps its keys, but takes no presses.
-            let sensing = !craft::ui::runtime::pointer::frame(&app.ctx()).mods.cmd;
+            // A refused draft of another document waits for its explicit retry: no press adds to it (`cancel_stale`).
+            let stale = pen.is_some_and(|p| p.commit_failed && p.owner.as_ref().is_some_and(|o| !o.valid(app)));
+            let sensing = !craft::ui::runtime::pointer::frame(&app.ctx()).mods.cmd && !stale;
+            let idle = pen.is_none_or(|p| p.draft.knots.is_empty());
+            let carry = if curvature && idle { pen::carry_on(app) } else { None };
             state
                 .pen
                 .mode(if curvature { PenMode::Curvature } else { PenMode::Pen })
                 .sensing(sensing)
                 .auto_add_delete(!curvature && o.pen_auto_add_delete)
                 .path_options(o.path_options.clone())
-                .ends(&if pen.is_none_or(|p| p.draft.knots.is_empty()) { pen::ends(app) } else { Vec::new() })
+                .ends(&if idle { pen::ends(app) } else { Vec::new() })
+                .carry_on(carry.as_ref().map(|(key, knot, draft)| (*key, *knot, draft)))
                 // A draft the selected tool did not draw (a refused one kept after a tool switch) is foreign: Delete,
                 // Backspace and Undo leave its anchors to that tool (`PenPath::owns_undo`).
                 .draft(pen.map(|p| if p.owns_undo(tool) { PenDraft::Own(&p.draft) } else { PenDraft::Foreign(&p.draft) }))
@@ -313,11 +318,16 @@ fn set_draft(app: &mut PhotocraftApp, value: EditSubpath) {
         return;
     }
     let grew = n > pen.draft.knots.len();
-    // Only the first anchor changing under a path of three or more is the press that closes it with a drag.
+    // Only the first anchor changing under a path of three or more is the press that closes it with a drag. The
+    // Curvature Pen's close reflows every anchor's handles: the open draft is the one before the closing update.
     if n != pen.draft.knots.len() {
         pen.before_close = None;
-    } else if pen.before_close.is_none() && n >= 3 && value.knots[1..] == pen.draft.knots[1..] && value.knots[0] != pen.draft.knots[0] {
-        pen.before_close = Some(pen.draft.clone());
+    } else if pen.before_close.is_none() && n >= 3 {
+        let first_dragged = value.knots[1..] == pen.draft.knots[1..] && value.knots[0] != pen.draft.knots[0];
+        let closing_curve = pen.curvature && value.closed && !pen.draft.closed;
+        if first_dragged || closing_curve {
+            pen.before_close = Some(pen.draft.clone());
+        }
     }
     pen.draft = value;
     pen.commit_failed = false;
@@ -342,7 +352,8 @@ fn finish(app: &mut PhotocraftApp, end: PenEnd, committed: bool) {
         PenEnd::Closed if has_draft => {
             pen::pen_commit(app, true);
         }
-        PenEnd::Interrupted if committed => end_keeping(app),
+        // A refused draft the tool ends again on a tool switch stays as it is: it waits for an explicit retry.
+        PenEnd::Interrupted if committed && !waiting => end_keeping(app),
         PenEnd::Removed | PenEnd::Discarded => drop_draft(app),
         _ => {}
     }

@@ -377,7 +377,11 @@ impl PhotocraftApp {
     /// Files dropped onto the window, routed by `to` ([`DropTo`]). Preset files (brushes,
     /// gradients) always go to their libraries. A native drop carries an absolute path, read in
     /// bounded reads (#375); a drop without a path carries its bytes.
-    pub fn open_dropped(&mut self, _ctx: &egui::Context, files: Vec<OsFile>, to: DropTo) {
+    pub fn open_dropped(&mut self, ctx: &egui::Context, files: Vec<OsFile>, to: DropTo) {
+        // Files dragged in from another app's window bring PhotoCraft to the front and give it the keyboard, as
+        // Photoshop does, instead of leaving it behind the source (#5687). A drop on a floating panel's window
+        // brings the main window.
+        ctx.send_viewport_cmd_to(egui::ViewportId::ROOT, egui::ViewportCommand::Focus);
         // The log tells a drop that never reached the app (the operating system, or an elevated
         // process, refused it) from one the app routed (#10492). File names stay out of it.
         log::info!("{} file(s) dropped on the window: {to:?}", files.len());
@@ -545,6 +549,7 @@ impl PhotocraftApp {
                 // Running in the background: Free Transform starts when the layer has landed.
                 Ok(started) if crate::jobs_ui::track_place(self, &name, &started) => return,
                 Ok(result) => {
+                    crate::notices::io_result_warnings(self, &result, &name);
                     if result.get("frame").and_then(serde_json::Value::as_u64).is_some() {
                         continue;
                     }

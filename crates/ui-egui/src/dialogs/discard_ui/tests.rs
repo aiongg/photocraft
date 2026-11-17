@@ -400,10 +400,9 @@ fn the_all_answers_need_more_than_one_document_left() {
     assert!(question_open(&h));
 }
 
-/// Whether the prompt is asking about the document called `name`.
-fn asks_about(h: &Prompted, name: &str) -> bool {
-    use egui_kittest::kittest::Queryable;
-    h.query_by_label_contains(&format!("“{name}”")).is_some()
+/// Whether the open question is about the document `id`.
+fn asks_about(h: &Prompted, id: DocId) -> bool {
+    question_open(h) && h.state().discard.as_ref().and_then(|p| p.asked) == Some(id)
 }
 
 /// No on one of several documents closes it and asks about the next one (#2547).
@@ -413,18 +412,17 @@ fn answering_no_closes_that_document_and_asks_about_the_next() {
         let mut app = app_with_docs(2);
         make_dirty(&mut app, 0);
         make_dirty(&mut app, 1);
-        let names: Vec<String> = app.session.documents().iter().map(|d| d.doc.name.clone()).collect();
         let second = doc_id(&app, 1);
         let first = doc_id(&app, 0);
         assert_eq!(app.session.active_index(), Some(1), "the last new document is active");
         let mut h = prompt_for(app, command, craft::host::target::Os::Windows);
-        assert!(asks_about(&h, &names[0]), "{command}");
+        assert!(asks_about(&h, first), "{command}");
         assert_eq!(h.state().session.active().map(|d| d.doc.id), Some(first), "{command}: the first tab asked about is shown");
         answer(&mut h, "dontSave", false);
         assert_eq!(h.state().session.documents().len(), 1, "{command}: No closed the first document");
         assert_eq!(doc_id(h.state(), 0), second);
         assert_eq!(h.state().session.active_index(), Some(0), "{command}: the tab asked about is shown");
-        assert!(asks_about(&h, &names[1]), "{command}: then about the second");
+        assert!(asks_about(&h, second), "{command}: then about the second");
         assert!(!h.state().allow_close);
         answer(&mut h, "dontSave", false);
         assert!(h.state().discard.is_none());

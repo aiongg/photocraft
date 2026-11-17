@@ -74,11 +74,10 @@ pub(crate) fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers
 /// pressure (a test's own reading, with its tilt and pen end); a mouse (pressure 1) feeds no pen.
 fn pen(app: &PhotocraftApp, pressure: f32) {
     let feed = &app.stylus.feed;
-    if pressure == 1.0 {
-        feed.set(None);
-    } else if feed.get().map(|s| s.pressure) != Some(pressure) {
-        feed.set(Some(PenSample { pressure, ..PenSample::default() }));
+    if feed.get().map(|s| s.pressure) == Some(pressure) {
+        return;
     }
+    feed.set((pressure != 1.0).then(|| PenSample { pressure, ..PenSample::default() }));
 }
 
 /// The context the canvas pass runs in: the app's own, which its code outside the pass reads too.
@@ -109,14 +108,29 @@ fn run_frame(app: &mut PhotocraftApp) {
     let mut frames = app.canvas_tools.frames.take().unwrap_or_else(|| Frames::over(ctx.clone()));
     app.canvas_tools.last_response = None;
     app.framework_before_input(&ctx);
-    frames.frame_without_input(Vec::new(), |ui| {
+    // The platform completes an IME reset the framework asked for in the pass before; without it the engine drops
+    // every composition event after an interrupted composition.
+    let os_input = ctx.data_mut(|d| d.remove_temp::<Vec<egui::Event>>(egui::Id::new(OS_IME_RESETS))).unwrap_or_default();
+    frames.frame_without_input(os_input, |ui| {
         crate::shortcut_dispatch::record_view_commands(app);
         crate::shortcuts::handle(app, &ui.ctx().clone());
         egui::CentralPanel::default().show(ui, |ui| super::document_area(app, ui));
         crate::dialogs::run(app, ui);
         crate::shortcuts::escape_keys(app, &ui.ctx().clone());
     });
+    if let Some(request_id) = frames.ime().and_then(|ime| ime.reset) {
+        ctx.data_mut(|d| d.insert_temp(egui::Id::new(OS_IME_RESETS), vec![egui::Event::ImeResetCompleted { request_id }]));
+    }
     app.canvas_tools.frames = Some(frames);
+}
+
+const OS_IME_RESETS: &str = "photocraft.test-os-ime-resets";
+
+/// Holds back the platform's answer to the IME reset the last pass asked for, until the next frame has run: events
+/// of the interrupted composition that are still on their way reach the framework before the answer, as they do on
+/// a platform. The request stays pending, so the answer follows that frame.
+pub(crate) fn hold_ime_reset_answer(app: &PhotocraftApp) {
+    let _ = ctx(app).data_mut(|d| d.remove_temp::<Vec<egui::Event>>(egui::Id::new(OS_IME_RESETS)));
 }
 
 /// Runs frames until the window host has delivered everything queued.
@@ -243,6 +257,13 @@ pub(crate) fn modifiers(app: &mut PhotocraftApp, mods: Modifiers) {
 /// One pass with no input: what a tool change cancels, a document switch drops.
 pub(crate) fn frame(app: &mut PhotocraftApp) {
     run_frame(app);
+}
+
+/// Keeps the frames' clock still: a frame leaves the time where it is, so a held pen repeats no point (and no
+/// other timed behaviour fires) until the test advances `Frames`' clock.
+pub(crate) fn still_clock(app: &mut PhotocraftApp) {
+    let ctx = ctx(app);
+    app.canvas_tools.frames.get_or_insert_with(|| Frames::over(ctx)).still_clock();
 }
 
 /// The window the following frames run in is `size` points (at least 800 × 600); the document area and its canvas

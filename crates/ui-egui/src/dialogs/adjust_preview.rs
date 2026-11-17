@@ -69,9 +69,10 @@ fn doc_rect(r: PixelRect) -> Rect {
     Rect::new(r.x0, r.y0, r.x1, r.y1)
 }
 
-/// The host's clock in seconds, the unit the live preview's settle time is in.
-fn now_s() -> f64 {
-    crate::gpu_canvas::now_ms() / 1000.0
+/// The time of the pass the app runs in, in seconds: the unit the live preview's settle time is in. It is the frame
+/// time, not the wall clock, so a driver that steps the frame clock steps the settle too.
+fn now_s(app: &PhotocraftApp) -> f64 {
+    app.ctx().input(|i| i.time)
 }
 
 /// Why `target` in `doc` can't preview through the temporary layer path, or None when it can.
@@ -313,9 +314,10 @@ fn update(app: &mut PhotocraftApp, idx: usize) -> Option<&AdjustPreview> {
             proxy: None,
         });
     }
+    let now = now_s(app);
     let p = app.adjust_preview.as_mut()?;
     let built = p.base.as_ref().and_then(|b| with_settings(b, &kind, &params).ok());
-    let key = p.live.key(h, now_s());
+    let key = p.live.key(h, now);
     p.keyed = key;
     p.layer_path = built.is_some();
     p.shown = built.filter(|_| preview).map(|d| (Arc::new(d), key));
@@ -372,7 +374,7 @@ pub fn uncovered(app: &mut PhotocraftApp, doc: DocId, key: u64, visible: Rect) -
 /// True while the preview's settings changed within the last `ms` milliseconds (secondary views
 /// such as the Navigator wait for the settings to settle instead of recompositing every change).
 pub fn settling(app: &PhotocraftApp, ms: f64) -> bool {
-    app.adjust_preview.as_ref().is_some_and(|p| p.shown.is_some() && p.live.settling(now_s(), ms / 1000.0))
+    app.adjust_preview.as_ref().is_some_and(|p| p.shown.is_some() && p.live.settling(now_s(app), ms / 1000.0))
 }
 
 /// Proxy document ids: the document's id with this bit flipped.
@@ -524,6 +526,7 @@ fn live_region(doc: &Document, layer: LayerId) -> Rect {
 /// measuring its region) when the document, revision or layer changes.
 pub fn live_key(app: &mut PhotocraftApp, doc: &Document, revision: u64, layer: LayerId, params: &Value) -> u64 {
     let session = PreviewSession::new(doc.id.0, revision, layer.0);
+    let now = now_s(app);
     let p = app.live_adjust_preview.get_or_insert_with(|| LiveAdjust {
         doc: doc.id,
         revision,
@@ -535,7 +538,7 @@ pub fn live_key(app: &mut PhotocraftApp, doc: &Document, revision: u64, layer: L
     if p.live.session() != Some(session) {
         p.live.begin(session, pixel_rect(&live_region(doc, layer)));
     }
-    p.keyed = p.live.key(settings_hash(&[params.to_string().as_bytes()]), now_s());
+    p.keyed = p.live.key(settings_hash(&[params.to_string().as_bytes()]), now);
     p.keyed.raw()
 }
 

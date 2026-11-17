@@ -425,7 +425,8 @@ fn clone_overlay_of_a_scaled_source_stays_within_the_sampling_budget() {
         app.run("cloneSource.set", json!({"width": scale, "height": scale})).unwrap();
         let source = super::strokes::clone_source(&mut app, [32.0, 32.0]).unwrap_or_else(|| panic!("{size} px at {scale} %: the image shows"));
         let side = source.size();
-        assert!(side.width <= size as u32 + 2 && side.height <= size as u32 + 2, "{size} px at {scale} %: the image is no larger than the brush: {side:?}");
+        let budget = super::strokes::CLONE_PREVIEW_MAX_SIDE;
+        assert!(side.width <= budget && side.height <= budget, "{size} px at {scale} %: the image stays within the sampling budget: {side:?}");
         assert_eq!(clone_source_image(&mut app).unwrap()(32, 32).a(), 255, "{size} px at {scale} %: the source under the pointer");
     }
 }
@@ -661,12 +662,14 @@ fn a_secondary_canvas_hand_pans_while_a_transform_is_open() {
     view0.fit_pending = false;
     view0.fill_pending = false;
     let center0 = view0.center;
+    // The same document in a document window of its own, whose canvas is not the main window's.
+    let window = CanvasHost { idx: 0, viewport: egui::ViewportId::ROOT, window: Some(1) };
     let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0));
     let frame = |app: &mut PhotocraftApp, events: Vec<egui::Event>| -> View {
         let input = egui::RawInput { screen_rect: Some(rect), events, ..Default::default() };
         let mut seen = view0.clone();
         let mut out = ctx.run_ui(input, |ui| {
-            (seen, _) = canvas_view(app, ui, CanvasHost::main(0), rect, view0.clone(), false);
+            (seen, _) = canvas_view(app, ui, window, rect, view0.clone(), false);
         });
         out.textures_delta.clear();
         seen
@@ -721,8 +724,8 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     let position = |pred: &dyn Fn(&egui::Shape) -> bool| out.shapes.iter().position(|s| pred(&s.shape));
     // The moving pixels: the mesh that spans the layer's box.
     let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if near(m.calc_bounds())));
-    // The guide: a vertical line at x = 150.
-    let guide = position(&|s| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() < 0.01)));
+    // The guide: a vertical line at x = 150, which the framework's rule puts on a pixel centre (within a pixel).
+    let guide = position(&|s| matches!(s, egui::Shape::LineSegment { points, .. } if points.iter().all(|p| (p.x - 150.0).abs() <= 0.5)));
     // The box: the closed four-point outline round the layer.
     let frame = position(&|s| matches!(s, egui::Shape::Path(p) if p.closed && p.points.len() == 4 && near(Rect::from_points(&p.points))));
     let (Some(preview), Some(guide), Some(frame)) = (preview, guide, frame) else {
@@ -1004,15 +1007,16 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         app
     });
     h.run_steps(6);
-    let ctx = h.ctx.clone();
-    crate::menus::invoke(h.state_mut(), &ctx, "window.panel.navigator", json!({})).unwrap();
+    // The panel is shown, not toggled: the menu entry closes a Navigator the workspace already shows.
+    crate::panel_docking::show_panel(h.state_mut(), "navigator", Some(true)).unwrap();
     h.run_steps(6);
     assert_eq!(h.state().session.active_index(), Some(0), "the floating document is active");
     // The status bar's zoom field (bottom left) and the Navigator's.
     let fields = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
+        // The fields are the nodes named Zoom that show the percentage as their value (a field's group and the Navigator's slider carry the name too).
         let mut f: Vec<egui::Rect> = h
-            .query_all_by_role(egui::accesskit::Role::SpinButton)
-            .filter(|n| n.accesskit_node().label().as_deref() == Some("Zoom"))
+            .query_all_by_label("Zoom")
+            .filter(|n| n.accesskit_node().role() != egui::accesskit::Role::Slider && n.accesskit_node().value().is_some())
             .map(|n| n.rect())
             .collect();
         f.sort_by(|a, b| a.left().total_cmp(&b.left()));

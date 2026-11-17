@@ -350,6 +350,23 @@ fn style_params_json(params: &StyleParams) -> Value {
     Value::Object(o)
 }
 
+/// Adds each effect's command parameters (`params`, as [`style_params_json`] gives them) to the open Layer Style dialog's
+/// entry of `dialogs`, the `ui.inspect` listing: the framework's own listing names the effects but not their values, and
+/// an agent reads a gradient's stops or a colour from here.
+pub(crate) fn describe_params(app: &PhotocraftApp, dialogs: &mut Value) {
+    let Some((id, ..)) = app.layer_style_target else { return };
+    let Some(dialog) = app.framework.dialogs.get_by_id::<HostedLayerStyle>(id) else { return };
+    let key = id.value().to_string();
+    let Some(entry) = dialogs.as_array_mut().and_then(|list| list.iter_mut().find(|d| d["id"] == key.as_str())) else { return };
+    let Some(effects) = entry.pointer_mut("/fields/effects").and_then(Value::as_array_mut) else { return };
+    for effect in effects {
+        let instance = effect["id"].as_str().and_then(EffectId::from_key).and_then(|id| dialog.draft().style.effect(id));
+        if let Some(instance) = instance {
+            effect["params"] = style_params_json(&instance.params);
+        }
+    }
+}
+
 /// The effect snapshot the instance was loaded with; none for an instance added in the dialog.
 fn fx_of(params: &StyleParams) -> Option<Value> {
     match params.get("fx") {
@@ -631,6 +648,20 @@ fn effect_entry(fx: Option<&Value>, kind: &str, mut params: Value, initial_light
                     if edits.get(key) == shown.get(key) {
                         edits.remove(key);
                     }
+                }
+            }
+            if kind == "gradientOverlay"
+                && let Ok(original) = serde_json::from_value::<Effect>(fx.clone())
+                && let Some(edits) = params.as_object_mut()
+            {
+                // Unedited stops must not rebuild a baked curve from their rounded copy.
+                let shown = values_of(&original, initial_light_angle.unwrap_or(120.0) as f32);
+                let unchanged = gradient_field::stops_from_json(&Value::Object(edits.clone()))
+                    .zip(gradient_field::stops_from_json(&shown))
+                    .is_some_and(|(edited, opened)| gradient_field::same(&edited, &opened));
+                if unchanged {
+                    edits.remove(gradient_field::KEY);
+                    edits.remove(gradient_field::OPACITY_KEY);
                 }
             }
             json!({"kind": kind, "fx": fx, "params": params})

@@ -1156,7 +1156,9 @@ fn a_dialog_toggled_step_pauses_playback_and_resumes_on_ok() {
     let id = v["paused"]["dialog"].as_u64().unwrap();
     answer_ok(&mut app, id).unwrap();
     assert!(app.session.active().unwrap().doc.selection.is_some(), "the step after the background blur ran");
-    assert!(app.ui.status.starts_with("Played"), "{}", app.ui.status);
+    // The job's completion, polled by the frame the answer settles with, names itself in the status bar after the
+    // action's "Played" line: the action is over and has not failed.
+    assert!(app.paused_playbacks.paused.is_empty() && !app.ui.status_error, "{}", app.ui.status);
     app.background_jobs = false;
     // Agents play headlessly: no pause, the recorded values run.
     app.automation_input = true;
@@ -1197,7 +1199,13 @@ fn equalize_step_with_a_selection_opens_its_choices() {
 /// An 8×6 document, a Child action whose first step (a blur) shows its dialog and whose
 /// second step adds a "Suffix" layer, and recording into Owner started.
 fn recording_with_dialog_child() -> PhotocraftApp {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    recording_with_dialog_child_using(crate::Services::default())
+}
+
+/// [`recording_with_dialog_child`] with the app built on `services`: the file service is the framework's from
+/// construction on.
+fn recording_with_dialog_child_using(services: crate::Services) -> PhotocraftApp {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
     app.run("file.new", json!({"width": 8, "height": 6, "background": "#203040"})).unwrap();
     let mut child =
         new_action("Child", vec![("filter.blur.gaussianBlur".into(), json!({"radius": 1.5})), ("layer.new.layer".into(), json!({"name": "Suffix"}))]);
@@ -1373,8 +1381,10 @@ fn a_step_dialog_keeps_its_continuation_token() {
     assert!(app.paused_playbacks.paused.is_empty());
 }
 
-fn recording_with_displace_child() -> PhotocraftApp {
-    let mut app = recording_with_dialog_child();
+/// [`recording_with_dialog_child`] over a Displace step, whose map picker answers `answers` in turn.
+fn recording_with_displace_child(answers: impl IntoIterator<Item = craft::host::Picked>) -> PhotocraftApp {
+    let services = crate::Services { files: Some(std::sync::Arc::new(craft::host::ScriptedFiles::answering(answers))), ..Default::default() };
+    let mut app = recording_with_dialog_child_using(services);
     app.background_jobs = false;
     app.session.actions.list.replace_step(0, 0, ActionStep::new("filter.distort.displace", json!({}))).unwrap();
     app
@@ -1393,7 +1403,7 @@ fn assert_displace_call_finished(app: &mut PhotocraftApp, suffix_count: usize) {
 
 #[test]
 fn a_displace_step_restores_recording_when_the_map_picker_fails_or_is_cancelled() {
-    use craft::host::{Picked, ScriptedFiles};
+    use craft::host::Picked;
     let dir = tempfile::tempdir().unwrap();
     let missing = dir.path().join("missing.png");
     for answer in [
@@ -1403,8 +1413,7 @@ fn a_displace_step_restores_recording_when_the_map_picker_fails_or_is_cancelled(
         Picked::Contents(vec![("map.png".into(), Vec::new())]),
         Picked::Paths(vec![missing]),
     ] {
-        let mut app = recording_with_displace_child();
-        app.services.files = Some(std::sync::Arc::new(ScriptedFiles::answering([answer])));
+        let mut app = recording_with_displace_child([answer]);
         let id = pause_child(&mut app);
         answer_ok(&mut app, id).unwrap();
         assert!(app.file_dialog_open());
@@ -1416,12 +1425,11 @@ fn a_displace_step_restores_recording_when_the_map_picker_fails_or_is_cancelled(
 
 #[test]
 fn a_displace_step_resumes_and_records_its_call_once_after_choosing_a_map() {
-    let mut app = recording_with_displace_child();
     let dir = tempfile::tempdir().unwrap();
     let map = dir.path().join("map.png");
+    let mut app = recording_with_displace_child([craft::host::Picked::Paths(vec![map.clone()])]);
     let bytes = photocraft_io::export(&app.session.active().unwrap().doc, "png", &Default::default()).unwrap().bytes;
     std::fs::write(&map, bytes).unwrap();
-    app.services.files = Some(std::sync::Arc::new(craft::host::ScriptedFiles::answering([craft::host::Picked::Paths(vec![map.clone()])])));
     let id = pause_child(&mut app);
     answer_ok(&mut app, id).unwrap();
     app.poll_file_dialog();
@@ -1909,9 +1917,8 @@ fn deny_displace_file(id: &str, params: &Value) -> photocraft_engine::Result<()>
 #[test]
 /// Authorize a deferred displacement-map path before file access, worker admission or continuation history changes.
 fn a_deferred_displace_map_is_authorized_before_reading_or_resuming_history() {
-    let mut app = recording_with_displace_child();
+    let mut app = recording_with_displace_child([craft::host::Picked::Paths(vec!["denied-map.png".into()])]);
     app.background_jobs = true;
-    app.services.files = Some(std::sync::Arc::new(craft::host::ScriptedFiles::answering([craft::host::Picked::Paths(vec!["denied-map.png".into()])])));
     app.session.authorize = Some(deny_displace_file);
     let dialog = pause_child(&mut app);
     app.session.authorize = None;

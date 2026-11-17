@@ -7,7 +7,6 @@ use photocraft_geom::Rect;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::canvas::document_display::CanvasHost;
 use crate::state::Tool;
 
 fn harness() -> Harness<'static, PhotocraftApp> {
@@ -84,11 +83,9 @@ fn bounds(app: &PhotocraftApp) -> Option<Rect> {
     app.session.active().unwrap().doc.selection.as_ref().map(|s| s.content_bounds())
 }
 
-/// The tool or document changed: the switch the tool-change hook runs (`tools::tool_changed`).
+/// The tool or document changed: the next pass of the canvas.
 fn switched(app: &mut PhotocraftApp) {
-    let ctx = crate::canvas::testing::ctx(app);
-    let idx = app.session.active_index().unwrap();
-    crate::canvas::tools::tool_changed(app, &ctx, CanvasHost::main(idx));
+    crate::canvas::testing::frame(app);
 }
 
 /// ⌘-drag inside a selection with the Polygonal Lasso cuts and floats the pixels, as with the

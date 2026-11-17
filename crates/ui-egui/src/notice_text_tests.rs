@@ -6,7 +6,7 @@
 
 use egui::{Modifiers, PointerButton, Pos2, vec2};
 use egui_kittest::Harness;
-use egui_kittest::kittest::Queryable;
+use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -34,10 +34,14 @@ fn app_harness() -> Harness<'static, PhotocraftApp> {
     h
 }
 
-/// The notice's message (the status bar shows it too, on one line: the notice wraps it).
+/// The notice's message: the selectable text of its card (the status bar shows it too, on one line, as a label).
 fn notice_text(h: &Harness<'static, PhotocraftApp>) -> egui::Rect {
-    let rects: Vec<egui::Rect> = h.get_all_by_label(MESSAGE).map(|n| n.rect()).collect();
-    rects.into_iter().max_by(|a, b| a.height().total_cmp(&b.height())).unwrap()
+    let rects: Vec<egui::Rect> = h
+        .query_all_by_role(egui::accesskit::Role::MultilineTextInput)
+        .filter(|n| n.accesskit_node().value().is_some_and(|text| text.contains("1073741824 px limit")))
+        .map(|n| n.rect())
+        .collect();
+    rects.into_iter().max_by(|a, b| a.height().total_cmp(&b.height())).expect("the notice shows its message as selectable text")
 }
 
 /// The document's layers (bounds) and History length.

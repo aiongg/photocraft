@@ -8,11 +8,11 @@ use crate::{
         document_display::CanvasHost,
         tools::{FamilyTool, ToolScope},
     },
-    state::{FreeTransform, SessionWarp, Tool},
+    state::{FreeTransform, Tool},
     theme::Tokens,
 };
 use craft::behavior::{
-    CancelReason, Cursor, CursorIcon, EditEvent, GestureId, IconId, Mixed,
+    CancelReason, Cursor, CursorIcon, EditEvent, GestureId, IconId, Mixed, PointerButton,
     geometry::{BoxAllow, BoxPart, BoxRules, BoxState, ConstrainStyle, Directions, MoveGesture, ScaleRule, drag as box_drag},
     kurbo::{Point as KPoint, Rect as KRect},
 };
@@ -364,8 +364,10 @@ fn press_rule(app: &mut PhotocraftApp, at: KPoint, clicks: u32, reach: f64, styl
         return Pressed::Done;
     }
     let p = [at.x, at.y];
-    if clicks >= 2 {
-        let Some(id) = frame_at(app, p) else { return Pressed::Done };
+    // A repeated press with no frame under it is an ordinary press: a drag from where the last click was still draws.
+    if clicks >= 2
+        && let Some(id) = frame_at(app, p)
+    {
         let next = if selected(app).is_some_and(|l| l.id == id && target(app, l) == Target::Content) { Target::Both } else { Target::Content };
         select(app, id, next);
         return Pressed::Done;
@@ -432,11 +434,17 @@ fn drag_content(app: &mut PhotocraftApp, c: &mut ContentPress, to: KPoint, mods:
 
 /// The release of a content press: the box's Commit (when it moved) and the automatic commit of the session.
 fn release_content(app: &mut PhotocraftApp, c: &ContentPress, to: KPoint, mods: Mods) {
-    let mut edits: Vec<TransformEdit<SessionWarp>> = Vec::new();
-    if c.begun {
-        let after = box_drag(&c.origin, &c.last, c.part, c.start, to, mods, &BoxRules::default());
-        edits.push(TransformEdit::Box(EditEvent::commit(c.id, Mixed::Same(c.origin), after)));
+    if !c.begun {
+        // A click moved nothing: the session its press opened ends with the press, as the release of any press that
+        // opened one. The untouched box closes without a step.
+        if app.ui.frame_tool.auto_transform {
+            app.ui.frame_tool.auto_transform = false;
+            crate::transform_tool::commit(app);
+        }
+        return;
     }
+    let after = box_drag(&c.origin, &c.last, c.part, c.start, to, mods, &BoxRules::default());
+    let edits = [TransformEdit::Box(EditEvent::commit(c.id, Mixed::Same(c.origin), after))];
     crate::transform_tool::auto_commit(app, &edits);
 }
 
@@ -596,6 +604,11 @@ impl CanvasTool for FramePass<'_> {
             }
         });
         self.state.draw.cancel(reason, cx);
+    }
+
+    /// ⌘ is the Move tool's stand-in: with it held the press belongs to the stand-in, not to a frame.
+    fn takes(&self, button: PointerButton, mods: Mods) -> bool {
+        button == PointerButton::Primary && !mods.cmd
     }
 
     fn claims(&self) -> ToolClaims {

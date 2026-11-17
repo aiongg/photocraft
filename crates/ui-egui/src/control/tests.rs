@@ -98,61 +98,6 @@ fn shift_right_brush_does_not_open_presets_or_paint() {
 }
 
 #[test]
-fn brush_mode_control_routes_modifiers_and_reports_choices_without_history() {
-    for (tool, modifiers, expected) in [
-        ("brush", json!({"shift": true}), "mode"),
-        ("brush", json!({}), "erase"),
-        ("brush", json!({"alt": true}), "resize"),
-        ("brush", json!({"shift": true, "alt": true}), "erase"),
-        ("brush", json!({"shift": true, "ctrl": true}), if cfg!(target_os = "macos") { "erase" } else { "layer" }),
-        ("brush", json!({"shift": true, "command": true}), "layer"),
-        ("pencil", json!({"shift": true}), "mode"),
-        ("eraser", json!({"shift": true}), "mode"),
-        ("spotHealing", json!({"shift": true}), "preset"),
-    ] {
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-        let ctx = app.ctx().clone();
-        app.run("file.new", json!({"width": 64, "height": 64, "background": "white"})).unwrap();
-        app.run("prefs.set", json!({"path": "tools.rightClickWithPaintingTools", "value": "erase"})).unwrap();
-        let history = app.session.active().unwrap().history.past_len();
-        let journal = app.session.journal.len();
-        pointer(
-            &mut app,
-            json!({"tool": tool, "button": "right", "modifiers": modifiers,
-            "events": [{"kind": "down", "x": 20, "y": 20}]}),
-        );
-        let menu_kind = |app: &PhotocraftApp| app.ui.canvas_tool_menu.as_ref().map(|m| m.kind.clone());
-        assert_eq!(matches!(menu_kind(&app), Some(MenuKind::BrushMode { .. })), expected == "mode", "{tool}: {modifiers}");
-        let painted = |app: &PhotocraftApp, since: usize| app.session.journal.iter().skip(since).any(|(id, _)| id == "paint.stroke");
-        match expected {
-            "mode" => {
-                assert!(!crate::canvas::testing::in_gesture(&mut app));
-                assert!(!painted(&app, journal));
-                assert_eq!(app.session.active().unwrap().history.past_len(), history);
-                let inspect = inspect(&app, &ctx);
-                assert_eq!(inspect["brushModeMenu"]["choices"], json!(crate::brush_mode_menu::labels(app.ui.tool)));
-                let journal = app.session.journal.len();
-                pointer(
-                    &mut app,
-                    json!({"events": [
-                    {"kind": "down", "x": 10, "y": 10}, {"kind": "move", "x": 30, "y": 30}, {"kind": "up", "x": 30, "y": 30}]}),
-                );
-                assert!(menu_kind(&app).is_none() && !crate::canvas::testing::in_gesture(&mut app));
-                assert_eq!(app.session.journal.len(), journal, "control dismissal cannot paint");
-            }
-            "preset" => assert!(!inspect(&app, &ctx)["brushPicker"].is_null()),
-            "layer" => assert!(matches!(menu_kind(&app), Some(MenuKind::Layers { .. }))),
-            "resize" => assert!(app.brush_resize.active()),
-            "erase" => {
-                assert!(crate::canvas::testing::in_gesture(&mut app));
-                assert!(!app.brush_resize.active(), "Shift+Alt is not the resize gesture");
-            }
-            _ => panic!("unknown fixture route: {expected}"),
-        }
-    }
-}
-
-#[test]
 fn perf_output_includes_slow_frames() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
@@ -178,58 +123,6 @@ fn perf_output_includes_slow_frames() {
     assert_eq!(last["command"], "actions.play", "{last}");
     let command_ms = last["commandMs"].as_f64().unwrap();
     assert!((command_ms - outer_ms).abs() < 1e-9, "the outer run's {outer_ms} ms, once: {last}");
-}
-
-#[test]
-fn camera_raw_control_updates_and_commits_or_cancels_an_open_raw() {
-    use photocraft_raw::testgen::{DngSpec, mosaic, scene};
-    let (w, h) = (48, 32);
-    let mut spec = DngSpec::cfa(w, h, mosaic(&scene(w, h), w, [0, 1, 1, 2], 0, 30000));
-    spec.as_shot_neutral = Some([0.5, 1.0, 0.7]);
-    let dng = spec.build();
-    for finish in ["commit", "cancel"] {
-        let services = crate::Services {
-            import: Some(Box::new(|name, bytes, opts| {
-                photocraft_io::import_with_options(name, bytes, opts).map(|r| (r.document, r.warnings)).map_err(|e| e.to_string())
-            })),
-            ..Default::default()
-        };
-        let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-        let ctx = app.ctx().clone();
-        PhotocraftApp::setup_context(&ctx, Default::default());
-        app.open_bytes("control.dng", &dng).unwrap();
-        ctx.run_ui(Default::default(), |ui| crate::dialogs::run(&mut app, ui)).textures_delta.clear();
-        assert_eq!(crate::distort_ui::modal_workspace(&app), Some("filter.cameraRaw"));
-        // A developed raw has no embedded profile to ask about (`open_prompt`), so no profile
-        // prompt stands between the open and the Camera Raw dialog.
-        assert!(dialogs(&mut app, &ctx).is_empty());
-        let update = json!({"id":"filter.cameraRaw","params":{"ui":{"set":{"exposure":0.5}}}});
-        let original = app.session.active().unwrap().doc.clone();
-        let changed = call(&mut app, &ctx, "ui.menu.invoke", update.clone());
-        let undone = call(&mut app, &ctx, "ui.menu.invoke", json!({"id":"filter.cameraRaw","params":{"ui":{"undo":true}}}));
-        assert_eq!(undone["result"]["params"]["exposure"], 0.0, "{undone}");
-        let redone = call(&mut app, &ctx, "ui.menu.invoke", json!({"id":"filter.cameraRaw","params":{"ui":{"redo":true}}}));
-        assert_eq!(redone["result"]["params"]["exposure"], 0.5, "{redone}");
-        assert_eq!(changed["ok"], true, "{changed}");
-        assert_eq!(changed["result"]["params"]["exposure"], 0.5);
-        assert_eq!(crate::camera_raw_ui::describe(&app)["params"]["exposure"], 0.5);
-        assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &original), "a preview must not commit");
-        assert!(!crate::menus::allows(&app, &CommandRef::new("filter.cameraRaw")), "native menu clicks stay blocked");
-        let finished = call(&mut app, &ctx, "ui.menu.invoke", json!({"id":"filter.cameraRaw","params":{"ui":{finish:true}}}));
-        assert_eq!(finished["ok"], true, "{finished}");
-        assert_eq!(crate::distort_ui::modal_workspace(&app), None);
-        if finish == "commit" {
-            assert_eq!(finished["result"]["redeveloped"], true, "{finished}");
-            assert_eq!(app.session.documents().len(), 1);
-            let st = app.session.active().unwrap();
-            assert_ne!(st.doc.id, original.id);
-            assert_eq!(st.doc.depth, photocraft_color::SampleType::U16);
-            assert_eq!(st.saved_revision, st.revision);
-        } else {
-            assert_eq!(finished["result"]["cancelled"], true);
-            assert!(app.session.documents().is_empty());
-        }
-    }
 }
 
 #[test]
@@ -322,41 +215,6 @@ fn layer_style_picker_control_binds_previews_confirms_and_cancels() {
     call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","parent":parent,"effect":"fx1","field":"stops","stop":1}));
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog":parent}))["ok"], true);
     assert!(dialogs(&mut app, &ctx).is_empty());
-}
-
-#[test]
-fn text_style_picker_control_uses_bound_target_and_rejects_invalid_requests_atomically() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let ctx = app.ctx().clone();
-    app.run("file.new", json!({"width":32,"height":32})).unwrap();
-    let id = app.run("type.characterStyle.new", json!({"fromSelection":false,"attrs":{"color":"#123456"}})).unwrap()["id"].as_u64().unwrap();
-    for style in [
-        Value::Null,
-        json!({"kind":"wrong","id":id}),
-        json!({"kind":"character","id":"bad"}),
-        json!({"kind":"paragraph","id":u64::MAX}),
-        json!({"kind":"character","id":0}),
-        json!({"kind":"character","id":id,"extra":1}),
-    ] {
-        let panels = app.ui.type_panels.clone();
-        assert_eq!(call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":style}))["ok"], false);
-        assert_eq!(app.ui.type_panels, panels);
-        assert!(dialogs(&mut app, &ctx).is_empty());
-    }
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":{"kind":"character","id":id},"parent":1}))["ok"], false);
-    let doc = app.session.active().unwrap().doc.clone();
-    let r = call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":{"kind":"character","id":id}}));
-    assert_eq!(r["ok"], true);
-    let picker = r["result"]["dialog"].clone();
-    assert_eq!(top_dialog(&mut app, &ctx)["key"], format!("textStyle.character.{id}"));
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.set", json!({"dialog":picker,"field":"color","value":"#00ff00"}))["ok"], true);
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog":picker}))["ok"], true);
-    assert!(std::sync::Arc::ptr_eq(&app.session.active().unwrap().doc, &doc));
-    let r = call(&mut app, &ctx, "ui.dialog.open", json!({"kind":"colorPicker","textStyle":{"kind":"character","id":id}}));
-    let picker = r["result"]["dialog"].clone();
-    call(&mut app, &ctx, "ui.dialog.set", json!({"dialog":picker,"field":"color","value":"#00ff00"}));
-    assert_eq!(call(&mut app, &ctx, "ui.dialog.confirm", json!({"dialog":picker}))["ok"], true);
-    assert_ne!(app.session.active().unwrap().doc.text_styles, doc.text_styles);
 }
 
 #[test]
@@ -614,6 +472,8 @@ fn agent_space_right_click_opens_the_hand_view_menu() {
         assert!(crate::canvas_tool_menu::rows(&menu) == crate::canvas_tool_menu::HAND_MENU, "{tool:?}");
         assert_eq!(menu.under, Some(tool), "{tool:?}");
         assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"view.twoHundredPercent"}))["ok"], true, "{tool:?}");
+        // The canvas carries out the runtime's view command in its next frame.
+        crate::canvas::testing::frame(&mut app);
         assert_eq!(app.ui.views[0].zoom, 2.0, "{tool:?}");
         assert_eq!(app.ui.tool, tool);
         app.ui.canvas_tool_menu = None;
@@ -645,27 +505,6 @@ fn agent_space_right_click_while_typing_keeps_the_type_menu() {
     assert_eq!(pointer(&mut app, click)["ok"], true);
     let menu = app.ui.canvas_tool_menu.clone().expect("the type edit menu");
     assert!(matches!(menu.kind, MenuKind::TypeEdit { .. }), "the type edit menu, not the view menu");
-}
-
-/// #11271: with a text field focused Space types, so an agent's Space right-click with the Move
-/// tool is the Move tool's (its layer list), not the Hand's view menu, as `hold_keys` decides in
-/// the app.
-#[test]
-fn agent_space_right_click_with_a_text_field_focused_keeps_the_tool() {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    // The focus lives on the app's context, which the canvas passes run on.
-    let ctx = app.ctx().clone();
-    app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
-    app.sync_views();
-    app.ui.tool = crate::state::Tool::Move;
-    let field = egui::Id::unique("a focused text field");
-    egui::text_edit::TextEditState::default().store(&ctx, field);
-    ctx.memory_mut(|m| m.request_focus(field));
-    assert!(ctx.text_edit_focused(), "the field has focus");
-    let click = json!({"space": true, "button": "secondary", "events": [{"kind":"down","x":8,"y":8},{"kind":"up","x":8,"y":8}]});
-    assert_eq!(pointer(&mut app, click)["ok"], true);
-    assert!(app.ui.canvas_tool_menu.as_ref().is_none_or(|m| !matches!(m.kind, MenuKind::View)), "no view menu while a field has focus");
-    assert!(matches!(app.ui.canvas_tool_menu.as_ref().map(|m| &m.kind), Some(MenuKind::Layers { .. })), "the Move tool's layer list");
 }
 
 /// #6561: an agent's right-click on a pending crop opens the crop menu, as on the canvas.

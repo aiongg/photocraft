@@ -465,6 +465,10 @@ fn seed(app: &PhotocraftApp, kind: &str, recorded: &Value, smart: Option<&(usize
             supplied.remove("gray");
             supplied.remove("smooth"); // Already applied by parsing; never smooth a second time.
             supplied.extend(canonical);
+            // A Lab set's canonical parameters carry the true combined record, which the editor reads only when flagged.
+            if color_set.is_some() && mode == ColorMode::Lab {
+                supplied.insert("__combinedLab".into(), json!(true));
+            }
         }
     }
     let mut params = Map::new();
@@ -673,7 +677,10 @@ pub fn open_last(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, Str
             .ok()
             .map(|a| photocraft_engine::adjust_params::to_params(&a))
             .unwrap_or(Value::Null);
-        let combined = if last.get("__combinedLab").and_then(Value::as_bool) == Some(true) { &last } else { &neutral };
+        let flagged = last.get("__combinedLab").and_then(Value::as_bool) == Some(true);
+        let combined = if flagged { &last } else { &neutral };
+        // The editor reads the combined record only when flagged, as the colour-set seed flags it.
+        restored["__combinedLab"] = json!(flagged);
         for key in ["points", "inBlack", "inWhite", "gamma", "outBlack", "outWhite"] {
             if let Some(value) = combined.get(key) {
                 restored[key] = value.clone();
@@ -834,7 +841,12 @@ fn run_confirmed(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust
     crate::actions::authorize_panel_preview(app, open.id, &open.command, &params)?;
     let captured = open.smart_filter.as_ref().map_or(Value::Null, |(_, target)| target.clone());
     let (command, run_params) = crate::smart_ui::confirm_command(app, &captured, open.command.clone(), params.clone())?;
-    crate::actions::run_step_dialog(app, open.id, &command, run_params)?;
+    // The editor Record Again opened answers the step it was opened for, not a new run of the command.
+    if crate::actions::record_again::owns_dialog(app, open.id) {
+        crate::actions::record_again::confirm(app, open.id, &command, run_params)?;
+    } else {
+        crate::actions::run_step_dialog(app, open.id, &command, run_params)?;
+    }
     remember(app, ctx, open, &value.cx, &params);
     Ok(())
 }

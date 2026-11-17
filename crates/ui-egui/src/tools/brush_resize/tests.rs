@@ -38,6 +38,8 @@ fn app(tool: Tool) -> PhotocraftApp {
     app.run("tools.setBrush", json!({"brush": {"size": 40, "hardness": 0.2}})).unwrap();
     app.ui.tool = tool;
     app.sync_views();
+    // The Ctrl+Alt chord is a Mac gesture: off macOS the window host reports Ctrl as the command key.
+    testing::on_a_mac(&app);
     app
 }
 

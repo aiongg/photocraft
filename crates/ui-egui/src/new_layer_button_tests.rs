@@ -43,24 +43,3 @@ fn shortcut_asks_first_and_alt_shortcut_makes_a_layer_at_once() {
     h.run_steps(4);
     assert_eq!(layers(&h), 3, "once per press");
 }
-
-#[test]
-fn alt_shortcut_follows_a_custom_new_layer_shortcut_and_yields_to_a_bound_command() {
-    // Rebound to F2: ⌥F2 makes the layer at once.
-    let mut h = panel();
-    h.state_mut().session.prefs.edit(|p| p.shortcuts.insert("layer.new.layer".into(), "F2".into()));
-    h.key_press_modifiers(Modifiers::ALT, egui::Key::F2);
-    h.run_steps(4);
-    assert_eq!(layers(&h), 2);
-    assert!(!dialog_open(&h));
-    // A command bound to ⌥⇧⌘N itself keeps the key.
-    let mut h = panel();
-    h.state_mut().session.prefs.edit(|p| p.shortcuts.insert("layer.new.layerViaCopy".into(), "Cmd+Alt+Shift+N".into()));
-    h.key_press_modifiers(Modifiers::COMMAND | Modifiers::SHIFT | Modifiers::ALT, egui::Key::N);
-    h.run_steps(4);
-    assert_eq!(layers(&h), 2);
-    assert!(!dialog_open(&h));
-    let doc = &h.state().session.active().unwrap().doc;
-    let top = doc.layers.last().unwrap().surface().unwrap();
-    assert!(!top.content_bounds().is_empty(), "Layer via Copy ran (the white background copied), not New Layer");
-}

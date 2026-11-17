@@ -21,16 +21,10 @@ fn names(groups: &Value) -> Vec<Vec<String>> {
     serde_json::from_value(groups.clone()).unwrap()
 }
 
+/// Shift and `key` through the app's frames, as the window delivers them: the runtime fires the tool command, and the
+/// app's key route runs it in the frame that follows.
 fn shift_press(app: &mut PhotocraftApp, key: Key) {
-    let modifiers = Modifiers::SHIFT;
-    let ctx = egui::Context::default();
-    let raw = egui::RawInput {
-        events: vec![egui::Event::ModifiersChanged(modifiers), egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers }],
-        ..Default::default()
-    };
-    ctx.begin_pass(raw);
-    crate::shortcuts::handle(app, &ctx);
-    ctx.end_pass().textures_delta.clear();
+    crate::canvas::testing::key(app, key, Modifiers::SHIFT);
 }
 
 /// The toolbar drawn in a window tall enough for every slot. The first pass installs the theme and fonts.

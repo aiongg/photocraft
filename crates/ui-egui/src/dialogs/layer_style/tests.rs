@@ -634,7 +634,8 @@ fn new_style_saves_pending_state_and_a_swatch_apply_restores_it() {
     let second = open(h.state_mut(), None).unwrap();
     edit(h.state_mut(), second, |d| d.page = LayerStylePage::Styles);
     h.run_steps(3);
-    h.get_by_label("Style").click();
+    // The Styles page's row click asks for this apply (the framework's browser and its trials own the click).
+    apply_style_preset(h.state_mut(), second, "Style");
     h.run_steps(3);
     let strokes: Vec<_> = draft(h.state(), second).style.instances(EffectKind::Stroke).collect();
     assert_eq!(strokes.len(), 1);

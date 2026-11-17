@@ -6,6 +6,7 @@ use craft::automation::actions::{ActionPlayer, ActionRunner, ActionStep, Playbac
 use craft::behavior::canvas::ZoomLadder;
 use craft::behavior::kurbo::Size;
 use craft::ui::dialog::DialogId;
+use craft::ui::patterns::form_dialogs::{HostedCanvasSize, HostedImageSize, HostedParamDialog};
 use serde_json::{Value, json};
 use web_time::Duration;
 
@@ -154,6 +155,7 @@ fn pause_menu_item(app: &mut PhotocraftApp, action: &str, from: usize, id: &str,
     let receiver = app.session.active().and_then(|st| st.active_layer);
     let doc = app.session.active().map(|st| st.doc.id);
     let dialog = open_step_editor(app, command, &defaults)?;
+    hold_editor_ok(app, dialog);
     let token = app.paused_playbacks.pause(action.to_owned(), from, app.session.authorize);
     if let Some(p) = app.paused_playbacks.paused.get_mut(&token) {
         p.dialog = Some(dialog);
@@ -224,6 +226,7 @@ fn pause_for_dialog(app: &mut PhotocraftApp, action: &Action, step: usize, id: &
     if let Some(paused) = app.paused_playbacks.paused.get_mut(&token) {
         paused.dialog = Some(dialog);
         paused.filter_receiver = receiver;
+        paused.explicit_layer = params.get("layer").filter(|layer| !layer.is_null()).cloned();
     }
     Ok(dialog)
 }
@@ -806,6 +809,9 @@ pub(crate) struct PausedPlayback {
     /// An implicit filter/adjustment step resolves this active layer at the pause. The outer Option marks
     /// that binding even when there was no active layer; explicit-layer and other dialogs omit it.
     pub(super) filter_receiver: Option<Option<photocraft_doc::LayerId>>,
+    /// The layer the recorded step names. The settings editor has no row for it, so the confirmed command takes it
+    /// from here: the step keeps its receiver, whatever layer is active at OK.
+    pub(super) explicit_layer: Option<Value>,
     /// Descriptor-free menu playback owns this settings dialog and the concrete command it opened.
     pub(super) menu_editor: Option<(DialogId, String)>,
     /// The actions that called this one through Play Action steps, nearest first, each with the
@@ -867,6 +873,7 @@ impl PausedPlaybacks {
                 doc: None,
                 dialog: None,
                 filter_receiver: None,
+                explicit_layer: None,
                 menu_editor: None,
                 callers: Vec::new(),
                 allow_continue: false,
@@ -900,10 +907,40 @@ pub(crate) fn authorize_panel_preview(app: &PhotocraftApp, dialog: DialogId, com
     Ok(())
 }
 
+/// Makes the open editor `dialog` hold its OK, so [`check_editor`] judges the answer before the editor closes: a
+/// parameter form or a sizing dialog files it for the host; an adjustment editor holds its own.
+pub(crate) fn hold_editor_ok(app: &mut PhotocraftApp, dialog: DialogId) {
+    let dialogs = &mut app.framework.dialogs;
+    if let Some(form) = dialogs.get_mut_by_id::<HostedParamDialog>(dialog) {
+        form.hold_ok();
+    } else if let Some(size) = dialogs.get_mut_by_id::<HostedImageSize>(dialog) {
+        size.hold_ok();
+    } else if let Some(size) = dialogs.get_mut_by_id::<HostedCanvasSize>(dialog) {
+        size.hold_ok();
+    }
+}
+
+/// Whether `dialog` is an editor whose OK a step judges: the one Record Again opened or the one a paused menu step opened.
+pub(crate) fn is_editor(app: &PhotocraftApp, dialog: DialogId) -> bool {
+    record_again::owns_dialog(app, dialog) || app.paused_playbacks.paused.values().any(|p| p.menu_editor.as_ref().is_some_and(|(id, _)| *id == dialog))
+}
+
+/// The held OK of the editor `dialog` with the answer `command` and `params`: what the editor's Record Again or paused
+/// menu step requires before it takes the answer. A refusal keeps the editor open.
+pub(crate) fn check_editor(app: &PhotocraftApp, dialog: DialogId, command: &str, params: &Value) -> Result<(), String> {
+    if record_again::owns_dialog(app, dialog) {
+        record_again::check(app, dialog, command, params)
+    } else {
+        authorize_panel_preview(app, dialog, command, params)
+    }
+}
+
 /// Check that preview and confirmation still target the command and receiver that opened the editor.
 fn check_menu_editor(app: &PhotocraftApp, paused: &PausedPlayback, command: &str, params: &Value) -> Result<(), String> {
+    let actions = app.session.actions.list.actions();
     if let Some((_, original)) = &paused.menu_editor
         && (original != command
+            || paused.played.iter().any(|played| actions.iter().find(|action| action.name == played.name) != Some(played))
             || app.session.active().map(|st| st.doc.id) != paused.doc
             || (!document_target(params) && paused.filter_receiver != Some(app.session.active().and_then(|st| st.active_layer))))
     {
@@ -925,6 +962,10 @@ pub(crate) fn run_step_dialog(app: &mut PhotocraftApp, dialog: DialogId, command
 /// [`run_step_dialog`] for the playback `token` names, which Check Spelling holds itself.
 fn run_paused_command(app: &mut PhotocraftApp, token: u64, command: &str, params: Value) -> Result<Value, String> {
     let paused = app.paused_playbacks.paused.get(&token).ok_or("this dialog doesn't belong to a paused action")?;
+    let mut params = params;
+    if let (Some(layer), Some(object)) = (&paused.explicit_layer, params.as_object_mut()) {
+        object.entry("layer").or_insert_with(|| layer.clone());
+    }
     check_menu_editor(app, paused, command, &params)?;
     if let Some(receiver) = paused.filter_receiver
         && !document_target(&params)

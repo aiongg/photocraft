@@ -114,8 +114,14 @@ pub(crate) fn drain(app: &mut PhotocraftApp, state: &mut RetouchTools, _response
     for event in state.lasso.take_events() {
         // A press inside the selection is routed to the selection drag, so the lasso's own inside drag and
         // deselect events do not arise here.
-        let SelectEvent::Commit { shape, operation, .. } = event else { continue };
         let tool = app.ui.tool;
+        // A click, or an outline of fewer than three points, reaches the app as the lasso's deselect: it selects no
+        // pixel, which the Content-Aware Move tool answers with its alert.
+        if matches!(event, SelectEvent::Deselect) && tool == Tool::ContentAwareMove {
+            retouch_ui::content_aware_move_no_pixels(app, &[]);
+            continue;
+        }
+        let SelectEvent::Commit { shape, operation, .. } = event else { continue };
         if tool == Tool::ContentAwareMove
             && let SelectionShape::Polygon(points) = &shape
         {
@@ -172,6 +178,11 @@ impl CanvasTool for RetouchTool<'_> {
         }
         if self.drags_outline(at, mods) {
             return state.drag.press(&self.probe, pointer, cx);
+        }
+        // ⌘ with Object Selection is the Move stand-in's: answered `Ignored`, the press goes to it and drags the
+        // selected pixels.
+        if tool == Tool::ObjectSelection && mods.cmd {
+            return ToolAction::Ignored;
         }
         // A press of another document never reaches here: the canvas pass ends it (`end_foreign_gesture`), which
         // cancels this tool and drops its press.
@@ -313,7 +324,8 @@ impl CanvasTool for SourceTool<'_> {
     fn cancel(&mut self, _reason: CancelReason, _cx: &mut ToolContext<'_>) {}
 
     fn takes(&self, button: PointerButton, mods: Mods) -> bool {
-        button == PointerButton::Primary && mods.alt
+        // Control+Alt is the brush-resize drag, which the painting tool takes (`cursor_policy::alt_samples`).
+        button == PointerButton::Primary && mods.alt && !mods.ctrl
     }
 
     fn paint(&self, _draw: &Draw<'_>, _cx: &ToolContext<'_>) {}

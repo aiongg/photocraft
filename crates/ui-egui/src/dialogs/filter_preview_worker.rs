@@ -103,7 +103,7 @@ pub(crate) fn discard_closed(app: &mut crate::PhotocraftApp) {
         let Some(dialog) = app.framework.dialogs.get_by_id::<HostedParamDialog>(id) else { return false };
         let Some(key) = dialog.key() else { return false };
         let captured = crate::dialogs::params::captured(app, key);
-        dialog.is_previewing() && (captured.is_null() || crate::smart_filter_dialog::validate_target(app, &captured).is_ok())
+        dialog.is_previewing() && (!crate::smart_filter_dialog::is_target(&captured) || crate::smart_filter_dialog::validate_target(app, &captured).is_ok())
     });
     if !visible {
         if let Some(r) = &app.filter_preview_worker.running {
@@ -124,6 +124,7 @@ mod tests {
             revision,
             sources: Vec::new(),
             dialog: craft::ui::dialog::DialogId::new(dialog),
+            open: 0,
             active: None,
             target: Default::default(),
             command: "image.mode.indexedColor".into(),

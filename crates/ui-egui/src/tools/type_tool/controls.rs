@@ -218,6 +218,11 @@ fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &craft::behavior::Ca
     if let Some(ed) = app.ui.text_edit.as_mut() {
         (ed.anchor, ed.caret) = (selection.anchor, selection.caret);
     }
+    // A caret move that edits no text (arrows, Home/End, a click) drops the pending font, even when the caret comes
+    // back to where the font was chosen. Typing keeps it (`insertion_style::replace` moves it with the caret).
+    if out.selection_changed && !out.changed {
+        app.ui.type_insertion_style = None;
+    }
     if out.character_panel {
         let _ = crate::menus::invoke(app, ui.ctx(), "window.panel.character", json!({}));
     }
@@ -225,6 +230,9 @@ fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &craft::behavior::Ca
     // the same press reaches the tool, which then starts no new text.
     let background_press = canvas_space(&Env::of(ui).view()).is_some_and(|space| space.background().pressed == Some(PointerButton::Primary));
     let held = craft::ui::runtime::pointer::frame(ui.ctx()).mods;
+    if let Some(at) = out.context {
+        app.canvas_tools.type_tool.context = Some((at, held));
+    }
     let mods = egui::Modifiers { alt: held.alt, ctrl: held.ctrl, shift: held.shift, mac_cmd: false, command: held.cmd };
     // The editor's end is the session's, whether or not its text changed: an untouched placeholder or an empty mask
     // ends on Escape too. Every other end of the gesture (the frame drag's `cancel_all`, an undo, a removed editor)

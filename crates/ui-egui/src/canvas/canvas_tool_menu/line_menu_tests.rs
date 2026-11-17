@@ -119,7 +119,9 @@ fn over_a_line_shape_layer_the_menu_lists_the_reference_rows() {
 #[test]
 fn path_and_pixels_mode_open_no_menu() {
     for mode in [VectorMode::Path, VectorMode::Pixels] {
-        for mut app in [pixel_layer(), line_layer()] {
+        // One app at a time: an array of built apps keeps them all on the test thread's stack.
+        for make in [pixel_layer as fn() -> PhotocraftApp, line_layer] {
+            let mut app = make();
             app.ui.tool_options.shape_mode = mode;
             let mut h = harness(app);
             let center = h.state().last_canvas_rect.center();

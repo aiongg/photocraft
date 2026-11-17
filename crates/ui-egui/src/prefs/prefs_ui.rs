@@ -33,8 +33,6 @@ pub struct Runtime {
     log_len: usize,
     /// The preferences revision last handed to the settings writer.
     saved_rev: u64,
-    /// The open Preferences window. It lives here, not in `UiState`, because its document is not serialisable.
-    pub(crate) window: Option<dialogs::PrefsSession>,
     /// The open Keyboard Shortcuts and Menus window.
     pub(crate) shortcuts: Option<shortcuts::ShortcutsSession>,
     /// Style last sent to the GPU canvas.
@@ -73,7 +71,8 @@ pub use appearance::{canvas_style, pasteboard_color};
 use appearance::{display_scale, selected_theme};
 #[cfg(test)]
 pub(crate) use dialogs::set_draft;
-pub use dialogs::{apply_window, invoke, open_preferences, show, window_open};
+pub use dialogs::{apply_window, invoke, open_preferences, window_open};
+pub(crate) use dialogs::{feed, take as take_window};
 pub(crate) use presets::{PRESETS_FAMILY, open_io, open_manager, take as take_presets};
 pub(crate) use save::save_preferences;
 pub use save::{autosave_now, tick};

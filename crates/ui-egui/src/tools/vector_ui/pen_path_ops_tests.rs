@@ -202,15 +202,17 @@ fn path_mode_adds_subpaths_with_the_operation() {
     app.run("path.set", json!({"name": "Saved", "path": {"subpaths": [{"closed": true, "knots": [[2, 2], [60, 2], [60, 60]]}]}})).unwrap();
     app.ui.selected_path = Some("Saved".into());
     app.ui.tool_options.pen_path_op = "exclude".into();
-    square(&mut app, 10.0, 10.0, 20.0);
+    // Clear of the saved path's segments, which the Pen's Auto Add/Delete would edit.
+    square(&mut app, 100.0, 100.0, 20.0);
     let saved = app.session.active().unwrap().doc.paths.iter().find(|p| p.name == "Saved").unwrap().path.clone();
     assert_eq!(saved.subpaths.last().map(|s| s.op), Some(PathOp::Exclude));
     // A targeted vector mask.
     let id = app.session.active().unwrap().active_layer.unwrap().0;
-    app.run("layer.vectorMask.add", json!({"layer": id, "path": {"subpaths": [{"closed": true, "knots": [[0, 0], [100, 0], [100, 100], [0, 100]]}]}})).unwrap();
+    app.run("layer.vectorMask.add", json!({"layer": id, "path": {"subpaths": [{"closed": true, "knots": [[0, 0], [190, 0], [190, 190], [0, 190]]}]}})).unwrap();
     app.ui.vector_mask_target = true;
     app.ui.tool_options.pen_path_op = "subtract".into();
-    square(&mut app, 20.0, 20.0, 30.0);
+    // Clear of the Work Path's segments and the mask's, which Auto Add/Delete would edit.
+    square(&mut app, 155.0, 155.0, 30.0);
     let vm = app.session.active().unwrap().doc.layer(LayerId(id)).unwrap().vector_mask.clone().unwrap();
     assert_eq!(vm.path.subpaths.iter().map(|s| s.op).collect::<Vec<_>>(), [PathOp::Combine, PathOp::Subtract]);
 }
@@ -303,6 +305,8 @@ fn freeform_refuses_a_locked_shape_before_starting_a_stroke() {
         assert!(app.ui.status_error, "{lock}");
         assert_eq!(shape_path(&app), (id, body), "{lock}");
         assert_eq!(app.session.active().unwrap().history.past_len(), steps, "{lock}");
+        // The refused press ends with its button, as a user's does, before the next one.
+        tool_event(&mut app, ToolEvent::Up { x: 50.0, y: 50.0 }, egui::Modifiers::NONE);
         app.session.undo();
         tool_event(&mut app, ToolEvent::Down { x: 50.0, y: 50.0, pressure: 1.0 }, egui::Modifiers::NONE);
         assert!(testing::in_gesture(&app), "{lock}: unlocked stroke can start");

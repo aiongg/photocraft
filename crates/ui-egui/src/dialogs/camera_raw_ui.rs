@@ -429,7 +429,7 @@ pub(crate) fn settings(app: &PhotocraftApp) -> Option<&CameraRaw> {
 
 /// The demosaic the workspace shows for the raw being opened.
 pub(crate) fn workspace_demosaic(hosted: &Hosted) -> Option<photocraft_io::raw::Demosaic> {
-    let fields = hosted.workspace().json_fields()?;
+    let fields = hosted.workspace().json_fields(&**hosted.source())?;
     let value = fields.get("demosaic")?.clone();
     serde_json::from_value::<FrameworkDemosaic>(value).ok().map(from_framework)
 }
@@ -476,7 +476,7 @@ pub(crate) fn describe(app: &PhotocraftApp) -> Value {
     let (Some(session), Some(hosted)) = (app.raw.as_ref(), hosted(app)) else { return Value::Null };
     let source = &session.source;
     let developed = source.developed();
-    let fields = hosted.workspace().json_fields().unwrap_or(Value::Null);
+    let fields = hosted.workspace().json_fields(&**hosted.source()).unwrap_or(Value::Null);
     let before = fields.get("before").and_then(Value::as_bool).unwrap_or(false);
     let scope = fields.get("scope").cloned().unwrap_or(Value::Null);
     let region = scope.get("selectedRegion").and_then(Value::as_bool).unwrap_or(false);
@@ -538,6 +538,17 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
 
 /// [`take`], with the reply of a finish that landed in this call: the command's result, an error, or `{"cancelled": true}`.
 pub(crate) fn take_with(app: &mut PhotocraftApp, ctx: &egui::Context) -> Option<Result<Value, String>> {
+    // A raw queued by an open (`queue_open_dialog`) shows its dialog on the next pass; the shelf keeps it as the
+    // filmstrip's tile while it is shown.
+    if app.raw.is_none()
+        && !app.raw_shelf.is_empty()
+        && let Err(e) = filmstrip::open_held(app, ctx, 0)
+    {
+        // The document stays open, developed with the defaults.
+        app.raw_shelf.remove(0);
+        app.ui.status = e;
+        app.ui.status_error = true;
+    }
     let events = hosted_mut(app).map(Hosted::take_events).unwrap_or_default();
     for event in events {
         let outcome = match event {

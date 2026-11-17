@@ -51,22 +51,28 @@ fn selection_moves(app: &PhotocraftApp) -> bool {
     pixels || transform
 }
 
-/// The layers a drag moves or resizes: they are not targets. What the Move tool would move whole
-/// (the selected layers, the layers linked to them and everything inside a group, so a group does not
-/// snap to its own layers' starting edges), and the type layer being edited (a paragraph-box handle
-/// drag does not snap to the text it resizes, #6819).
+/// The layers a drag moves or resizes: they are not targets. The selected layers when the Move tool drags and,
+/// unless selected pixels float, what it moves whole (the layers linked to them and everything inside a group, so a
+/// group does not snap to its own layers' starting edges), the type layer being edited (a paragraph-box handle drag
+/// does not snap to the text it resizes, #6819) and the layers of the open Free Transform.
 fn moving_set(app: &PhotocraftApp) -> Vec<LayerId> {
     let mut set = Vec::new();
     if moves_as_move_tool(app)
-        && !crate::move_ui::moves_selected_pixels_with(app, Tool::Move)
         && let Some(st) = app.session.active()
     {
         let selected = st.selected_layers();
-        set.extend(crate::move_ui::with_descendants(&st.doc, &move_targets(&st.doc, &selected)));
+        // Selected pixels float off the selected layers alone (a floating piece never snaps to its own layer), so
+        // the layers linked to them stay put and stay targets.
+        if !crate::move_ui::moves_selected_pixels_with(app, Tool::Move) {
+            set.extend(crate::move_ui::with_descendants(&st.doc, &move_targets(&st.doc, &selected)));
+        }
         set.extend(selected);
     }
     if let Some(edit) = app.ui.text_edit.as_ref() {
         set.push(LayerId(edit.layer));
+    }
+    if let Some(t) = app.ui.transform.as_ref() {
+        set.extend(crate::transform_tool::moving_layers(t));
     }
     set
 }
@@ -138,10 +144,35 @@ pub(crate) fn targets(app: &PhotocraftApp, idx: usize, exclude: &[LayerId]) -> A
     targets
 }
 
-/// The canvas `Snap` of document `idx`: View › Snap To over its targets, without the layers a drag moves.
+/// The canvas `Snap` of document `idx`: View › Snap To over its targets, without the layers a drag moves, on the
+/// pixel grid where `pixel_grid` says.
 pub(crate) fn snap(app: &PhotocraftApp, idx: usize) -> Snap {
-    let exclude = if app.session.active_index() == Some(idx) { moving_set(app) } else { Vec::new() };
-    Snap::new(targets(app, idx, &exclude), options(app))
+    let active = app.session.active_index() == Some(idx);
+    let exclude = if active { moving_set(app) } else { Vec::new() };
+    Snap::new(targets(app, idx, &exclude), options(app)).whole_pixels(active && pixel_grid(app))
+}
+
+/// Whether the active document's points round to whole pixels: Preferences › Tools › Snap Vector Tools and
+/// Transforms to Pixel Grid, for the vector tools' points (production `pixel_round`) and for an open Free Transform
+/// of shape layers or a path, moved or scaled (#5751). The transform box rounds only an upright box at least a unit
+/// wide.
+fn pixel_grid(app: &PhotocraftApp) -> bool {
+    if !app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid {
+        return false;
+    }
+    let Some(t) = app.ui.transform.as_ref() else {
+        return matches!(
+            app.ui.tool,
+            Tool::Pen | Tool::CurvaturePen | Tool::Rectangle | Tool::EllipseShape | Tool::Triangle | Tool::Polygon | Tool::Star | Tool::Line
+        );
+    };
+    if t.selection || t.session.warp().is_some() || t.content_aware.is_some() || t.target.is_some() {
+        return false;
+    }
+    let shapes = |st: &photocraft_engine::DocState| {
+        crate::transform_tool::moving_layers(t).iter().all(|id| st.doc.layer(*id).is_some_and(|l| matches!(l.content, photocraft_doc::LayerContent::Shape(_))))
+    };
+    t.path.is_some() || app.session.active().is_some_and(shapes)
 }
 
 /// The bounds of layer `id` as the Move tool moves and snaps it. `snap::layer_rect` skips groups,

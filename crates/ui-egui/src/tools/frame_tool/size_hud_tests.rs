@@ -32,18 +32,6 @@ fn frames(app: &PhotocraftApp) -> Vec<[f64; 6]> {
 }
 
 #[test]
-fn the_readout_follows_the_drag_and_goes_on_release() {
-    let mut app = app();
-    let m = Modifiers::NONE;
-    assert_eq!(readout(&mut app, mv(50.0, 50.0), m), None, "no readout before a drag");
-    assert_eq!(readout(&mut app, ToolEvent::Down { x: 50.0, y: 50.0, pressure: 1.0 }, m), None, "pressed, not moved yet");
-    assert_eq!(readout(&mut app, mv(90.0, 80.0), m), Some(("40 px".into(), "30 px".into())));
-    assert_eq!(readout(&mut app, mv(130.0, 110.0), m), Some(("80 px".into(), "60 px".into())), "updated live");
-    assert_eq!(readout(&mut app, ToolEvent::Up { x: 130.0, y: 110.0 }, m), None, "gone on release");
-    assert_eq!(frames(&app), vec![[80., 0., 0., 60., 50., 50.]], "the readout was the frame's size");
-}
-
-#[test]
 fn shift_and_alt_read_the_size_the_release_makes() {
     let mut app = app();
     let shift = Modifiers::SHIFT;

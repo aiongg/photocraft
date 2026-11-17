@@ -89,7 +89,7 @@ const CLONE_PREVIEW_MAX_PIXELS: u64 = 1800 * 1800;
 
 /// The largest side `retouch_cmds::clone_preview_periodic` samples, for the overlay's area and for
 /// the source area it reads (`Mapping::source_rect`: the overlay's, mapped, with a 2 px apron).
-const CLONE_PREVIEW_MAX_SIDE: u32 = 1024;
+pub(super) const CLONE_PREVIEW_MAX_SIDE: u32 = 1024;
 
 /// The coverage of one dab of `brush` at `at`, including flow, tip, angle, roundness and
 /// hardness (a soft tip reaches past its radius). Stroke opacity is applied when drawing. The area

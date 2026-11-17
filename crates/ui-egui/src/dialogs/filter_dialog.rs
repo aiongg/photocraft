@@ -12,8 +12,8 @@ use std::sync::Arc;
 
 use craft::host::{PickRequest, Picked};
 use craft::ui::contract::Bind;
-use craft::ui::dialog::DialogId;
-use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, Param, ParamDialog, ParamKind, ParamLayout, ParamResult};
+use craft::ui::dialog::{DialogId, dialog_id};
+use craft::ui::patterns::form_dialogs::{DialogFields, FieldValue, HostedParamDialog, Param, ParamDialog, ParamKind, ParamLayout, ParamResult};
 use craft::ui::runtime::env::{Label, UnitKind};
 use craft::ui::runtime::requests::PathKind;
 use photocraft_doc::Document;
@@ -531,7 +531,11 @@ pub fn open(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, String> 
     let captured = if command == MATCH_COLOR { json!(app.session.active().map(|st| (st.doc.id, st.active_layer))) } else { Value::Null };
     let reset = reset_values(&params, &fields);
     let build = builder(app, command, title_of(spec.label), params, reset);
-    Ok(crate::dialogs::params::open_param(app, command, fields, captured, build))
+    let id = crate::dialogs::params::open_param(app, command, fields, captured, build);
+    if command == MATCH_COLOR {
+        reconcile_match_color(app);
+    }
+    Ok(id)
 }
 
 /// A filter dialog for `command` whose parameters follow `spec` (registry notation) instead of the
@@ -655,15 +659,19 @@ pub(crate) fn check(app: &mut PhotocraftApp, result: &ParamResult) -> Result<(),
     validate_match_color_source_layer(app, &result.key, &fields).map_err(Label::from)
 }
 
-/// An explicit source layer must be in the chosen source document: a missing one refuses OK instead of falling back
-/// to Merged.
+/// The chosen source must be an open document, and an explicit source layer must be in it: a closed or invalid source
+/// or a missing layer refuses OK instead of falling back to another document or to Merged.
 fn validate_match_color_source_layer(app: &PhotocraftApp, command: &str, fields: &Map<String, Value>) -> Result<(), String> {
     if command != MATCH_COLOR {
         return Ok(());
     }
-    let Some(layer) = fields.get("sourceLayer").filter(|layer| !layer.is_null()) else { return Ok(()) };
     let source = fields.get("source").and_then(|source| source.as_u64().or_else(|| source.as_str()?.parse().ok())).and_then(|i| usize::try_from(i).ok());
-    let Some(source) = source.and_then(|i| app.session.documents().get(i)) else { return Ok(()) };
+    let source = match source {
+        Some(index) => Some(app.session.documents().get(index).ok_or("the Match Color source document is not open")?),
+        None => None,
+    };
+    let Some(layer) = fields.get("sourceLayer").filter(|layer| !layer.is_null()) else { return Ok(()) };
+    let Some(source) = source else { return Ok(()) };
     let listed =
         source.doc.walk().into_iter().any(|(_, _, l)| layer.as_u64() == Some(l.id.0) || layer.as_i64().is_some_and(|v| i64::try_from(l.id.0) == Ok(v)));
     if listed { Ok(()) } else { Err("the Match Color source layer is not in the source document".into()) }
@@ -674,6 +682,38 @@ pub(crate) fn cancel(app: &mut PhotocraftApp, _ctx: &egui::Context, dialog: Dial
     app.filter_preview = None;
     if let Some(token) = crate::actions::token_of(app, dialog) {
         crate::actions::stopped(app, token);
+    }
+}
+
+/// The document index Match Color's `source` row holds (a choice id, so text; a number from a caller).
+fn source_index(fields: &Map<String, Value>) -> Option<usize> {
+    let source = fields.get("source")?;
+    source.as_u64().or_else(|| source.as_str()?.parse().ok()).and_then(|i| usize::try_from(i).ok())
+}
+
+/// Runs [`refresh_match_color_sources`] on the open Match Color dialog and writes back what it changed: the source
+/// index after a document closed, a source layer that was deleted, and the identities it compares the next frame with.
+pub(crate) fn reconcile_match_color(app: &mut PhotocraftApp) {
+    let id = dialog_id(MATCH_COLOR);
+    let Some(dialog) = app.framework.dialogs.get_by_id::<HostedParamDialog>(id) else { return };
+    let mut fields = fields_map(dialog.fields());
+    fields.insert("__command".into(), json!(MATCH_COLOR));
+    let before = fields.clone();
+    refresh_match_color_sources(&app.session, &mut fields);
+    if fields == before {
+        return;
+    }
+    let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedParamDialog>(id) else { return };
+    for (key, value) in &fields {
+        if before.get(key) != Some(value) {
+            match value.as_str().filter(|_| key == "source") {
+                Some(text) => dialog.set_field(key.clone(), FieldValue::Text(text.to_owned())),
+                None => dialog.set_field(key.clone(), FieldValue::Json(value.clone())),
+            }
+        }
+    }
+    for key in before.keys().filter(|key| !fields.contains_key(*key)) {
+        dialog.clear_field(key);
     }
 }
 
@@ -688,7 +728,7 @@ pub(crate) fn refresh_match_color_sources(session: &photocraft_engine::Session, 
     if fields.get("__sourceState") == Some(&state) {
         return;
     }
-    let old_index = fields.get("source").and_then(Value::as_u64).and_then(|i| usize::try_from(i).ok());
+    let old_index = source_index(fields);
     let selected = old_index.and_then(|i| fields.get("__sourceDocuments")?.as_array()?.get(i)?.as_u64());
     let mut ids: Vec<_> = documents.iter().map(|st| st.doc.id.0).collect();
     let mut names: Vec<_> = documents.iter().map(|st| st.doc.name.clone()).collect();
@@ -705,9 +745,9 @@ pub(crate) fn refresh_match_color_sources(session: &photocraft_engine::Session, 
             layers.push(Value::Null);
             index
         });
-        fields.insert("source".into(), json!(index));
+        fields.insert("source".into(), json!(index.to_string()));
     }
-    let source = fields.get("source").and_then(Value::as_u64).and_then(|i| usize::try_from(i).ok());
+    let source = source_index(fields);
     if let Some(layer) = fields.get("sourceLayer").and_then(Value::as_u64) {
         let contains_layer = |choices: Option<&Value>| {
             choices.and_then(Value::as_array).is_some_and(|choices| choices.iter().any(|choice| choice.get("id").and_then(Value::as_u64) == Some(layer)))
@@ -841,7 +881,7 @@ pub fn params_of(f: &Map<String, Value>) -> Value {
 pub(crate) fn run_command(app: &mut PhotocraftApp, ctx: &egui::Context, command: &str, result: ParamResult) -> Result<Value, String> {
     let dialog = result.id;
     if crate::actions::record_again::owns_dialog(app, dialog) {
-        return crate::actions::record_again::confirm(app, dialog, &result);
+        return crate::actions::record_again::confirm(app, dialog, &result.key, command_params(&result.key, &result.fields));
     }
     // PLAN: `token_of`, `abandoned`, `resume`, `run_step_dialog` and `authorize_panel_preview` are assumed re-exported at `crate::actions` (panels-w32).
     let token = crate::actions::token_of(app, dialog);
@@ -1225,6 +1265,8 @@ pub struct FilterPreviewKey {
     pub revision: u64,
     pub sources: Vec<(photocraft_doc::DocId, u64)>,
     pub dialog: DialogId,
+    /// Which open of the dialog this is (`DialogHost::open_serial`): a dialog's id repeats at every open of its command.
+    pub open: u64,
     pub active: Option<photocraft_doc::LayerId>,
     pub target: photocraft_engine::channel_cmds::ChannelTarget,
     pub command: String,

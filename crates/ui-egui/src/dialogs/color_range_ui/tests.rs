@@ -69,6 +69,8 @@ fn ok(h: &mut Harness<'static, PhotocraftApp>) {
 }
 
 fn press_release(app: &mut PhotocraftApp, at: [f64; 2], mods: Modifiers) {
+    // The dialog opens centred over the canvas and refits the view; the press needs a point it neither covers nor moves.
+    crate::canvas::testing::clear_of_dialogs(app, at);
     crate::canvas::testing::press(app, at, mods);
     crate::canvas::testing::release(app, at, mods);
 }

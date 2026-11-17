@@ -2,8 +2,10 @@ use craft::ui::runtime::commands::CommandRef;
 
 use super::*;
 
-fn app(tool: Tool) -> PhotocraftApp {
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+/// Boxed: tests keep several apps alive, and each would otherwise take its full size on the test
+/// thread's stack.
+fn app(tool: Tool) -> Box<PhotocraftApp> {
+    let mut app = Box::new(PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()));
     app.run("file.new", json!({"width": 32, "height": 32})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.ui.tool = tool;
@@ -145,7 +147,7 @@ fn blend_keys_reach_each_tools_target() {
         assert_eq!(a.ui.tool, tool);
     }
     // A document-less app takes the key and does nothing.
-    let mut none = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
+    let mut none = Box::new(PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()));
     none.ui.tool = Tool::Move;
     assert!(key(&mut none, BlendStep::Next));
     // Other commands are not blend keys.

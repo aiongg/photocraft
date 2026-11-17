@@ -1,18 +1,22 @@
-//! The Edit-menu front end (`invoke`) and the app-held Preferences window.
+//! The Edit-menu front end (`invoke`) and the Preferences window as a dialog on the framework's host.
 //!
 //! The window is a [`SettingsDocument`] over the engine's preferences, shown by `PreferencesWindow` once per pass
-//! while `app.prefs_rt.window` holds a session. Apply and OK leave the keys they changed in the document;
-//! `show` writes just those through `prefs.set` and `prefs.reset`, so a value changed elsewhere while the window is
-//! open survives.
+//! while its [`PrefsDialog`] is open. Apply and OK leave the keys they changed in the document and the dialog files
+//! them; `take` writes just those through `prefs.set` and `prefs.reset`, so a value changed elsewhere while the
+//! window is open survives. The dialog runs inside the host and has no app: `feed` hands it the app's facts before
+//! each pass, and `take` carries its requests (edits, a colour to pick) out after it.
 
 use std::sync::Arc;
 
 use craft::host::Host;
 use craft::i18n::Lang;
 use craft::ui::contract::{Bind, Props as _};
-use craft::ui::dialog::DialogId;
-use craft::ui::patterns::preferences::{PageInfo, PrefValue, PreferencesModel, PreferencesState, PreferencesWindow, RowKind, SettingsDocument, StandardPage};
+use craft::ui::dialog::{DialogId, DialogResult, DialogStack, StackDialog, dialog_id};
+use craft::ui::patterns::preferences::{
+    Closed, PageInfo, PrefValue, PreferencesModel, PreferencesState, PreferencesWindow, RowKind, SettingsDocument, StandardPage,
+};
 use craft::ui::runtime::memory::SaveKey;
+use craft::ui::runtime::requests::ColorRequest;
 use photocraft_engine::prefs::SECTIONS;
 use serde_json::{Value, json};
 
@@ -23,20 +27,6 @@ use crate::PhotocraftApp;
 /// The document the window edits between passes. The custom rows borrow the app, so each pass attaches `PrefsCustom`
 /// for its own duration and takes it off again before the app is used mutably.
 type Doc = SettingsDocument<PrefPages, ()>;
-
-/// The open Preferences window: its document, the state the window keeps between passes, and what `show` tracks.
-pub(crate) struct PrefsSession {
-    /// The saved values, the draft and the rows' rules.
-    pub(super) doc: Doc,
-    /// The page, search text and Apply error the window keeps.
-    pub(super) state: PreferencesState,
-    /// The engine's preferences revision the document was last based on.
-    pub(super) saved_rev: u64,
-    /// The colour picker this window opened, until it answers or closes.
-    pub(super) picker: Option<DialogId>,
-    /// The language the document's labels are in: the draft's language, which previews before Apply.
-    pub(super) labels: Lang,
-}
 
 // ------------------------------------------------------------------ menu routing
 
@@ -91,15 +81,128 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
 
 // ------------------------------------------------------------------ the window
 
+/// The edits Apply or OK made, as the `values` of `prefs.set` and the paths `prefs.reset` takes.
+type Edits = (Value, Vec<String>);
+
+/// What OK answers with: the edits the window made that no pass has handed on yet.
+pub(crate) struct PrefsAnswer(Vec<Edits>);
+
+/// The open Preferences window, a dialog on the framework's host under the key `preferences`.
+pub(crate) struct PrefsDialog {
+    /// The saved values, the draft and the rows' rules. Taken out while a pass runs, because the custom rows attach to
+    /// it by value.
+    doc: Option<Doc>,
+    /// The page, search text and Apply error the window keeps.
+    state: PreferencesState,
+    /// The engine's preferences revision the document was last based on.
+    saved_rev: u64,
+    /// The language the document's labels are in: the draft's language, which previews before Apply.
+    labels: Lang,
+    /// What the custom rows read from the app, as of the last `feed`.
+    custom: PrefsCustom,
+    /// The colour row whose swatch was pressed, until `take` opens the picker for it.
+    pick: Option<ColorRequest>,
+    /// The edits Apply or OK made, until `take` writes them.
+    edits: Vec<Edits>,
+}
+
+impl PrefsDialog {
+    /// Moves the keys the document's last Apply changed into `edits`.
+    fn file_edits(&mut self) {
+        if let Some(edits) = self.doc.as_mut().and_then(Doc::take_applied_edits) {
+            self.edits.push(PrefPages::edits_to_values(edits));
+        }
+    }
+
+    /// Applies the draft as the Apply button does. `Err` when a colour picker the window opened is still open or the
+    /// draft doesn't fit the settings; the message also shows in the window's footer.
+    fn apply(&mut self) -> Result<(), String> {
+        let Some(doc) = self.doc.take() else { return Err("Preferences is not open".into()) };
+        let mut with_custom = doc.custom(self.custom.clone());
+        let applied = if with_custom.nested_open() { Err(tl!("Close the Color Picker first.").to_string()) } else { with_custom.apply() };
+        self.doc = Some(with_custom.custom(()));
+        self.file_edits();
+        self.state.error = applied.as_ref().err().cloned();
+        applied
+    }
+
+    /// Updates what the window reads of the app before a pass: the custom rows' facts, the saved values (an unedited row
+    /// follows them; `Err` from the rebase keeps the document as it was) and the labels' language.
+    fn feed(&mut self, custom: PrefsCustom, saved: Option<(u64, PrefPages)>, host: &Host) {
+        self.custom = custom;
+        let Some(doc) = self.doc.as_mut() else { return };
+        if let Some((rev, pages)) = saved {
+            let _ = doc.rebase(pages);
+            self.saved_rev = rev;
+        }
+        // The draft's language previews inside the window; the main window keeps the committed one.
+        let wanted = draft_language(doc).map_or_else(|| host.lang(), |code| language_of(host, &code));
+        if wanted != self.labels {
+            doc.relabel(&host.with_lang(wanted));
+            self.labels = wanted;
+        }
+    }
+}
+
+impl StackDialog for PrefsDialog {
+    type Result = PrefsAnswer;
+
+    fn id(&self) -> DialogId {
+        dialog_id("photocraft.preferences")
+    }
+
+    fn key(&self) -> Option<&str> {
+        Some("preferences")
+    }
+
+    /// A pass applies only its own output: `pick_color`, `closed` and the applied edits are each filed once, so a second
+    /// pass in the same frame, which gets no input, files nothing again.
+    fn show(&mut self, ui: &mut egui::Ui, _stack: &DialogStack) -> Option<DialogResult<PrefsAnswer>> {
+        let doc = self.doc.take()?;
+        let mut with_custom = doc.custom(self.custom.clone());
+        let out = PreferencesWindow::new(Bind::bound(&mut self.state)).remember(SaveKey::new("photocraft.preferences")).show(ui, &mut with_custom);
+        self.doc = Some(with_custom.custom(()));
+        if let Some(request) = out.pick_color {
+            self.pick = Some(request);
+        }
+        self.file_edits();
+        out.closed.map(|closed| match closed {
+            Closed::Ok => DialogResult::Ok(PrefsAnswer(std::mem::take(&mut self.edits))),
+            _ => DialogResult::Cancel,
+        })
+    }
+
+    fn confirm(&mut self, _ctx: &egui::Context) -> Option<PrefsAnswer> {
+        self.apply().ok()?;
+        Some(PrefsAnswer(std::mem::take(&mut self.edits)))
+    }
+
+    fn json_fields(&self) -> Option<Value> {
+        let values = self.doc.as_ref()?.draft().to::<Value>()?;
+        Some(json!({"values": values, "page": self.state.selected}))
+    }
+
+    fn set_json_field(&mut self, _ctx: &egui::Context, field: &str, value: Value) -> Result<(), String> {
+        match field {
+            "values" => self.doc.as_mut().ok_or("Preferences is not open")?.draft_mut().replace(&value).map_err(|e| format!("`values` is not valid: {e}")),
+            "page" => {
+                self.state.selected = value.as_str().ok_or("`page` is not valid: not text")?.to_string();
+                Ok(())
+            }
+            _ => Err(format!("the Preferences window has no field `{field}`")),
+        }
+    }
+}
+
 /// Whether the Preferences window is open.
 pub fn window_open(app: &PhotocraftApp) -> bool {
-    app.prefs_rt.window.is_some()
+    app.framework.dialogs.is_open::<PrefsDialog>()
 }
 
 /// Opens Edit › Preferences on `section` (`general` for an unknown one). With the window open only its page changes.
 pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
     let section = if SECTIONS.iter().any(|(id, _)| *id == section) { section } else { "general" };
-    if let Some(open) = app.prefs_rt.window.as_mut() {
+    if let Some(open) = app.framework.dialogs.get_mut::<PrefsDialog>() {
         open.state.selected = section.to_string();
         return;
     }
@@ -120,7 +223,9 @@ pub fn open_preferences(app: &mut PhotocraftApp, section: &str) {
     doc.relabel(&host);
     let mut state = PreferencesState::default();
     state.selected = section.to_string();
-    app.prefs_rt.window = Some(PrefsSession { doc, state, saved_rev: app.session.prefs.rev(), picker: None, labels: host.lang() });
+    let custom = PrefsCustom::new(app, false);
+    let saved_rev = app.session.prefs.rev();
+    app.framework.dialogs.open(PrefsDialog { doc: Some(doc), state, saved_rev, labels: host.lang(), custom, pick: None, edits: Vec::new() });
 }
 
 /// The language the draft's `interface.language` names, as the code stored in the draft.
@@ -142,9 +247,7 @@ fn language_of(host: &Host, code: &str) -> Lang {
 /// Writes the keys Apply or OK changed through the engine, and returns the `prefs.set` reply. Only these keys go,
 /// so a setting changed elsewhere while the window is open is not overwritten. Keys Reset Section removed go through
 /// `prefs.reset`.
-fn write_edits(app: &mut PhotocraftApp, doc: &mut Doc) -> Result<Value, String> {
-    let Some(edits) = doc.take_applied_edits() else { return Ok(json!({})) };
-    let (values, resets) = PrefPages::edits_to_values(edits);
+fn write_edits(app: &mut PhotocraftApp, (values, resets): Edits) -> Result<Value, String> {
     let mut reply = json!({});
     if values.as_object().is_some_and(|map| !map.is_empty()) {
         reply = app.run("prefs.set", json!({"values": values}))?;
@@ -155,64 +258,67 @@ fn write_edits(app: &mut PhotocraftApp, doc: &mut Doc) -> Result<Value, String> 
     Ok(reply)
 }
 
-/// Shows the Preferences window for this pass while it is open.
-///
-/// A pass applies only its own output: `pick_color`, `closed`, the colour picker's answer and the applied edits
-/// are each taken once, so a second pass in the same frame, which gets no input, does none of it again.
-pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    let Some(PrefsSession { mut doc, mut state, mut saved_rev, mut picker, mut labels }) = app.prefs_rt.window.take() else { return };
-    // Saved values changed outside the window: unedited rows follow them. `Err` keeps the document as it was.
+/// Writes every batch of edits; the reply of the last `prefs.set`. The first refusal stops the rest.
+fn write_all(app: &mut PhotocraftApp, batches: Vec<Edits>) -> Result<Value, String> {
+    let mut reply = json!({});
+    for edits in batches {
+        reply = write_edits(app, edits)?;
+    }
+    Ok(reply)
+}
+
+/// Hands the open window what it reads of the app, before the host runs it.
+pub(crate) fn feed(app: &mut PhotocraftApp) {
+    let Some(shown_rev) = app.framework.dialogs.get::<PrefsDialog>().map(|d| d.saved_rev) else { return };
+    let custom = PrefsCustom::new(&*app, crate::color_picker_ui::window_picker_open(app));
     let rev = app.session.prefs.rev();
-    if rev != saved_rev {
-        let _ = doc.rebase(PrefPages::of(app.session.prefs()));
-        saved_rev = rev;
-    }
-    // The draft's language previews inside the window; the main window keeps the committed one.
+    let saved = (rev != shown_rev).then(|| (rev, PrefPages::of(app.session.prefs())));
     let host = Arc::clone(app.framework.host());
-    let wanted = draft_language(&doc).map_or_else(|| host.lang(), |code| language_of(&host, &code));
-    if wanted != labels {
-        // PLAN: the window's own words (OK, Cancel) follow the scope's host; only the document's labels preview here.
-        doc.relabel(&host.with_lang(wanted));
-        labels = wanted;
+    if let Some(dialog) = app.framework.dialogs.get_mut::<PrefsDialog>() {
+        dialog.feed(custom, saved, &host);
     }
-    // PLAN: SaveKey needs a crate prefix, so the key is `photocraft.preferences`.
-    // The custom rows carry the dialog host's answer to "is the window's colour picker open", which OK and Apply refuse on.
-    let picker_open = crate::color_picker_ui::window_picker_open(app);
-    let mut with_custom = doc.custom(PrefsCustom::new(&*app, app.framework.suite(), picker_open));
-    let out = PreferencesWindow::new(Bind::bound(&mut state)).remember(SaveKey::new("photocraft.preferences")).show(ui, &mut with_custom);
-    let mut doc = with_custom.custom(());
-    if let Some(request) = out.pick_color {
-        picker = Some(crate::color_picker_ui::open_for_window(app, request));
+}
+
+/// Carries the window's requests out after a host pass: the answer it ended with, the edits Apply filed, the colour
+/// picker its swatch asked for and the picker's answer. A window that is gone takes its picker with it.
+pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    let mut batches = match app.framework.dialogs.take::<PrefsDialog>() {
+        Some(DialogResult::Ok(PrefsAnswer(edits))) => edits,
+        _ => Vec::new(),
+    };
+    let mut picked = None;
+    if let Some(dialog) = app.framework.dialogs.get_mut::<PrefsDialog>() {
+        batches.append(&mut dialog.edits);
+        picked = dialog.pick.take();
+    } else {
+        crate::color_picker_ui::cancel_window_picker(app, ctx);
     }
-    if let Some((key, color)) = crate::color_picker_ui::answer_for_window(app) {
+    if let Some(request) = picked {
+        crate::color_picker_ui::open_for_window(app, request);
+    }
+    if let Some((key, color)) = crate::color_picker_ui::answer_for_window(app)
+        && let Some(doc) = app.framework.dialogs.get_mut::<PrefsDialog>().and_then(|d| d.doc.as_mut())
+    {
         doc.set_color(&key, color);
     }
-    if let Err(error) = write_edits(app, &mut doc) {
-        state.error = Some(error);
+    if let Err(error) = write_all(app, batches)
+        && let Some(dialog) = app.framework.dialogs.get_mut::<PrefsDialog>()
+    {
+        dialog.state.error = Some(error);
     }
-    if out.closed.is_some() {
-        if let Some(id) = picker {
-            app.framework.dialogs.cancel_by_id(ui.ctx(), id);
-        }
-        return;
-    }
-    if picker.is_some() && !crate::color_picker_ui::window_picker_open(app) {
-        picker = None;
-    }
-    app.prefs_rt.window = Some(PrefsSession { doc, state, saved_rev, picker, labels });
 }
 
 /// Applies the open window's draft as its Apply button does and keeps the window open. `Err` when it is closed, a
 /// colour picker it opened is still open, or the engine refuses a value.
 pub fn apply_window(app: &mut PhotocraftApp) -> Result<Value, String> {
-    let Some(mut session) = app.prefs_rt.window.take() else { return Err("Preferences is not open".into()) };
-    let picker_open = crate::color_picker_ui::window_picker_open(app);
-    let mut with_custom = session.doc.custom(PrefsCustom::new(&*app, app.framework.suite(), picker_open));
-    let applied = if with_custom.nested_open() { Err(tl!("Close the Color Picker first.").to_string()) } else { with_custom.apply() };
-    session.doc = with_custom.custom(());
-    let result = applied.and_then(|()| write_edits(app, &mut session.doc));
-    session.state.error = result.as_ref().err().cloned();
-    app.prefs_rt.window = Some(session);
+    let Some(dialog) = app.framework.dialogs.get_mut::<PrefsDialog>() else { return Err("Preferences is not open".into()) };
+    let applied = dialog.apply().map(|()| std::mem::take(&mut dialog.edits));
+    let result = applied.and_then(|batches| write_all(app, batches));
+    if let Err(error) = &result
+        && let Some(dialog) = app.framework.dialogs.get_mut::<PrefsDialog>()
+    {
+        dialog.state.error = Some(error.clone());
+    }
     result
 }
 
@@ -220,9 +326,9 @@ pub fn apply_window(app: &mut PhotocraftApp) -> Result<Value, String> {
 /// `false` when the window is closed.
 #[cfg(test)]
 pub(crate) fn set_draft(app: &mut PhotocraftApp, key: &str, value: PrefValue) -> bool {
-    match app.prefs_rt.window.as_mut() {
-        Some(session) => {
-            session.doc.set(key, value);
+    match app.framework.dialogs.get_mut::<PrefsDialog>().and_then(|d| d.doc.as_mut()) {
+        Some(doc) => {
+            doc.set(key, value);
             true
         }
         None => false,

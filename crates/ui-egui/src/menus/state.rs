@@ -9,6 +9,10 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     if crate::tool_shortcuts::tool(id).is_some() {
         return true;
     }
+    // Fit Artboard on Screen needs a board to fit (the bridged view command carries no engine rule).
+    if id == "view.fitArtboardOnScreen" {
+        return app.session.active().is_some_and(|d| d.doc.has_artboards());
+    }
     if id == "ui.symmetryTransform" {
         return crate::symmetry_ui::can_transform(app);
     }
@@ -22,6 +26,10 @@ pub fn is_enabled(app: &PhotocraftApp, id: &str) -> bool {
     }
     // Photoshop greys these for the Background layer, other layer kinds or single-layer documents.
     if crate::enable_rules::disabled(app, id) {
+        return false;
+    }
+    // A pending crop greys what Photoshop greys during one (#1918).
+    if crate::crop_ui::blocks(app, id) {
         return false;
     }
     // Filters stay live on a type layer: choosing one asks to rasterize it (#4303).

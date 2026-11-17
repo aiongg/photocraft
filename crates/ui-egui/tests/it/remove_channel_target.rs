@@ -26,32 +26,31 @@ enum Input {
 }
 
 fn probe(input: Input) {
-    let mut a = PhotocraftApp::new(Session::new(), Services::default());
-    run(&mut a.session, "file.new", r#"{"name":"A","width":32,"height":24,"background":"transparent"}"#);
-    run(&mut a.session, "type.create", r#"{"text":"X","x":2,"y":18,"size":14}"#);
-    let text = a.session.active().unwrap().active_layer.unwrap();
-    run(&mut a.session, "layer.new.layer", r#"{"name":"Target"}"#);
-    let target = a.session.active().unwrap().active_layer.unwrap();
-    a.session
-        .edit("fixture", |d, l| {
-            let q = d.layer_mut(l.unwrap()).unwrap().surface_mut().unwrap();
-            for y in 0..24 {
-                for x in 0..32 {
-                    q.write_pixel(x, y, &[((x * 7 + y * 13) % 31) as f32 / 30., (x % 5) as f32 / 4., (y % 7) as f32 / 6., 1.]);
-                }
+    let mut a = Session::new();
+    run(&mut a, "file.new", r#"{"name":"A","width":32,"height":24,"background":"transparent"}"#);
+    run(&mut a, "type.create", r#"{"text":"X","x":2,"y":18,"size":14}"#);
+    let text = a.active().unwrap().active_layer.unwrap();
+    run(&mut a, "layer.new.layer", r#"{"name":"Target"}"#);
+    let target = a.active().unwrap().active_layer.unwrap();
+    a.edit("fixture", |d, l| {
+        let q = d.layer_mut(l.unwrap()).unwrap().surface_mut().unwrap();
+        for y in 0..24 {
+            for x in 0..32 {
+                q.write_pixel(x, y, &[((x * 7 + y * 13) % 31) as f32 / 30., (x % 5) as f32 / 4., (y % 7) as f32 / 6., 1.]);
             }
-            Ok(())
-        })
-        .unwrap();
-    run(&mut a.session, "file.new", r##"{"name":"B","width":32,"height":24,"background":"#6a219c"}"##);
-    a.session.set_active(0);
-    run(&mut a.session, "channel.target", r#"{"channel":"red"}"#);
-    let b = a.session.documents()[1].doc.clone();
-    let text_before = a.session.documents()[0].doc.layer(text).unwrap().clone();
+        }
+        Ok(())
+    })
+    .unwrap();
+    run(&mut a, "file.new", r##"{"name":"B","width":32,"height":24,"background":"#6a219c"}"##);
+    a.set_active(0);
+    run(&mut a, "channel.target", r#"{"channel":"red"}"#);
+    let b = a.documents()[1].doc.clone();
+    let text_before = a.documents()[0].doc.layer(text).unwrap().clone();
 
     // The inline Red-only Remove is the oracle.
     let mut inline = Session::new();
-    inline.add_document(a.session.documents()[0].doc.as_ref().clone(), None);
+    inline.add_document(a.documents()[0].doc.as_ref().clone(), None);
     inline.select_layer(target).unwrap();
     run(&mut inline, "channel.target", r#"{"channel":"red"}"#);
     run(&mut inline, "paint.remove", REMOVE);
@@ -61,7 +60,8 @@ fn probe(input: Input) {
     // frames after the call.
     let mut h = Harness::builder().with_size(egui::vec2(1100.0, 720.0)).with_max_steps(64).build_eframe(move |cc| {
         PhotocraftApp::setup_context(&cc.egui_ctx, Default::default());
-        a
+        // The app shares the harness's context, which is where the control channel's pointer input arrives.
+        PhotocraftApp::with_context(cc.egui_ctx.clone(), a, Services::default())
     });
     h.run_steps(4);
 

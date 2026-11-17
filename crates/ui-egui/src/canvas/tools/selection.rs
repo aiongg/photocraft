@@ -66,6 +66,20 @@ impl SelectionTools {
         self.polygon.replaces_selection() || self.magnetic.replaces_selection()
     }
 
+    /// Ends the open outline of every lasso that is not `tool`, without a command: an outline lasts while its own tool
+    /// is the selected one. The document is the draft's own check (`OutlineDraft::for_document`, each pass of its tool).
+    pub(crate) fn end_outlines_but(&mut self, tool: Tool) {
+        if tool != Tool::Lasso {
+            self.lasso.reset();
+        }
+        if tool != Tool::PolygonLasso {
+            self.polygon.reset();
+        }
+        if tool != Tool::MagneticLasso {
+            self.magnetic.reset();
+        }
+    }
+
     /// Drops every outline and drag without a command: the tool or the document changed.
     pub(crate) fn reset(&mut self) {
         self.marquee.reset();

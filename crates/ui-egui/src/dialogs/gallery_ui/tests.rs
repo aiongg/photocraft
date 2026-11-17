@@ -350,8 +350,8 @@ fn bench_gallery_preview() {
     }
 }
 
-/// The Glow Color swatch asks the app for a colour; the stored floats stay exact through OK and
-/// Cancel on the opening colour and change only on a new pick, which is stored linear.
+/// The Glow Color swatch asks the app for a colour; the dialog's floats stay exact through OK and
+/// Cancel on the opening colour and change only on a new pick. The command records the colour linear.
 #[test]
 fn glow_color_keeps_exact_floats_until_a_new_pick_and_stores_linear() {
     use egui_kittest::kittest::Queryable;
@@ -396,5 +396,15 @@ fn glow_color_keeps_exact_floats_until_a_new_pick_and_stores_linear() {
     crate::color_picker_ui::testing::set_color(h.state_mut(), id, "#8040ff");
     crate::dialogs::testing::confirm(h.state_mut(), id);
     h.run_steps(3);
-    assert!(near(&glow(h.state())[..3], &[0.21586, 0.05127, 1.0], 1e-3), "{:?}", glow(h.state()));
+    let recorded = |app: &PhotocraftApp| -> Vec<f64> {
+        let g = app.gallery.as_ref().expect("the gallery is open");
+        let hosted = app.framework.dialogs.get_by_id::<Hosted>(g.id).expect("the gallery dialog");
+        g.source.command_params(&hosted.workspace().session().effects)["effects"][0]["params"]["glowColor"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .filter_map(Value::as_f64)
+            .collect()
+    };
+    assert!(near(&recorded(h.state())[..3], &[0.21586, 0.05127, 1.0], 1e-3), "{:?}", recorded(h.state()));
 }

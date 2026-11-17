@@ -79,9 +79,9 @@ fn the_outline_belongs_to_the_layer_auto_select_picked() {
     // Press on A and drag it 5 px to the right.
     press(&mut app, [16.0, 16.0], none);
     move_to(&mut app, [21.0, 16.0], none);
-    // The frame the drag starts in picks A: it outlines A, never B, which isn't moving.
+    // The frame the drag starts in picks A: it outlines A where its pixels show, 5 px along, never B, which isn't moving.
     assert_eq!(active(&app), Some(a), "Auto-Select picked A");
-    assert_eq!(edges(&app), outline(A), "the frame that picks A outlines A, not the previously selected B");
+    assert_eq!(edges(&app), outline(A.translate(5, 0)), "the frame that picks A outlines A, not the previously selected B");
     frame(&mut app);
     assert_eq!(edges(&app), outline(A.translate(5, 0)), "A's outline follows it");
     release(&mut app, [21.0, 16.0], none);

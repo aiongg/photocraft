@@ -224,7 +224,7 @@ pub fn canvas_view(
     let flip = app.ui.view.flip_horizontal;
     let pass = document_display::CanvasPass { ctx: &ctx, host, doc: &doc, output, rect, ppp, flip, aspect };
     let shown = document_display::show(app, ui, &mut view, &pass);
-    canvas_tool_menu::run(ui, app, &shown.output, &shown.response, shown.guides.as_ref());
+    canvas_tool_menu::run(ui, app, &shown.output, &shown.response, shown.guides.as_ref(), shown.overlay_context);
     // A press on the canvas while a tool letter is held makes that tool temporary (#2672).
     if active && !app.dialog_open() && matches!(shown.output.press.phase, PressPhase::Down { .. }) {
         crate::spring_tools::note_canvas_press(app);

@@ -22,8 +22,8 @@ use craft::behavior::{CancelReason, Cursor, GesturePhase, PointerButton};
 use craft::draw::ui::{CropShown, CropToolPass};
 use craft::keymap::Mods;
 use craft::ui::canvas::{
-    Autoscroll, CanvasOutput, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims,
-    ToolContext, ToolHost, ToolHostResponse, ToolKey, ToolPath, ToolPointer, ZoomTool,
+    Autoscroll, CanvasTool, HandTool, Momentary, NavigationOptions, NoTool, RotateViewTool, StandInKey, ToolAccess, ToolAction, ToolClaims, ToolContext,
+    ToolHost, ToolHostResponse, ToolKey, ToolPass, ToolPath, ToolPointer, ToolRegion, ZoomTool,
 };
 use craft::ui::primitives::Draw;
 
@@ -37,6 +37,19 @@ pub(crate) type FamilyTool<'a> = Box<dyn CanvasTool + 'a>;
 
 /// A tool borrowed for the host's run.
 type DynTool<'x> = &'x mut (dyn CanvasTool + 'x);
+
+/// The tool of the selection a canvas gesture began with.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum GesturePick {
+    /// The armed pick of the top dialog.
+    Dialog,
+    /// The open Free Transform session's tool.
+    Transform,
+    /// The open symmetry session's tool.
+    Symmetry,
+    /// The selected family's tool.
+    Selected,
+}
 
 /// Every canvas family's state between passes. `run` takes it out of the app for a pass (`std::mem::take`), so a family
 /// reads its own state through the tool it is given, and readers outside a pass read the fields through the app.
@@ -59,6 +72,10 @@ pub(crate) struct CanvasTools {
     pub(crate) mover: move_tool::MoveTool,
     /// The armed pick of the top dialog.
     pub(crate) dialog: dialog::DialogTools,
+    /// Which tool of the selection the canvas's gesture in progress began with: set at each pass with no gesture, so
+    /// a dialog pick, a Free Transform or a symmetry session that opens during another tool's drag leaves that drag
+    /// its tool until it ends (the host keeps a gesture's tool only for stand-ins and momentary tools).
+    gesture_pick: GesturePick,
     /// Brush, pencil, eraser, bucket and the other painting tools.
     pub(crate) paint: super::paint_tool::PaintState,
     /// The Eyedropper, also the Alt stand-in of the painting tools that sample.
@@ -105,6 +122,7 @@ impl Default for CanvasTools {
             selection: Default::default(),
             mover: Default::default(),
             dialog: Default::default(),
+            gesture_pick: GesturePick::Selected,
             paint: Default::default(),
             eyedropper: Default::default(),
             vector: Default::default(),
@@ -282,11 +300,28 @@ fn press_refused(app: &mut PhotocraftApp, tool: Tool) -> bool {
         return true;
     }
     if let Some(why) = hidden {
-        app.ui.status = why.into();
-        app.ui.status_error = true;
+        if !quiet_hidden_refusal(app, tool) {
+            app.ui.status = why.into();
+            app.ui.status_error = true;
+        }
         return true;
     }
     false
+}
+
+/// A Remove press on a hidden active pixel layer does nothing and says nothing, as in Photoshop (#12554). Only that
+/// case was measured: a layer inside a hidden group, a targeted mask, Sample All Layers and the other layer kinds keep
+/// the status-bar error. Hidden is checked before the lock, so a hidden layer with Lock All is quiet too.
+fn quiet_hidden_refusal(app: &PhotocraftApp, tool: Tool) -> bool {
+    if tool != Tool::Remove || app.ui.tool_options.sample_all.remove || super::paint_target(app) != serde_json::json!("pixels") {
+        return false;
+    }
+    let Some(st) = app.session.active() else { return false };
+    let Some(id) = st.active_layer.filter(|&id| st.doc.layer(id).is_some_and(|l| matches!(l.content, photocraft_doc::LayerContent::Raster(_)))) else {
+        return false;
+    };
+    let Some(path) = st.doc.path_of(id) else { return false };
+    (1..path.len()).all(|n| path.get(..n).and_then(|p| st.doc.layer_at(p)).is_some_and(|l| l.visible))
 }
 
 /// A press with `tool` that would paint the pixels of a group (the active layer, with neither its mask, an alpha channel
@@ -337,7 +372,10 @@ impl CanvasTool for Preflight<'_, '_> {
                 if self.alt_stand_in && self.scope.with_app(|app| super::cursor_policy::shape_alt_samples(app, pointer.mods, at[0], at[1])) {
                     return ToolAction::Ignored;
                 }
-                if self.refused(pointer, at) {
+                // The Control+Alt resize drag changes the brush, not the layer: it runs where a stroke would be refused
+                // (a hidden layer, a Clone Stamp without a source), as quick pick does before it.
+                let resizes = crate::brush_resize::PaintResize::chord(tool, pointer.button, pointer.mods);
+                if !resizes && self.refused(pointer, at) {
                     return ToolAction::Done;
                 }
             }
@@ -363,6 +401,10 @@ impl CanvasTool for Preflight<'_, '_> {
 
     fn claims(&self) -> ToolClaims {
         self.inner.claims()
+    }
+
+    fn regions(&self) -> Vec<ToolRegion> {
+        self.inner.regions()
     }
 
     fn key(&mut self, key: &ToolKey, cx: &mut ToolContext<'_>) -> bool {
@@ -465,19 +507,25 @@ fn with_rig<R>(
     // Tools that own state the app lends nobody are built before the scope takes the app.
     let crop_run = (fam == Family::Crop).then(|| crate::crop_ui::CropRun::of(app)).flatten();
     let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut tools.crop.tool));
-    // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the app.
-    let free_transform = app.ui.transform.take();
+    let in_gesture = ToolHost::in_gesture(ctx, host.canvas_id());
+    // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the
+    // app. Only the primary canvas draws and drives the box; a secondary window's tool is the selected tool's own. A
+    // gesture another pick began leaves it in the app, where that tool edits it: the Frame tool's press on an image
+    // handle opens the session and its drag moves the box.
+    let transform_open = app.ui.transform.is_some();
+    let lends_transform = stand_ins && (!in_gesture || tools.gesture_pick == GesturePick::Transform);
+    let free_transform = if lends_transform { app.ui.transform.take() } else { None };
     let BodyShown { crop: crop_shown, transform_snapped } = shown;
     let mut transform = free_transform.as_ref().map(|session| crate::transform_tool::canvas_tool(session, transform_snapped));
     // The symmetry session moves into the pass the same way.
-    let symmetry_transform = if fam == Family::Paint { app.ui.symmetry_transform.take() } else { None };
+    let symmetry_transform = if stand_ins && fam == Family::Paint { app.ui.symmetry_transform.take() } else { None };
     let mut symmetry = symmetry_transform.as_ref().and_then(|t| crate::symmetry_ui::session_tool(app, t));
     let mut crop_pass = match (crop_tool.as_mut(), crop_run.as_ref()) {
         (Some(tool), Some(run)) => Some(crop::pass(tool, run, ctx, crop_shown)),
         _ => None,
     };
-    let command_wanted = stand_ins && transform.is_none() && takes_command_stand_in(tool);
-    let alt_wanted = stand_ins && transform.is_none() && super::cursor_policy::alt_eyedropper(tool);
+    let command_wanted = stand_ins && !transform_open && takes_command_stand_in(tool);
+    let alt_wanted = stand_ins && !transform_open && super::cursor_policy::alt_eyedropper(tool);
     let source_wanted = stand_ins && matches!(tool, Tool::CloneStamp | Tool::Healing);
 
     let CanvasTools {
@@ -488,6 +536,7 @@ fn with_rig<R>(
         selection,
         mover,
         dialog,
+        gesture_pick,
         paint,
         eyedropper,
         vector,
@@ -510,18 +559,33 @@ fn with_rig<R>(
         let mut mover = Some(mover);
         let mut eyedropper = Some(eyedropper);
         let mut retouch = Some(retouch);
-        let dialog_picked = dialog::dialog_tool(&scope, dialog, host).is_some_and(|picked| {
-            boxed = Some(picked);
-            true
-        });
+        // A gesture keeps the pick it began with; with none running the dialog's pick, then a Free Transform, then a
+        // symmetry session, then the family's tool.
+        let began = in_gesture.then_some(*gesture_pick);
+        let may = |pick: GesturePick| began.is_none_or(|began| began == pick);
+        let dialog_picked = may(GesturePick::Dialog)
+            && dialog::dialog_tool(&scope, dialog, host).is_some_and(|picked| {
+                boxed = Some(picked);
+                true
+            });
+        let transform_picked = !dialog_picked && transform.is_some() && may(GesturePick::Transform);
+        let symmetry_picked = !dialog_picked && !transform_picked && symmetry.is_some() && may(GesturePick::Symmetry);
+        if !in_gesture {
+            *gesture_pick = match (dialog_picked, transform_picked, symmetry_picked) {
+                (true, _, _) => GesturePick::Dialog,
+                (_, true, _) => GesturePick::Transform,
+                (_, _, true) => GesturePick::Symmetry,
+                _ => GesturePick::Selected,
+            };
+        }
         let selected: DynTool<'_> = 'select: {
             if dialog_picked {
                 break 'select dynamic(boxed.as_mut().expect("the dialog's tool was just stored"));
             }
-            if let Some(t) = transform.as_mut() {
+            if transform_picked && let Some(t) = transform.as_mut() {
                 break 'select t as &mut dyn CanvasTool;
             }
-            if let Some(t) = symmetry.as_mut() {
+            if symmetry_picked && let Some(t) = symmetry.as_mut() {
                 break 'select t as &mut dyn CanvasTool;
             }
             match fam {
@@ -579,7 +643,10 @@ fn with_rig<R>(
     };
     let transform_keys = transform.as_mut().map(|t| t.take_keys());
     drop(transform);
-    app.ui.transform = free_transform;
+    // A session a tool opened in the pass (no session was lent) stays.
+    if free_transform.is_some() {
+        app.ui.transform = free_transform;
+    }
     if let Some(keys) = transform_keys {
         crate::transform_tool::tool_keys(app, keys);
     }
@@ -601,16 +668,23 @@ fn with_rig<R>(
     result
 }
 
-/// Runs the tool host for the canvas `host` on the canvas's output `out`, and applies what it reports: the view a
-/// tool or the autoscroll moved (in the response's `view`), the Scroll All Windows follow, and each family's drain.
-/// Tools are active in the main window only.
-pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &CanvasOutput, shown: BodyShown) -> ToolHostResponse {
+/// Runs the tool host for the canvas `host` on the canvas's tool input `out`, in the canvas's body after its controls
+/// (`shown` is what they reported) and before its picture, and applies what it reports: the view a tool or the
+/// autoscroll moved (in the response's `view`), the Scroll All Windows follow, and each family's drain, which feeds
+/// the picture of the same pass. Tools are active in the main window only.
+pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &ToolPass, shown: BodyShown) -> ToolHostResponse {
     let ctx = ui.ctx().clone();
     let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
     let mut tools = std::mem::take(&mut app.canvas_tools);
     let tool = app.ui.tool;
+    // A tool switch ends the other lassos' outlines between presses; a gesture keeps its tool (`ToolHost`).
+    if primary && !ToolHost::in_gesture(&ctx, host.canvas_id()) {
+        tools.selection.end_outlines_but(tool);
+    }
     let navigation = document_display::navigation(app);
-    tools.momentary.hand_selected(tool == Tool::Hand && app.ui.transform.is_none());
+    // A pick a dialog arms on the canvas stands in for the selected tool, so the Hand's Cmd and Alt zoom is not in effect.
+    let dialog_picks = app.session.active_index() == Some(host.idx) && crate::dialogs::canvas_input::armed(app).is_some();
+    tools.momentary.hand_selected(tool == Tool::Hand && app.ui.transform.is_none() && !dialog_picks);
     tools.momentary.set_options(navigation.clone());
     tools.hand.options = navigation.clone();
     // Zoom In or Out and Scrubby Zoom are the selected Zoom tool's own options, never the momentary Zoom's.
@@ -618,8 +692,7 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     tools.zoom.options = navigation;
     tools.zoom.options.scrubby_zoom = app.ui.tool_options.zoom_scrubby;
     let smart = super::snap_ui::smart_guide_color(app);
-    let mut response =
-        with_rig(app, &ctx, host, &mut tools, primary, shown, |selected, tool_host| tool_host.enabled(primary).smart_guide_color(smart).run(ui, out, selected));
+    let mut response = with_rig(app, &ctx, host, &mut tools, primary, shown, |selected, tool_host| tool_host.smart_guide_color(smart).run(ui, out, selected));
     // The autoscroll moves the view the pass ended with; the caller copies the response's view into its own.
     if let (Some(scroll), Some(space)) = (response.scroll, out.space.as_ref()) {
         let size = app.session.documents().get(host.idx).map(|state| Size::new(f64::from(state.doc.size.width), f64::from(state.doc.size.height)));
@@ -643,6 +716,20 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     }
     app.canvas_tools = tools;
     response
+}
+
+/// The regions the tool of the canvas `host`'s next pass claims over the canvas controls (`CanvasTool::regions`), for
+/// `Canvas::tool_regions`: asked before the canvas shows, from the same pick as the pass (`with_rig`). Tools run in the
+/// main window only, so the other canvases claim nothing.
+pub(crate) fn claimed_regions(app: &mut PhotocraftApp, ctx: &egui::Context, host: CanvasHost) -> Vec<ToolRegion> {
+    let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
+    if !primary {
+        return Vec::new();
+    }
+    let mut tools = std::mem::take(&mut app.canvas_tools);
+    let regions = with_rig(app, ctx, host, &mut tools, primary, BodyShown::default(), |selected, _| selected.regions());
+    app.canvas_tools = tools;
+    regions
 }
 
 /// Ends a gesture that began on another document than the one the canvas `host` shows now: a document switch while the

@@ -12,7 +12,7 @@ use craft::imaging::ui::transform_preview::{PreviewDisplay, PreviewMap, Transfor
 use craft::imaging::ui::warp::{CylinderValues, CylinderWarp, WarpEdit, WarpGrid, WarpMesh};
 use craft::ui::canvas::RasterDisplay;
 use craft::ui::contract::{Bind, Show as _};
-use photocraft_doc::{DocId, LayerContent};
+use photocraft_doc::DocId;
 use photocraft_geom::warp::WarpStyle;
 
 use super::{OpenPreview, begin, cancel, commit, warp};
@@ -107,10 +107,7 @@ fn show_session(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
         Some(w) => show_warp(t, pv, w, ui, rect, &mut out),
         None => {
             let settings = super::settings(app);
-            let shown = TransformOverlay::new("Free Transform", &t.session, &settings)
-                .pixel_grid(pixel_grid_rule(app, t))
-                .id_salt(super::BOX_ID_SALT)
-                .show_at(ui, rect);
+            let shown = TransformOverlay::new("Free Transform", &t.session, &settings).id_salt(super::BOX_ID_SALT).show_at(ui, rect);
             out.edits = shown.edits;
             out.snapped = shown.snapped;
             out.apply = shown.apply;
@@ -130,7 +127,7 @@ pub struct SessionShown {
 }
 
 /// The moving pixels as the session maps them (warped, skewed or styled), then the layers above
-/// them. Nothing is shown for the Frame tool's transform.
+/// them, both in the canvas's picture, under the grid, guides and controls. Nothing is shown for the Frame tool's transform.
 fn show_preview(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &mut egui::Ui, rect: egui::Rect) {
     if crate::frame_tool::frame_transform(t) {
         return;
@@ -152,7 +149,8 @@ fn show_preview(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
         .opacity(pv.opacity)
         .nearest(t.session.interpolation() == Interpolation::NearestNeighbor)
         .clip(canvas)
-        .dragging(t.session.dragging());
+        .dragging(t.session.dragging())
+        .picture();
     if let Some(display) = display.as_ref() {
         preview = preview.display(display);
     }
@@ -163,7 +161,7 @@ fn show_preview(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
     if let Some(above) = &pv.above
         && let Some(frame) = above.frame()
     {
-        RasterDisplay::new("", above).mapped(frame, 1).show_at(ui, rect);
+        RasterDisplay::new("", above).mapped(frame, 1).picture().show_at(ui, rect);
     }
 }
 
@@ -231,22 +229,6 @@ fn show_warp(t: &FreeTransform, pv: &OpenPreview, w: &SessionWarp, ui: &mut egui
 /// `Begin` or an `Update` (a `Commit` or `Cancel` closes it).
 fn gesture_open<T>(events: &EditEvents<T>) -> bool {
     matches!(events.iter().last(), Some(craft::behavior::EditEvent::Begin { .. } | craft::behavior::EditEvent::Update { .. }))
-}
-
-/// Whether the box rounds to whole pixels: Preferences › Tools › Snap Vector Tools and Transforms
-/// to Pixel Grid, for a path or shape layers moved or scaled (#5751). The box checks that it is
-/// upright and at least a unit wide.
-fn pixel_grid_rule(app: &PhotocraftApp, t: &FreeTransform) -> bool {
-    if !app.session.prefs().tools.snap_vector_tools_and_transforms_to_pixel_grid {
-        return false;
-    }
-    if t.selection || t.session.warp().is_some() || t.content_aware.is_some() || t.target.is_some() {
-        return false;
-    }
-    let shapes = |st: &photocraft_engine::DocState| {
-        super::moving_layers(t).iter().all(|id| st.doc.layer(*id).is_some_and(|l| matches!(l.content, LayerContent::Shape(_))))
-    };
-    t.path.is_some() || app.session.active().is_some_and(shapes)
 }
 
 /// Where the box puts the moving texture's corners: the box's own, or, when the texture covers

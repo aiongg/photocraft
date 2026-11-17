@@ -85,7 +85,8 @@ fn notices(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
 pub fn inspect(app: &PhotocraftApp, ctx: &egui::Context) -> Value {
     let screen = ctx.content_rect();
     // The framework host's dialogs in their one stack order (top last).
-    let dialogs = craft::automation::dialogs::inspect(&app.framework.dialogs);
+    let mut dialogs = craft::automation::dialogs::inspect(&app.framework.dialogs);
+    crate::layer_style::describe_params(app, &mut dialogs);
     // Last frame's task bar rect, unless the bar can't show now (hidden by `ui.set` before the
     // next draw).
     let task_bar_rect = app.ui.task_bar_shown.filter(|_| crate::crop_task_bar::eligible(app));

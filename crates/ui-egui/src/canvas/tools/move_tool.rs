@@ -14,8 +14,8 @@ use crate::state::Tool;
 use craft::behavior::geometry::{ConstrainStyle, Directions, MoveGesture};
 use craft::behavior::kurbo::{self, Point};
 use craft::behavior::{CancelReason, Cursor, CursorIcon};
-use craft::keymap::Mods;
-use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolPath, ToolPointer};
+use craft::keymap::{Chord, Key, Mods};
+use craft::ui::canvas::{CanvasTool, ToolAction, ToolClaims, ToolContext, ToolKey, ToolPath, ToolPointer};
 use craft::ui::primitives::{Draw, PaintShape, StrokeColor, StrokeWidth};
 use craft::ui::runtime::env::Label;
 use photocraft_engine::float_cmds::Floating;
@@ -107,6 +107,13 @@ pub(crate) fn tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut MoveTool, _host:
 }
 
 /// The Move tool as the host runs it: the pass's scope over the app, and the tool's own state.
+/// ↩ drops pixels left floating by a move.
+const DROP_KEYS: &[Chord] = &[Chord::plain(Key::Enter)];
+
+fn floating(app: &PhotocraftApp) -> bool {
+    app.session.active().is_some_and(|st| photocraft_engine::float_cmds::floating(st).is_some())
+}
+
 pub(crate) struct MoveRun<'a> {
     scope: &'a ToolScope<'a>,
     state: &'a mut MoveTool,
@@ -284,6 +291,21 @@ impl CanvasTool for MoveRun<'_> {
         let Some(space) = cx.space() else { return ToolAction::Ignored };
         let at = space.view.to_doc(pointer.pos);
         let style = ConstrainStyle::new(f64::from(cx.slop), f64::from(cx.slop));
+        // A double-click on type edits it, as in Photoshop (#1132): only the selected Move tool, not a ⌘ stand-in for
+        // another tool, and not while a transform box is open (its double-click commits).
+        if pointer.clicks >= 2 {
+            let edited = self.scope.with_app(|app| {
+                if app.ui.tool != Tool::Move || app.ui.transform.is_some() {
+                    return false;
+                }
+                let ctx = app.ctx().clone();
+                crate::type_tool::edit_at(app, &ctx, at.x, at.y)
+            });
+            if edited {
+                self.state.run = None;
+                return ToolAction::Done;
+            }
+        }
         let (action, run) = self.scope.with_app(|app| press_at(app, [at.x, at.y], pointer.mods, style));
         self.state.run = run;
         action
@@ -334,6 +356,11 @@ impl CanvasTool for MoveRun<'_> {
                     app.ui.status = e;
                     app.ui.status_error = true;
                 }
+                if run.kind == Kind::Pixels {
+                    // The floating piece shows from the document now, also when the drag snapped back to where it
+                    // began: the drag's preview is spent.
+                    app.move_preview = None;
+                }
                 crate::move_mods::finish(app);
             }
         });
@@ -346,6 +373,30 @@ impl CanvasTool for MoveRun<'_> {
             crate::move_mods::abandon(app);
             app.move_preview = None;
         });
+    }
+
+    fn claims(&self) -> ToolClaims {
+        if self.state.run.is_none() && self.scope.with_app(|app| floating(app)) { ToolClaims::NONE.keys(DROP_KEYS) } else { ToolClaims::NONE }
+    }
+
+    fn key(&mut self, key: &ToolKey, _cx: &mut ToolContext<'_>) -> bool {
+        let enter = match key {
+            ToolKey::Submit => true,
+            ToolKey::Kept(chord) => *chord == DROP_KEYS[0],
+            _ => false,
+        };
+        enter
+            && self.state.run.is_none()
+            && self.scope.with_app(|app| {
+                if !floating(app) {
+                    return false;
+                }
+                if let Err(e) = app.run("select.drop", json!({})) {
+                    app.ui.status = e;
+                    app.ui.status_error = true;
+                }
+                true
+            })
     }
 
     fn paint(&self, draw: &Draw<'_>, cx: &ToolContext<'_>) {
