@@ -125,6 +125,12 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
     move_to(&mut h, a);
     h.run_steps(2);
     let locator = Some(Cursor::Painted(PaintedCursor::Locator));
+    eprintln!(
+        "DIAG a_click_on_the_image_centres_the_smart_sharpen_preview: at {a:?} armed={:?} cursor={:?} canvas_rect={:?}",
+        crate::dialogs::canvas_input::armed(h.state()),
+        craft::ui::runtime::cursor::current(&h.ctx),
+        crate::canvas::testing::view(h.state()).map(|v| v.rect)
+    );
     assert_eq!(craft::ui::runtime::cursor::current(&h.ctx), locator, "the locator replaces the pointer");
     move_to(&mut h, pos2(600.0, 400.0));
     h.run_steps(2);
