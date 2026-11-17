@@ -316,10 +316,20 @@ fn photo_filter_color(a: &Adjustment) -> [f32; 3] {
 /// Clicks the colour well labelled `label` and returns the Color Picker it opened.
 fn open_picker(h: &mut Harness<'_, PhotocraftApp>, label: &str) -> craft::ui::dialog::DialogId {
     // The panel scrolls: bring the well into view before the pointer goes to it.
+    let test = std::thread::current().name().and_then(|name| name.rsplit("::").next()).unwrap_or("").to_owned();
+    let before = h.get_by_role_and_label(Role::ColorWell, label).rect();
     h.get_by_role_and_label(Role::ColorWell, label).scroll_to_me();
     h.run_steps(2);
+    let well = h.get_by_role_and_label(Role::ColorWell, label);
+    eprintln!(
+        "DIAG {test}: well {label} before {before:?} after {:?} disabled {} focused {:?}",
+        well.rect(),
+        well.accesskit_node().is_disabled(),
+        h.ctx.memory(|m| m.focused())
+    );
     h.get_by_role_and_label(Role::ColorWell, label).click();
     h.run_steps(3);
+    eprintln!("DIAG {test}: after the click picker {:?} focused {:?}", crate::color_picker_ui::top(h.state()), h.ctx.memory(|m| m.focused()));
     crate::color_picker_ui::top(h.state()).expect("the colour well opens the Color Picker")
 }
 
