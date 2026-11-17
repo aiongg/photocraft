@@ -105,11 +105,6 @@ fn info_panel_position_reads_from_the_zero_point() {
 #[test]
 fn info_panel_shows_guide_drag_position_outside_canvas() {
     let mut h = canvas_harness([200, 100], Tool::Move);
-    eprintln!(
-        "DIAG info_panel_shows_guide_drag_position_outside_canvas: view rect {:?} panel rect {:?}",
-        testing::view(h.state()).map(|v| v.rect),
-        h.state().last_canvas_rect
-    );
     let digits = |s: &str| s.chars().any(|c| c.is_ascii_digit());
     for (top, at, axis, want) in [(false, [42.0, 60.0], 0, "42"), (true, [80.0, 17.0], 1, "17")] {
         let from = ruler_at(&h, top, at[0], at[1]);
@@ -192,11 +187,6 @@ fn guide_edits_run_their_view_commands() {
         }
         h.run_steps(2);
         let before = guides(h.state());
-        eprintln!(
-            "DIAG guide_edits_run_their_view_commands: {name} view rect {:?} panel rect {:?}",
-            testing::view(h.state()).map(|v| v.rect),
-            h.state().last_canvas_rect
-        );
         edit(&mut h);
         let mut got = guides(h.state());
         got.0.sort_by(f64::total_cmp);

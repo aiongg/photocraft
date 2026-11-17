@@ -313,6 +313,21 @@ fn photo_filter_color(a: &Adjustment) -> [f32; 3] {
     }
 }
 
+/// DIAG: the AccessKit nodes and egui's hit widgets under `at`, front last.
+fn diag_under(h: &Harness<'_, PhotocraftApp>, what: &str, at: Pos2) {
+    let test = std::thread::current().name().and_then(|name| name.rsplit("::").next()).unwrap_or("").to_owned();
+    let under: Vec<String> = h
+        .query_all(egui_kittest::kittest::by().include_labels().predicate(|node| node.bounding_box().is_some()))
+        .filter(|node| node.rect().contains(at))
+        .map(|node| format!("{:?} {:?} {:?}", node.accesskit_node().role(), node.accesskit_node().label(), node.rect()))
+        .collect();
+    let hits = h.ctx.viewport(|vp| {
+        let contains: Vec<_> = vp.hits.contains_pointer.iter().rev().take(4).map(|w| (w.rect, w.layer_id)).collect();
+        (vp.hits.click.map(|w| (w.rect, w.layer_id)), contains)
+    });
+    eprintln!("DIAG {test}: under {what} at {at:?}: nodes {under:?} hits click {:?} contains (front first) {:?} layer {:?}", hits.0, hits.1, h.ctx.layer_id_at(at));
+}
+
 /// Clicks the colour well labelled `label` and returns the Color Picker it opened.
 fn open_picker(h: &mut Harness<'_, PhotocraftApp>, label: &str) -> craft::ui::dialog::DialogId {
     // The panel scrolls: bring the well into view before the pointer goes to it.
@@ -327,8 +342,10 @@ fn open_picker(h: &mut Harness<'_, PhotocraftApp>, label: &str) -> craft::ui::di
         well.accesskit_node().is_disabled(),
         h.ctx.memory(|m| m.focused())
     );
+    let at = h.get_by_role_and_label(Role::ColorWell, label).rect().center();
     h.get_by_role_and_label(Role::ColorWell, label).click();
     h.run_steps(3);
+    diag_under(h, label, at);
     eprintln!("DIAG {test}: after the click picker {:?} focused {:?}", crate::color_picker_ui::top(h.state()), h.ctx.memory(|m| m.focused()));
     crate::color_picker_ui::top(h.state()).expect("the colour well opens the Color Picker")
 }
@@ -345,8 +362,10 @@ fn photo_filter_colour_picker_previews_live_cancel_restores_and_ok_is_one_step()
     let (id, _) = layer(&h);
     h.state_mut().run("layer.setAdjustment", json!({"layer": id.0, "color": "#336699"})).unwrap();
     h.run_steps(4);
+    let at = h.get_by_role_and_label(Role::RadioButton, "Color").rect().center();
     h.get_by_role_and_label(Role::RadioButton, "Color").click();
     h.run_steps(3);
+    diag_under(&h, "the Color radio", at);
     let start = photo_filter_color(&layer(&h).1);
     let before = history_len(&h);
 

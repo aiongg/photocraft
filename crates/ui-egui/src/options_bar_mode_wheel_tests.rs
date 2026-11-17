@@ -64,12 +64,6 @@ fn the_wheel_over_the_brush_mode_dropdown_steps_the_painting_mode() {
     assert!(!h.state().ui.tool_options.brush_clear);
     assert_eq!(brush_mode(&h), BlendMode::Darken);
     wheel(&mut h, at, 4.0);
-    eprintln!(
-        "DIAG the_wheel_over_the_brush_mode_dropdown_steps_the_painting_mode: after 4 lines up mode {:?} clear {} behind {}",
-        brush_mode(&h),
-        h.state().ui.tool_options.brush_clear,
-        h.state().session.tools.brush.behind
-    );
     assert_eq!(brush_mode(&h), BlendMode::Normal, "up steps back and stops at the first mode");
 }
 
