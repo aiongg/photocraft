@@ -509,16 +509,6 @@ fn stroke_swatch_gradient_tab_sets_the_next_shapes_stroke() {
     let (_, style, angle) = stroke_gradient(&h);
     assert_eq!((style, angle), (photocraft_doc::GradientStyle::Linear, 90.0));
     assert_eq!(h.state().ui.tool_options.stroke_width, 3.0, "choosing a gradient enables the stroke");
-    {
-        let band = egui::Rect::from_min_max(egui::pos2(0.0, 100.0), egui::pos2(1440.0, 345.0));
-        let shown: Vec<_> = h
-            .query_all(egui_kittest::kittest::by().include_labels().predicate(|node| node.bounding_box().is_some()))
-            .filter(|n| band.intersects(n.rect()))
-            .take(40)
-            .map(|n| (format!("{:?}", n.accesskit_node().role()), n.accesskit_node().label().unwrap_or_default(), n.rect()))
-            .collect();
-        eprintln!("DIAG stroke_swatch_gradient_tab_sets_the_next_shapes_stroke: nodes in y 100..345 {shown:?}");
-    }
     h.get_by_label("Blue 01").click();
     h.run_steps(2);
     let presets = h.state().session.presets.gradients.clone();
