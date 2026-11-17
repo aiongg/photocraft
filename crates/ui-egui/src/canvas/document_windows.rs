@@ -136,7 +136,7 @@ mod tests {
     fn view(zoom: f32, fit: bool, fill: bool) -> View {
         let pending = [(fit, craft::ui::canvas::ViewCommands::FitOnScreen), (fill, craft::ui::canvas::ViewCommands::FillScreen)]
             .into_iter()
-            .filter_map(|(asked, command)| asked.then_some(command))
+            .filter_map(|(asked, command)| asked.then_some(craft::ui::canvas::ViewRequest::Place(command)))
             .collect();
         View { zoom, pending, ..View::default() }
     }

@@ -1001,7 +1001,7 @@ impl ViewSet {
         }
         if self.fit {
             app.ui.views[i].clear_pending();
-            app.ui.views[i].request(craft::ui::canvas::ViewCommands::FitOnScreen);
+            app.ui.views[i].place(craft::ui::canvas::ViewCommands::FitOnScreen);
         }
         if let Some(r) = self.rotation {
             app.ui.views[i].rotation = normalized_angle(r) as f32;

@@ -167,7 +167,7 @@ fn apply_commit(app: &mut PhotocraftApp, commit: &CropCommit) -> bool {
     match app.run("image.crop", params) {
         Ok(_) => {
             if let Some(view) = app.session.active_index().and_then(|i| app.ui.views.get_mut(i)) {
-                view.request(craft::ui::canvas::ViewCommands::FitOnScreen);
+                view.place(craft::ui::canvas::ViewCommands::FitOnScreen);
             }
             app.canvas_tools.crop.tool.applied(true);
             true

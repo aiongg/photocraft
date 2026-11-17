@@ -18,7 +18,7 @@ use craft::draw::ui::{BrushPickerState, GradientRef};
 use craft::imaging::ui::scopes::ScopePanelState;
 use craft::layers::ui::filter::LayerFilter;
 use craft::layers::ui::options::LayersSettings;
-use craft::ui::canvas::{SplitAt, ViewCommands};
+use craft::ui::canvas::{SplitAt, ViewCommands, ViewRequest};
 use craft::ui::patterns::presets::{PresetState, PresetView};
 use photocraft_doc::DocId;
 
@@ -67,10 +67,10 @@ pub struct View {
     pub zoom: f32,
     /// Document-space point shown at the canvas centre.
     pub center: [f32; 2],
-    /// The view commands asked of this view's canvas (Fit on Screen for a new view, a menu row, an action step), which
-    /// its next pass runs in order (`craft::ui::canvas::Canvas::queued`); never persisted.
+    /// The view commands asked of this view's canvas (Fit on Screen placing a new view, a menu row, an action step),
+    /// which its next pass runs in order (`craft::ui::canvas::Canvas::queued`); never persisted.
     #[serde(skip, default = "View::first_fit")]
-    pub pending: Vec<ViewCommands>,
+    pub pending: Vec<ViewRequest>,
     /// Document size this view last showed; a change (Image/Canvas Size, crop) re-centres it.
     #[serde(default)]
     pub doc_size: [u32; 2],
@@ -89,14 +89,21 @@ pub struct View {
 }
 
 impl View {
-    /// A new view's queue: it fits on its first pass.
-    fn first_fit() -> Vec<ViewCommands> {
-        vec![ViewCommands::FitOnScreen]
+    /// A new view's queue: its first pass places it fitted.
+    fn first_fit() -> Vec<ViewRequest> {
+        vec![ViewRequest::Place(ViewCommands::FitOnScreen)]
     }
 
-    /// Asks this view's canvas to run `command` on its next pass, after the commands already asked.
+    /// Asks this view's canvas to run `command`, a command the user gave, on its next pass, after the commands already
+    /// asked: it eases under Animated Zoom.
     pub fn request(&mut self, command: ViewCommands) {
-        self.pending.push(command);
+        self.pending.push(ViewRequest::Command(command));
+    }
+
+    /// Asks this view's canvas to place the view with `command` (a new or cropped document's fit) on its next pass: the
+    /// view jumps there.
+    pub fn place(&mut self, command: ViewCommands) {
+        self.pending.push(ViewRequest::Place(command));
     }
 
     /// Drops the commands asked of this view's canvas: the view set now stands.
@@ -106,7 +113,7 @@ impl View {
 
     /// Whether `command` waits for this view's canvas.
     pub fn asks(&self, command: ViewCommands) -> bool {
-        self.pending.contains(&command)
+        self.pending.iter().any(|request| request.command() == command)
     }
 
     /// Asks the canvas to ease the discrete zoom about to be made, from the zoom and centre the view has now, when

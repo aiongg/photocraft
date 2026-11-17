@@ -81,7 +81,7 @@ pub(crate) fn publish_shown(app: &PhotocraftApp) {
 pub(crate) fn apply_arranged(app: &mut PhotocraftApp, arranged: Arranged) {
     if arranged == Arranged::Windows && app.ui.document_windows.arrangement.is_some() {
         app.ui.split_at = SplitAt::default();
-        app.ui.views.iter_mut().for_each(|view| view.request(craft::ui::canvas::ViewCommands::FitOnScreen));
+        app.ui.views.iter_mut().for_each(|view| view.place(craft::ui::canvas::ViewCommands::FitOnScreen));
     }
 }
 

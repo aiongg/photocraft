@@ -395,7 +395,7 @@ fn shots(h: &mut H, dir: &str, ppp: f32, [group, headline]: [LayerId; 2]) {
                     v.center = [(b.x0 + b.x1) as f32 / 2.0, (b.y0 + b.y1) as f32 / 2.0];
                     v.clear_pending();
                 } else {
-                    v.request(craft::ui::canvas::ViewCommands::FitOnScreen);
+                    v.place(craft::ui::canvas::ViewCommands::FitOnScreen);
                 }
             }
             settle(h, 6);
