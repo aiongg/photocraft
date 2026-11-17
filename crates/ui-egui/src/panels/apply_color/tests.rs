@@ -142,7 +142,7 @@ fn a_swatch_and_the_color_picker_go_through_it() {
     // The Color Picker's OK for the foreground.
     let picker = crate::color_picker_ui::open(&mut app, "foreground");
     crate::color_picker_ui::testing::set_color(&mut app, picker, "#0000ff");
-    crate::dialogs::testing::confirm(&mut app, picker);
+    crate::dialogs::testing::confirm(&mut app, picker).unwrap();
     assert_eq!(app.session.tools.foreground, [0.0, 0.0, 1.0, 1.0]);
     assert!(shapes.iter().all(|id| same(&app, *id)), "the picker recoloured the shapes");
 }

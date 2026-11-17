@@ -98,7 +98,7 @@ fn a_dialog_colour_follows_the_picker_and_cancel_restores_it() {
     }
     assert_eq!(previewed_dialogs(&app), vec![fill]);
     assert_eq!(past(&app), 0, "previewing makes no history step");
-    crate::dialogs::testing::cancel(&mut app, picker);
+    crate::dialogs::testing::cancel(&mut app, picker).unwrap();
     assert_eq!(values(&app, fill), before, "Cancel leaves the dialog as it was");
     assert!(previewed_dialogs(&app).is_empty());
     assert!(app.color_picker_live.is_empty());
@@ -114,7 +114,7 @@ fn ok_keeps_the_colour_and_the_dialog_makes_one_history_step() {
     let FillPicker { fill, picker, key } = fill_with_picker(&mut app);
     pick(&mut app, picker, "#ff0000");
     pick(&mut app, picker, "#336699");
-    crate::dialogs::testing::confirm(&mut app, picker);
+    crate::dialogs::testing::confirm(&mut app, picker).unwrap();
     assert!(app.color_picker_live.is_empty());
     assert_eq!(past(&app), 0, "the picker's OK only answers the dialog's colour row");
     let (answered_key, color) = answer_for(&mut app, fill).expect("OK answers the row");
@@ -125,7 +125,7 @@ fn ok_keeps_the_colour_and_the_dialog_makes_one_history_step() {
     host_pass(&mut app);
     assert_eq!(held_color(&app, fill, &key).as_deref(), Some("#336699"));
 
-    crate::dialogs::testing::confirm(&mut app, fill);
+    crate::dialogs::testing::confirm(&mut app, fill).unwrap();
     assert_eq!(past(&app), 1, "one step for the Fill");
     let st = app.session.active().unwrap();
     let c = st.doc.layer(st.active_layer.unwrap()).unwrap().surface().unwrap().rgba(3, 3);
@@ -170,7 +170,7 @@ fn a_picker_or_parent_closed_any_other_way_ends_the_preview() {
     // A cancelled dialog takes its picker with it, leaving no picker whose OK has no target.
     let FillPicker { fill, picker, .. } = fill_with_picker(&mut app);
     pick(&mut app, picker, "#336699");
-    crate::dialogs::testing::cancel(&mut app, fill);
+    crate::dialogs::testing::cancel(&mut app, fill).unwrap();
     assert!(app.framework.dialogs.get_by_id::<ColorPickerDialog>(picker).is_none(), "the picker closes with its dialog");
     assert!(target(&app, picker).is_none(), "and its target is dropped");
     assert!(app.color_picker_live.is_empty(), "the preview ends with its dialog");
@@ -201,7 +201,7 @@ fn the_dialog_under_a_picker_refuses_control_edits() {
     let r = call(&mut app, "ui.dialog.set", set.clone());
     assert_eq!(r["ok"], false, "{r}");
     assert_eq!(values(&app, fill), before);
-    crate::dialogs::testing::cancel(&mut app, picker);
+    crate::dialogs::testing::cancel(&mut app, picker).unwrap();
     let r = call(&mut app, "ui.dialog.set", set);
     assert_eq!(r["ok"], true, "{r}");
 }
@@ -226,13 +226,13 @@ fn the_crop_shield_keeps_a_colour_set_while_its_picker_is_open() {
     let picker = shield_picker(&mut app);
     pick(&mut app, picker, "#336699");
     app.ui.tool_options.crop.shield.custom_color = [1, 2, 3];
-    crate::dialogs::testing::cancel(&mut app, picker);
+    crate::dialogs::testing::cancel(&mut app, picker).unwrap();
     assert_eq!(shield(&app), (ShieldColor::Custom, [1, 2, 3]));
 
     let picker = shield_picker(&mut app);
     app.ui.tool_options.crop.shield.color = ShieldColor::MatchCanvas;
     pick(&mut app, picker, "#ff0000");
-    crate::dialogs::testing::cancel(&mut app, picker);
+    crate::dialogs::testing::cancel(&mut app, picker).unwrap();
     assert_eq!(shield(&app), (ShieldColor::MatchCanvas, [1, 2, 3]), "Cancel puts back the choice made while it was open");
 }
 
@@ -247,13 +247,13 @@ fn the_crop_shield_colour_follows_its_picker() {
     let picker = shield_picker(&mut app);
     pick(&mut app, picker, "#336699");
     assert_eq!(shield(&app), (ShieldColor::Custom, [0x33, 0x66, 0x99]), "shown before OK");
-    crate::dialogs::testing::cancel(&mut app, picker);
+    crate::dialogs::testing::cancel(&mut app, picker).unwrap();
     assert_eq!(shield(&app), before);
 
     let picker = shield_picker(&mut app);
     pick(&mut app, picker, "#ff0000");
     pick(&mut app, picker, "#336699");
-    crate::dialogs::testing::confirm(&mut app, picker);
+    crate::dialogs::testing::confirm(&mut app, picker).unwrap();
     assert_eq!(shield(&app), (ShieldColor::Custom, [0x33, 0x66, 0x99]));
     assert!(app.color_picker_live.is_empty());
     assert_eq!(past(&app), 0);
@@ -272,7 +272,7 @@ fn preferences_apply_waits_for_an_open_picker() {
     pick(&mut app, picker, "#ff8000");
     assert!(crate::prefs_ui::apply_window(&mut app).is_err(), "Apply refuses while the picker is open");
     assert_eq!(app.session.prefs().guides_grid_and_slices.guide_color, before, "nothing is saved");
-    crate::dialogs::testing::cancel(&mut app, picker);
+    crate::dialogs::testing::cancel(&mut app, picker).unwrap();
     assert!(crate::prefs_ui::apply_window(&mut app).is_ok(), "Apply works once the picker is closed");
     assert_eq!(app.session.prefs().guides_grid_and_slices.guide_color, before, "Cancel left the colour as it was");
 }

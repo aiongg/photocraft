@@ -39,7 +39,7 @@ fn cmyk_app() -> PhotocraftApp {
 fn ok(app: &mut PhotocraftApp, dialog: DialogId) -> Result<(), String> {
     app.ui.status = Default::default();
     app.ui.status_error = false;
-    crate::dialogs::testing::confirm(app, dialog);
+    crate::dialogs::testing::confirm(app, dialog).unwrap();
     if app.ui.status_error { Err(app.ui.status.to_string()) } else { Ok(()) }
 }
 
@@ -82,7 +82,7 @@ fn new_solid_color_from_menu_cancel_keeps_document_and_history_unchanged() {
     assert_eq!(app.session.active().unwrap().history.entries().len(), steps);
 
     testing::set_color(app, dialog, "#ff8800");
-    crate::dialogs::testing::cancel(app, dialog);
+    crate::dialogs::testing::cancel(app, dialog).unwrap();
     assert!(app.framework.dialogs.get_by_id::<ColorPickerDialog>(dialog).is_none());
     assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc), "Cancel must not create or delete a layer");
     assert_eq!(app.session.active().unwrap().active_layer, active);
@@ -154,7 +154,7 @@ fn picker_previews_without_editing_cancel_discards_and_ok_is_one_step() {
     let LayerContent::Fill(Fill::Solid(color)) = preview.layer(id).unwrap().content else { panic!() };
     assert_eq!(color.to_rgba8(), [255, 136, 0, 128]);
     assert_eq!(thumbnail_color(app, before.id, id, original), color);
-    crate::dialogs::testing::cancel(app, dialog);
+    crate::dialogs::testing::cancel(app, dialog).unwrap();
     assert!(display_doc(app, 0).is_none());
     assert!(app.solid_fill_preview.is_none());
     assert_eq!(thumbnail_color(app, before.id, id, original), original);
@@ -230,7 +230,7 @@ fn cmyk_lab_preview_thumbnail_cancel_and_ok_are_consistent() {
         assert_eq!(thumbnail_color(app, before.id, id, original), preview);
         assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
         assert_eq!(app.session.active().unwrap().history.entries().len(), count);
-        crate::dialogs::testing::cancel(app, dialog);
+        crate::dialogs::testing::cancel(app, dialog).unwrap();
         assert!(display_doc(app, app.session.active_index().unwrap()).is_none());
         assert!(Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
         assert_eq!(app.session.active().unwrap().history.entries().len(), count);

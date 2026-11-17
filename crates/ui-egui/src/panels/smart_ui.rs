@@ -306,7 +306,7 @@ mod tests {
         assert_eq!(fields["contrast"].as_f64(), Some(-10.0));
         let dialog = d.id;
         // OK updates the recorded filter (one history step), it does not add a second filter.
-        crate::dialogs::testing::confirm(&mut app, dialog);
+        crate::dialogs::testing::confirm(&mut app, dialog).unwrap();
         let LayerContent::Smart(sm) = &app.session.active().unwrap().doc.layer(photocraft_doc::LayerId(id)).unwrap().content else {
             panic!("the layer stays a smart object");
         };
@@ -360,7 +360,7 @@ mod tests {
         edited["method"] = json!("relative");
         assert!(crate::adjust_dialog::apply_params(h.state_mut(), dialog, &edited), "the dialog takes the edit");
         h.run_steps(2);
-        crate::dialogs::testing::confirm(h.state_mut(), dialog);
+        crate::dialogs::testing::confirm(h.state_mut(), dialog).unwrap();
         let sm = recorded(h.state());
         assert_eq!(sm.smart_filters.len(), 1, "no filter was stacked");
         let photocraft_doc::Adjustment::SelectiveColor { relative, adjustments } =
@@ -421,7 +421,7 @@ mod tests {
         assert_eq!(filters[0].params.get("radius").and_then(Value::as_f64), Some(6.0));
         assert_eq!(smart(&app, &app.session.active().unwrap().doc).smart_filters[0].params["radius"], json!(1.0), "the document is untouched");
 
-        crate::dialogs::testing::confirm(&mut app, dialog);
+        crate::dialogs::testing::confirm(&mut app, dialog).unwrap();
         let doc = &app.session.active().unwrap().doc;
         assert_eq!(smart(&app, doc).smart_filters.len(), 1);
         assert!(photocraft_compose::flatten(&shown).px == photocraft_compose::flatten(doc).px, "OK gives what the preview showed");

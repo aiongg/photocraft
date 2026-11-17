@@ -598,7 +598,7 @@ mod tests {
         let ctx = app.ctx().clone();
         app.session.color.set_displays(Ok(displays(None)));
         app.session.color.main_display = Some(1);
-        crate::prefs_ui::invoke(&mut app, &ctx, "edit.colorSettings", &serde_json::json!({})).unwrap();
+        crate::prefs_ui::invoke(&mut app, &ctx, "edit.colorSettings", &serde_json::json!({})).unwrap().unwrap();
         assert!(!app.framework.dialogs.is_empty(), "Color Settings is open");
         let cell = note_cell(&app);
         let shown = || cell.lock().unwrap().clone();

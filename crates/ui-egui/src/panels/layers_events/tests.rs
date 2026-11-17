@@ -588,7 +588,7 @@ fn activate_and_fx_events_open_the_right_editor() {
     assert_eq!(active(&app), Some(LayerId(a)), "the smart object becomes active");
     let dialog = top(&app);
     assert!(crate::smart_filter_dialog::owns(dialog.key.as_deref().unwrap_or_default()));
-    crate::dialogs::testing::cancel(&mut app, dialog.id);
+    crate::dialogs::testing::cancel(&mut app, dialog.id).unwrap();
 
     // The row opens the filter's editor on the recorded values; OK edits it in place.
     send(&mut app, vec![select(&[c], None)]);
@@ -597,7 +597,7 @@ fn activate_and_fx_events_open_the_right_editor() {
     let dialog = top(&app);
     assert_eq!(dialog.fields.as_ref().unwrap()["radius"].as_f64(), Some(1.0), "the recorded radius");
     app.framework.dialogs.set_json_field(&ctx, dialog.id, "radius", json!(3.0)).unwrap();
-    crate::dialogs::testing::confirm(&mut app, dialog.id);
+    crate::dialogs::testing::confirm(&mut app, dialog.id).unwrap();
     assert!(!app.ui.status_error, "{}", app.ui.status);
     assert_eq!(filter_commands(&app, a).len(), 2, "edited in place, not added");
     let LayerContent::Smart(sm) = &layer(&app, a).content else { panic!("smart object") };

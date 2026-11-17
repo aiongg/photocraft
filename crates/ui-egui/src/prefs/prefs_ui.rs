@@ -82,7 +82,7 @@ pub(crate) use startup::{on_recovery_event, remember_rulers};
 
 // Test modules stay after the production code: the prefs_usage test reads each file up to
 // its first `#[cfg(test)] mod`.
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod agents_tests;
 #[cfg(test)]
 mod recovery_tests;

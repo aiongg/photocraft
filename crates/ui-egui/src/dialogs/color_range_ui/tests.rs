@@ -338,7 +338,7 @@ fn opens_and_previews_in_the_full_app_without_a_gpu() {
     assert!(hosted(h.state()).shows_image());
     set_field(h.state_mut(), "select", json!("reds"));
     let id = dialog_id(h.state());
-    crate::dialogs::testing::confirm(h.state_mut(), id);
+    crate::dialogs::testing::confirm(h.state_mut(), id).unwrap();
     h.run_steps(3);
     assert_eq!(coverage(h.state(), 5, 5), 1.0);
 }

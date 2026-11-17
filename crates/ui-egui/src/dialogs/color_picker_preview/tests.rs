@@ -94,7 +94,7 @@ fn cancel_leaves_the_text_and_history_as_they_were_and_stops_the_preview() {
     let dialog = pick(&mut app, "#00ff00");
     assert!(display_doc(&mut app, 0).is_some());
 
-    crate::dialogs::testing::cancel(&mut app, dialog);
+    crate::dialogs::testing::cancel(&mut app, dialog).unwrap();
     assert!(display_doc(&mut app, 0).is_none(), "Cancel: the canvas draws the document again");
     let after = committed(&app);
     assert!(Arc::ptr_eq(&after.0, &doc));
@@ -110,7 +110,7 @@ fn ok_commits_exactly_what_the_preview_showed_in_one_history_step() {
     let dialog = pick(&mut app, "#ff8800");
     let (shown, _) = display_doc(&mut app, 0).unwrap();
 
-    crate::dialogs::testing::confirm(&mut app, dialog);
+    crate::dialogs::testing::confirm(&mut app, dialog).unwrap();
     let doc = app.session.active().unwrap().doc.clone();
     assert_eq!(text_in(&doc, id).char_runs(), text_in(&shown, id).char_runs(), "the preview is the committed edit");
     assert_eq!(committed(&app).3, history + 1);
@@ -168,13 +168,13 @@ fn no_preview_for_other_pickers_other_tabs_or_other_commands() {
     let fg = crate::color_picker_ui::open(&mut app, "foreground");
     set_color(&mut app, "#ff0000");
     assert!(display_doc(&mut app, 0).is_none());
-    crate::dialogs::testing::cancel(&mut app, fg);
+    crate::dialogs::testing::cancel(&mut app, fg).unwrap();
 
     // A picker that runs a command this module does not preview shows nothing either.
     let other = crate::color_picker_ui::open_for_command(&mut app, "Color Picker (Preset Stop)", [0.0; 3], "gradient.presets.stop", json!({"layer": id.0}));
     set_color(&mut app, "#ff0000");
     assert!(display_doc(&mut app, 0).is_none(), "a preset's stop edits no pixels");
-    crate::dialogs::testing::cancel(&mut app, other);
+    crate::dialogs::testing::cancel(&mut app, other).unwrap();
 
     // Another document's tab never shows this picker's colour.
     pick(&mut app, "#ff0000");
@@ -251,7 +251,7 @@ fn ok_counts_the_previewed_canvas_as_the_document_so_only_the_layer_is_redrawn()
         let dk = crate::canvas::canvas_display(&app, &doc, None).1;
         assert_ne!(cached(&app).1, dk, "gradient={gradient}: the canvas holds the preview");
 
-        crate::dialogs::testing::confirm(&mut app, dialog);
+        crate::dialogs::testing::confirm(&mut app, dialog).unwrap();
         let revision = app.session.active().unwrap().revision;
         let seen = cached(&app);
         assert_eq!(seen.1, dk, "gradient={gradient}: OK's edit is what the canvas already shows");
@@ -273,7 +273,7 @@ fn ok_after_a_colour_the_canvas_never_drew_redraws_as_before() {
     let dk = crate::canvas::canvas_display(&app, &doc, None).1;
     // The colour changes and OK lands before the canvas drew it: the shown copy is not the edit.
     set_color(&mut app, "#0000ff");
-    crate::dialogs::testing::confirm(&mut app, dialog);
+    crate::dialogs::testing::confirm(&mut app, dialog).unwrap();
     let seen = app.raster_logs[&crate::canvas::cache_key(doc.id, None)].composite_seen().unwrap();
     assert_ne!(seen.1, dk, "a stale red preview is never counted as the blue document");
 }
@@ -349,7 +349,7 @@ fn a_gradient_stop_colour_is_previewed_before_ok_and_cancel_changes_nothing() {
         assert!(Arc::ptr_eq(&after.0, &doc));
         assert_eq!((after.1, after.2, after.3), (revision, dirty, history), "{depth}-bit: the session is untouched");
 
-        crate::dialogs::testing::cancel(&mut app, dialog);
+        crate::dialogs::testing::cancel(&mut app, dialog).unwrap();
         assert!(display_doc(&mut app, 0).is_none(), "{depth}-bit: Cancel shows the document again");
         assert_eq!(crate::canvas::display_doc(&mut app, 0).1, 0, "{depth}-bit: the canvas draws the document");
         assert_eq!(stop_rgb(&app.session.active().unwrap().doc, id, 0), [0, 0, 0]);
@@ -366,7 +366,7 @@ fn ok_commits_the_previewed_gradient_stop_in_one_history_step() {
     set_color(&mut app, "#00ff00");
     let (shown, _) = display_doc(&mut app, 0).unwrap();
 
-    crate::dialogs::testing::confirm(&mut app, dialog);
+    crate::dialogs::testing::confirm(&mut app, dialog).unwrap();
     let doc = app.session.active().unwrap().doc.clone();
     assert_eq!(stop_rgb(&doc, id, 1), stop_rgb(&shown, id, 1), "the preview is the committed edit");
     assert_eq!(stop_rgb(&doc, id, 1), [0, 255, 0]);
@@ -406,7 +406,7 @@ fn no_preview_when_the_params_name_no_layer() {
         set_color(&mut app, "#ff0000");
         assert!(display_doc(&mut app, 0).is_none(), "{params}: no preview of a guessed layer");
         assert_eq!(crate::canvas::display_doc(&mut app, 0).1, 0, "{params}");
-        crate::dialogs::testing::cancel(&mut app, picker);
+        crate::dialogs::testing::cancel(&mut app, picker).unwrap();
     }
     // A named layer is previewed.
     crate::color_picker_ui::open_for_command(&mut app, "Color Picker (Text Color)", [0.0; 3], "type.setStyle", json!({"layer": id.0}));

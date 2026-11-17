@@ -18,7 +18,7 @@ fn slice_options_ok_promotes_an_auto_slice_and_sets_its_fields() {
     let id = open_options(&mut app).unwrap();
     let ctx = app.ctx().clone();
     app.framework.dialogs.set_json_field(&ctx, id, "name", json!("footer")).unwrap();
-    crate::dialogs::testing::confirm(&mut app, id);
+    crate::dialogs::testing::confirm(&mut app, id).unwrap();
     let doc = app.session.active().unwrap().doc.clone();
     assert!(doc.slices.list.iter().any(|s| s.name == "footer"), "{:?}", doc.slices.list);
     assert_eq!(app.ui.slices.options, None);

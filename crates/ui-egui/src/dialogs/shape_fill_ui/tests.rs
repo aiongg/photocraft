@@ -15,7 +15,7 @@ fn fill(app: &PhotocraftApp, id: LayerId) -> Option<Fill> {
 fn ok(app: &mut PhotocraftApp, dialog: DialogId) -> Result<(), String> {
     app.ui.status = Default::default();
     app.ui.status_error = false;
-    crate::dialogs::testing::confirm(app, dialog);
+    crate::dialogs::testing::confirm(app, dialog).unwrap();
     if app.ui.status_error { Err(app.ui.status.to_string()) } else { Ok(()) }
 }
 

@@ -125,7 +125,7 @@ fn indexed_matte_tool_seeds_use_document_encoded_rgb() {
     let transform = Transform::new(&source, &destination, app.session.color.settings.intent(), app.session.color.settings.bpc).unwrap();
     for (value, input) in [("foreground", [0.2, 0.4, 0.8]), ("background", [0.8, 0.4, 0.2])] {
         let mut output = [0.0; 16];
-        transform.eval(&input, &mut output);
+        transform.eval(&input, &mut output).unwrap();
         let got = rows::indexed_matte_seed(&colors, value).unwrap_or_else(|| panic!("{value}: no seed"));
         for c in 0..3 {
             assert!((got[c] - output[c]).abs() < 1e-4, "{value}: channel {c} is {} want {}", got[c], output[c]);

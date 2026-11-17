@@ -81,7 +81,7 @@ fn cmyk_values_survive_ok_and_a_reopen() {
     let rgb = Srgba::from_rgb_array(photocraft_color::convert::cmyk_to_rgb(cyan).map(|c| c.clamp(0.0, 1.0)));
     // The picker's CMYK fields are percent.
     app.framework.dialogs.get_mut_by_id::<ColorPickerDialog>(id).expect("the picker is open").set_color(PickedColor::cmyk(rgb, cyan.map(|v| v * 100.0)));
-    crate::dialogs::testing::confirm(&mut app, id);
+    crate::dialogs::testing::confirm(&mut app, id).unwrap();
     let fg = app.session.tools.foreground;
     assert_eq!(app.session.tools.picked_cmyk([fg[0], fg[1], fg[2]]), Some(cyan));
     let id = open(&mut app, "foreground");
@@ -145,7 +145,7 @@ fn the_top_picker_samples_the_image() {
     assert_eq!(top(&app), None);
     sample_at(&mut app, 25.0, 5.0);
     assert_eq!(dialog_color(&app, id), "#ff0000");
-    crate::dialogs::testing::cancel(&mut app, over);
+    crate::dialogs::testing::cancel(&mut app, over).unwrap();
     assert_eq!(top(&app), Some(id), "the picker is on top again");
     sample_at(&mut app, 25.0, 5.0);
     assert_eq!(dialog_color(&app, id), "#00ff00");

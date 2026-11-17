@@ -74,13 +74,13 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, field: &str, value: serde_j
 /// OK on the newest open dialog.
 fn confirm(app: &mut PhotocraftApp) {
     let id = app.framework.dialogs.open_dialogs().pop().expect("an open dialog").id;
-    crate::dialogs::testing::confirm(app, id);
+    crate::dialogs::testing::confirm(app, id).unwrap();
 }
 
 /// Cancel on the newest open dialog.
 fn cancel(app: &mut PhotocraftApp) {
     let id = app.framework.dialogs.open_dialogs().pop().expect("an open dialog").id;
-    crate::dialogs::testing::cancel(app, id);
+    crate::dialogs::testing::cancel(app, id).unwrap();
 }
 
 /// An adjustment on a Smart Object reopens its editor with the stored values and OK updates it in one step; Invert has no editor.
