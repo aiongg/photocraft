@@ -49,7 +49,7 @@ impl Default for FreeformPenTool {
         Self {
             admit: Admit::Open,
             refused: false,
-            draft: OutlineDraft::new(DraftKind::Mixed, DraftReach::new(0.0, 0.0)),
+            draft: OutlineDraft::new(DraftKind::Mixed, DraftReach::new(0.0, 0.0)).locking_drags(true),
             owner: None,
             target: None,
             closed: None,
