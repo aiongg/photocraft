@@ -751,10 +751,6 @@ fn panels_patch(app: &PhotocraftApp, patch: Option<&Value>) -> std::result::Resu
             return Err(format!("unknown panels field `{key}`"));
         }
     }
-    // Saved panels read an unknown side as the default; a control request is still refused.
-    if let Some(side) = own_patch.get("toolbar_side") {
-        serde_json::from_value::<crate::state::ToolbarSide>(side.clone()).map_err(|e| format!("panels.toolbar_side: {e}"))?;
-    }
     if let Some(bar) = own_patch.get("task_bar") {
         let merged = merged_object(&app.ui.panels.task_bar, Some(bar), "panels.task_bar")?;
         own_patch.insert("task_bar".into(), serde_json::to_value(merged).map_err(|e| e.to_string())?);
@@ -801,10 +797,17 @@ impl PanelSet {
             writes.push(Box::new(move |app| app.ui.actions.panel.settings = settings));
         }
         writes.extend(preset_browsers_param(app, p)?);
-        match uint_field(p, "toolbarColumns")? {
-            Some(columns @ (1 | 2)) => writes.push(Box::new(move |app| app.ui.panels.toolbar_double = columns == 2)),
-            Some(_) => return Err("toolbarColumns must be 1 or 2".into()),
-            None => {}
+        // The toolbar's width in tool columns: its dock column's steps, from one to the cells of its grid.
+        if let Some(columns) = uint_field(p, "toolbarColumns")? {
+            let most = crate::panels::toolbar::cells(app);
+            let steps = u16::try_from(columns).ok().filter(|steps| (1..=most).contains(&usize::from(*steps)));
+            let steps = steps.ok_or_else(|| format!("toolbarColumns must be 1 to {most}"))?;
+            writes.push(Box::new(move |app| {
+                let action = Action::set_column_steps(crate::panels::registry::TOOLBAR.to_owned(), steps);
+                if let Err(error) = crate::panel_docking::apply(app, vec![action]) {
+                    app.ui.status = error;
+                }
+            }));
         }
         if let Some(v) = p.get("recentView") {
             let view = parse_like(&app.ui.chrome.home_recent_view, v, || "recentView must be grid or list".to_string())?;

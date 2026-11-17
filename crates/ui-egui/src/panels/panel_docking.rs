@@ -6,18 +6,20 @@
 //! The lock is `app.workspaces.set.locked`.
 
 use craft::behavior::dock::{Action, DockEdge, DockPlacement, Layout, Node, PanelPlace, PanelState, Permissions, SplitSize, Target};
+use craft::behavior::overlay::Side;
 use craft::behavior::{DockSide, EditEvent, EditEvents, IconId};
 use craft::ui::contract::{Bind, BodyCx, SizeLimits};
 use craft::ui::docking::{
-    DockCommands, DockConfig, DockEvent, DockPanels, DockScene, DockSizes, DockTo, DragUnit, FloatSpace, GroupAt, PanelSpec, actions, move_actions,
+    DockCommands, DockConfig, DockEvent, DockPanels, DockScene, DockSizes, DockTo, DragUnit, FloatSpace, GroupAt, HidePanels, PanelSpec, actions, move_actions,
     request_actions,
 };
 use craft::ui::menu::PanelRow;
 use craft::ui::patterns::dock::{DockArea, DockAreaOutput};
 use craft::ui::primitives::IconSpec;
+use craft::ui::rails::ToolRail;
 use serde_json::{Map, Value, json};
 
-use super::registry::{self, CANVAS, CANVAS_MIN, LEGACY_GROUPS};
+use super::registry::{self, CANVAS, CANVAS_MIN, LEGACY_GROUPS, TOOLBAR};
 use crate::PhotocraftApp;
 
 /// The saved arrangement: layout, hidden panels with their return places, and the floated panels' docked places.
@@ -39,22 +41,52 @@ pub(crate) fn is_shown(app: &PhotocraftApp, id: &str) -> bool {
     app.ui.docking.layout.contains(&id.to_owned())
 }
 
-/// Whether `panel` shows: the active tab of its group, and neither the group nor its window minimized.
+/// Whether `panel`'s Window menu row is checked: it is in the layout, or, in a column collapsed to icons, its flyout is
+/// open.
+pub(crate) fn is_checked(app: &PhotocraftApp, id: &str) -> bool {
+    let panel = id.to_owned();
+    if app.ui.docking.layout.opens_in_flyout(&panel) { app.ui.flyout.as_ref() == Some(&panel) } else { is_shown(app, id) }
+}
+
+/// Whether `panel` shows: the active tab of its group in an expanded column, neither the group minimized nor its column
+/// collapsed, or the panel open in a collapsed column's flyout.
 pub(crate) fn is_front(app: &PhotocraftApp, id: &str) -> bool {
-    app.ui.docking.layout.panel_state(&id.to_owned()) == PanelState::Front
+    let panel = id.to_owned();
+    let layout = &app.ui.docking.layout;
+    layout.panel_state(&panel) == PanelState::Front || (layout.opens_in_flyout(&panel) && app.ui.flyout.as_ref() == Some(&panel))
+}
+
+/// The side of the Toolbar its flyouts and drawer open on: the side of the canvas. A toolbar in the end dock opens
+/// towards the start, any other toward the end.
+pub(crate) fn toolbar_opens(app: &PhotocraftApp) -> Side {
+    let layout = &app.ui.docking.layout;
+    match layout.place(&TOOLBAR.to_owned()) {
+        Some(PanelPlace::Dock { path, .. }) if layout.dock_path(DockEdge::End).is_some_and(|end| end == path) => Side::Start,
+        _ => Side::End,
+    }
 }
 
 /// Shows or hides panel `id` (an id or a label). `Some(true)` opens a hidden panel at its place, and brings a shown
-/// one to the front, expanding its minimized group or window; `Some(false)` closes it; `None` shows a panel that is
-/// hidden, minimized or behind another tab and closes one that is in front. Returns whether the panel shows.
+/// one to the front, expanding its minimized group; `Some(false)` closes it; `None` shows a panel that is hidden,
+/// minimized or behind another tab and closes one that is in front. A panel in a column collapsed to icons opens and
+/// closes its flyout instead, and stays in the layout. Returns whether the panel shows.
 pub(crate) fn show_panel(app: &mut PhotocraftApp, id: &str, show: Option<bool>) -> Result<bool, String> {
     let panel = registry::normalize(id).ok_or_else(|| format!("`{id}` is not a registered panel"))?;
+    let owned = panel.to_owned();
     let show = show.unwrap_or_else(|| !is_front(app, panel));
+    if app.ui.docking.layout.opens_in_flyout(&owned) {
+        app.ui.flyout = show.then_some(owned);
+        return Ok(show);
+    }
     if !show && !is_shown(app, panel) {
         return Ok(false);
     }
-    let action = if show { Action::open(panel.to_owned(), None) } else { Action::close(panel.to_owned()) };
+    let action = if show { Action::open(owned.clone(), None) } else { Action::close(owned.clone()) };
     apply(app, vec![action])?;
+    // A panel that opened into a column of icons shows in its flyout.
+    if show && app.ui.docking.layout.opens_in_flyout(&owned) {
+        app.ui.flyout = Some(owned);
+    }
     Ok(show)
 }
 
@@ -112,8 +144,9 @@ fn stop_closed_timeline(app: &mut PhotocraftApp, closed: &[String]) {
     }
 }
 
-/// What the dock reads of `panel`: its name, icon, least size, group heights and float size.
-fn spec(panel: &str) -> PanelSpec {
+/// What the dock reads of `panel`: its name, icon, least size, group heights, float size and, for the toolbar, the grid
+/// its column is whole steps of.
+fn spec(app: &PhotocraftApp, panel: &str) -> PanelSpec {
     if panel == CANVAS {
         let least = SizeLimits::at_least(egui::vec2(CANVAS_MIN[0], CANVAS_MIN[1]));
         return PanelSpec::new(tl!("Documents").to_string()).canvas().limits(least).allow_native(false);
@@ -127,6 +160,9 @@ fn spec(panel: &str) -> PanelSpec {
     if let Some([width, height]) = entry.float_size {
         spec = spec.float_size(egui::vec2(width, height));
     }
+    if panel == TOOLBAR {
+        spec = spec.grid(ToolRail::<crate::state::Tool>::dock_grid(app.ctx(), super::toolbar::cells(app)));
+    }
     spec
 }
 
@@ -137,7 +173,7 @@ struct Panels<'a> {
 
 impl DockPanels<String> for Panels<'_> {
     fn spec(&self, panel: &String) -> PanelSpec {
-        spec(panel)
+        spec(self.app, panel)
     }
 
     fn permissions(&self, panel: &String) -> Permissions {
@@ -152,8 +188,20 @@ impl DockPanels<String> for Panels<'_> {
         Some(super::region_versions::panel(self.app, panel))
     }
 
-    /// The canvas group is the document area: it draws its own tabs, rail and documents in the group's rect.
+    /// The canvas group is the document area: it draws its own tabs and documents in the group's rect. The toolbar's
+    /// group is its rail, which takes the group's full rect and measures its height at a width.
     fn group_view(&mut self, panels: &[String], _: usize, ui: &mut egui::Ui, at: GroupAt, _: &mut BodyCx<'_>) -> Option<f32> {
+        if panels.iter().any(|panel| panel == TOOLBAR) {
+            return Some(match at {
+                GroupAt::Measure(width) => super::toolbar::measure(self.app, ui, width),
+                GroupAt::Show(rect) => {
+                    #[cfg(test)]
+                    probe::record(ui.ctx(), TOOLBAR, rect, false);
+                    super::toolbar::toolbar(self.app, ui);
+                    rect.height()
+                }
+            });
+        }
         if !panels.iter().any(|panel| panel == CANVAS) {
             return None;
         }
@@ -190,7 +238,8 @@ pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
     (entry.body)(app, ui);
 }
 
-/// Draws the workspace, the canvas included, in the room `ui` has left.
+/// Draws the workspace, the canvas included, in the room `ui` has left. With `panels_hidden` (Shift+Tab: the panels
+/// hide and the tools stay) only the toolbar stays.
 ///
 /// The area shows the live workspace and writes none of it. Every change of the pass reaches [`apply`] once, after
 /// the pass: the area's own (tab picks, drops, menu rows, divider drags, window moves), then what the bodies asked
@@ -198,13 +247,19 @@ pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
 /// reads the pass's pointer and the files dropped on it, and a second pass in the same frame gets neither again, so
 /// nothing applies twice. A divider drag or window move changes the workspace at each step and remembers the layout
 /// once, when it commits: the area's `edit` says whether its gesture is still running.
-pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
+pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, panels_hidden: bool) {
     #[cfg(test)]
     probe::clear(ui.ctx());
     let ctx = ui.ctx().clone();
     let workspace = app.ui.docking.clone();
     let locked = app.workspaces.set.locked;
     let auto_collapse = app.session.prefs().workspace.auto_collapse_icon_panels;
+    // A flyout stays open only while its panel is in a column collapsed to icons.
+    if app.ui.flyout.as_ref().is_some_and(|panel| !app.ui.docking.layout.opens_in_flyout(panel)) {
+        app.ui.flyout = None;
+    }
+    let flyout = app.ui.flyout.clone();
+    let keeps_toolbar = |panel: &String| panel == TOOLBAR;
     let config = DockConfig::default().group_order_items(true).native_windows(cfg!(not(target_arch = "wasm32")));
     let output: DockAreaOutput<String> = {
         let mut panels = Panels { app: &mut *app };
@@ -215,7 +270,10 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         if auto_collapse {
             area = area.auto_collapse();
         }
-        area.show(ui)
+        if panels_hidden {
+            area = area.hide(HidePanels::Except(&keeps_toolbar));
+        }
+        area.flyout(Bind::given(flyout)).show(ui)
     };
     #[cfg(test)]
     probe::record_windows(&ctx, &app.ui.docking.layout, &output.windows);
@@ -238,8 +296,12 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         crate::dock::persist(app);
     }
     for event in events {
-        if matches!(event, DockEvent::ToggleAutoCollapse) {
-            app.session.prefs.edit(|prefs| prefs.workspace.auto_collapse_icon_panels = !prefs.workspace.auto_collapse_icon_panels);
+        match event {
+            DockEvent::ToggleAutoCollapse => {
+                app.session.prefs.edit(|prefs| prefs.workspace.auto_collapse_icon_panels = !prefs.workspace.auto_collapse_icon_panels);
+            }
+            DockEvent::FlyoutChanged { panel } => app.ui.flyout = panel,
+            _ => {}
         }
     }
     // Files dropped on a floating panel's own window open as documents, and the main window comes forward.
@@ -254,7 +316,7 @@ pub(crate) fn width_actions(app: &PhotocraftApp, ctx: &egui::Context, total: f32
     if !total.is_finite() || total <= 0.0 {
         return Vec::new();
     }
-    DockSizes::of(ctx).resize_side(&app.ui.docking.layout, DockEdge::End, &|panel: &String| spec(panel), total)
+    DockSizes::of(ctx).resize_side(&app.ui.docking.layout, DockEdge::End, &|panel: &String| spec(app, panel), total)
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -286,6 +348,7 @@ pub(crate) fn command(app: &mut PhotocraftApp, id: &str, params: &Value) -> Opti
         "window.panel.closeGroup" => one_panel(app, params, Action::close_group),
         "window.panel.closeOthers" => one_panel(app, params, Action::close_others),
         "window.panel.minimize" => minimize_command(app, params),
+        "window.panel.iconic" => iconic_command(app, params),
         "window.panel.window" => window_command(app, params),
         // Opening the Character or Paragraph panel from the type tool never hides it (`view_cmds/dispatch.rs:303`).
         "type.panels.character" => toggled(app, "character", Some(true)),
@@ -500,16 +563,13 @@ fn one_panel(app: &mut PhotocraftApp, params: &Value, action: fn(String) -> Acti
     run(app, vec![action(panel)])
 }
 
-/// Whether the group or floating window holding `panel` is minimized.
+/// Whether the group holding `panel` is minimized.
 fn minimized(layout: &Layout<String>, panel: &String) -> bool {
-    match layout.place(panel) {
-        Some(PanelPlace::Floating { window, .. }) => layout.floating.get(window).is_some_and(|floating| floating.minimized),
-        Some(place) => layout.group(&place).is_some_and(|group| group.minimized),
-        None => false,
-    }
+    layout.place(panel).is_some_and(|place| layout.group(&place).is_some_and(|group| group.minimized))
 }
 
-/// `window.panel.minimize {panel, minimized?}`: without `minimized`, toggles.
+/// `window.panel.minimize {panel, minimized?}`: minimizes the panel's group to its tab strip or restores it; without
+/// `minimized`, toggles.
 fn minimize_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, String> {
     let fields = fields(params)?;
     let panel = required_panel(&fields)?;
@@ -518,6 +578,20 @@ fn minimize_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, St
         Some(value) => value.as_bool().ok_or("minimized must be a boolean")?,
     };
     run(app, vec![Action::set_minimized(panel, on)])
+}
+
+/// `window.panel.iconic {panel, iconic?}`: collapses the column holding the panel, docked or floating, to icons, or
+/// expands it; without `iconic`, toggles.
+fn iconic_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, String> {
+    let fields = fields(params)?;
+    let panel = required_panel(&fields)?;
+    let layout = &app.ui.docking.layout;
+    let current = layout.place(&panel).and_then(|place| layout.column(&place)).map(|column| column.iconic).ok_or("panel is hidden")?;
+    let on = match fields.get("iconic") {
+        None | Some(Value::Null) => !current,
+        Some(value) => value.as_bool().ok_or("iconic must be a boolean")?,
+    };
+    run(app, vec![Action::set_iconic(panel, on)])
 }
 
 /// `window.panel.window {panel, native?}`: floats a docked panel's group, whose window the dock gives an OS window of
@@ -627,9 +701,6 @@ fn group_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, Strin
         }
         "up" | "down" => {
             let up = operation == "up";
-            if !matches!(layout.place(&panel), Some(PanelPlace::Dock { .. })) {
-                return Err("floating groups cannot move within the dock".into());
-            }
             if !layout.can_step_group(&panel, up, permissions) {
                 return Err("group is already at the edge".into());
             }
@@ -672,18 +743,80 @@ pub(crate) fn load_at_launch(app: &mut PhotocraftApp, saved: &Value) {
     app.ui.docking.replace(workspace);
 }
 
-/// The workspace of a saved layout, fitted to the registry.
+/// The workspace of a saved layout, fitted to the registry. A save that predates the toolbar panel brings the toolbar's
+/// old chrome flags over once ([`migrate_toolbar`]).
 fn loaded(saved: &Value) -> Workspace {
     let default = registry::default_workspace();
+    let toolbar = TOOLBAR.to_owned();
+    let mut predates_toolbar = false;
     let mut workspace = match saved.get("docking") {
         Some(docking) if docking.is_object() => match serde_json::from_value::<Workspace>(docking.clone()) {
-            Ok(workspace) if workspace.validate().is_ok() => workspace,
+            Ok(workspace) if workspace.validate().is_ok() => {
+                predates_toolbar = !workspace.layout.contains(&toolbar) && !workspace.hidden.iter().any(|(panel, _)| *panel == toolbar);
+                workspace
+            }
             _ => default.clone(),
         },
-        _ => migrated(saved, &default),
+        _ => {
+            predates_toolbar = true;
+            migrated(saved, &default)
+        }
     };
     workspace.reconcile(|panel: &String| registry::registered(panel), permissions, &default);
+    if predates_toolbar {
+        migrate_toolbar(&mut workspace, saved.get("panels"));
+    }
     workspace
+}
+
+/// The first panel of the end dock's outermost column other than `skip`: the anchor a column moves before to take the
+/// window's end edge.
+fn end_edge_anchor(layout: &Layout<String>, skip: &String) -> Option<String> {
+    let end = layout.dock_path(DockEdge::End)?;
+    layout
+        .panels()
+        .into_iter()
+        .filter(|panel| *panel != skip)
+        .find(|panel| matches!(layout.place(panel), Some(PanelPlace::Dock { path, column: 0, .. }) if path == end))
+        .cloned()
+}
+
+/// The toolbar of a save that predates the toolbar panel, from the chrome flags it saved in `panels`: `toolbar: false`
+/// closes it, `toolbar_double: true` makes it two tool columns wide, and a `toolbar_side` that resolves to the right
+/// of the window moves its column to the end dock's outer edge. The flags are read as plain values: no type of them is
+/// left. A flag that does not read changes nothing.
+fn migrate_toolbar(workspace: &mut Workspace, panels: Option<&Value>) {
+    let Some(panels) = panels.and_then(Value::as_object) else { return };
+    let toolbar = TOOLBAR.to_owned();
+    let mut actions = Vec::new();
+    if panels.get("toolbar").and_then(Value::as_bool) == Some(false) {
+        actions.push(Action::close(toolbar.clone()));
+    } else {
+        if !workspace.layout.contains(&toolbar) {
+            actions.push(Action::open(toolbar.clone(), None));
+        }
+        if panels.get("toolbar_double").and_then(Value::as_bool) == Some(true) {
+            actions.push(Action::set_column_steps(toolbar.clone(), 2));
+        }
+        let rtl = crate::direction::is_rtl();
+        let right = match panels.get("toolbar_side").and_then(Value::as_str) {
+            Some("right") => true,
+            Some("start") => rtl,
+            Some("end") => !rtl,
+            _ => false,
+        };
+        if right {
+            let to = match end_edge_anchor(&workspace.layout, &toolbar) {
+                Some(anchor) => Target::at(anchor, DockPlacement::column(false)),
+                None => Target::new_dock(DockEdge::End),
+            };
+            actions.push(Action::move_column(toolbar.clone(), to));
+        }
+    }
+    for action in actions {
+        // A step the workspace refuses leaves the toolbar where the default put it.
+        let _ = workspace.apply(action, false, permissions);
+    }
 }
 
 /// A save from before the workspace on the default workspace: its group flags, selected tabs, collapsed groups and

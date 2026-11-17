@@ -99,7 +99,7 @@ The transport is the framework's control server (`craft::automation::server` in 
   - `typeTransform` is `null` outside a temporary Ctrl/Cmd Type-tool drag. During a drag it reports its source document/revision, original affine, oriented `frame` (layer, local bounds, document-space corners and pivot), and captured `gesture`. Drive it with `ui.pointer` and `command: true` at `down`; `move`/`up` may release the modifier. The document/history remain unchanged during preview, and `up` applies one `type.edit` within `textEdit`'s session. Pressing Escape during the drag cancels only the preview. This pointer state is never restored from saved UI state.
 - `ui.menu.invoke {id, params?, wait?}` / `ui.menu.list`: activate a menu item by id; list the menu tree. A menu item that starts a background job (a filter without a dialog, such as Blur More) replies with the job's result once it has been applied; with `"wait": false` the reply is `{job, pending: true}` at once. Window ends with the open documents as `window.document.<index>` (tab order, the active one checked, #2991); invoking one brings that document to the front and replies `{document: index}`. Camera Raw and the full-window workspaces (Liquify, Content-Aware Fill, Filter Gallery, Adaptive Wide Angle) are modal: while one is open, `ui.menu.invoke` refuses every other menu item ("menu command is unavailable while a modal dialog is open") and accepts only that workspace's own `{"ui": {...}}` requests (`filter.liquify`, `edit.contentAwareFill`, `filter.filterGallery`, `filter.adaptiveWideAngle`, `filter.cameraRaw`; `params` must hold only the `ui` object), so finish it with `{"ui":{"commit":true}}` or `{"ui":{"cancel":true}}` first. Those requests are refused too while a dialog, an unsaved-changes prompt or a crop that blocks the command is open: resolve that first, then commit or cancel the workspace. `ui.menu.list` reports the same gate: an item the modal state refuses is listed with `enabled: false`. `engine.execute` is not a menu click and is not gated
 - `ui.set` also accepts `gradientBlendMode` (a layer blend mode name, such as `Difference`) and `gradientClassic` (boolean) for the Gradient tool options bar.
-- `ui.set` also accepts `statusInfo` (the status bar item next to the zoom field), `marqueeStyle` (`normal`, `fixedRatio`, `fixedSize`; the size stays as the options bar's Style dropdown leaves it) and `marqueeSize` (`[width, height]` within the style's range), `actionsPanel` (an object patching `buttonMode` and `collapsed`), `presetBrowsers` (`{<panel>: {view, zoom}}`, each patching that preset panel's browser), `toolbarColumns` (`1` or `2`) and `recentView` (`grid` or `list`, the Home screen's recent files). `ui.inspect` reports `statusInfo`.
+- `ui.set` also accepts `statusInfo` (the status bar item next to the zoom field), `marqueeStyle` (`normal`, `fixedRatio`, `fixedSize`; the size stays as the options bar's Style dropdown leaves it) and `marqueeSize` (`[width, height]` within the style's range), `actionsPanel` (an object patching `buttonMode` and `collapsed`), `presetBrowsers` (`{<panel>: {view, zoom}}`, each patching that preset panel's browser), `toolbarColumns` (1 up to the number of toolbar cells: the toolbar column's width in tool columns) and `recentView` (`grid` or `list`, the Home screen's recent files). `ui.inspect` reports `statusInfo`.
 - `ui.set` also accepts `moveShowTransform` (boolean), the Move tool's Show Transform Controls checkbox (`ui.inspect` › `toolOptions.move_show_transform`). With Move active and the controls visible, a primary `ui.pointer` down on a handle or in the rotation zone starts the same Free Transform session as the canvas, framing all selected non-Background layers. `move` and `up` drive the existing preview; `ui.key {"key":"Enter"}` commits one "Free Transform" history step. A press inside the box keeps the ordinary Move behavior. Hidden or disabled controls do not start a transform. An invalid value rejects the whole `ui.set` request before any fields change.
 - `ui.set` also accepts `camTransformOnDrop` (boolean), the Content-Aware Move tool's Transform On Drop checkbox: a drop then puts a scale/rotate box on the patch (`ui.inspect` › `camTransform`: its document/revision, drag `offset` and `frame`), driven with `ui.pointer` (handles as Free Transform's; outside the box rotates), committed with `ui.key Enter` (one `paint.contentAwareMove` with `scaleX`, `scaleY`, `rotate`) or dropped with `Escape`.
 - `ui.set` also accepts `tileGrid` (boolean), a developer overlay of the active layer's storage tiles: the tile grid over the document, every stored tile filled and labelled `tx,ty`, tiles with identical pixels in a shared colour and unique ones in blue. It has no menu item and View › Extras doesn't hide it. `ui.inspect` reports it as `view.tile_grid`.
@@ -834,7 +834,10 @@ by ID or label, and `onto` is accepted for `anchor`.
 - `window.panel.activate {panel}` reveals and selects a panel, restoring its saved
   position when possible. `window.panel.close {panel}` hides it; `window.panel.closeGroup` and
   `window.panel.closeOthers` close its group or the group's other panels.
-- `window.panel.minimize {panel, minimized?}` collapses a floating window to its title bar.
+- `window.panel.minimize {panel, minimized?}` minimizes the panel's group to its tab strip, or restores it.
+- `window.panel.iconic {panel, iconic?}` collapses the column holding the panel, docked or floating, to icons,
+  or expands it; without `iconic` it toggles. The Toolbar never collapses. `window.panel.<id>` on a panel in a
+  collapsed column opens or closes its flyout and leaves the layout as it is.
 - `window.panel.window {panel, native?}` floats a docked panel's group and gives its floating
   window its own OS window. On the desktop every floating window has one, except the Studio
   themes' Properties card, which stays over the canvas, and on Wayland, where floating windows
@@ -882,9 +885,11 @@ or `down` to the panel's entire current group. With `operation:"move"`, provide
 `anchor` and optional `zone`/`before` (as for panel.move), or a serialized `placement`,
 to transfer all members atomically while preserving their order and selecting the
 requested `panel`.
-A floating group's drag bar or title bar also transfers the whole group when dropped on a
-dock target. The panel menu and icon rail remain
-available in custom workspaces. `window.panel.<id> {show:true}` always reveals, selects
+A floating window is one column, so a floating group's drag bar or its column bar transfers
+the whole column when dropped on a dock target. The panel menu remains available in custom
+workspaces. The Toolbar (`toolbar`, labelled Tools) is a panel of its own column, as many tool
+columns wide as `window.panel.layout {SetColumnSteps}` or `ui.set {toolbarColumns}` say; it takes
+no tabs, no other group and no collapse, and moves like any panel. `window.panel.<id> {show:true}` always reveals, selects
 and expands the panel, including when another tab is selected. Workspace snapshots
 retain custom collapse settings and Timeline visibility.
 

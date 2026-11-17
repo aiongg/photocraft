@@ -101,33 +101,52 @@ fn an_unreadable_docking_layout_is_dropped_and_the_rest_applies() {
     assert!(!app.ui.panels.status_bar, "the rest of the save still applies");
 }
 
-/// `toolbar_side` belongs to the workspace when the layout saved one; a layout saved before the
-/// toolbar could move, or with an unreadable side, keeps the current side instead of `Start`.
-#[test]
-fn applying_a_workspace_keeps_the_toolbar_side_unless_it_saved_one() {
-    use crate::state::ToolbarSide;
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
-    let saved = snapshot(&app);
-    let cases = [
-        (None, ToolbarSide::Right),
-        (Some(json!("sideways")), ToolbarSide::Right),
-        (Some(json!("left")), ToolbarSide::Left),
-        (Some(json!("start")), ToolbarSide::Start),
-    ];
-    for (side, expected) in cases {
-        app.ui.panels.toolbar_side = ToolbarSide::Right;
-        app.ui.panels.status_bar = true;
-        let mut saved = saved.clone();
-        let panels = saved["panels"].as_object_mut().unwrap();
-        panels.insert("status_bar".into(), json!(false));
-        match &side {
-            Some(side) => panels.insert("toolbar_side".into(), side.clone()),
-            None => panels.remove("toolbar_side"),
-        };
-        apply(&mut app, &saved);
-        assert_eq!(app.ui.panels.toolbar_side, expected, "{side:?}");
-        assert!(!app.ui.panels.status_bar, "the rest of the saved panels still apply: {side:?}");
+/// Whether the toolbar's column is in the end dock.
+fn toolbar_at_end(app: &PhotocraftApp) -> bool {
+    let layout = &app.ui.docking.layout;
+    match layout.place(&registry::TOOLBAR.to_owned()) {
+        Some(craft::behavior::dock::PanelPlace::Dock { path, .. }) => layout.dock_path(craft::behavior::dock::DockEdge::End) == Some(path),
+        _ => false,
     }
+}
+
+/// A save from before the toolbar was a panel names its side in `panels.toolbar_side`: a side that resolves to the right
+/// puts the toolbar's column in the end dock once; any other side, or one that does not read, leaves the default's
+/// start dock. A save that holds the toolbar panel keeps the place it saved, whatever the flags say.
+#[test]
+fn an_old_saves_toolbar_side_places_the_toolbar_once() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    for (side, at_end) in [(json!("right"), true), (json!("left"), false), (json!("start"), false), (json!("sideways"), false), (json!(7), false)] {
+        let old = json!({"panels": {"toolbar": true, "options_bar": true, "status_bar": true, "toolbar_side": side.clone()}});
+        apply(&mut app, &old);
+        assert_eq!(toolbar_at_end(&app), at_end, "{side}");
+    }
+
+    // A save from the toolbar panel's version holds its place; its chrome flags no longer mention the toolbar.
+    let ctx = app.ctx().clone();
+    crate::menus::invoke(&mut app, &ctx, "window.panel.dock", json!({"panel": "toolbar", "column": true, "side": "end"})).unwrap();
+    assert!(toolbar_at_end(&app));
+    let mut saved = snapshot(&app);
+    saved["panels"].as_object_mut().unwrap().insert("toolbar_side".into(), json!("left"));
+    let mut restored = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    assert!(!toolbar_at_end(&restored));
+    apply(&mut restored, &saved);
+    assert!(toolbar_at_end(&restored), "the saved place wins over an old flag");
+}
+
+/// An old save's `toolbar_double` makes the toolbar two tool columns wide, and `toolbar: false` closes it.
+#[test]
+fn an_old_saves_toolbar_flags_set_its_width_and_visibility() {
+    let steps = |app: &PhotocraftApp| {
+        let layout = &app.ui.docking.layout;
+        layout.place(&registry::TOOLBAR.to_owned()).and_then(|place| layout.column(&place)).and_then(|column| column.steps)
+    };
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    apply(&mut app, &json!({"panels": {"toolbar": true, "options_bar": true, "status_bar": true, "toolbar_double": true}}));
+    assert_eq!(steps(&app), Some(2));
+    apply(&mut app, &json!({"panels": {"toolbar": false, "options_bar": true, "status_bar": true}}));
+    assert!(!crate::panel_docking::is_shown(&app, registry::TOOLBAR), "the toolbar is closed");
+    assert!(app.ui.docking.hidden.iter().any(|(panel, _)| panel == registry::TOOLBAR), "and keeps its place to reopen at");
 }
 
 /// A workspace from a newer version shows the default, and its file stays as saved until the user

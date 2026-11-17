@@ -40,6 +40,10 @@ pub(crate) struct PanelEntry {
     pub run: fn(&mut PhotocraftApp, &egui::Context, &CommandRef) -> bool,
 }
 
+/// The toolbar: a column of tool buttons that docks, floats and resizes in whole tool columns like a panel of its own.
+/// Its group view (`panel_docking`) draws the rail in the group's full rect.
+pub(crate) const TOOLBAR: &str = "toolbar";
+
 /// The panel that holds the document area. It never moves, floats or closes, and panels open beside it.
 pub(crate) const CANVAS: &str = "canvas";
 
@@ -56,6 +60,9 @@ fn no_rows(_: &PhotocraftApp) -> Vec<PanelRow> {
 fn no_states(_: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
     Vec::new()
 }
+
+/// The body of a panel whose group view draws it.
+fn drawn_by_group_view(_: &mut PhotocraftApp, _: &mut egui::Ui) {}
 
 fn runs_nothing(_: &mut PhotocraftApp, _: &egui::Context, _: &CommandRef) -> bool {
     false
@@ -93,6 +100,7 @@ const BRUSHES_HEIGHTS: DockHeights = DockHeights::new(170.0).compact(120.0).fill
 /// Every registered panel: the docked panels in their groups' one tab order, top to bottom, then the panels that
 /// float or open below the canvas.
 pub(crate) static PANELS: &[PanelEntry] = &[
+    PanelEntry { min: [0.0, 0.0], ..panel(TOOLBAR, || tl!("Tools").to_string(), "move", 0.0, drawn_by_group_view) },
     // The Color panel sizes its field to the group and scrolls its slider modes itself (#6000).
     PanelEntry {
         heights: Some(COLOR_HEIGHTS),
@@ -248,10 +256,15 @@ pub(crate) fn registered(panel: &str) -> bool {
     panel == CANVAS || entry(panel).is_some()
 }
 
-/// What may happen to `panel`: the canvas stays docked and open and takes no tabs, but panels open beside it; every
-/// other panel moves, floats and closes. A locked workspace narrows these itself.
+/// What may happen to `panel`: the canvas stays docked and open and takes no tabs, but panels open beside it; the
+/// toolbar never collapses to icons and never shares its column or tab group; every other panel moves, floats and
+/// closes. A locked workspace narrows these itself.
 pub(crate) fn permissions(panel: &str) -> Permissions {
-    if panel == CANVAS { Permissions::PROTECTED.accepts_splits(true) } else { Permissions::ALL }
+    match panel {
+        CANVAS => Permissions::PROTECTED.accepts_splits(true),
+        TOOLBAR => Permissions::ALL.collapses(false).shares_column(false),
+        _ => Permissions::ALL,
+    }
 }
 
 /// The state of every panel's menu commands.
@@ -265,8 +278,9 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, command: &
 }
 
 /// The groups of saved layouts written before the workspace (`panels.<group>`, `dockTabs.<group>`,
-/// `dock.collapsed`): each old group key with its panels in the one tab order. Top to bottom, it is also the default
-/// dock column.
+/// `dock.collapsed`): each old group key with its panels in the one tab order. Color, Properties, Character and
+/// Layers are the default expanded dock column from top to bottom; Navigator, History and Brushes the default column
+/// of icons.
 pub(crate) const LEGACY_GROUPS: &[(&str, &[&str])] = &[
     ("color", &["color", "swatches", "gradients", "patterns"]),
     ("properties", &["properties", "adjustments"]),
@@ -295,14 +309,31 @@ fn float_rect(id: &str, size: [f32; 2]) -> Rect {
     Rect::from_min_size(min, vec2(size[0], size[1]))
 }
 
-/// Every panel laid out: the canvas with the Timeline below it, the end dock's one column of the old groups top to
-/// bottom, and each floating panel in its own window. The built-in workspaces close what they do not show, so every
-/// closed panel keeps the place it comes back to.
+/// The old groups the default expanded column holds, top to bottom; the rest are the column of icons.
+const EXPANDED_GROUPS: [&str; 4] = ["color", "properties", "character", "layers"];
+
+/// The width of the Start dock's split: the toolbar's dock takes its column's own width.
+const TOOLBAR_DOCK_WIDTH: f32 = 60.0;
+
+/// The old group `key` as a dock group of its panels in the one tab order.
+fn legacy_group(key: &str) -> Group<String> {
+    let panels: &[&str] = LEGACY_GROUPS.iter().find(|(group, _)| *group == key).map_or(&[], |(_, panels)| *panels);
+    Group::new(panels.iter().map(|panel| (*panel).to_owned()).collect(), 0)
+}
+
+/// Every panel laid out: the toolbar's column in a dock at the start edge, the canvas with the Timeline below it, an
+/// end dock of two columns (from the window edge inward: the expanded groups, then the column of icons Photoshop keeps
+/// beside the canvas), and each floating panel in its own window. The built-in workspaces close what they do not show,
+/// so every closed panel keeps the place it comes back to.
 fn full_layout() -> Layout<String> {
-    let column = Column::new(LEGACY_GROUPS.iter().map(|(_, panels)| Group::new(panels.iter().map(|panel| (*panel).to_owned()).collect(), 0)).collect());
+    let toolbar = Column::new(vec![Group::new(vec![TOOLBAR.to_owned()], 0)]).with_steps(1);
+    let expanded = Column::new(EXPANDED_GROUPS.iter().map(|key| legacy_group(key)).collect());
+    let icons =
+        Column::new(LEGACY_GROUPS.iter().map(|(key, _)| *key).filter(|key| !EXPANDED_GROUPS.contains(key)).map(legacy_group).collect()).with_iconic(true);
     let canvas =
         Node::split(Axis::Y, SplitSize::FixedSecond(TIMELINE_HEIGHT), Node::tabs(vec![CANVAS.to_owned()], 0), Node::tabs(vec!["timeline".to_owned()], 0));
-    let root = Node::split(Axis::X, SplitSize::Ratio(0.8), canvas, Node::dock(DockEdge::End, vec![column]));
+    let beside = Node::split(Axis::X, SplitSize::Ratio(0.8), canvas, Node::dock(DockEdge::End, vec![expanded, icons]));
+    let root = Node::split(Axis::X, SplitSize::FixedFirst(TOOLBAR_DOCK_WIDTH), Node::dock(DockEdge::Start, vec![toolbar]), beside);
     // Ids from the table order, so the built-in layout's windows are the same on every build of it.
     let floating = PANELS
         .iter()
@@ -323,9 +354,10 @@ fn preset_panels(name: &str) -> Vec<&'static str> {
         // Color includes Swatches; the Navigator keeps the pixel canvas easy to inspect.
         "Pixel Art" => &["color", "navigator", "layers"],
         "Motion" => &["properties", "layers"],
-        _ => &["color", "properties", "layers"],
+        _ => &["color", "properties", "layers", "navigator", "history", "brushes"],
     };
-    let mut shown: Vec<&'static str> = LEGACY_GROUPS.iter().filter(|(key, _)| groups.contains(key)).flat_map(|(_, panels)| panels.iter().copied()).collect();
+    let mut shown: Vec<&'static str> = vec![TOOLBAR];
+    shown.extend(LEGACY_GROUPS.iter().filter(|(key, _)| groups.contains(key)).flat_map(|(_, panels)| panels.iter().copied()));
     if name == "Motion" {
         shown.push("timeline");
     }

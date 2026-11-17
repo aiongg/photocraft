@@ -107,8 +107,7 @@ fn the_toolbar_draws_one_slot_per_toolbar_group() {
     app.run("edit.toolbar", json!({"toolbar": [["Move"], ["Lasso", "EllipseMarquee"], ["Brush"]]})).unwrap();
     assert_eq!(slots(&app), vec![vec![Tool::Move], vec![Tool::Lasso, Tool::EllipseMarquee], vec![Tool::Brush]]);
     let harness = toolbar_harness(app);
-    // "Move Tool" is left out: the Move Toolbar button's name contains it.
-    for name in ["Lasso Tool", "Brush Tool"] {
+    for name in ["Move Tool", "Lasso Tool", "Brush Tool"] {
         assert!(shows(&harness, name), "{name} has its slot");
     }
     for name in ["Pencil Tool", "Zoom Tool", "Hand Tool"] {

@@ -129,12 +129,8 @@ const PANEL_VERBS: [&str; 13] =
 /// The dock panel a Window menu id shows or hides.
 fn panel_of(id: &str) -> Option<&str> {
     if let Some(toggle) = id.strip_prefix("window.toggle.") {
-        // PLAN: assumed dock panel ids `tools` (the toolbar) and the toggle names for the others.
-        return match toggle {
-            "dock" => None,
-            "toolbar" => Some("tools"),
-            other => Some(other),
-        };
+        // The toggle names are the dock panel ids (`toolbar` is the Tools panel); `dock` is not a panel.
+        return (toggle != "dock").then_some(toggle);
     }
     let panel = id.strip_prefix("window.panel.")?;
     (!PANEL_VERBS.contains(&panel)).then_some(panel)
@@ -201,7 +197,7 @@ pub(super) fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
         "view.lockGuides" => return Some(e.lock_guides),
         _ => {}
     }
-    let shown = |panel: &str| crate::panel_docking::is_shown(app, panel);
+    let shown = |panel: &str| crate::panel_docking::is_checked(app, panel);
     Some(match id {
         "window.toggle.dock" => shown("dock"),
         "window.togglePanels" => ["tools", "options", "dock"].into_iter().any(shown),
