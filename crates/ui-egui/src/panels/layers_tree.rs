@@ -74,8 +74,12 @@ fn effect_kind(e: &Effect) -> Option<EffectKind> {
     })
 }
 
-/// The Smart Filter row selected on its own, while its smart object is active and the row is listed.
+/// The Smart Filter row selected on its own, while its smart object is active and the row is listed in the Layers
+/// panel in front: a row nobody sees highlighted (the panel closed, minimized or behind another tab) is not selected.
 pub(crate) fn listed_filter(app: &PhotocraftApp) -> Option<crate::smart_ui::FilterDrag> {
+    if !super::panel_docking::is_front(app, "layers") {
+        return None;
+    }
     let st = app.session.active()?;
     let picked = crate::smart_ui::selected(&app.smart_filter_picks, &st.doc, st.active_layer);
     PhotoLayers::new(app, st, &app.ui.layer_filter, false, picked).selected_filter()

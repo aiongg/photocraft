@@ -132,8 +132,6 @@ fn the_delete_key_and_a_selected_filter() {
     }
 }
 
-// Fails: nothing tells PhotoCraft that the selected filter row is off screen with the Layers panel
-// closed (`layers_tree::listed_filter` reads the filter, not the panel), so Delete removes the filter.
 /// With the Layers panel closed the selected filter row isn't on screen, so Delete deletes the
 /// active layer as usual.
 #[test]
