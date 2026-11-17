@@ -50,14 +50,6 @@ pub fn take_escape_with(ctx: &Context, mods: Modifiers) -> bool {
     ctx.input_mut(|i| i.consume_key(mods, Key::Escape)) || window_cancel(ctx, Some(mods), true)
 }
 
-/// Takes this pass's Escape for a modal layer the app opens in the pass the key arrives in: the window's and the
-/// focused component's (a crop frame's part, say), so nothing beneath the layer acts on it.
-pub fn take_escape_for_layer(ctx: &Context) -> bool {
-    let window = take_escape(ctx);
-    let focused = craft::ui::runtime::keys::take_cancel(ctx);
-    window || focused
-}
-
 /// Takes the window's Cancel only, for a reader that walks egui's events itself and already sees
 /// an Escape left there.
 pub fn take_window_escape(ctx: &Context) -> bool {
