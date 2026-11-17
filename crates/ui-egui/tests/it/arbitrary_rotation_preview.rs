@@ -178,6 +178,9 @@ fn preview_toggle_and_cancel_keep_the_document_while_ok_applies_rotation() {
     assert_eq!((st.doc.size.width, st.doc.size.height), (453, 453));
     assert_eq!(st.history.entries().len(), history.len() + 1);
     assert!(st.revision > revision);
-    assert_eq!(photocraft_ui_egui::canvas::active_view(h.state()).expect("a shown view").center.x, 226.5);
+    // The view the app keeps is centred on the rotated canvas; the canvas shows it moved by under half a device pixel
+    // so the pixels land on device pixels (`pixel_aligned`), so the kept view is read, not the shown one.
+    let index = h.state().session.active_index().expect("an active document");
+    assert_eq!(h.state().ui.views[index].center[0], 226.5);
     assert!(blue(&mut h, "control-ok").0 > 5_000, "the applied rotation must be visible");
 }
