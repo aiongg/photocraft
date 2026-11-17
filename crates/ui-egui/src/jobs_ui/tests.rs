@@ -547,6 +547,13 @@ fn a_failed_save_or_one_cancelled_while_encoding_leaves_the_document_unsaved() {
     step_until(&mut h, |a| !a.saving());
     let st = h.state().session.active().unwrap();
     assert!(st.is_dirty() && st.path.is_none());
+    eprintln!(
+        "DIAG a_failed_save_or_one_cancelled_while_encoding_leaves_the_document_unsaved: status={:?} error={} posted={} shown={:?}",
+        h.state().ui.status,
+        h.state().ui.status_error,
+        crate::notices::shown_titled(h.state(), "Save failed: disk full"),
+        crate::notices::shown(h.state(), &h.ctx)
+    );
     assert!(noticed(&h, "disk full"), "the failure is reported");
 
     gates.encode.store(false, Ordering::Relaxed);
