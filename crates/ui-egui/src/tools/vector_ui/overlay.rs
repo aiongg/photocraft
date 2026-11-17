@@ -138,9 +138,11 @@ pub(crate) fn show_paths(app: &mut PhotocraftApp, ui: &mut egui::Ui, at: egui::R
         return None;
     }
     let anchors = shown.first().map_or(AnchorsShown::Hidden, |(_, _, a)| *a);
-    let (refs, mut paths): (Vec<PathRef>, Vec<EditPath>) = shown.into_iter().map(|(r, p, _)| (r, p)).unzip();
+    let (refs, paths): (Vec<PathRef>, Vec<EditPath>) = shown.into_iter().map(|(r, p, _)| (r, p)).unzip();
     let selection = crate::direct_select::selection(app, tool);
-    let output = BezierOverlay::new("Paths", Bind::bound(&mut paths), &selection)
+    // Given, not bound: the paths come from the document each pass and only an edit's end (`Commit`, `Set`) changes
+    // the document, so a drag's own updates are no outside change that cancels it.
+    let output = BezierOverlay::new("Paths", Bind::given(paths), &selection)
         .tool(tool)
         .anchors(anchors)
         .path_options(&app.ui.tool_options.path_options)
