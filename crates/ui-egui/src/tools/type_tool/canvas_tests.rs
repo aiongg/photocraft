@@ -1196,9 +1196,11 @@ fn click_inside_the_paragraph_box_off_the_glyphs_moves_the_caret() {
         drag_create(app, [p.x, p.y], [p.x, p.y]);
     };
     let layers = app.session.active().unwrap().doc.layers.len();
-    // Near the bottom of the box, just right of its left edge.
-    assert!(!photocraft_text::text_point_inside(&l, bx + 8.0, by + h - 8.0, 6.0), "the point is off the glyphs");
-    click(&mut app, bx + 8.0, by + h - 8.0);
+    // Below the two lines, just right of the box's left edge and 40 units above its bottom: clear of the bottom-left
+    // handle's reach at the zoom the view fits the document to (the reach is in screen points; the box shows at
+    // about half size).
+    assert!(!photocraft_text::text_point_inside(&l, bx + 8.0, by + h - 40.0, 6.0), "the point is off the glyphs");
+    click(&mut app, bx + 8.0, by + h - 40.0);
     let ed = app.ui.text_edit.clone().expect("still editing");
     // "Hello é世界\n" is 10 characters: the start of the second line.
     assert_eq!((ed.layer, ed.caret, ed.anchor), (id.0, 10, 10));
