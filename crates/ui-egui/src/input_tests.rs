@@ -80,11 +80,6 @@ fn clicking_outside_a_dialog_keeps_it_open_and_the_canvas_pans_and_zooms() {
     // Space-drag pans too.
     h.event(egui::Event::Key { key: Key::Space, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
     h.run_steps(1);
-    eprintln!(
-        "DIAG clicking_outside_a_dialog_keeps_it_open_and_the_canvas_pans_and_zooms: after Space held {:?} focused {:?}",
-        h.state().canvas_tools.momentary.held(),
-        h.ctx.memory(|m| m.focused())
-    );
     h.event(egui::Event::PointerButton { pos: p, button: egui::PointerButton::Primary, pressed: true, modifiers: Modifiers::NONE });
     h.run_steps(1);
     for i in 1..=5 {
@@ -155,12 +150,6 @@ fn color_picker_samples_the_image_under_its_pipette() {
     h.event(egui::Event::Key { key: Key::Space, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE });
     h.run_steps(1);
     press(&mut h, red, true);
-    eprintln!(
-        "DIAG color_picker_samples_the_image_under_its_pipette: after Space held {:?} focused {:?} tool {:?}",
-        h.state().canvas_tools.momentary.held(),
-        h.ctx.memory(|m| m.focused()),
-        h.state().ui.tool
-    );
     h.hover_at(red + vec2(40.0, 0.0));
     h.run_steps(1);
     press(&mut h, red + vec2(40.0, 0.0), false);
