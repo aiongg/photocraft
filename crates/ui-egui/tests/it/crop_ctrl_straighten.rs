@@ -133,7 +133,9 @@ fn a_command_held_line_undoes_as_one_box_step_and_commits_as_one_document_step()
         assert!(!pending(h.state()), "classic {classic}: the default frame again");
         h.state_mut().run("edit.redo", json!({})).expect("redo");
         h.run_steps(6);
-        assert!((angle(&h) + 10.0).abs() < 1e-6 && pending(h.state()), "classic {classic}: redone");
+        // The line's ends pass through f32 screen points, so the angle is -10 only to f32 precision (about 1e-6 degrees
+        // for ends hundreds of points apart); 1e-4 is the tolerance.
+        assert!((angle(&h) + 10.0).abs() < 1e-4 && pending(h.state()), "classic {classic}: redone");
         assert_eq!(rect(&h), Some([0.0, 0.0, 800.0, 500.0]), "classic {classic}: redone");
         let steps = h.state().session.active().expect("document").history.past_len();
         assert_eq!(committed(&mut h), (800, 500), "classic {classic}");
