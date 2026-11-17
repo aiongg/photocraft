@@ -694,7 +694,8 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     // the moving pixels. The preview is image content, drawn before the grid and guides like
     // the document is; the box and handles still go over them, as in Photoshop. The document
     // picture and the controls are on different paint layers, so the order is read from the
-    // pass's shapes, which egui hands over merged in paint order.
+    // pass's shapes, which egui hands over merged in paint order. The canvas's picture slot holds the document and the
+    // preview as one list shape at its place, so the order is read from the shapes with every list opened in place.
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
@@ -721,7 +722,17 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     // At 100 % centred on the document, screen and document coordinates coincide.
     let layer = Rect::from_min_max(pos2(100.0, 100.0), pos2(200.0, 160.0));
     let near = |r: Rect| (r.min - layer.min).length() < 1.0 && (r.max - layer.max).length() < 1.0;
-    let position = |pred: &dyn Fn(&egui::Shape) -> bool| out.shapes.iter().position(|s| pred(&s.shape));
+    fn open<'a>(shape: &'a egui::Shape, into: &mut Vec<&'a egui::Shape>) {
+        match shape {
+            egui::Shape::Vec(list) => list.iter().for_each(|shape| open(shape, into)),
+            shape => into.push(shape),
+        }
+    }
+    let mut shapes = Vec::new();
+    for clipped in &out.shapes {
+        open(&clipped.shape, &mut shapes);
+    }
+    let position = |pred: &dyn Fn(&egui::Shape) -> bool| shapes.iter().position(|s| pred(s));
     // The moving pixels: the mesh that spans the layer's box.
     let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if near(m.calc_bounds())));
     // The guide: a vertical line at x = 150, which the framework's rule puts on a pixel centre (within a pixel).

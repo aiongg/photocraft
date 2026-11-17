@@ -247,9 +247,15 @@ fn transform_preview_stays_visible_while_panning() {
         .pick(&h.ctx, craft::imaging::ui::transform_preview::PreviewTextures::choose(1.0, 1.0, false), None)
         .expect("the preview uploads its texels")
         .0;
-    let has_preview = |h: &Harness<'static, PhotocraftApp>| {
-        h.output().shapes.iter().any(|clipped| matches!(&clipped.shape, egui::epaint::Shape::Mesh(mesh) if mesh.texture_id == texture))
-    };
+    // The preview paints in the canvas's picture slot, a list shape holding the document and the preview.
+    fn shows(shape: &egui::epaint::Shape, texture: egui::TextureId) -> bool {
+        match shape {
+            egui::epaint::Shape::Vec(list) => list.iter().any(|shape| shows(shape, texture)),
+            egui::epaint::Shape::Mesh(mesh) => mesh.texture_id == texture,
+            _ => false,
+        }
+    }
+    let has_preview = |h: &Harness<'static, PhotocraftApp>| h.output().shapes.iter().any(|clipped| shows(&clipped.shape, texture));
     assert!(has_preview(&h), "the transformed pixels are visible before panning");
 
     let center0 = h.state().ui.views[0].center;
