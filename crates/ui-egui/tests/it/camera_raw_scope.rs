@@ -109,6 +109,11 @@ fn hover_over_picture(h: &mut Harness<'_, PhotocraftApp>) -> (Pos2, Value) {
             }
         }
     }
+    let now = inspect(h);
+    eprintln!(
+        "DIAG lab_readouts_respect_embedded_rgb_profile: view={} proxy={} sourceSize={} previewPending={} histogram={}",
+        now["view"], now["proxy"], now["sourceSize"], now["previewPending"], !now["histogram"].is_null()
+    );
     panic!("no point of the window reads the picture");
 }
 
