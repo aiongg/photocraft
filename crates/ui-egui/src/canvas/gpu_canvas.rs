@@ -1111,51 +1111,6 @@ impl GpuCanvas {
         Some((d.format, d.size, out))
     }
 
-    /// DIAG: the stored texel of document `key`'s canvas texture at document pixel `at`, read from mip `level`.
-    #[cfg(not(target_arch = "wasm32"))]
-    pub(crate) fn diag_texel(&self, key: u64, level: u32, at: [u32; 2]) -> Option<[f32; 4]> {
-        if !self.health.is_ok() {
-            return None;
-        }
-        let (device, queue) = (&self.rs.device, &self.rs.queue);
-        let renderer = self.rs.renderer.read();
-        let d = renderer.callback_resources.get::<Resources>()?.docs.get(&key)?;
-        let t = d.tiles.iter().find(|t| {
-            let [tx, ty, tw, th] = t.rect;
-            at[0] >= tx && at[0] < tx + tw && at[1] >= ty && at[1] < ty + th
-        })?;
-        if level as usize >= t.levels.len() {
-            return None;
-        }
-        let bpp = texel_bytes(d.format) as usize;
-        let row = wgpu::COPY_BYTES_PER_ROW_ALIGNMENT;
-        let buf = device.create_buffer(&wgpu::BufferDescriptor {
-            label: Some("pc_canvas_diag"),
-            size: u64::from(row),
-            usage: wgpu::BufferUsages::COPY_DST | wgpu::BufferUsages::MAP_READ,
-            mapped_at_creation: false,
-        });
-        let mut enc = device.create_command_encoder(&wgpu::CommandEncoderDescriptor { label: Some("pc_canvas_diag") });
-        enc.copy_texture_to_buffer(
-            wgpu::TexelCopyTextureInfo {
-                texture: &t.texture,
-                mip_level: level,
-                origin: wgpu::Origin3d { x: (at[0] - t.rect[0]) >> level, y: (at[1] - t.rect[1]) >> level, z: 0 },
-                aspect: wgpu::TextureAspect::All,
-            },
-            wgpu::TexelCopyBufferInfo { buffer: &buf, layout: wgpu::TexelCopyBufferLayout { offset: 0, bytes_per_row: Some(row), rows_per_image: Some(1) } },
-            wgpu::Extent3d { width: 1, height: 1, depth_or_array_layers: 1 },
-        );
-        queue.submit([enc.finish()]);
-        let slice = buf.slice(..);
-        slice.map_async(wgpu::MapMode::Read, |_| {});
-        if !self.health.wait(device, None) {
-            return None;
-        }
-        let data = slice.get_mapped_range().ok()?;
-        Some(texel_to_f32(d.format, data.get(..bpp)?))
-    }
-
     /// Add the paint callback drawing `params` into `rect` (clipped by the painter's clip rect).
     pub fn paint(painter: &egui::Painter, rect: egui::Rect, params: ViewParams) {
         painter.add(egui_wgpu::Callback::new_paint_callback(rect, CanvasCallback { rect, params }));

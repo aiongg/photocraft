@@ -77,19 +77,6 @@ pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Opti
             picture.as_ref().map(|p| p.k),
             app.live_stroke_busy()
         );
-        // The worst and the first differing pixels of round J (document pixels), at mip levels 0 and 1.
-        #[cfg(not(target_arch = "wasm32"))]
-        if let Some(gpu) = app.gpu.as_ref() {
-            let key = req.doc.id.0;
-            for at in [[132u32, 142u32], [168, 40]] {
-                eprintln!(
-                    "DIAG {test}: texel {at:?} L0 {:?} L1 {:?} alpha of the L0 2x2 block under the L1 texel {:?}",
-                    gpu.diag_texel(key, 0, at),
-                    gpu.diag_texel(key, 1, at),
-                    [[at[0] & !1, at[1] & !1], [at[0] | 1, at[1] & !1], [at[0] & !1, at[1] | 1], [at[0] | 1, at[1] | 1]].map(|p| gpu.diag_texel(key, 0, p).map(|t| t[3]))
-                );
-            }
-        }
     }
     picture
 }
