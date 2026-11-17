@@ -183,7 +183,7 @@ fn launch(app: &mut PhotocraftApp, dialog: ColorPickerDialog, parent: Option<Dia
 }
 
 /// Opens the picker for the foreground or background colour.
-pub(crate) fn open(app: &mut PhotocraftApp, target: &str) -> DialogId {
+pub fn open(app: &mut PhotocraftApp, target: &str) -> DialogId {
     let background = target == "background";
     let c = if background { app.session.tools.background } else { app.session.tools.foreground };
     let rgb = [c[0], c[1], c[2]];

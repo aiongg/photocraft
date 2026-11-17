@@ -501,7 +501,7 @@ pub fn run(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// Answers dialog `id` with OK, as its default button would, and runs what OK does. A held OK is answered at once by the
 /// family that holds it: an accepted one closes the dialog in this call, a refusal comes back as the error text, and one
 /// that waits on a pick (Export's save dialog) is answered by the pick.
-pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
+pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
     if app.framework.dialogs.get_dyn(id).is_none() {
         return Err(format!("no dialog {}", id.value()));
     }
@@ -537,7 +537,7 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId
 }
 
 /// Cancels dialog `id`, as Cancel or Escape would, and runs what a cancel leaves to do.
-pub(crate) fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
+pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
     // A prompt answers Escape with its escape button, as an answer its family takes; the host's own cancel is a result
     // that reaches no family (it stands for a replaced prompt).
     let escape = app.framework.dialogs.get_dyn_mut(id).and_then(|dialog| dialog.downcast_mut::<StandardPrompt>()).and_then(|prompt| {
