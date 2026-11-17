@@ -86,7 +86,8 @@ pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Opti
                     "DIAG {test}: texel {at:?} L0 {:?} L1 {:?} alpha of the L0 2x2 block under the L1 texel {:?}",
                     gpu.diag_texel(key, 0, at),
                     gpu.diag_texel(key, 1, at),
-                    [[at[0] & !1, at[1] & !1], [at[0] | 1, at[1] & !1], [at[0] & !1, at[1] | 1], [at[0] | 1, at[1] | 1]].map(|p| gpu.diag_texel(key, 0, p).map(|t| t[3]))
+                    [[at[0] & !1, at[1] & !1], [at[0] | 1, at[1] & !1], [at[0] & !1, at[1] | 1], [at[0] | 1, at[1] | 1]]
+                        .map(|p| gpu.diag_texel(key, 0, p).map(|t| t[3]))
                 );
             }
         }
