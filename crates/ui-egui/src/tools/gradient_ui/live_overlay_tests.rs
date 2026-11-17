@@ -43,8 +43,9 @@ fn a_live_handle_or_stop_drag_is_one_fill_step_and_shows_before_release() {
     assert!((g["to"][0].as_f64().unwrap() - 150.0).abs() < 1e-3 && (g["to"][1].as_f64().unwrap() - 100.0).abs() < 1e-3, "{g}");
     assert_eq!(past(&app), before + 1);
 
-    // A click on the line (now from (20, 60) to (150, 100); its middle is (85, 80)) adds a stop.
-    let on_line = [85.0, 80.0];
+    // A click on the line (now from (20, 60) to (150, 100)) adds a stop: a third of the way, since the midpoint
+    // diamond sits half-way and takes the press there, as in production (gradient_ui tests).
+    let on_line = [20.0 + 130.0 / 3.0, 60.0 + 40.0 / 3.0];
     let before = past(&app);
     press(&mut app, on_line, m);
     release(&mut app, on_line, m);
