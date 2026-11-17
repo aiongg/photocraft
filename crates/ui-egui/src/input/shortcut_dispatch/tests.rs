@@ -136,7 +136,7 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
         Place::LayersRow => {
             h.get_by_role_and_label(Role::TreeItem, "paint").scroll_to_me();
             h.run_steps(4);
-            let row = crate::layers_panel_nodes::row(&h, "paint");
+            let row = crate::layers_panel_nodes::row(h, "paint");
             click(h, row.center() + vec2(row.width() / 4.0, 0.0));
             assert_eq!(active_name(h), "paint");
         }
@@ -210,7 +210,7 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
             let chord = Chord::parse(&sc).unwrap_or_else(|_| panic!("{id}: unparsable {sc}"));
             // A press the focused component holds (the Layers rows' stacking and visibility keys)
             // is the component's and reaches no app command.
-            let held = focus_holds(&h.ctx, chord.clone());
+            let held = focus_holds(&h.ctx, chord);
             press(&mut h, &sc);
             let log = take_log(&h.ctx);
             if typing && !chord.has_command() && !chord.is_function_key() {

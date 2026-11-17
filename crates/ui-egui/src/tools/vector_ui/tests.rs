@@ -1093,7 +1093,6 @@ fn type_stroke_width(h: &mut egui_kittest::Harness<'_, PhotocraftApp>) {
 
 #[test]
 fn shape_options_bar_edits_the_selected_shape() {
-    use egui_kittest::kittest::Queryable;
     let mut h = shape_bar_harness(Tool::Rectangle);
     assert!(active_shape_paint(h.state()).0.is_some() && active_shape_paint(h.state()).1.is_none());
     type_stroke_width(&mut h);
@@ -1120,7 +1119,6 @@ fn shape_options_bar_edits_the_selected_shape() {
 /// controls when a shape is selected, and editing them edits the selected shape.
 #[test]
 fn path_selection_options_bar_edits_the_selected_shape() {
-    use egui_kittest::kittest::Queryable;
     let mut h = shape_bar_harness(Tool::PathSelection);
     assert!(active_shape_paint(h.state()).0.is_some() && active_shape_paint(h.state()).1.is_none());
     // Stroke width field is available on Path Selection bar too.

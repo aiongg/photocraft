@@ -474,7 +474,7 @@ fn bevel_angle_change_is_not_overridden_by_unchanged_drop_shadow_angle() {
 /// No angle changed: OK runs no `layer.layerStyle.globalLight` step and the document's light stays.
 #[test]
 fn unchanged_global_light_angle_is_not_applied() {
-    let mut s = session();
+    let s = session();
     let id = s.active().unwrap().active_layer.unwrap();
     let mut d = LayerStyleDraft::new(drafted(&s));
     let bevel = d.add_instance(EffectKind::BevelEmboss, &defaults(EffectKind::BevelEmboss));

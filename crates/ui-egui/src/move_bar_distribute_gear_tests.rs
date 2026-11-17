@@ -181,7 +181,7 @@ fn ctrl_click(app: &mut PhotocraftApp) {
 #[test]
 fn expand_layer_group_on_click_off_keeps_the_group_closed_for_a_ctrl_click_from_another_tool() {
     // Auto-Select off, so the Ctrl-click is the Move way of picking from the Brush.
-    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
     assert_eq!(app.session.active().unwrap().active_layer, Some(inner), "the Ctrl-click picked the layer");
@@ -190,7 +190,7 @@ fn expand_layer_group_on_click_off_keeps_the_group_closed_for_a_ctrl_click_from_
 
 #[test]
 fn expand_layer_group_on_click_on_opens_the_group_for_a_ctrl_click_from_another_tool() {
-    let (mut app, inner, group) = closed_group_doc(Tool::Brush, true);
+    let (mut app, inner, _) = closed_group_doc(Tool::Brush, true);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
     assert_eq!(app.session.active().unwrap().active_layer, Some(inner));
@@ -199,7 +199,7 @@ fn expand_layer_group_on_click_on_opens_the_group_for_a_ctrl_click_from_another_
 
 #[test]
 fn expand_layer_group_on_click_off_keeps_the_group_closed_for_a_move_tool_click() {
-    let (mut app, inner, group) = closed_group_doc(Tool::Move, false);
+    let (mut app, inner, _) = closed_group_doc(Tool::Move, false);
     use crate::canvas::{ToolEvent, tool_event};
     tool_event(&mut app, ToolEvent::Down { x: 12.0, y: 12.0, pressure: 1.0 }, egui::Modifiers::default());
     tool_event(&mut app, ToolEvent::Up { x: 12.0, y: 12.0 }, egui::Modifiers::default());
@@ -209,7 +209,7 @@ fn expand_layer_group_on_click_off_keeps_the_group_closed_for_a_move_tool_click(
 
 #[test]
 fn expand_layer_group_on_click_off_still_opens_the_group_for_other_active_layer_changes() {
-    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
     select(&mut app, inner);
     assert_eq!(track(&mut app), Some((inner, Groups::Open)), "a command that changes the active layer reveals it");
 }
@@ -217,7 +217,7 @@ fn expand_layer_group_on_click_off_still_opens_the_group_for_other_active_layer_
 #[test]
 fn expand_layer_group_on_click_governs_a_ctrl_click_pick_of_a_position_locked_layer() {
     for on in [false, true] {
-        let (mut app, inner, group) = closed_group_doc(Tool::Brush, on);
+        let (mut app, inner, _) = closed_group_doc(Tool::Brush, on);
         app.ui.tool_options.move_auto_select = false;
         app.session.execute("layer.setProps", json!({"layer": inner.0, "locks": {"position": true}})).unwrap();
         ctrl_click(&mut app);
@@ -228,7 +228,7 @@ fn expand_layer_group_on_click_governs_a_ctrl_click_pick_of_a_position_locked_la
 
 #[test]
 fn a_pick_marker_the_hidden_layers_panel_never_read_does_not_hide_a_later_command_change() {
-    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     // A Move-way pick of the inner layer while the Layers panel draws nothing (no `track`).
     ctrl_click(&mut app);
@@ -244,7 +244,7 @@ fn a_pick_marker_the_hidden_layers_panel_never_read_does_not_hide_a_later_comman
 
 #[test]
 fn a_pick_marker_survives_any_number_of_frames_while_the_layers_panel_is_hidden() {
-    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
     app.frame += 5;
@@ -254,7 +254,7 @@ fn a_pick_marker_survives_any_number_of_frames_while_the_layers_panel_is_hidden(
 #[test]
 fn commands_after_a_pick_in_the_same_frame_or_the_next_make_it_a_command_change() {
     for gap in [0, 1] {
-        let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
+        let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
         app.ui.tool_options.move_auto_select = false;
         ctrl_click(&mut app);
         app.frame += gap;
@@ -266,7 +266,7 @@ fn commands_after_a_pick_in_the_same_frame_or_the_next_make_it_a_command_change(
 
 #[test]
 fn a_pick_marker_is_read_once_and_governs_the_next_change_only() {
-    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
     assert_eq!(track(&mut app), Some((inner, Groups::Keep)));

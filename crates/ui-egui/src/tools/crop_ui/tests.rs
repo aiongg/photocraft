@@ -3,7 +3,7 @@ use crate::PhotocraftApp;
 use crate::canvas::{ToolEvent, tool_event};
 use crate::state::Tool;
 use craft::behavior::geometry::CropBox;
-use craft::behavior::kurbo::{Point, Rect};
+use craft::behavior::kurbo::Rect;
 use craft::draw::ui::crop::{CropFill, CropLength, CropRatio, CropSettings, CropTool, ResolutionUnit};
 use craft::ui::runtime::env::UnitKind;
 use egui::Modifiers;

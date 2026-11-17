@@ -393,7 +393,7 @@ mod tests {
         vp.outer_rect = Some(egui::Rect::from_min_size(egui::pos2(pos[0], pos[1]), egui::vec2(800.0, 600.0)));
         vp.monitor_size = Some(egui::vec2(monitor[0], monitor[1]));
         vp.focused = Some(focused);
-        let out = crate::testing::run_ui(&ctx, input, |ui| poll(app, ui.ctx()));
+        let out = crate::testing::run_ui(ctx, input, |ui| poll(app, ui.ctx()));
         out.viewport_output.get(&egui::ViewportId::ROOT).map_or(std::time::Duration::MAX, |v| v.repaint_delay)
     }
 
@@ -532,7 +532,7 @@ mod tests {
         vp.native_pixels_per_point = Some(1.0);
         vp.outer_rect = Some(egui::Rect::from_min_size(egui::pos2(pos[0], pos[1]), egui::vec2(800.0, 600.0)));
         vp.monitor_size = Some(egui::vec2(1728.0, 1117.0));
-        let out = crate::testing::run_ui(&ctx, input, |ui| check_window(app, ui.ctx()));
+        let out = crate::testing::run_ui(ctx, input, |ui| check_window(app, ui.ctx()));
         out.viewport_output.get(&egui::ViewportId::ROOT).map_or(std::time::Duration::MAX, |v| v.repaint_delay)
     }
 

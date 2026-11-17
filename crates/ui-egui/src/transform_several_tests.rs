@@ -68,7 +68,7 @@ fn free_transform_frames_every_selected_layer_and_moves_them_all() {
     let (mut app, paint, text) = app();
     let (p0, t0) = (bounds(&app, paint), bounds(&app, text));
     free_transform(&mut app);
-    let t = app.ui.transform.as_ref().unwrap();
+    assert!(app.ui.transform.is_some());
     let both = p0.union(&t0);
     assert_eq!(frame_of(&app), [both.x0, both.y0, both.x1, both.y1].map(f64::from), "the box frames both layers");
     let t = app.ui.transform.as_ref().unwrap();

@@ -643,7 +643,6 @@ fn a_select_commits_an_open_text_edit_before_changing_the_selection() {
     for same in [true, false] {
         for thumbnail in [true, false] {
             let mut app = app_of(Session::new());
-            let ctx = app.ctx().clone();
             app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
             let text = LayerId(app.run("type.create", json!({"text": "Before", "size": 24, "x": 20, "y": 80})).unwrap()["layer"].as_u64().unwrap());
             let other = LayerId(app.run("layer.new.layer", json!({"name": "Other pixels"})).unwrap()["layer"].as_u64().unwrap());

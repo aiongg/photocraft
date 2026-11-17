@@ -52,7 +52,7 @@ mod tests {
             v.outer_rect = outer;
             v.maximized = maximized;
         }
-        let out = crate::testing::run_ui(&ctx, input, |ui| {
+        let out = crate::testing::run_ui(ctx, input, |ui| {
             fit_window(ui.ctx());
         });
         out.viewport_output.get(&egui::ViewportId::ROOT).map(|v| v.commands.clone()).unwrap_or_default()

@@ -26,7 +26,7 @@ fn dialog(app: &PhotocraftApp) -> Option<DialogId> {
         .dialogs
         .stack()
         .ids()
-        .filter(|id| app.framework.dialogs.get_by_id::<HostedParamDialog>(*id).is_some_and(|d| d.key().is_some_and(|k| owns(&k))))
+        .filter(|id| app.framework.dialogs.get_by_id::<HostedParamDialog>(*id).is_some_and(|d| d.key().is_some_and(|k| owns(k))))
         .collect();
     assert!(open.len() <= 1, "one dialog at a time: {open:?}");
     open.first().copied()

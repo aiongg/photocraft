@@ -168,7 +168,7 @@ fn chord(text: &str) -> Chord {
 /// The shortcut the menu shows for `id`.
 fn menu_shortcut(app: &PhotocraftApp, id: &str) -> Option<Chord> {
     let rows = crate::menus::menu_rows(app);
-    rows.iter().find(|row| row.command.id == id).unwrap_or_else(|| panic!("no menu row {id}")).shortcut.clone()
+    rows.iter().find(|row| row.command.id == id).unwrap_or_else(|| panic!("no menu row {id}")).shortcut
 }
 
 // --- the preferences' own rules ---------------------------------------------------------------------------------
@@ -871,7 +871,7 @@ fn restart_cases() -> Vec<Case> {
         Case {
             name: "untouched View items store nothing",
             seed: None,
-            set: Box::new(|app, ctx| crate::view_cmds::persist(app, ctx)),
+            set: Box::new(crate::view_cmds::persist),
             check: Box::new(|_, _, stored| {
                 // So later default changes still reach the user.
                 assert!(stored.get("viewExtras").is_none_or(Value::is_null));

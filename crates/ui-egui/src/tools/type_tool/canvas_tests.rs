@@ -234,7 +234,6 @@ mod panel_defaults {
     use super::*;
     use crate::state::{Tool, ToolOptions};
     use egui::accesskit::Role;
-    use egui_kittest::kittest::NodeT;
     use photocraft_doc::text::{Caps, Kerning, Orientation, TextAlign, TextShape};
 
     /// Without a type target the preset chevrons set the next layer's defaults, with no

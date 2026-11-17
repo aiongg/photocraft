@@ -642,7 +642,7 @@ fn remove_after_each_stroke_off_collects_strokes_until_enter_or_escape() {
         if by_key {
             crate::canvas::testing::key(&mut app, egui::Key::Enter, m);
         } else {
-            let _ = crate::retouch_ui::bar::answer(&mut app, Tool::Remove, true, false);
+            crate::retouch_ui::bar::answer(&mut app, Tool::Remove, true, false);
         }
         assert!(!app.ui.status_error, "by_key {by_key}: {}", app.ui.status);
         let (id, p) = app.session.journal.last().cloned().expect("a journaled command");

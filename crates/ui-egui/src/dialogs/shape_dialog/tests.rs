@@ -41,7 +41,6 @@ fn live(app: &PhotocraftApp) -> LiveShape {
 }
 
 /// Writes fields of the hosted dialog `id`, as `ui.dialog.set` does.
-
 fn set(app: &mut PhotocraftApp, id: DialogId, fields: Value) {
     let ctx = app.ctx().clone();
     for (k, v) in fields.as_object().unwrap() {
