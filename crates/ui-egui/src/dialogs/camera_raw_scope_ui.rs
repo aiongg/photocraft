@@ -12,8 +12,6 @@ use photocraft_algo::histogram::RgbHistogram;
 use photocraft_algo::vectorscope::{HUES, SATURATIONS, Vectorscope, hue_saturation};
 use std::sync::Arc;
 
-/// Most colour samplers (probes) on the preview.
-pub(crate) const MAX_SAMPLERS: usize = 9;
 /// Vectorscope analysis samples at most this many proxy pixels.
 const SCOPE_SAMPLES: usize = 8192;
 
@@ -128,11 +126,6 @@ impl ScopeData {
     /// The After picture's clipping mask and the revision of the develop it was made from.
     pub(crate) fn clipping(&self) -> (Arc<ClippingMask>, Revision) {
         (self.mask.clone(), self.revision)
-    }
-
-    /// The counts of the picture before or after the settings, for the control channel's reply.
-    pub(crate) fn histogram(&self, before: bool) -> &RgbHistogram {
-        &self.histograms[side(before)]
     }
 
     /// The vectorscope of the picture before or after the settings over the whole frame or the

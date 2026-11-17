@@ -27,26 +27,8 @@ use crate::guide_edit::Target;
 use crate::guide_layout_ui::{guide_units, preference_rgba};
 
 const COMMAND: &str = "view.newGuide";
-const EDIT_COMMAND: &str = "view.editGuide";
-const CUSTOM: &str = "custom";
 /// Where New Guide's values are remembered between opens.
 const REMEMBER: SaveKey = SaveKey::new("craft_dialogs.photocraft.new_guide");
-/// New Guide's colour when nothing was remembered, as in Photoshop.
-const DEFAULT_COLOR: &str = "cyan";
-
-/// Accept the named guide colours and the explicit custom-colour choice.
-fn is_color_name(name: &str) -> bool {
-    name == CUSTOM || GUIDE_COLORS.iter().any(|(n, ..)| *n == name)
-}
-
-/// The list entry (and Custom… colour) showing `rgb`: a named colour when it is one, else Custom….
-fn color_choice(rgb: [u8; 3]) -> (String, String) {
-    let hex = format!("#{:02x}{:02x}{:02x}", rgb[0], rgb[1], rgb[2]);
-    match GUIDE_COLORS.iter().find(|(.., c)| *c == rgb) {
-        Some((name, ..)) => (name.to_string(), hex),
-        None => (CUSTOM.to_string(), hex),
-    }
-}
 
 /// `"#rrggbb"` of a guide colour, as the engine takes it.
 fn hex(color: GuideColor) -> String {

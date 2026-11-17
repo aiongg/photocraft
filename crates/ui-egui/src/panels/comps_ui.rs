@@ -32,11 +32,6 @@ pub(crate) fn panel_rows(_app: &PhotocraftApp) -> Vec<PanelRow> {
     Vec::new()
 }
 
-/// The panel has no command set of its own.
-pub(crate) fn command_states(_app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
-    Vec::new()
-}
-
 /// The panel has no menu commands to run.
 pub(crate) fn run_fired(_app: &mut PhotocraftApp, _ctx: &egui::Context, _command: &CommandRef) -> bool {
     false

@@ -305,27 +305,6 @@ pub(crate) fn edit_path(path: &Path, key: u64) -> EditPath {
     EditPath::new(key, subpaths).copies(copies)
 }
 
-/// The document path of an edited `EditPath`, with each subpath's operation and the path's fill
-/// rule taken from `base` (the overlay does not carry them).
-pub(crate) fn doc_path(edit: &EditPath, base: &Path) -> Path {
-    let point = |p: EditPoint| photocraft_geom::Point::new(p.x, p.y);
-    let subpaths = edit
-        .subpaths
-        .iter()
-        .enumerate()
-        .map(|(i, s)| photocraft_doc::vector::Subpath {
-            closed: s.closed,
-            knots: s
-                .knots
-                .iter()
-                .map(|k| photocraft_doc::vector::Knot { anchor: point(k.anchor), in_ctrl: point(k.in_ctrl), out_ctrl: point(k.out_ctrl), smooth: k.smooth })
-                .collect(),
-            op: base.subpaths.get(i).map(|b| b.op).unwrap_or_default(),
-        })
-        .collect();
-    Path { subpaths, ..base.clone() }
-}
-
 /// Edit › Free Transform Path (⌘T with Path Selection or Direct Selection): the path the
 /// box transforms (the one Path Selection edits) and `path.transform`'s params that name it.
 pub(crate) fn free_transform_path(app: &PhotocraftApp) -> Option<(Value, Path)> {

@@ -42,6 +42,7 @@ pub(crate) struct CloneSource {
 }
 
 impl CloneSource {
+    #[cfg(test)]
     /// The overlay's pixels, premultiplied sRGBA, row by row.
     pub(crate) fn image(&self) -> &ColorImage {
         &self.pixels

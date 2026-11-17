@@ -239,11 +239,6 @@ pub(crate) struct GalleryApp {
     source: Arc<PcGallerySource>,
 }
 
-/// The document the open gallery belongs to.
-pub(crate) fn document(app: &PhotocraftApp) -> Option<DocId> {
-    app.gallery.as_ref().map(|g| g.document)
-}
-
 /// The open gallery's fields for automation, with the document, layer and smart filter it edits.
 pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {
     let g = app.gallery.as_ref()?;

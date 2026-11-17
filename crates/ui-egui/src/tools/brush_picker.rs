@@ -160,6 +160,7 @@ pub(crate) fn show_field(ui: &mut egui::Ui, app: &mut PhotocraftApp, enabled: bo
     apply(app, ui.ctx(), input, out);
 }
 
+#[cfg(test)]
 /// Where the canvas picker is open, in screen points; `None` while it is closed.
 pub(crate) fn opened_at(app: &PhotocraftApp) -> Option<egui::Pos2> {
     app.ui.brush_picker.map(|at| egui::pos2(at[0], at[1]))

@@ -66,15 +66,6 @@ impl SharedPicture {
         self.record(&mut state, None);
     }
 
-    /// Edits the picture in place; `rect` (document pixels) is what `edit` changes. Nothing happens before the
-    /// first write.
-    pub(crate) fn edit(&self, rect: PixelRect, edit: impl FnOnce(&mut ColorImage)) {
-        let mut state = self.lock();
-        let Some(image) = state.image.as_mut() else { return };
-        edit(image);
-        self.record(&mut state, Some(rect));
-    }
-
     /// Whether the picture holds a result.
     pub(crate) fn is_ready(&self) -> bool {
         self.revision.load(Ordering::Acquire) != 0

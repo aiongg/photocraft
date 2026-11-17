@@ -61,28 +61,6 @@ pub(crate) fn layer_thumb_frame(layer: &photocraft_doc::Layer, canvas: photocraf
     if bounds.is_empty() { canvas } else { bounds }
 }
 
-/// Square thumbnail of the document area `frame`, letterboxed, sampling `f(x, y)` in document
-/// space.
-fn thumb_image(frame: photocraft_geom::Rect, side: usize, mut f: impl FnMut(i32, i32) -> [f32; 4]) -> egui::ColorImage {
-    let (w, h) = (frame.width().max(1) as f32, frame.height().max(1) as f32);
-    let scale = w.max(h) / side as f32;
-    let (ox, oy) = ((side as f32 - w / scale) / 2.0, (side as f32 - h / scale) / 2.0);
-    let mut px = vec![egui::Color32::TRANSPARENT; side * side];
-    for ty in 0..side {
-        for tx in 0..side {
-            let dx = (tx as f32 - ox + 0.5) * scale;
-            let dy = (ty as f32 - oy + 0.5) * scale;
-            if dx < 0.0 || dy < 0.0 || dx >= w || dy >= h {
-                continue;
-            }
-            let c = f(frame.x0.saturating_add(dx as i32), frame.y0.saturating_add(dy as i32));
-            let q = |v: f32| (v.clamp(0.0, 1.0) * 255.0 + 0.5) as u8;
-            px[ty * side + tx] = egui::Color32::from_rgba_unmultiplied(q(c[0]), q(c[1]), q(c[2]), q(c[3]));
-        }
-    }
-    egui::ColorImage::new([side, side], px)
-}
-
 impl PhotocraftApp {
     /// Cached `Surface::content_bounds` keyed by an id and the surface's tile identity.
     pub fn cached_bounds(&mut self, key: u64, surface: &photocraft_raster::Surface) -> photocraft_geom::Rect {

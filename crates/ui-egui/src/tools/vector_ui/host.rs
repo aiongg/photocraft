@@ -41,11 +41,6 @@ impl Default for VectorTools {
     }
 }
 
-/// Whether the Vector family runs `tool`.
-pub(crate) fn handles(tool: Tool) -> bool {
-    matches!(tool, Tool::Pen | Tool::CurvaturePen | Tool::FreeformPen | Tool::PathSelection) || super::shapes::is_shape_tool(tool)
-}
-
 /// Which of the family's tools a pass runs.
 #[derive(Clone, Copy, PartialEq, Eq)]
 enum Which {

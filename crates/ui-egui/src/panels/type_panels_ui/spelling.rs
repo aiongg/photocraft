@@ -56,12 +56,6 @@ fn byte_range(text: &str, chars: Range<usize>) -> Range<usize> {
     at(chars.start)..at(chars.end)
 }
 
-/// The engine's character range for a byte range of `text`.
-fn char_range(text: &str, bytes: Range<usize>) -> Range<usize> {
-    let at = |b: usize| text.char_indices().take_while(|(i, _)| *i < b).count();
-    at(bytes.start)..at(bytes.end)
-}
-
 /// The dialog's items for the engine's JSON items. The engine counts characters; the items hold byte ranges.
 fn to_items(app: &PhotocraftApp, raw: &[Value]) -> Vec<SpellingItem> {
     raw.iter()
@@ -74,18 +68,6 @@ fn to_items(app: &PhotocraftApp, raw: &[Value]) -> Vec<SpellingItem> {
             SpellingItem::new(layer, range, i["word"].as_str().unwrap_or(""), suggestions)
         })
         .collect()
-}
-
-/// Lists the misspellings again with the hosted dialog's Check All Layers and ignored words, and keeps the session's
-/// `all_layers` at what the dialog has. Single-layer checks stay on the opening layer.
-fn relist(app: &mut PhotocraftApp) -> Vec<SpellingItem> {
-    let Some(dialog) = app.framework.dialogs.get::<CheckSpellingDialog>() else { return Vec::new() };
-    let (checked, ignored) = (dialog.all_layers_checked(), dialog.ignored().to_vec());
-    let Some(spell) = app.ui.type_panels.spell.as_mut() else { return Vec::new() };
-    spell.all_layers = checked;
-    let layer = spell.layer;
-    let raw = list(app, checked, layer, &ignored);
-    to_items(app, &raw)
 }
 
 /// Opens Edit › Check Spelling (returns the misspellings). Opening it again while an action waits
@@ -111,6 +93,7 @@ pub fn open_spelling(app: &mut PhotocraftApp, all_layers: bool) -> Result<Value,
     Ok(json!({ "dialog": SPELLING, "misspellings": raw }))
 }
 
+#[cfg(test)]
 /// Done: an action being recorded gets one Check Spelling step with Check All Layers as the dialog
 /// has it, and an action paused at a Check Spelling step continues on the document it was playing
 /// on. When recording the step fails, the status keeps that error with the playback's outcome.
@@ -131,65 +114,6 @@ pub(crate) fn close_spelling(app: &mut PhotocraftApp, ctx: &egui::Context) {
             app.ui.status = format!("{error} ({})", app.ui.status);
             app.ui.status_error = true;
         }
-    }
-}
-
-/// Reports an engine refusal in the status line.
-fn report(app: &mut PhotocraftApp, result: Result<Value, String>) {
-    if let Err(error) = result {
-        app.ui.status = error;
-        app.ui.status_error = true;
-    }
-}
-
-/// Replaces the one listed occurrence.
-fn change(app: &mut PhotocraftApp, item: &SpellingItem, to: &str) {
-    let chars = char_range(&text_of(app, item.object), item.range.clone());
-    let p = json!({ "action": "change", "layer": item.object, "start": chars.start, "end": chars.end, "word": item.word, "replace": to });
-    let result = crate::actions::spelling_change(app, p);
-    report(app, result);
-}
-
-/// Replaces the listed item's word: in its own text object, or in every text object when `all_layers`.
-fn change_all(app: &mut PhotocraftApp, item: &SpellingItem, to: &str, all_layers: bool) {
-    let mut p = json!({ "action": "changeAll", "word": item.word, "replace": to, "allLayers": all_layers });
-    if !all_layers {
-        p["layer"] = json!(item.object);
-    }
-    let result = crate::actions::spelling_change(app, p);
-    report(app, result);
-}
-
-/// Carries out one button of the dialog. The list is read again by the caller.
-fn run_action(app: &mut PhotocraftApp, action: SpellingAction) {
-    match action {
-        SpellingAction::Change { item, to, .. } => change(app, &item, &to),
-        SpellingAction::ChangeAll { item, to, all_layers, .. } => change_all(app, &item, &to, all_layers),
-        SpellingAction::Add(word) => {
-            let _ = run(app, "edit.checkSpelling", json!({ "action": "addToDictionary", "word": word }));
-        }
-        // The relist after the actions reads the dialog's Check All Layers and ignored words.
-        SpellingAction::Relist => {}
-        _ => {}
-    }
-}
-
-/// The result pump (`dialogs::TAKERS`): while the dialog is open, runs its actions and lists again; a result of any
-/// kind ends the session. A second pass in a frame finds no action left, so it applies nothing twice.
-pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    let mut acted = false;
-    while let Some(action) = app.framework.dialogs.get_mut::<CheckSpellingDialog>().and_then(|d| d.take_action()) {
-        run_action(app, action);
-        acted = true;
-    }
-    if acted {
-        let items = relist(app);
-        if let Some(dialog) = app.framework.dialogs.get_mut::<CheckSpellingDialog>() {
-            dialog.set_items(items);
-        }
-    }
-    if app.framework.dialogs.take::<CheckSpellingDialog>().is_some() {
-        close_spelling(app, ctx);
     }
 }
 

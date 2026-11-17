@@ -95,16 +95,6 @@ fn find<'a>(rows: &'a mut [Row], id: &str) -> Option<&'a mut Row> {
     rows.iter_mut().find(|r| r.command.id == id)
 }
 
-fn row_in(path: &[String], id: &str, label: &str) -> Row {
-    let path: Vec<&str> = path.iter().map(String::as_str).collect();
-    Row::new(&path, id, label)
-}
-
-fn separator_in(path: &[String]) -> Row {
-    let path: Vec<&str> = path.iter().map(String::as_str).collect();
-    Row::separator(&path)
-}
-
 /// A live row shows the chord the runtime's keymap runs its command for (`commands::chord`: overrides included, a
 /// key another command wins left out); a catalogue row shows its text.
 fn shortcut_of(app: &PhotocraftApp, id: &str, catalogue: Option<&str>) -> Option<Chord> {

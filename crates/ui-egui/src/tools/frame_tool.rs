@@ -121,6 +121,7 @@ impl Default for FrameTool {
     }
 }
 impl FrameTool {
+    #[cfg(test)]
     /// Whether a gesture of the tool runs.
     pub(crate) fn busy(&self) -> bool {
         self.moving.is_some() || self.content.is_some() || self.draw.shape().is_some()

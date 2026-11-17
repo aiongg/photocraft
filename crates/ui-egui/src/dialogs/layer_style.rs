@@ -915,6 +915,7 @@ fn build_preview(app: &PhotocraftApp, style: &LayerStyle, layer: LayerId) -> Res
     s.active().map(|d| (*d.doc).clone()).ok_or_else(|| "no preview document".into())
 }
 
+#[cfg(test)]
 /// The preview of the open dialog's style on the active document, built afresh, with its key.
 pub(crate) fn preview_document(app: &PhotocraftApp) -> Option<(Arc<Document>, u64)> {
     let (style, layer, key) = preview_source(app, app.session.active_index()?)?;

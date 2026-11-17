@@ -28,9 +28,9 @@ pub(crate) mod params {
     use serde_json::Value;
 
     use super::{
-        PhotocraftApp, alerts, canvas_input, channel_options_ui, color_picker_ui, color_table_ui, count_group_name_ui, duplicate_layer_ui, equalize_ui, file_forms,
-        fill_ui, filter_dialog, brush_preset_dialog, history_options_ui, image_processor_ui, merge_channels_ui, new_group_ui, new_layer_ui, smart_filter_dialog,
-        snapshot_dialog, stack_dialog, stroke_ui,
+        PhotocraftApp, alerts, brush_preset_dialog, canvas_input, channel_options_ui, color_picker_ui, color_table_ui, count_group_name_ui, duplicate_layer_ui,
+        equalize_ui, file_forms, fill_ui, filter_dialog, history_options_ui, image_processor_ui, merge_channels_ui, new_group_ui, new_layer_ui,
+        smart_filter_dialog, snapshot_dialog, stack_dialog, stroke_ui,
     };
     use crate::canvas::document_display::CanvasHost;
 

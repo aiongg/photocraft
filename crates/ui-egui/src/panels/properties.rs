@@ -151,22 +151,6 @@ fn adjustment_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, 
     }
 }
 
-/// Properties has no panel-menu rows of its own; the dock adds its group rows.
-pub(crate) fn panel_rows(_app: &PhotocraftApp) -> Vec<PanelRow> {
-    Vec::new()
-}
-
-/// Properties has no command set of its own, so it publishes no command states.
-// PLAN: the sheet lists `panel_rows` and `run_fired` only; pn.PC12 names `command_states` as well, so it is here, empty.
-pub(crate) fn command_states(_app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
-    Vec::new()
-}
-
-/// Properties has no panel-menu commands to run.
-pub(crate) fn run_fired(_app: &mut PhotocraftApp, _ctx: &egui::Context, _command: &CommandRef) -> bool {
-    false
-}
-
 #[cfg(test)]
 mod tests {
     use egui_kittest::Harness;

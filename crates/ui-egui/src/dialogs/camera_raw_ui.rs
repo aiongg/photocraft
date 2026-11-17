@@ -71,7 +71,6 @@ const PROXY_SIDE: usize = 900;
 /// split costs more than the work.
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) const PARALLEL_MIN_PIXELS: usize = 16 * 1024;
-const BANDS: [&str; 8] = ["Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta"];
 
 /// The hosted workspace this module opens.
 pub(crate) type Hosted = HostedWorkspace<RawDevelopWorkspace>;

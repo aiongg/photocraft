@@ -85,6 +85,7 @@ impl CanvasHost {
     }
 }
 
+#[cfg(test)]
 /// The zoom (device pixels per document pixel at `ppp`) and centre the document view shows on `host`'s canvas: the
 /// view on screen of the canvas's zoom ease while one runs, else `view`'s own. For the panels that read the view
 /// outside the canvas's pass.

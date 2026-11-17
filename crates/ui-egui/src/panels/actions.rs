@@ -159,6 +159,7 @@ fn selected_set_actions(app: &PhotocraftApp) -> Vec<usize> {
     selected_set(app).map(|set| set_actions(app, set)).unwrap_or_default()
 }
 
+#[cfg(test)]
 /// What Play plays: the selected action; with a set folder selected, every action of that set in
 /// order, as Photoshop plays a selected set (nothing for an empty set); else the first action.
 pub(crate) fn playback_targets(app: &PhotocraftApp) -> Vec<usize> {
@@ -168,6 +169,7 @@ pub(crate) fn playback_targets(app: &PhotocraftApp) -> Vec<usize> {
     playback_selection(app).into_iter().collect()
 }
 
+#[cfg(test)]
 /// Index of the playback target. Photoshop's Play button uses the first action when
 /// the panel has actions but none of its rows is selected.
 fn playback_selection(app: &PhotocraftApp) -> Option<usize> {

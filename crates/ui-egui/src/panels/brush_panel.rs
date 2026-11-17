@@ -48,9 +48,6 @@ pub const SECTIONS: [(&str, bool); 13] = [
 /// The final five entries are switches, not sections with a properties pane.
 pub(super) const CHECKBOX_ONLY_START: usize = 8;
 
-/// Panel width.
-pub(crate) const WIDTH: f32 = 540.0;
-
 /// The enable flag behind section `i` (None for Brush Tip Shape).
 pub fn section_flag(b: &mut BrushSettings, i: usize) -> Option<&mut bool> {
     Some(match i {

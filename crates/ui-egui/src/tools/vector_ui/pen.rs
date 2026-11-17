@@ -21,30 +21,11 @@ fn doc_knot(k: &Knot) -> photocraft_doc::Knot {
     photocraft_doc::Knot { anchor: pt(k.anchor), in_ctrl: pt(k.in_ctrl), out_ctrl: pt(k.out_ctrl), smooth: k.smooth }
 }
 
-/// An open draft of a document subpath's knots.
-fn edit_subpath(sub: &photocraft_doc::vector::Subpath) -> EditSubpath {
-    EditSubpath::new(sub.knots.iter().map(edit_knot).collect(), false)
-}
-
 /// The Pen path being drawn as a document path (one subpath, closed as the draft is), so ⌘/Ctrl (Direct Selection)
 /// can edit it in place while drawing (#4022) and the commit sends it to the engine with `path_json`.
 pub(crate) fn pen_path(pen: &PenPath) -> Path {
     let knots = pen.draft.knots.iter().map(doc_knot).collect();
     Path::new(vec![photocraft_doc::vector::Subpath { closed: pen.draft.closed, knots, op: Default::default() }])
-}
-
-/// The Pen path being drawn becomes `path`'s first subpath, edited with ⌘/Ctrl (Direct Selection);
-/// drawing carries on from its last anchor. A Curvature Pen path keeps following its anchors.
-pub(crate) fn pen_replace(app: &mut PhotocraftApp, path: &Path) {
-    if app.ui.pen.is_none() {
-        return;
-    }
-    let draft = path.subpaths.first().map(edit_subpath).unwrap_or_default();
-    if draft.knots.is_empty() {
-        super::host::drop_draft(app);
-        return;
-    }
-    super::replace_draft(app, &draft);
 }
 
 pub fn cancel_stale(app: &mut PhotocraftApp) -> bool {
@@ -526,9 +507,12 @@ fn fit_with_straight_segments(trace: &[[f64; 2]], straight: &[usize], fit: f64, 
         start = end;
     }
     let closed = close && knots.len() > 3;
-    if closed && let Some(last) = knots.pop() && let Some(k) = knots.first_mut() {
-            k.in_ctrl = Point::new(last.in_ctrl.x - last.anchor.x + k.anchor.x, last.in_ctrl.y - last.anchor.y + k.anchor.y);
-            k.smooth = false;
+    if closed
+        && let Some(last) = knots.pop()
+        && let Some(k) = knots.first_mut()
+    {
+        k.in_ctrl = Point::new(last.in_ctrl.x - last.anchor.x + k.anchor.x, last.in_ctrl.y - last.anchor.y + k.anchor.y);
+        k.smooth = false;
     }
     (PenPath { draft: EditSubpath::new(knots, closed), ..Default::default() }, closed)
 }

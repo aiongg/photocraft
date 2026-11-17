@@ -264,11 +264,6 @@ impl<'a> ToolScope<'a> {
         f(&mut self.app.borrow_mut())
     }
 
-    /// The canvas this pass runs on.
-    pub(crate) fn host(&self) -> CanvasHost {
-        self.host
-    }
-
     /// The egui context of the pass.
     pub(crate) fn ctx(&self) -> &egui::Context {
         &self.ctx
@@ -362,21 +357,24 @@ impl CanvasTool for Preflight<'_, '_> {
     fn press(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> ToolAction {
         let tool = self.tool;
         let doc = cx.space().map(|space| space.view.to_doc(pointer.pos));
-        if pointer.button == PointerButton::Primary && !self.dialog && let Some(doc) = doc {
-                if self.scope.with_app(|app| super::quick_pick::press(app, pointer, doc)) {
-                    return ToolAction::Done;
-                }
-                let at = [doc.x, doc.y];
-                // The Triangle's ⌥ press that samples is the Eyedropper stand-in's, not a shape (#13364).
-                if self.alt_stand_in && self.scope.with_app(|app| super::cursor_policy::shape_alt_samples(app, pointer.mods, at[0], at[1])) {
-                    return ToolAction::Ignored;
-                }
-                // The Control+Alt resize drag changes the brush, not the layer: it runs where a stroke would be refused
-                // (a hidden layer, a Clone Stamp without a source), as quick pick does before it.
-                let resizes = crate::brush_resize::PaintResize::chord(tool, pointer.button, pointer.mods);
-                if !resizes && self.refused(pointer, at) {
-                    return ToolAction::Done;
-                }
+        if pointer.button == PointerButton::Primary
+            && !self.dialog
+            && let Some(doc) = doc
+        {
+            if self.scope.with_app(|app| super::quick_pick::press(app, pointer, doc)) {
+                return ToolAction::Done;
+            }
+            let at = [doc.x, doc.y];
+            // The Triangle's ⌥ press that samples is the Eyedropper stand-in's, not a shape (#13364).
+            if self.alt_stand_in && self.scope.with_app(|app| super::cursor_policy::shape_alt_samples(app, pointer.mods, at[0], at[1])) {
+                return ToolAction::Ignored;
+            }
+            // The Control+Alt resize drag changes the brush, not the layer: it runs where a stroke would be refused
+            // (a hidden layer, a Clone Stamp without a source), as quick pick does before it.
+            let resizes = crate::brush_resize::PaintResize::chord(tool, pointer.button, pointer.mods);
+            if !resizes && self.refused(pointer, at) {
+                return ToolAction::Done;
+            }
         }
         self.inner.press(pointer, cx)
     }

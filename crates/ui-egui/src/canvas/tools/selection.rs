@@ -80,17 +80,6 @@ impl SelectionTools {
         }
     }
 
-    /// Drops every outline and drag without a command: the tool or the document changed.
-    pub(crate) fn reset(&mut self) {
-        self.marquee.reset();
-        self.lasso.reset();
-        self.polygon.reset();
-        self.magnetic.reset();
-        self.wand.drag.reset();
-        self.wand.clicks.clear();
-        self.lock_prompted = false;
-    }
-
     /// The whole-pixel offset of the selection drag in progress, from the tool that runs it.
     pub(crate) fn drag_offset(&self) -> Option<(i32, i32)> {
         [self.marquee.phase(), self.lasso.phase(), self.polygon.phase(), self.magnetic.phase(), self.wand.drag.phase()].into_iter().find_map(drag_delta)
@@ -137,13 +126,6 @@ impl InsideSelectionDrag {
     /// Where the drag is, for [`SelectionTools::drag_offset`] and the retouch family's offset.
     pub(crate) fn phase(&self) -> SelectPhase {
         self.marquee.phase()
-    }
-
-    /// Drops the drag without a command.
-    pub(crate) fn reset(&mut self) {
-        self.marquee.reset();
-        self.active = false;
-        self.lock_prompted = false;
     }
 
     pub(crate) fn each_pass(&mut self, probe: &dyn SelectionProbe, cx: &mut ToolContext<'_>) {

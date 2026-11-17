@@ -527,49 +527,11 @@ fn scaled_size(w: f64, h: f64, scale: f64) -> (f64, f64) {
 /// Largest side Export As will ask Image Size for. The same cap `image.imageSize` enforces.
 pub(crate) const MAX_PX: f64 = 300_000.0;
 
-/// Pixel size, percent scale and whether the two sides stay linked.
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub(crate) struct ExportSize {
-    pub(crate) width: f64,
-    pub(crate) height: f64,
-    pub(crate) scale: f64,
-}
-
 fn finite_px(v: f64) -> Result<f64, String> {
     if !v.is_finite() || !(1.0..=MAX_PX).contains(&v) {
         return Err(format!("export size must be within 1..={MAX_PX} pixels"));
     }
     Ok(v.round())
-}
-
-/// Percent scale applied to both sides. `scale` is a percent in 1..=1000.
-pub(crate) fn resize_from_scale(src_w: f64, src_h: f64, scale: f64) -> Result<ExportSize, String> {
-    if !scale.is_finite() || !(1.0..=1000.0).contains(&scale) {
-        return Err("scale must be within 1..=1000 percent".into());
-    }
-    let (width, height) = scaled_size(src_w.max(1.0), src_h.max(1.0), scale / 100.0);
-    if width > MAX_PX || height > MAX_PX {
-        return Err(format!("export size must be within 1..={MAX_PX} pixels"));
-    }
-    Ok(ExportSize { width, height, scale })
-}
-
-/// An edited side. With `lock`, the other side keeps the source aspect, never below 1 px (as
-/// [`scaled_size`]); otherwise it stays.
-pub(crate) fn resize_from_side(src_w: f64, src_h: f64, width: f64, height: f64, lock: bool, edited_width: bool) -> Result<ExportSize, String> {
-    let src_w = src_w.max(1.0);
-    let src_h = src_h.max(1.0);
-    let (width, height) = if edited_width {
-        let width = finite_px(width)?;
-        let height = if lock { finite_px((src_h * width / src_w).max(1.0))? } else { finite_px(height)? };
-        (width, height)
-    } else {
-        let height = finite_px(height)?;
-        let width = if lock { finite_px((src_w * height / src_h).max(1.0))? } else { finite_px(width)? };
-        (width, height)
-    };
-    let scale = if edited_width { width / src_w * 100.0 } else { height / src_h * 100.0 };
-    Ok(ExportSize { width, height, scale })
 }
 
 /// The pixels `export_document` resizes to. Explicit width and height win; otherwise the percent

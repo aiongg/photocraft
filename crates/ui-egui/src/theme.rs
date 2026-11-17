@@ -128,11 +128,6 @@ impl Palette {
         Palette::ALL.into_iter().find(|p| p.theme() == (id.as_str(), dark))
     }
 
-    /// Photoshop-grammar layout (tab strips, flat panels): the four Pro brightness levels.
-    fn is_pro(self) -> bool {
-        matches!(self, Palette::Pro | Palette::ProMedium | Palette::ProLightGray | Palette::ProLight)
-    }
-
     fn is_dark(self) -> bool {
         self.theme().1
     }
@@ -311,11 +306,6 @@ pub struct Tokens {
 }
 
 impl Tokens {
-    /// Tool outlines need contrast on arbitrary document pixels, independently of UI theme.
-    pub(crate) fn cursor_outline() -> [Color32; 2] {
-        [Color32::from_black_alpha(160), Color32::from_white_alpha(235)]
-    }
-
     /// The tokens PhotoCraft draws a suite theme with when it has no palette for it: craft-theme's
     /// resolved colours and radii, in the Studio layout.
     fn from_resolved(t: &craft::theme::Tokens, dark: bool) -> Self {

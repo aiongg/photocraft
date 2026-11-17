@@ -310,6 +310,7 @@ fn command_params(cmd: &SelectMaskCommand, target_mask: bool) -> Value {
     params
 }
 
+#[cfg(test)]
 /// The params OK runs `select.refineEdge` with, over the open workspace.
 pub(crate) fn commit_params(app: &PhotocraftApp) -> Option<Value> {
     let (id, _, _, source) = app.select_mask_target.as_ref()?;

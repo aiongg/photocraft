@@ -37,23 +37,6 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
 }
 
-/// A blank family represents mixed fonts, rather than falsely reporting the first one after
-/// commit. At a caret, the current/pending insertion font is the relevant single style.
-pub(super) fn shown_family(app: &PhotocraftApp, c: &photocraft_doc::text::CharStyle) -> String {
-    let same = |s: &photocraft_doc::text::CharStyle| s.font_family == c.font_family;
-    let Some(st) = target_doc(app) else { return c.font_family.clone() };
-    let uniform = if let Some(ed) = &app.ui.text_edit {
-        if ed.caret == ed.anchor {
-            true
-        } else {
-            text_layer(&st.doc, LayerId(ed.layer)).is_none_or(|t| selected_styles(t, ed.anchor, ed.caret).iter().all(same))
-        }
-    } else {
-        st.selected_layers().into_iter().filter_map(|id| text_layer(&st.doc, id)).all(|t| t.char_runs().iter().all(|r| same(&r.style)))
-    };
-    if uniform { c.font_family.clone() } else { String::new() }
-}
-
 /// Character and paragraph style at the selection, caret, or first run of selected layers.
 /// The paragraph at a collapsed caret is the caret's, as the options bar and Paragraph panel show it.
 pub(crate) fn styles_at(app: &PhotocraftApp) -> Option<(photocraft_doc::text::CharStyle, photocraft_doc::text::ParagraphStyle)> {

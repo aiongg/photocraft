@@ -620,11 +620,6 @@ pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
     }
 }
 
-/// The document the open workspace belongs to, for the document-switch cancel.
-pub(crate) fn document(app: &PhotocraftApp) -> Option<DocId> {
-    app.vanishing.as_ref().map(|v| v.document)
-}
-
 /// The open workspace's command fields for the automation surface, with the document and layer it works on.
 pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {
     let vp = app.vanishing.as_ref()?;

@@ -198,11 +198,6 @@ pub(crate) struct WideAngleApp {
     source: Arc<PcWideAngleSource>,
 }
 
-/// The document the open workspace belongs to.
-pub(crate) fn document(app: &PhotocraftApp) -> Option<DocId> {
-    app.wide_angle.as_ref().map(|w| w.document)
-}
-
 /// The open workspace's fields for automation, with the layer it edits.
 pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {
     let w = app.wide_angle.as_ref()?;

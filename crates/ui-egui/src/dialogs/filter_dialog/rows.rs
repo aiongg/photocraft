@@ -171,17 +171,6 @@ pub(crate) fn indexed_matte_seed(colors: &MatteColors, value: &str) -> Option<[f
     }
 }
 
-/// The family's `check` for Indexed Color: refuses a Foreground or Background matte the document cannot hold.
-pub(crate) fn indexed_matte_check(app: &PhotocraftApp, fields: &DialogFields) -> Result<(), String> {
-    let Some(doc) = app.session.active().map(|state| state.doc.as_ref()) else { return Ok(()) };
-    let tool = match fields.text("matte") {
-        Some("foreground") => app.session.tools.foreground,
-        Some("background") => app.session.tools.background,
-        _ => return Ok(()),
-    };
-    indexed_matte_document_color(app, doc, tool).map(drop)
-}
-
 // --- Lens Blur -------------------------------------------------------------------------------------------------
 
 /// The active document's channel names, in index order.

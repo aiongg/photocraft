@@ -14,11 +14,6 @@ pub(crate) fn panel_rows(_app: &PhotocraftApp) -> Vec<PanelRow> {
     TextStylesPanel::panel_rows()
 }
 
-/// The panel publishes its commands' states itself.
-pub(crate) fn command_states(_app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
-    Vec::new()
-}
-
 /// The panel's commands come back to it as actions, scoped to the focused panel.
 // PLAN: the lead's ruling maps `TextStyleCommand` here into the panel's action handling, but the command carries no
 // panel kind and the panel's `Facts` (picked row, selection) are private, so the panel's own scope delivers it.

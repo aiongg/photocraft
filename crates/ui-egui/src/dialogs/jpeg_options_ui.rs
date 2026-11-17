@@ -265,8 +265,10 @@ pub(crate) fn poll_estimate(app: &mut PhotocraftApp, ctx: &egui::Context) {
         return;
     }
     let request = app.framework.dialogs.get_mut::<HostedFormatOptions>().and_then(|dialog| dialog.wanted_estimate());
-    if let Some(request) = request && let (Some(ParkedSave { format: ParkedFormat::Jpeg(parked), .. }), FormatOptions::Jpeg(options)) = (&mut app.parked_save, request.options) {
-            parked.asked = Some(Asked { revision: request.revision, quality: options.quality, format: codec_format(options.format) });
+    if let Some(request) = request
+        && let (Some(ParkedSave { format: ParkedFormat::Jpeg(parked), .. }), FormatOptions::Jpeg(options)) = (&mut app.parked_save, request.options)
+    {
+        parked.asked = Some(Asked { revision: request.revision, quality: options.quality, format: codec_format(options.format) });
     }
     let asked = match &app.parked_save {
         Some(ParkedSave { format: ParkedFormat::Jpeg(parked), .. }) => parked.asked,

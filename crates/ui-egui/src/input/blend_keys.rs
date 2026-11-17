@@ -79,6 +79,7 @@ fn target(tool: Tool) -> Target {
     }
 }
 
+#[cfg(test)]
 /// The active tool's mode, `None` being Clear. A brush-based tool's lives in its own brush.
 pub fn tool_mode(app: &mut PhotocraftApp) -> Option<BlendMode> {
     let o = &app.ui.tool_options;

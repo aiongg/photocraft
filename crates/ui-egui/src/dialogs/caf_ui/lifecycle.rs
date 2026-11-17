@@ -88,11 +88,6 @@ pub(super) fn bounds(b: &Base) -> Rect {
     })
 }
 
-/// The document the open workspace belongs to.
-pub(crate) fn document(app: &PhotocraftApp) -> Option<photocraft_doc::DocId> {
-    app.caf.as_ref().map(|c| c.document)
-}
-
 /// The workspace's facts for the automation surface: the app's (the plan's window and areas, the preview, the last
 /// error) with the workspace's own fields.
 pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {

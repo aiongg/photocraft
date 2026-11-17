@@ -59,11 +59,6 @@ pub(crate) fn display_pixels(px: &[[f32; 4]], w: usize, h: usize, display: &phot
 }
 
 impl ProxyJob {
-    /// The develop of `request` over `base`: its settings as they are and its revision.
-    pub(crate) fn from_request(request: &RawPreviewRequest, base: &ProxyBase) -> Self {
-        Self { base: base.clone(), params: request.settings.clone(), revision: request.revision }
-    }
-
     pub(crate) fn run(self) -> ProxyFrame {
         let ProxyJob { base, params, revision } = self;
         let ProxyBase { proxy, selection, raw_curve, float, size, full_w, display, gpu, source_key, inputs } = base;
