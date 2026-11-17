@@ -124,7 +124,11 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
 
     // Over the image (left of the dialog) the pointer is the locator square; over the dialog it is
     // the normal pointer. The points are on the canvas in the strip at its left edge, clear of the dialog
-    // that opens centred over it.
+    // that opens centred over it. The view is panned so that strip shows document column 160: the pane
+    // keeps its well on the picture, so a centre nearer the picture's edge than half the well shows
+    // settled at that edge, and the click's point would not be the centre the pane shows.
+    crate::canvas::testing::clear_of_dialogs(h.state_mut(), [160.0, 150.0]);
+    h.run_steps(2);
     let r = canvas_rect(&h);
     let a = pos2(r.left() + 40.0, r.bottom() - 80.0);
     let a_doc = doc(&h, a);
@@ -133,13 +137,6 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
     move_to(&mut h, a);
     h.run_steps(2);
     let locator = Some(Cursor::Painted(PaintedCursor::Locator));
-    eprintln!(
-        "DIAG a_click_on_the_image_centres_the_smart_sharpen_preview: at {a:?} doc {a_doc:?} armed={:?} cursor={:?} canvas_rect={r:?} document_area={:?} screen={:?}",
-        crate::dialogs::canvas_input::armed(h.state()),
-        craft::ui::runtime::cursor::current(&h.ctx),
-        h.state().last_canvas_rect,
-        h.ctx.content_rect()
-    );
     assert_eq!(craft::ui::runtime::cursor::current(&h.ctx), locator, "the locator replaces the pointer");
     move_to(&mut h, r.center());
     h.run_steps(2);
