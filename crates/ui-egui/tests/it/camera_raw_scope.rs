@@ -245,8 +245,9 @@ fn exact_clipping_rgb_lab_capped_samplers_and_reversible_tone_controls() {
 #[test]
 fn lab_readouts_respect_embedded_rgb_profile() {
     let lab_a = |profile: Option<&'static str>| {
+        // Big enough that the pointer scan of `hover_over_picture` lands on it: the view fits a picture up to 400 %.
         let mut h = harness(AppTheme::pro(), move |app| {
-            app.run("file.new", json!({"width":4,"height":4})).unwrap();
+            app.run("file.new", json!({"width":64,"height":48})).unwrap();
             app.run("layer.new.layer", json!({})).unwrap();
             app.run("edit.fill", json!({"color":"#ff0000"})).unwrap();
             if let Some(profile) = profile {

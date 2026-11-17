@@ -1033,6 +1033,16 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         f.sort_by(|a, b| a.left().total_cmp(&b.left()));
         f
     };
+    for n in h.query_all_by(|n| n.label().is_some_and(|l| l.contains("Zoom") || l.contains("Navigator"))) {
+        let a = n.accesskit_node();
+        eprintln!(
+            "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: node role={:?} label={:?} value={:?} rect={:?}",
+            a.role(),
+            a.label(),
+            a.value(),
+            n.rect()
+        );
+    }
     assert_eq!(fields(&h).len(), 2, "the status bar's and the Navigator's zoom fields");
     for (field, typed, want) in [(0, "200", 2.0), (1, "50", 0.5), (0, "300", 3.0), (1, "100", 1.0)] {
         let at = fields(&h)[field].center();

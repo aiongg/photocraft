@@ -340,6 +340,14 @@ pub(crate) fn overrides(app: &PhotocraftApp) -> Overrides {
             overrides.insert(id, Vec::new());
         }
     }
+    // A tool's key is bound on the rail's tool command (`panels::tool_commands`), which answers to the saved
+    // `tools.select.<tool>` id: the saved entry is that command's too.
+    for tool in Tool::ALL {
+        let saved = crate::tool_shortcuts::id(tool);
+        if let Some(keys) = overrides.get(&saved).map(<[String]>::to_vec) {
+            overrides.insert(CommandRef::from(crate::panels::tool_commands::command_of(tool)).key(), keys);
+        }
+    }
     let taken: Vec<Chord> = prefs
         .shortcuts
         .iter()
