@@ -501,7 +501,19 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
         );
     }
     h.key_press(egui::Key::B);
-    h.run_steps(2);
+    for step in 0..2 {
+        h.step();
+        let ctx = h.ctx.clone();
+        let keys: Vec<(egui::Key, bool)> =
+            ctx.input(|i| i.events.iter().filter_map(|e| if let egui::Event::Key { key, pressed, .. } = e { Some((*key, *pressed)) } else { None }).collect());
+        eprintln!(
+            "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: step {step} time={} pass={} key events this pass={keys:?} tool={:?} spring={:?}",
+            ctx.input(|i| i.time),
+            ctx.cumulative_pass_nr(),
+            h.state().ui.tool,
+            h.state().ui.spring
+        );
+    }
     eprintln!(
         "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: after B tool={:?} spring={:?}",
         h.state().ui.tool,
