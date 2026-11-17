@@ -221,7 +221,7 @@ fn save_for_web_dialog_runs_the_command() {
     confirm(&mut app, id);
     assert!(std::fs::read(&path).unwrap().starts_with(b"GIF89a"));
     // The next dialog starts from those settings.
-    let id = open_web(&mut app);
+    let id = open_web(&mut app).expect("an open document");
     assert_eq!(web_dialog(&mut app, id).current().format, WebFormat::Gif);
     // WebP, with the dialog's own defaults (lossy at quality 60).
     let path = dir.join("web.webp").to_string_lossy().into_owned();
@@ -240,7 +240,7 @@ fn the_save_for_web_dialog_seeds_from_the_remembered_preferences() {
     app.session.prefs.edit(|p| {
         p.dialogs.insert(WEB_COMMAND.into(), json!({"format": "png8", "colors": 64}));
     });
-    let id = open_web(&mut app);
+    let id = open_web(&mut app).expect("an open document");
     let o = web_dialog(&mut app, id).current().clone();
     assert_eq!((o.format, o.colors), (WebFormat::Png8, 64));
 }
@@ -258,7 +258,7 @@ fn save_for_web_with_the_suggested_name_records_only_the_folder() {
     ] {
         let mut app = app();
         let target = dir.join(name).to_string_lossy().into_owned();
-        let id = open_web(&mut app);
+        let id = open_web(&mut app).expect("an open document");
         set_option(&mut app, id, "format", json!(WebFormat::Png24));
         answer_path(&mut app, id, &target);
         confirm(&mut app, id);
@@ -282,7 +282,7 @@ fn save_for_web_writes_the_picked_file_when_the_name_changed() {
     for rename in [false, true] {
         let mut app = app();
         let target = dir.join("web.png").to_string_lossy().into_owned();
-        let id = open_web(&mut app);
+        let id = open_web(&mut app).expect("an open document");
         set_option(&mut app, id, "format", json!(WebFormat::Png24));
         answer_path(&mut app, id, &target);
         if rename {
@@ -301,7 +301,7 @@ fn save_for_web_writes_the_picked_file_when_the_name_changed() {
 #[test]
 fn save_for_web_width_keeps_proportions_and_sizes_the_file() {
     let mut app = app();
-    let id = open_web(&mut app);
+    let id = open_web(&mut app).expect("an open document");
     let revision = app.session.active().unwrap().revision;
     set_option(&mut app, id, "format", json!(WebFormat::Png24));
     // The dialog keeps one size as a percent of the document, so the width follows the height.
@@ -321,7 +321,7 @@ fn save_for_web_width_keeps_proportions_and_sizes_the_file() {
 #[test]
 fn save_for_web_reopens_at_full_size_with_the_resample_method() {
     let mut app = app();
-    let id = open_web(&mut app);
+    let id = open_web(&mut app).expect("an open document");
     set_option(&mut app, id, "format", json!(WebFormat::Png24));
     set_option(&mut app, id, "percent", json!(50.0));
     set_option(&mut app, id, "resample", json!(Resample::NearestNeighbor));
@@ -329,7 +329,7 @@ fn save_for_web_reopens_at_full_size_with_the_resample_method() {
     answer_path(&mut app, id, &path);
     confirm(&mut app, id);
     app.run("file.new", json!({"width": 240, "height": 160, "name": "next"})).unwrap();
-    let id = open_web(&mut app);
+    let id = open_web(&mut app).expect("an open document");
     let o = web_dialog(&mut app, id).current().clone();
     assert_eq!((o.percent, o.resample), (100.0, Resample::NearestNeighbor));
     let _ = std::fs::remove_file(path);
@@ -389,7 +389,7 @@ fn save_for_web_authorizes_before_opening_a_picker() {
     }
     for synthetic_input in [false, true] {
         let mut app = app();
-        open_web(&mut app);
+        open_web(&mut app).expect("an open document");
         if synthetic_input {
             app.automation_input = true;
             app.services.automation_authorize = Some(deny);
@@ -413,7 +413,7 @@ fn save_for_web_authorizes_generated_palette_before_opening_a_picker() {
     }
     for synthetic_input in [false, true] {
         let mut app = app();
-        let id = open_web(&mut app);
+        let id = open_web(&mut app).expect("an open document");
         set_option(&mut app, id, "format", json!(WebFormat::Gif));
         if synthetic_input {
             app.automation_input = true;
@@ -495,7 +495,7 @@ fn the_web_preview_selects_slices_and_saves_only_the_selected_ones() {
     // A 120 × 80 document with a user slice on its left half; the right half is auto slice 2.
     let mut app = app();
     app.run("slice.new", json!({"rect": [0, 0, 60, 80], "name": "left"})).unwrap();
-    let id = open_web(&mut app);
+    let id = open_web(&mut app).expect("an open document");
     set_option(&mut app, id, "format", json!(WebFormat::Png24));
     set_option(&mut app, id, "slices", json!(WebSlices::Selected(vec![2])));
     let mut options = web_dialog(&mut app, id).current().clone();

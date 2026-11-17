@@ -216,10 +216,10 @@ fn original_texture(ctx: &egui::Context, doc: &photocraft_doc::Document) -> Size
 /// remembered: it writes `Preferences.dialogs` on every run, scripted ones included). Each document starts at its
 /// own full size.
 ///
-/// Panics without a document; the menu item checks for one.
-pub fn open_web(app: &mut PhotocraftApp) -> DialogId {
+/// `None` without a document.
+pub fn open_web(app: &mut PhotocraftApp) -> Option<DialogId> {
     let ctx = app.ctx().clone();
-    let doc = app.session.active().expect("Save for Web needs an open document").doc.clone();
+    let doc = app.session.active()?.doc.clone();
     let mut seed = app.session.prefs().dialogs.get(WEB_COMMAND).cloned().unwrap_or_else(|| json!({}));
     if let Some(m) = seed.as_object_mut() {
         for key in ["path", "dir", "folder", "width", "height", "percent", "colorTable", "colorTableEdits", "numbers"] {
@@ -253,7 +253,7 @@ pub fn open_web(app: &mut PhotocraftApp) -> DialogId {
     if let Some(t) = doc.timeline.as_ref().filter(|t| t.duration >= 2) {
         dialog = dialog.animation(Animation::new(t.duration as u32, t.fps));
     }
-    app.framework.dialogs.open(dialog)
+    Some(app.framework.dialogs.open(dialog))
 }
 
 /// Seek a preview copy, preserving any edits to the source's currently displayed frame.
