@@ -1027,7 +1027,11 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         // The fields are the nodes named Zoom that show the percentage as their value (a field's group and the Navigator's slider carry the name too).
         let mut f: Vec<egui::Rect> = h
             .query_all_by_label("Zoom")
-            .filter(|n| n.accesskit_node().role() != egui::accesskit::Role::Slider && n.accesskit_node().value().is_some())
+            .filter(|n| {
+                let a = n.accesskit_node();
+                // A node without bounds is not on screen (nothing to click).
+                a.role() != egui::accesskit::Role::Slider && a.value().is_some() && a.bounding_box().is_some()
+            })
             .map(|n| n.rect())
             .collect();
         f.sort_by(|a, b| a.left().total_cmp(&b.left()));
@@ -1040,7 +1044,7 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
             a.role(),
             a.label(),
             a.value(),
-            n.rect()
+            a.bounding_box()
         );
     }
     assert_eq!(fields(&h).len(), 2, "the status bar's and the Navigator's zoom fields");
@@ -1055,7 +1059,7 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         h.key_press(egui::Key::Enter);
         h.run_steps(60);
         assert!(h.state().ui.window_views.is_empty(), "the window keeps no copy of the view");
-        assert!((h.state().ui.views[0].zoom - want).abs() < 1e-3, "field {field}, typed {typed}: not written back over by the window");
+        assert!((h.state().ui.views[0].zoom - want).abs() < 1e-3, "field {field}, typed {typed}: not written back over by the window: {}", h.state().ui.views[0].zoom);
     }
 }
 
