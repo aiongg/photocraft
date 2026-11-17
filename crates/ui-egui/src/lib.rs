@@ -1036,3 +1036,10 @@ mod red_eye_context_menu_tests;
 
 #[cfg(test)]
 mod clone_stamp_indexed_bar_tests;
+
+/// The running test's function name (libtest names each test's thread after it), for the round G `DIAG` prints;
+/// removed with them.
+#[allow(dead_code)]
+pub(crate) fn diag_test() -> String {
+    std::thread::current().name().unwrap_or("?").rsplit("::").next().unwrap_or("?").to_owned()
+}

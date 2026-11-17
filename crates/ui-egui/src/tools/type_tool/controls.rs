@@ -234,6 +234,17 @@ fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &craft::behavior::Ca
         app.canvas_tools.type_tool.context = Some((at, held));
     }
     let mods = egui::Modifiers { alt: held.alt, ctrl: held.ctrl, shift: held.shift, mac_cmd: false, command: held.cmd };
+    if background_press || out.ended.is_some() || out.selection_changed {
+        let at = ui.input(|i| i.pointer.interact_pos());
+        eprintln!(
+            "DIAG {}: type editor rect {rect:?} ended {:?} bg {background_press} sel {:?} at {at:?} shapes {:?} editor id {:?}",
+            crate::diag_test(),
+            out.ended,
+            (selection.anchor, selection.caret),
+            at.map(|at| craft::ui::runtime::pointer::shapes_at(ui.ctx(), at)),
+            out.response.id
+        );
+    }
     // The editor's end is the session's, whether or not its text changed: an untouched placeholder or an empty mask
     // ends on Escape too. Every other end of the gesture (the frame drag's `cancel_all`, an undo, a removed editor)
     // leaves the text.

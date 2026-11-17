@@ -527,6 +527,7 @@ impl CanvasTool for FramePass<'_> {
         let at = view.to_doc(pointer.pos);
         let (reach, scope, mods, clicks) = (view.doc_len(cx.reach()), self.scope, pointer.mods, pointer.clicks);
         let style = ConstrainStyle::new(f64::from(cx.slop), f64::from(cx.slop));
+        eprintln!("DIAG {}: frame press {at:?} clicks {clicks}", crate::diag_test());
         match scope.with_app(|app| press_rule(app, at, clicks, reach, &style, mods)) {
             Pressed::Draw => self.state.draw.press(pointer, cx),
             Pressed::Done => ToolAction::Done,
@@ -546,6 +547,7 @@ impl CanvasTool for FramePass<'_> {
         let (scope, time) = (self.scope, cx.time);
         let Some(view) = cx.space().map(|space| space.view) else { return };
         let at = view.to_doc(pointer.pos);
+        eprintln!("DIAG {}: frame drag {at:?} moving {} content {}", crate::diag_test(), self.state.moving.is_some(), self.state.content.is_some());
         if let Some(c) = self.state.content.as_mut() {
             scope.with_app(|app| drag_content(app, c, at, pointer.mods, time));
         } else if let Some(m) = self.state.moving.as_mut() {
@@ -562,6 +564,7 @@ impl CanvasTool for FramePass<'_> {
         let scope = self.scope;
         let Some(view) = cx.space().map(|space| space.view) else { return };
         let at = view.to_doc(pointer.pos);
+        eprintln!("DIAG {}: frame release {at:?} moving {} content {:?}", crate::diag_test(), self.state.moving.is_some(), self.state.content.as_ref().map(|c| c.begun));
         if let Some(c) = self.state.content.take() {
             scope.with_app(|app| release_content(app, &c, at, pointer.mods));
         } else if let Some(m) = self.state.moving.take() {
@@ -589,6 +592,7 @@ impl CanvasTool for FramePass<'_> {
 
     fn cancel(&mut self, reason: CancelReason, cx: &mut ToolContext<'_>) {
         let (scope, time) = (self.scope, cx.time);
+        eprintln!("DIAG {}: frame cancel {reason:?}", crate::diag_test());
         let content = self.state.content.take();
         self.state.moving = None;
         // Escape while a frame is drawn makes it as drawn, as the reference application does (#13866); a drag still

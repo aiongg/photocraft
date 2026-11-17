@@ -88,7 +88,15 @@ fn fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active
     // A committed crop keeps it.
     draw_frame(&mut h, [4.0, 4.0], [20.0, 16.0]);
     assert!(crop_ui::pending(h.state()), "the drawn frame is pending");
-    control(&mut h, "ui.menu.invoke", json!({"id": "image.crop"}));
+    eprintln!(
+        "DIAG fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active: frame {:?}",
+        crop_ui::frame(h.state())
+    );
+    let v = control(&mut h, "ui.menu.invoke", json!({"id": "image.crop"}));
+    eprintln!(
+        "DIAG fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active: crop reply {v} size {:?}",
+        size(&h)
+    );
     assert_eq!(size(&h), (16, 12), "the crop was committed");
     assert_eq!(fill(&h), CropFill::ContentAware, "a committed crop keeps it");
 

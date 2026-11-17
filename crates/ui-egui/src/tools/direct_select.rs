@@ -278,6 +278,7 @@ pub(crate) fn cancel_stale(app: &mut PhotocraftApp) -> bool {
         return false;
     }
     let was_editing = ds.editing.is_some();
+    eprintln!("DIAG {}: ds cancel_stale gesture_valid {gesture_valid} empty {empty} owner {} still {} tool {:?} owner_tool {:?}", crate::diag_test(), ds.owner.is_some(), still_valid(app, ds), app.ui.tool, ds.owner.as_ref().map(|o| o.tool));
     if let Some(overlay) = ds.editing_overlay.filter(|_| was_editing) {
         craft::ui::primitives::cancel_press_of(app.ctx(), overlay);
     }

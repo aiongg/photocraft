@@ -58,6 +58,12 @@ fn gpu_zoom_animation_reuses_the_document_composite() {
         assert!(h.state().perf.gpu, "{name}: keep the GPU canvas");
         assert_eq!(h.state().perf.last_refresh, "", "{name}: reuse the composite");
         let zoom = shown(&h);
+        eprintln!(
+            "DIAG gpu_zoom_animation_reuses_the_document_composite: {name} shown {zoom} view {} target {target} animating {} time {:?}",
+            h.state().ui.views[0].zoom,
+            h.state().ui.views[0].zoom_animating,
+            h.ctx.input(|i| i.time)
+        );
         midway |= zoom > 1.0 && zoom < target;
         let image = h.render().unwrap();
         let center = h.state().last_canvas_rect.center();

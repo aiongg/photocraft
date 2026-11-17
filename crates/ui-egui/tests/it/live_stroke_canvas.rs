@@ -221,6 +221,21 @@ fn the_canvas_shows_the_committed_stroke_part(part: usize) {
         assert!(max_diff(&before, &drawing) > 100, "{c:?}: the stroke shows while drawing");
         // …and is exactly what release leaves there: nothing extra (no stand-in shape), nothing missing.
         let d = max_diff(&drawing, &done);
+        if d > 1 {
+            let off: Vec<(usize, [u8; 4], [u8; 4], [u8; 4])> = (0..done.len())
+                .filter(|&i| (0..3).any(|k| drawing[i][k].abs_diff(done[i][k]) > 1))
+                .map(|i| (i, before[i], drawing[i], done[i]))
+                .collect();
+            let width = (h.state().last_canvas_rect.shrink(4.0).width() as usize).max(1);
+            eprintln!(
+                "DIAG {}: {c:?} gpu {gpu} canvas {:?}: {} pixels differ; first {:?}; worst {:?} (index, before, drawing, done; row width {width})",
+                std::thread::current().name().unwrap_or("?"),
+                h.state().last_canvas_rect,
+                off.len(),
+                off.iter().take(4).collect::<Vec<_>>(),
+                off.iter().max_by_key(|(_, _, a, b)| (0..3).map(|k| a[k].abs_diff(b[k])).max()),
+            );
+        }
         assert!(d <= 1, "{c:?}: the canvas changed by {d}/255 on release");
     }
     if !gpu_seen {
