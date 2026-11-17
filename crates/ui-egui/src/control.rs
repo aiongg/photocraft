@@ -19,7 +19,7 @@
 //! - `ui.dialog.apply {dialog}`: commit Preferences changes without closing the dialog
 //! - `ui.notice.post {title, lines?, tone?}`: show a notice; replies `{id}`
 //! - `ui.window.open {document?}` / `ui.window.close {window}`: extra document windows
-//! - `ui.pointer {events: [{kind: down|move|up, x, y, pressure?, tiltX?, tiltY?, rotation?}], tool?, modifiers?, button?}`: drive the active tool in document coordinates. The events are queued for the canvas, which takes them on its next pass; the reply does not wait for them (`button: "secondary"` opens the tool's canvas context menu (the pasteboard colour menu outside the image) or Brush Preset picker, or erases with Preferences › Tools › Right-click with painting tools = erase)
+//! - `ui.pointer {events: [{kind: down|move|up, x, y, pressure?, tiltX?, tiltY?, rotation?}], tool?, modifiers?, button?}`: drive the active tool in document coordinates (the open full-window workspace's tool while one is open). The events are queued for the canvas, which takes them on its next pass; the reply does not wait for them (`button: "secondary"` opens the tool's canvas context menu (the pasteboard colour menu outside the image) or Brush Preset picker, or erases with Preferences › Tools › Right-click with painting tools = erase)
 //! - `ui.click {x, y, coordinates?, button?, count?, hold?, modifiers?}` / `ui.move {x, y, coordinates?, rest?, modifiers?}` /
 //!   `ui.wheel {x, y, coordinates?, dx?, dy?, modifiers?}` / `ui.release {button?, key?, x?, y?, coordinates?}`: synthetic
 //!   pointer input in screen points, or document points with `coordinates: "document"` (the main canvas maps them);
