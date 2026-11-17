@@ -86,6 +86,12 @@ fn fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active
     assert_eq!(fill(&h), CropFill::ContentAware, "a new document keeps it");
 
     // A committed crop keeps it.
+    eprintln!(
+        "DIAG fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active: before the draw frame {:?} zoom {:?} rect {:?}",
+        crop_ui::frame(h.state()),
+        photocraft_ui_egui::canvas::active_view(h.state()).map(|v| v.zoom),
+        photocraft_ui_egui::canvas::active_view(h.state()).map(|v| v.rect)
+    );
     draw_frame(&mut h, [4.0, 4.0], [20.0, 16.0]);
     assert!(crop_ui::pending(h.state()), "the drawn frame is pending");
     eprintln!(
