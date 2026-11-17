@@ -24,7 +24,7 @@ pub fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut out = bar.show(ui);
     fonts::finish_font_state(app, font_state);
     values::apply_bar_events(app, &out.edits);
-    values::follow_family(app, out.preview_family.as_deref(), out.rested_family.as_deref(), values::bar_family_gesture(&out.edits));
+    values::follow_family(app, std::mem::take(&mut out.preview_family), out.rested_family.as_deref());
     if let Some(request) = out.requests.take_color() {
         values::pick_color(app, request.color.map(|c| [c.r, c.g, c.b]));
     }
