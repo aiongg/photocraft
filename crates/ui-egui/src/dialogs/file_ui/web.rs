@@ -182,7 +182,7 @@ pub(super) fn web_params(o: &SaveForWebOptions, has_slices: bool) -> Result<Valu
 
 /// The key of pane `index`'s indexed-encode cache and textures for document `doc_id`.
 pub(super) fn pane_key(doc_id: u64, index: usize) -> egui::Id {
-    egui::Id::new(("web-pane", doc_id, index))
+    egui::Id::unique(("web-pane", doc_id, index))
 }
 
 /// Keeps the picture alive for the context (a texture handle frees it on drop) and names it for the dialog.
@@ -209,7 +209,7 @@ fn original_texture(ctx: &egui::Context, doc: &photocraft_doc::Document) -> Size
             egui::ColorImage::from_rgba_unmultiplied([pw, ph], &rgba)
         })
         .unwrap_or_else(|_| egui::ColorImage::from_rgba_unmultiplied([1, 1], &[0; 4]));
-    texture(ctx, egui::Id::new(("web-original", doc.id.0)), image, egui::vec2(w as f32, h as f32))
+    texture(ctx, egui::Id::unique(("web-original", doc.id.0)), image, egui::vec2(w as f32, h as f32))
 }
 
 /// Opens Save for Web for the active document, seeded from the engine's last export (the one copy of what is
@@ -293,7 +293,7 @@ fn encode(ctx: &egui::Context, app: &PhotocraftApp, wanted: &WantedVariant, fram
     let (w, h) = (encoded.width.max(1), encoded.height.max(1));
     let ratio = (fw * fh) / (f64::from(w) * f64::from(h)).max(1.0);
     let image = egui::ColorImage::from_rgba_unmultiplied([w as usize, h as usize], &encoded.rgba);
-    let picture = texture(ctx, egui::Id::new(("web-texture", doc.id.0, index)), image, egui::vec2(fw as f32, fh as f32));
+    let picture = texture(ctx, egui::Id::unique(("web-texture", doc.id.0, index)), image, egui::vec2(fw as f32, fh as f32));
     let mut variant = WebVariant::new(index, revision, picture, (encoded.bytes as f64 * ratio) as u64).proxy(ratio > 1.001);
     if let Some(colors) = encoded.colors {
         variant = variant.colors(colors as u16);

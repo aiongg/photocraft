@@ -137,7 +137,7 @@ fn indexed_matte_document_color(app: &PhotocraftApp, doc: &Document, color: [f32
     let options = TransformOptions { intent: app.session.color.settings.intent(), bpc: app.session.color.settings.bpc, ..Default::default() };
     let transform = craft::cms::transform::cached(&source, &destination, options).map_err(|e| e.to_string())?;
     let mut output = [0.0; 16];
-    transform.eval(&color[..3], &mut output);
+    transform.eval(&color[..3], &mut output).map_err(|e| e.to_string())?;
     let rgb = if destination.color_space == ColorSpace::Gray { [output[0]; 3] } else { [output[0], output[1], output[2]] };
     if rgb.iter().any(|v| !v.is_finite()) {
         return Err("cannot convert matte colour to finite document samples".into());

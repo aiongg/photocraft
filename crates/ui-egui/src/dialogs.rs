@@ -246,7 +246,7 @@ pub(crate) mod params {
     struct Picks(Vec<(PickId, DialogId, String)>);
 
     fn picks_id() -> egui::Id {
-        egui::Id::new("pc-param-picks")
+        egui::Id::unique("pc-param-picks")
     }
 
     /// Answers the dialogs' requests of this pass: colours through a Color Picker child, paths through the host's file

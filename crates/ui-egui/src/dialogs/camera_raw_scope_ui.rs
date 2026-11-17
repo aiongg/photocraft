@@ -92,10 +92,10 @@ impl ScopeData {
                     .flat_map(|y| (0..size[0]).step_by(step).map(move |x| y * size[0] + x))
                     .filter_map(|i| pixels.get(i).map(|p| (i, p)))
                     .filter(|(i, p)| p[3] > 0.0 && p.iter().all(|v| v.is_finite()) && (!region || selection.and_then(|m| m.get(*i)).is_some_and(|v| *v > 0.0)))
-                    .map(|(_, p)| {
+                    .filter_map(|(_, p)| {
                         let mut rgb = [0.0; 3];
-                        scope_transform.eval(&p[..3], &mut rgb);
-                        [rgb[0], rgb[1], rgb[2], p[3]]
+                        scope_transform.eval(&p[..3], &mut rgb).ok()?;
+                        Some([rgb[0], rgb[1], rgb[2], p[3]])
                     })
                     .collect();
                 Vectorscope::from_rgba(&counted)
@@ -166,9 +166,8 @@ pub(crate) fn pixel_at(at: [f64; 2], size: [usize; 2], pixels: &[[f32; 4]], refi
 /// `pixel` as the readout form `lab` asks for: Lab through `lab_transform`, else RGB.
 pub(crate) fn readout(pixel: [f32; 4], lab: bool, lab_transform: &Transform) -> ScopeReadout {
     let rgb = [pixel[0], pixel[1], pixel[2]];
-    if lab {
-        let mut l = [0.0; 3];
-        lab_transform.eval(&rgb, &mut l);
+    let mut l = [0.0; 3];
+    if lab && lab_transform.eval(&rgb, &mut l).is_ok() {
         ScopeReadout::Lab([l[0] * 100.0, l[1] * 255.0 - 128.0, l[2] * 255.0 - 128.0])
     } else {
         ScopeReadout::Rgb(rgb)
@@ -179,7 +178,7 @@ pub(crate) fn readout(pixel: [f32; 4], lab: bool, lab_transform: &Transform) -> 
 /// target. `None` when the colour management gives a value that is not finite.
 pub(crate) fn hover_target(pixel: [f32; 4], scope_transform: &Transform) -> Option<[f32; 2]> {
     let mut rgb = [0.0; 3];
-    scope_transform.eval(&pixel[..3], &mut rgb);
+    scope_transform.eval(&pixel[..3], &mut rgb).ok()?;
     if !rgb.iter().all(|x| x.is_finite()) {
         return None;
     }

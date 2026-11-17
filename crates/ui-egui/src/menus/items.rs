@@ -77,11 +77,13 @@ impl MenuModel {
 /// after the first pass's commands ran.
 pub fn model<'a>(app: &'a mut PhotocraftApp, ctx: &egui::Context) -> &'a MenuModel {
     let state = crate::native_menu::state_hash(app, craft::menu::had_input(ctx).then_some(app.frame));
-    if app.menu_model.as_ref().is_none_or(|m| m.state != state) {
-        let built = build(app, state);
-        app.menu_model = Some(built);
+    match app.menu_model.take() {
+        Some(held) if held.state == state => app.menu_model.insert(held),
+        _ => {
+            let built = build(app, state);
+            app.menu_model.insert(built)
+        }
     }
-    app.menu_model.as_ref().expect("the model was just built")
 }
 
 /// The row that runs `id`.

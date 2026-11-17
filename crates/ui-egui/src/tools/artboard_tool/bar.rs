@@ -182,7 +182,9 @@ pub fn set_custom_background_from_picker(app: &mut PhotocraftApp, color: &str, u
 fn pick_background(app: &mut PhotocraftApp) {
     let rgb = crate::color_picker_ui::parse_hex(&shown_background(app).1).unwrap_or([1.0; 3]);
     let title = crate::color_picker_ui::title_for(tl!("Color"));
-    crate::color_picker_ui::open_for_target(app, "artboardBackground", &title, rgb);
+    if let Err(message) = crate::color_picker_ui::open_for_target(app, "artboardBackground", &title, rgb) {
+        crate::notices::error(app, message);
+    }
 }
 
 /// The framework's background for a bar background `name` (with `hex` for custom).

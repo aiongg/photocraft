@@ -485,9 +485,9 @@ impl Framework {
     /// Shift+F6 (Window › Color, Select › Modify › Feather) until those are a framework
     /// `CommandSet`. The held `Arc` is replaced only when the bindings differ, so the runtime
     /// rebuilds its keymap only on a change.
-    fn set_overrides(&mut self, rev: u64, catalog: AppCatalog, mut overrides: Overrides) {
+    fn set_overrides(&mut self, rev: u64, catalog: Option<AppCatalog>, mut overrides: Overrides) {
         self.overrides_rev = Some(rev);
-        self.catalog = Some(catalog);
+        self.catalog = catalog;
         for command in [NavCommand::NextPane, NavCommand::PreviousPane] {
             overrides.insert(CommandRef::from(command).key(), Vec::new());
         }

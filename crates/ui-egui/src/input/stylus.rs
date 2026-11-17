@@ -123,7 +123,7 @@ impl StylusFeed {
 }
 
 fn feed_id() -> egui::Id {
-    egui::Id::new("photocraft::stylus::feed")
+    egui::Id::unique("photocraft::stylus::feed")
 }
 
 /// Per-app stylus state.

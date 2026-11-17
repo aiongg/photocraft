@@ -187,7 +187,7 @@ fn masked_layer(app: &PhotocraftApp) -> Option<u64> {
 
 /// Where the Rename Channel… command leaves the row (an `Option<Row>`) whose rename field the next pass opens.
 fn rename_request() -> egui::Id {
-    egui::Id::new("photocraft.channels.rename")
+    egui::Id::unique("photocraft.channels.rename")
 }
 
 /// The Channels panel body.

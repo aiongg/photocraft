@@ -36,7 +36,9 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     if out.pick_color.is_some() {
         let rgb = settings.shield.custom_color.map(|v| f32::from(v) / 255.0);
-        crate::color_picker_ui::open_for_target(app, "cropShield", "Color Picker (Crop Shield Color)", rgb);
+        if let Err(message) = crate::color_picker_ui::open_for_target(app, "cropShield", "Color Picker (Crop Shield Color)", rgb) {
+            crate::notices::error(app, message);
+        }
     }
     if out.reset {
         reset(app);

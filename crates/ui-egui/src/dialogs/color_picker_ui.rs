@@ -62,7 +62,7 @@ pub(crate) enum PickWindow {
 impl PickWindow {
     /// The id under which this window's answers wait in `app.color_answers`.
     fn answers(self) -> DialogId {
-        egui::Id::new(("pc-color-picker-window", self))
+        egui::Id::unique(("pc-color-picker-window", self))
     }
 }
 

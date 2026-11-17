@@ -344,9 +344,10 @@ pub(crate) fn bridged_rows() -> Vec<CommandDef> {
 /// changes, so the holder takes a new one only when [`same_rows`] says the rows differ from the held ones. It
 /// compares where the menu model rebuilds, which covers a new action and a tool list change.
 // PLAN: hub-w1's `framework_before_input` holds the rows and the generation, and calls this in place of `catalog(app)`.
-pub(crate) fn catalog(rows: Vec<CommandDef>, generation: u64) -> AppCatalog {
-    // `command_rows` gives each id once and every row the app scope, the two things `new` refuses.
-    AppCatalog::new(rows, generation).unwrap_or_else(|_| AppCatalog::new(Vec::new(), generation).unwrap_or_else(|_| unreachable!("no rows, no refusal")))
+pub(crate) fn catalog(rows: Vec<CommandDef>, generation: u64) -> Option<AppCatalog> {
+    // `command_rows` gives each id once and every row the app scope, the two things `new` refuses; a refusal leaves the
+    // runtime with no app catalog.
+    AppCatalog::new(rows, generation).ok()
 }
 
 /// Whether two row lists describe the same commands, labels, paths and keys.
@@ -705,12 +706,8 @@ fn dispatch_as(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, last: boo
             // (#4794).
             app.run(id, json!({}))
         } else if crate::adjust_dialog::has_dialog(id) {
-            if last {
-                crate::adjust_dialog::open_last(app, id);
-            } else {
-                crate::adjust_dialog::open(app, id);
-            }
-            Ok(serde_json::Value::Null)
+            let opened = if last { crate::adjust_dialog::open_last(app, id) } else { crate::adjust_dialog::open(app, id) };
+            opened.map(|_| serde_json::Value::Null)
         } else {
             crate::menus::invoke(app, ctx, id, json!({}))
         };

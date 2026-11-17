@@ -99,9 +99,9 @@ pub(crate) fn answer(app: &mut PhotocraftApp, _ctx: &egui::Context, answer: &mut
 /// Opens `prompt` unless a `StandardPrompt` is already open. `Err` carries the open prompt's id.
 pub(crate) fn open_prompt(app: &mut PhotocraftApp, prompt: StandardPrompt) -> Result<DialogId, DialogId> {
     let host = &mut app.framework.dialogs;
-    match host.open_unless_open(prompt) {
-        Ok(id) => Ok(id),
-        Err(_) => Err(host.get::<StandardPrompt>().map(StackDialog::id).expect("a StandardPrompt is open when the host refuses one")),
+    match host.get::<StandardPrompt>().map(StackDialog::id) {
+        Some(open) => Err(open),
+        None => Ok(host.open(prompt)),
     }
 }
 

@@ -370,9 +370,11 @@ pub(crate) fn preset(name: &str) -> Workspace<String> {
     let shown = preset_panels(name);
     let closes = PANELS.iter().map(|panel| panel.id).filter(|id| !shown.contains(id)).map(|id| Action::close(id.to_owned()));
     let mut workspace = Workspace::new(full_layout());
-    workspace
-        .apply_all(closes, false, |panel: &String| permissions(panel))
-        .expect("the built-in layout holds every registered panel once, and each of them may close");
+    // The built-in layout holds every registered panel once and each of them may close, so a refusal does not arise; the
+    // full layout with every panel shown is the fallback.
+    if workspace.apply_all(closes, false, |panel: &String| permissions(panel)).is_err() {
+        workspace = Workspace::new(full_layout());
+    }
     workspace
 }
 

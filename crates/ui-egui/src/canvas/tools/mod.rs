@@ -580,8 +580,8 @@ fn with_rig<R>(
             };
         }
         let selected: DynTool<'_> = 'select: {
-            if dialog_picked {
-                break 'select dynamic(boxed.as_mut().expect("the dialog's tool was just stored"));
+            if dialog_picked && let Some(picked) = boxed.as_mut() {
+                break 'select dynamic(picked);
             }
             if transform_picked && let Some(t) = transform.as_mut() {
                 break 'select t as &mut dyn CanvasTool;
@@ -598,11 +598,15 @@ fn with_rig<R>(
                     None => dynamic(boxed.insert(Box::new(NoTool))),
                 },
                 Family::Selection => dynamic(boxed.insert(selection::tool(&scope, selection, host))),
-                Family::Move => dynamic(boxed.insert(move_tool::tool(&scope, mover.take().expect("the Move state is free"), host))),
+                Family::Move => match mover.take() {
+                    Some(state) => dynamic(boxed.insert(move_tool::tool(&scope, state, host))),
+                    None => dynamic(boxed.insert(Box::new(NoTool))),
+                },
                 Family::Paint => dynamic(boxed.insert(super::paint_tool::tool(&scope, paint, host))),
-                Family::Eyedropper => {
-                    dynamic(boxed.insert(super::eyedropper_tool::tool(&scope, eyedropper.take().expect("the Eyedropper state is free"), host)))
-                }
+                Family::Eyedropper => match eyedropper.take() {
+                    Some(state) => dynamic(boxed.insert(super::eyedropper_tool::tool(&scope, state, host))),
+                    None => dynamic(boxed.insert(Box::new(NoTool))),
+                },
                 Family::Vector => dynamic(boxed.insert(crate::vector_ui::host::tool(&scope, vector, host))),
                 Family::Type => dynamic(boxed.insert(crate::type_tool::tool(&scope, type_tool, host))),
                 Family::Gradient => dynamic(boxed.insert(crate::gradient_ui::tool::tool(&scope, gradient, host))),
@@ -610,7 +614,10 @@ fn with_rig<R>(
                 Family::Artboard => dynamic(boxed.insert(crate::artboard_tool::tool(&scope, artboard, host))),
                 Family::Frame => dynamic(boxed.insert(crate::frame_tool::tool(&scope, frame, host))),
                 Family::Slice => dynamic(boxed.insert(crate::slice_ui::tool(&scope, slice, host))),
-                Family::Retouch => dynamic(boxed.insert(retouch::tool(&scope, retouch.take().expect("the Retouch state is free"), host))),
+                Family::Retouch => match retouch.take() {
+                    Some(state) => dynamic(boxed.insert(retouch::tool(&scope, state, host))),
+                    None => dynamic(boxed.insert(Box::new(NoTool))),
+                },
                 Family::PerspectiveCrop => dynamic(boxed.insert(crate::perspective_crop_ui::tool(&scope, perspective, host))),
             }
         };

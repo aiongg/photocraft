@@ -276,7 +276,7 @@ fn screenshot(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply 
     let host = WindowHost::of(ctx);
     let viewport = match window.as_deref() {
         None | Some("main") => egui::ViewportId::ROOT,
-        Some(id) => match host.viewport_of(egui::Id::new(id)) {
+        Some(id) => match host.viewport_of(egui::Id::unique(id)) {
             Some(viewport) => viewport,
             None => return err(format!("no open window `{id}`")),
         },
