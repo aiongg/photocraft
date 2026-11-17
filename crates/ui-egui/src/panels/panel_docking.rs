@@ -145,7 +145,7 @@ fn stop_closed_timeline(app: &mut PhotocraftApp, closed: &[String]) {
 }
 
 /// What the dock reads of `panel`: its name, icon, least size, group heights, float size and, for the toolbar, the grid
-/// its column is whole steps of.
+/// its column is whole steps of and its float in the main window.
 fn spec(app: &PhotocraftApp, panel: &str) -> PanelSpec {
     if panel == CANVAS {
         let least = SizeLimits::at_least(egui::vec2(CANVAS_MIN[0], CANVAS_MIN[1]));
@@ -161,7 +161,9 @@ fn spec(app: &PhotocraftApp, panel: &str) -> PanelSpec {
         spec = spec.float_size(egui::vec2(width, height));
     }
     if panel == TOOLBAR {
-        spec = spec.grid(ToolRail::<crate::state::Tool>::dock_grid(app.ctx(), super::toolbar::cells(app)));
+        // The toolbar floats in the main window, as production's: its tooltips, tool flyouts and Edit Toolbar drawer
+        // open beside the one-button-wide rail, which its own OS window would clip.
+        spec = spec.grid(ToolRail::<crate::state::Tool>::dock_grid(app.ctx(), super::toolbar::cells(app))).allow_native(false);
     }
     spec
 }

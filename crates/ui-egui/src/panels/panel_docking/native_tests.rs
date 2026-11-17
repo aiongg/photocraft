@@ -273,3 +273,18 @@ fn a_dialog_blocks_the_panel_windows() {
         assert!(!is_shown(desktop.h.state(), "layers"), "{name}: the × closes the panel once the dialog is gone");
     }
 }
+
+/// A floated toolbar stays in the main window, where its tooltips, tool flyouts and drawer have room beside the rail;
+/// another panel floats in an OS window of its own.
+#[test]
+fn a_floated_toolbar_stays_in_the_main_window_while_other_panels_get_os_windows() {
+    let mut desktop = Desktop::new(app_with_document());
+    for panel in [TOOLBAR, "layers"] {
+        desktop.h.state_mut().run("window.panel.window", json!({"panel": panel})).unwrap();
+    }
+    desktop.steps(3);
+    let floating = |panel: &str| matches!(desktop.h.state().ui.docking.layout.place(&panel.to_owned()), Some(PanelPlace::Floating { .. }));
+    assert!(floating(TOOLBAR) && floating("layers"), "both panels float");
+    assert!(desktop.window(TOOLBAR).is_none(), "the toolbar floats in the main window");
+    assert!(desktop.window("layers").is_some(), "the Layers panel floats in its own OS window");
+}
