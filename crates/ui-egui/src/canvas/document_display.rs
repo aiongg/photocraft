@@ -220,12 +220,20 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let (ctx, host, idx, doc, output, rect, ppp) = (pass.ctx, pass.host, pass.host.idx, pass.doc, pass.output, pass.rect, pass.ppp);
     let given = view.canvas_view(rect, ppp, pass.flip, pass.aspect);
     let id = host.canvas_id();
-    // A discrete zoom eases from the view it was asked for in.
+    // A discrete zoom eases from the view it was asked for in. A measuring run starts no ease, so the request waits for
+    // the pass that shows the canvas.
+    let measuring = craft::ui::runtime::measure::active(ctx);
+    if view.zoom_animating {
+        eprintln!("DIAG navigator_viewport_follows_the_canvas_zoom_ease: ease request measuring={measuring} zoom={} from={:?}", view.zoom, view.zoom_from);
+    }
     let from = view.zoom_from.map_or(given, |(zoom, center)| View { zoom, center, ..view.clone() }.canvas_view(rect, ppp, pass.flip, pass.aspect));
-    let ease = view.zoom_animating.then(|| (from, view.zoom_anchor.map(|(doc, screen)| (Point::new(doc[0], doc[1]), Pos2::new(screen[0], screen[1])))));
-    view.zoom_animating = false;
-    view.zoom_anchor = None;
-    view.zoom_from = None;
+    let ease = (view.zoom_animating && !measuring)
+        .then(|| (from, view.zoom_anchor.map(|(doc, screen)| (Point::new(doc[0], doc[1]), Pos2::new(screen[0], screen[1])))));
+    if !measuring {
+        view.zoom_animating = false;
+        view.zoom_anchor = None;
+        view.zoom_from = None;
+    }
     // What is on screen until the canvas runs: the view of a zoom ease running, else the view given.
     let drawn = easing_view(ctx, id).map_or(given, |mut eased| {
         eased.rect = rect;
