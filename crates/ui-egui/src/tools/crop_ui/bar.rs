@@ -52,7 +52,7 @@ pub(crate) fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         let alert = Alert::new(words.fill_help_title.clone(), message);
         // The alert takes the Escape of the pass it opens in, as an open dialog takes the one that closes it: the
         // canvas, drawn after the bar, would otherwise cancel the pending crop with it.
-        if app.framework.dialogs.open_unless_open(HostedAlert::new(alert)).is_ok() {
+        if app.framework.dialogs.open_unless_open_in(ui.ctx(), HostedAlert::new(alert)).is_ok() {
             crate::window_keys::take_escape(ui.ctx());
         }
     }
