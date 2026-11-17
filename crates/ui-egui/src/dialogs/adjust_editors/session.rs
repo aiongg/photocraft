@@ -221,6 +221,14 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
             _ => {}
         }
     }
+    if let Some(test) = std::thread::current().name().and_then(|name| {
+        ["gradient_map_stop_picker_closed_without_a_colour_changes_nothing", "photo_filter_colour_picker_previews_live_cancel_restores_and_ok_is_one_step"]
+            .into_iter()
+            .find(|test| name.ends_with(test))
+    }) && out.ask.is_some()
+    {
+        eprintln!("DIAG {test}: Properties ask {:?} pick open {}", out.ask, record.pick.is_some());
+    }
     match out.ask {
         Some(AdjustAsk::Auto) => match black_white_auto(app, Some(id), None) {
             Ok(Value::Object(weights)) => {
