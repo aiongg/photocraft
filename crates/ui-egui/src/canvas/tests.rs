@@ -1056,8 +1056,19 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         h.run_steps(2);
         h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
         h.event(egui::Event::Text(typed.into()));
+        eprintln!(
+            "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: field {field} typed {typed}: before Enter zoom {} focused {:?}",
+            h.state().ui.views[0].zoom,
+            h.ctx.memory(|m| m.focused())
+        );
         h.key_press(egui::Key::Enter);
-        h.run_steps(60);
+        h.run_steps(2);
+        eprintln!(
+            "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: field {field} after Enter zoom {} shown {:?}",
+            h.state().ui.views[0].zoom,
+            crate::canvas::active_view(h.state()).map(|v| v.zoom)
+        );
+        h.run_steps(58);
         assert!(h.state().ui.window_views.is_empty(), "the window keeps no copy of the view");
         assert!((h.state().ui.views[0].zoom - want).abs() < 1e-3, "field {field}, typed {typed}: not written back over by the window: {}", h.state().ui.views[0].zoom);
     }
