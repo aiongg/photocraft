@@ -323,9 +323,24 @@ fn diag_under(h: &Harness<'_, PhotocraftApp>, what: &str, at: Pos2) {
         .collect();
     let hits = h.ctx.viewport(|vp| {
         let contains: Vec<_> = vp.hits.contains_pointer.iter().rev().take(4).map(|w| (w.rect, w.layer_id)).collect();
-        (vp.hits.click.map(|w| (w.rect, w.layer_id)), contains)
+        (vp.hits.click.map(|w| (w.rect, w.layer_id)), contains, vp.hits.drag.map(|w| (w.rect, w.layer_id)))
     });
-    eprintln!("DIAG {test}: under {what} at {at:?}: nodes {under:?} hits click {:?} contains (front first) {:?} layer {:?}", hits.0, hits.1, h.ctx.layer_id_at(at));
+    // The framework's hit record under `at`: each shape's owner (the tail of its id path), part and owner rect.
+    let short = |id: egui::Id| {
+        let text = format!("{id:?}");
+        text.char_indices().rev().nth(160).map_or(text.clone(), |(at, _)| text[at..].to_owned())
+    };
+    let shapes: Vec<_> = craft::ui::runtime::pointer::shapes_at(&h.ctx, at)
+        .into_iter()
+        .map(|(owner, part)| (short(owner), part, h.ctx.read_response(owner).map(|resp| (resp.rect, resp.sense))))
+        .collect();
+    eprintln!(
+        "DIAG {test}: under {what} at {at:?}: nodes {under:?} hits click {:?} drag {:?} contains (front first) {:?} layer {:?} shapes {shapes:?}",
+        hits.0,
+        hits.2,
+        hits.1,
+        h.ctx.layer_id_at(at)
+    );
 }
 
 /// Clicks the colour well labelled `label` and returns the Color Picker it opened.
@@ -343,6 +358,7 @@ fn open_picker(h: &mut Harness<'_, PhotocraftApp>, label: &str) -> craft::ui::di
         h.ctx.memory(|m| m.focused())
     );
     let at = h.get_by_role_and_label(Role::ColorWell, label).rect().center();
+    diag_under(h, &format!("{label} before the click"), at);
     h.get_by_role_and_label(Role::ColorWell, label).click();
     h.run_steps(3);
     diag_under(h, label, at);
@@ -363,6 +379,7 @@ fn photo_filter_colour_picker_previews_live_cancel_restores_and_ok_is_one_step()
     h.state_mut().run("layer.setAdjustment", json!({"layer": id.0, "color": "#336699"})).unwrap();
     h.run_steps(4);
     let at = h.get_by_role_and_label(Role::RadioButton, "Color").rect().center();
+    diag_under(&h, "the Color radio before the click", at);
     h.get_by_role_and_label(Role::RadioButton, "Color").click();
     h.run_steps(3);
     diag_under(&h, "the Color radio", at);
