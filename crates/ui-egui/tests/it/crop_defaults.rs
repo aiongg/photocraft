@@ -86,28 +86,16 @@ fn fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active
     assert_eq!(fill(&h), CropFill::ContentAware, "a new document keeps it");
 
     // A committed crop keeps it.
-    eprintln!(
-        "DIAG fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active: before the draw frame {:?} zoom {:?} rect {:?}",
-        crop_ui::frame(h.state()),
-        photocraft_ui_egui::canvas::active_view(h.state()).map(|v| v.zoom),
-        photocraft_ui_egui::canvas::active_view(h.state()).map(|v| v.rect)
-    );
-    draw_frame(&mut h, [4.0, 4.0], [20.0, 16.0]);
+    // Each press starts clear of the untouched default frame's handles and edges (their reach is at most a quarter
+    // of the frame's shortest side on screen), so it draws a frame instead of resizing the default one.
+    draw_frame(&mut h, [10.0, 10.0], [26.0, 22.0]);
     assert!(crop_ui::pending(h.state()), "the drawn frame is pending");
-    eprintln!(
-        "DIAG fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active: frame {:?}",
-        crop_ui::frame(h.state())
-    );
-    let v = control(&mut h, "ui.menu.invoke", json!({"id": "image.crop"}));
-    eprintln!(
-        "DIAG fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active: crop reply {v} size {:?}",
-        size(&h)
-    );
+    control(&mut h, "ui.menu.invoke", json!({"id": "image.crop"}));
     assert_eq!(size(&h), (16, 12), "the crop was committed");
     assert_eq!(fill(&h), CropFill::ContentAware, "a committed crop keeps it");
 
     // A cancelled crop keeps it.
-    draw_frame(&mut h, [2.0, 2.0], [10.0, 8.0]);
+    draw_frame(&mut h, [5.0, 4.0], [12.0, 9.0]);
     assert!(crop_ui::pending(h.state()));
     control(&mut h, "ui.key", json!({"key": "Escape"}));
     assert!(!crop_ui::pending(h.state()), "Escape cancelled the crop");
