@@ -1,6 +1,8 @@
 //! Chrome around the canvas: title bar, options bar, toolbar, status bar, dock cards, Properties.
 
 use craft::ui::patterns::blend_keys::{BlendKeyEntry, BlendShortcut};
+#[cfg(test)]
+use egui::Rect;
 use egui::vec2;
 use photocraft_color::BlendMode;
 use photocraft_doc::LayerId;

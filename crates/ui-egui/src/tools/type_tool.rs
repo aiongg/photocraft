@@ -51,9 +51,7 @@ pub(crate) use options_bar::styles_at;
 pub(crate) use panel::toggle_opentype;
 pub use panel::{character_panel, type_properties};
 #[cfg(test)]
-#[cfg(test)]
 pub(crate) use pointer::PathClick;
-pub(crate) use pointer::path_target;
 pub(crate) use pointer::{TypeState, box_shape, drain, tool};
 pub(crate) use values::doc_unit;
 

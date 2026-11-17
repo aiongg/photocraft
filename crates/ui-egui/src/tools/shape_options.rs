@@ -142,6 +142,29 @@ fn paint_edit(stroke: bool, change: &PaintChange, width: f32) -> Value {
 /// A pass applies only its own edits: the values are read from the app at the start of each pass
 /// and `ShapeBar` reports an edit only in the pass that read the input, so a second pass in the
 /// same frame sees the stored result and writes nothing.
+/// The bar's number fields: the next shape's, or the selected rectangle's own radius when the bar edits it.
+fn tool_settings(o: &crate::state::ToolOptions, live: Option<&photocraft_doc::LiveShape>, rect_target: bool) -> ShapeToolSettings {
+    let mut settings = ShapeToolSettings::default();
+    settings.fill_on = o.shape_fill;
+    settings.corner_radius = match live {
+        Some(photocraft_doc::LiveShape::Rect { radii, .. }) if rect_target => radii[0],
+        _ => f64::from(o.corner_radius),
+    };
+    settings.sides = o.polygon_sides;
+    settings.line_weight = f64::from(o.line_weight);
+    settings.stroke_width = f64::from(o.stroke_width);
+    settings
+}
+
+/// The paint a chip's Color Picker request edits, with the colour it starts from when the layer has none.
+fn paint_dialog_target<C>(which: ShapePaint, fg: C, bg: C) -> Option<(crate::shape_fill_ui::Paint, C)> {
+    match which {
+        ShapePaint::Fill => Some((crate::shape_fill_ui::Paint::Fill, fg)),
+        ShapePaint::Stroke => Some((crate::shape_fill_ui::Paint::Stroke, bg)),
+        _ => None,
+    }
+}
+
 pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, paint: bool) {
     // Path mode edits only the next outline: an active shape layer is not the target.
     let target = if paint { selected_shape(&app.session) } else { None };
@@ -163,15 +186,7 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
     // selection tools, whose Radius is its own.
     let rect_target = matches!(tool, Tool::PathSelection | Tool::DirectSelection)
         && matches!(target.as_ref().and_then(|s| s.live.as_ref()), Some(photocraft_doc::LiveShape::Rect { .. }));
-    let mut settings = ShapeToolSettings::default();
-    settings.fill_on = o.shape_fill;
-    settings.corner_radius = match target.as_ref().and_then(|s| s.live.as_ref()) {
-        Some(photocraft_doc::LiveShape::Rect { radii, .. }) if rect_target => radii[0],
-        _ => f64::from(o.corner_radius),
-    };
-    settings.sides = o.polygon_sides;
-    settings.line_weight = f64::from(o.line_weight);
-    settings.stroke_width = f64::from(o.stroke_width);
+    let settings = tool_settings(o, target.as_ref().and_then(|s| s.live.as_ref()), rect_target);
     let style = stroke.as_ref().map_or_else(|| o.shape_stroke.clone(), StrokeOptions::from);
     let locked = target.as_ref().is_some_and(|s| {
         app.session.active().is_some_and(|st| {
@@ -310,11 +325,7 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
     }
     if let Some((which, _request)) = out.pick_color {
         // The dialog starts from the layer's own paint, so the chip's request is not needed.
-        let (which, fallback) = match which {
-            ShapePaint::Fill => (crate::shape_fill_ui::Paint::Fill, fg),
-            ShapePaint::Stroke => (crate::shape_fill_ui::Paint::Stroke, bg),
-            _ => return,
-        };
+        let Some((which, fallback)) = paint_dialog_target(which, fg, bg) else { return };
         crate::shape_fill_ui::open_paint(app, which, target.as_ref().map(|s| s.layer), true, fallback);
     }
     if let Some((which, gesture)) = out.screen_pick {

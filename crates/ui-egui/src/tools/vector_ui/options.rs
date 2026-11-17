@@ -131,7 +131,6 @@ fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut BarOpe
         }
     }
     if tool == Tool::Line {
-        let alert;
         Divider::vertical().show(ui);
         let ppi = document_ppi(app);
         let o = &mut app.ui.tool_options;
@@ -143,7 +142,7 @@ fn bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool, open: &mut BarOpe
         arrows.concavity = f64::from(o.arrow_concavity);
         let out = ArrowheadsPopover::new(Bind::given(arrows), Bind::bound(&mut open.arrows), ppi).show(ui);
         // A Concavity typed past -50..50 % raises the reference's alert (#13258).
-        alert = out.out_of_range;
+        let alert = out.out_of_range;
         if let Some(a) = out.edits.iter().rev().find_map(EditEvent::value) {
             o.arrow_start = a.start;
             o.arrow_end = a.end;

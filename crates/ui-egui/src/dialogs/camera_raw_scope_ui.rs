@@ -12,8 +12,6 @@ use photocraft_algo::histogram::RgbHistogram;
 use photocraft_algo::vectorscope::{HUES, SATURATIONS, Vectorscope, hue_saturation};
 use std::sync::Arc;
 
-/// Most colour samplers (probes) on the preview.
-pub(crate) const MAX_SAMPLERS: usize = 9;
 /// Vectorscope analysis samples at most this many proxy pixels.
 const SCOPE_SAMPLES: usize = 8192;
 

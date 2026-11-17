@@ -98,7 +98,8 @@ fn show_session(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
     }
     if let Some(outline) = path_outline(t, pv) {
         let selection = PathSelection::default();
-        BezierOverlay::new("Transform path outline", Bind::given(vec![outline]), &selection)
+        // The outline is display-only: nothing in its output is acted on.
+        let _ = BezierOverlay::new("Transform path outline", Bind::given(vec![outline]), &selection)
             .tool(BezierTool::Anchors)
             .anchors(AnchorsShown::Hidden)
             .show_at(ui, rect);

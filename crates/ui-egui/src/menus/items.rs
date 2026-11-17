@@ -306,11 +306,11 @@ pub fn menu_rows(app: &PhotocraftApp) -> Vec<Row> {
     let mut rows = base_rows(app);
     let prefs = app.session.prefs();
     let hidden = prefs.menus.hidden.iter().filter(|id| photocraft_engine::prefs::MenuCustomization::hideable(id)).cloned();
-    let colors = prefs
-        .interface
-        .show_menu_colors
-        .then(|| prefs.menus.colors.iter().filter_map(|(id, name)| menu_tint(name).map(|c| (id.clone(), c.into()))).collect::<Vec<_>>())
-        .unwrap_or_default();
+    let colors = if prefs.interface.show_menu_colors {
+        prefs.menus.colors.iter().filter_map(|(id, name)| menu_tint(name).map(|c| (id.clone(), c.into()))).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
     Customization::new(hidden, colors).apply(&mut rows);
     rows
 }

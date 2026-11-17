@@ -541,7 +541,7 @@ pub fn shape_picker(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut value = Some(app.ui.presets_ui.shape().to_string());
     let before = value.clone();
     let mut state = picker_state(&app.ui.presets_ui, ID);
-    PresetPicker::new(tl!("Shape"), Bind::bound(&mut value), &rows, Bind::bound(&mut state)).columns(7).show(ui);
+    let _ = PresetPicker::new(tl!("Shape"), Bind::bound(&mut value), &rows, Bind::bound(&mut state)).columns(7).show(ui); // the picked value comes back through `value`
     keep_picker_state(&mut app.ui.presets_ui, ID, state);
     if let Some(picked) = value.filter(|picked| before.as_ref() != Some(picked) && !picked.starts_with(GROUP)) {
         app.ui.presets_ui.custom_shape = picked;
