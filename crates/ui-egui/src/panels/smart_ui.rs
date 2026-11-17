@@ -105,10 +105,10 @@ pub(crate) fn trash_action((layer, filter): FilterDrag) -> (String, Value) {
     }
 }
 
-/// Delete or Backspace with no modifiers while a filter's row is selected removes that filter (the
-/// Smart Filters row: all of them), as the panel's Delete button does (#4751), instead of
-/// deleting the smart object or reaching Edit › Clear.
-pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
+/// The fired Delete command (Delete or Backspace, which the shortcut route has taken from the input) while a filter's
+/// row is selected removes that filter (the Smart Filters row: all of them), as the panel's Delete button does
+/// (#4751), instead of deleting the smart object or reaching Edit › Clear.
+pub(crate) fn keys(app: &mut PhotocraftApp) -> bool {
     // A text edit keeps its keys. Text fields and widgets that delete with these keys themselves
     // take them before the key reaches here (#1534).
     if app.ui.text_edit.is_some() {
@@ -119,10 +119,6 @@ pub(crate) fn keys(app: &mut PhotocraftApp, ctx: &egui::Context) -> bool {
     // Only where the key would delete the smart object: Quick Mask, a single channel, a targeted
     // mask or a selection keep their own Delete.
     if crate::shortcut_dispatch::delete_key_command(app, "edit.clear".into()) != "layer.delete" {
-        return false;
-    }
-    let mods = ctx.input(|i| i.modifiers);
-    if !mods.is_none() || !ctx.input_mut(|i| i.consume_key(mods, egui::Key::Delete) || i.consume_key(mods, egui::Key::Backspace)) {
         return false;
     }
     let (command, params) = trash_action(picked);

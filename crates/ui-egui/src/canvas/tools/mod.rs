@@ -505,11 +505,12 @@ fn with_rig<R>(
     let crop_run = (fam == Family::Crop).then(|| crate::crop_ui::CropRun::of(app)).flatten();
     let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut tools.crop.tool));
     // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the app.
-    let free_transform = app.ui.transform.take();
+    // Only the primary canvas draws and drives the box; a secondary window's tool is the selected tool's own.
+    let free_transform = if stand_ins { app.ui.transform.take() } else { None };
     let BodyShown { crop: crop_shown, transform_snapped } = shown;
     let mut transform = free_transform.as_ref().map(|session| crate::transform_tool::canvas_tool(session, transform_snapped));
     // The symmetry session moves into the pass the same way.
-    let symmetry_transform = if fam == Family::Paint { app.ui.symmetry_transform.take() } else { None };
+    let symmetry_transform = if stand_ins && fam == Family::Paint { app.ui.symmetry_transform.take() } else { None };
     let mut symmetry = symmetry_transform.as_ref().and_then(|t| crate::symmetry_ui::session_tool(app, t));
     let mut crop_pass = match (crop_tool.as_mut(), crop_run.as_ref()) {
         (Some(tool), Some(run)) => Some(crop::pass(tool, run, ctx, crop_shown)),
@@ -635,7 +636,9 @@ fn with_rig<R>(
     };
     let transform_keys = transform.as_mut().map(|t| t.take_keys());
     drop(transform);
-    app.ui.transform = free_transform;
+    if stand_ins {
+        app.ui.transform = free_transform;
+    }
     if let Some(keys) = transform_keys {
         crate::transform_tool::tool_keys(app, keys);
     }
@@ -682,7 +685,7 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     tools.zoom.options.scrubby_zoom = app.ui.tool_options.zoom_scrubby;
     let smart = super::snap_ui::smart_guide_color(app);
     let mut response =
-        with_rig(app, &ctx, host, &mut tools, primary, shown, |selected, tool_host| tool_host.enabled(primary).smart_guide_color(smart).run(ui, out, selected));
+        with_rig(app, &ctx, host, &mut tools, primary, shown, |selected, tool_host| tool_host.smart_guide_color(smart).run(ui, out, selected));
     // The autoscroll moves the view the pass ended with; the caller copies the response's view into its own.
     if let (Some(scroll), Some(space)) = (response.scroll, out.space.as_ref()) {
         let size = app.session.documents().get(host.idx).map(|state| Size::new(f64::from(state.doc.size.width), f64::from(state.doc.size.height)));

@@ -49,9 +49,17 @@ fn navigator_viewport_follows_the_canvas_zoom_ease() {
     let view = &mut h.state_mut().ui.views[0];
     view.request_zoom_animation(true);
     view.zoom = 2.0;
-    h.run_steps(3);
-    let mid = percents(&h);
-    assert!(mid.iter().any(|p| *p > 100.5 && *p < 199.5), "the row shows the eased zoom while the canvas eases: {mid:?}");
+    // The ease's length belongs to the framework's motion settings: look at every frame for one between the start
+    // and the target.
+    let mut seen = Vec::new();
+    let midway = (0..30).any(|_| {
+        h.run_steps(1);
+        let row = percents(&h);
+        let between = row.iter().any(|p| *p > 100.5 && *p < 199.5);
+        seen.push(row);
+        between
+    });
+    assert!(midway, "the row shows the eased zoom while the canvas eases: {seen:?}");
     h.run_steps(90);
     assert!(percents(&h).iter().any(|p| (p - 200.0).abs() < 0.5), "the ease ends on the target: {:?}", percents(&h));
 }

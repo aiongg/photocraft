@@ -39,8 +39,14 @@ fn driven() -> PhotocraftApp {
     app.run("layer.new.layer", json!({"name": "Ink"})).unwrap();
     app.run("notes.add", json!({"x": 10, "y": 12, "text": "fix this"})).unwrap();
     app.ui.tool = Tool::Note;
-    app.ui.analysis.note_selected = Some(0);
     app.sync_views();
+    crate::canvas::testing::frame(&mut app);
+    // A click on the note selects it and focuses the canvas, where a Delete reaches the tool.
+    let at = [10.5, 13.0];
+    crate::canvas::testing::move_to(&mut app, at, egui::Modifiers::NONE);
+    crate::canvas::testing::press(&mut app, at, egui::Modifiers::NONE);
+    crate::canvas::testing::release(&mut app, at, egui::Modifiers::NONE);
+    assert_eq!(app.ui.analysis.note_selected, Some(0), "the click selected the note");
     crate::canvas::testing::frame(&mut app);
     app
 }
