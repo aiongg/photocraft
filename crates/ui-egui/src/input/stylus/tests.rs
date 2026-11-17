@@ -203,8 +203,12 @@ fn eraser_end_switches_tools_once_and_never_mid_drag() {
     app.stylus.feed.set(pen(false));
     assert!(!Stylus::sync_eraser_tool(&mut app));
     assert_eq!(app.ui.tool, Tool::Eraser);
-    // The canvas pass after the release takes the flip.
+    // The canvas pass after the release takes the flip. The driver's release ends the pen's reading with the press, so
+    // the pen, still in range at its tip, is read again for that pass.
     tool_event(&mut app, ToolEvent::Up { x: 20.0, y: 10.0 }, egui::Modifiers::NONE);
+    assert_eq!(app.ui.tool, Tool::Eraser, "the release itself changes no tool");
+    app.stylus.feed.set(pen(false));
+    assert!(Stylus::sync_eraser_tool(&mut app));
     assert_eq!(app.ui.tool, Tool::Brush, "the tip restores the previous tool");
     assert!(!Stylus::sync_eraser_tool(&mut app), "reported once");
     // The eraser end while the Eraser is already chosen remembers nothing to restore.
