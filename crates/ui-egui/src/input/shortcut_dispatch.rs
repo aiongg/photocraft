@@ -145,6 +145,11 @@ pub(crate) fn is_bridged(id: &str) -> bool {
     RUNTIME_COMMANDS.iter().any(|(bridged, _)| *bridged == id)
 }
 
+/// Whether `id` is a view row of [`RUNTIME_COMMANDS`]: a command the document canvas runs on its view.
+pub(crate) fn is_view_command(id: &str) -> bool {
+    RUNTIME_COMMANDS.iter().any(|(row, bridged)| *row == id && matches!(bridged, Bridged::View(_)))
+}
+
 /// The id of the command that steps a tool group to its next tool: the group is named by its key.
 pub(crate) fn next_in_group_id(letter: char) -> String {
     format!("tools.nextInGroup.{}", letter.to_ascii_lowercase())
