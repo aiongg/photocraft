@@ -509,6 +509,13 @@ fn stroke_swatch_gradient_tab_sets_the_next_shapes_stroke() {
     let (_, style, angle) = stroke_gradient(&h);
     assert_eq!((style, angle), (photocraft_doc::GradientStyle::Linear, 90.0));
     assert_eq!(h.state().ui.tool_options.stroke_width, 3.0, "choosing a gradient enables the stroke");
+    {
+        let mut shown = Vec::new();
+        for word in ["Basics", "Blue", "Reverse", "Radial"] {
+            shown.extend(h.query_all_by_label_contains(word).map(|n| (n.accesskit_node().label().unwrap_or_default(), n.rect())));
+        }
+        eprintln!("DIAG stroke_swatch_gradient_tab_sets_the_next_shapes_stroke: nodes {shown:?}");
+    }
     h.get_by_label("Blue 01").click();
     h.run_steps(2);
     let presets = h.state().session.presets.gradients.clone();
