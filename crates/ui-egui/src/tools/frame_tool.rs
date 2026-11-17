@@ -376,7 +376,9 @@ fn press_rule(app: &mut PhotocraftApp, at: KPoint, clicks: u32, reach: f64, styl
     let active = selected(app).map(|l| (l.id, target(app, l)));
     // A handle of the selected image's bounds reaches outside the frame.
     let content_control = active.is_some_and(|(id, t)| {
-        t == Target::Content && child_box(app, id).is_some_and(|b| matches!(b.part_at(at, reach), BoxPart::Corner(_) | BoxPart::Edge(_)))
+        let reference_point = app.ui.tool_options.transform.show_reference_point;
+        t == Target::Content
+            && child_box(app, id).is_some_and(|b| matches!(content_part(&b, at, reach, reference_point), BoxPart::Corner(_) | BoxPart::Edge(_)))
     });
     let Some(id) = content_control.then(|| active.map(|(id, _)| id)).flatten().or_else(|| frame_at(app, p)) else { return Pressed::Draw };
     let (frame, t) = {
@@ -407,7 +409,8 @@ fn press_rule(app: &mut PhotocraftApp, at: KPoint, clicks: u32, reach: f64, styl
             Ok(()) => {
                 let Some(t) = app.ui.transform.as_ref() else { return Pressed::Done };
                 let origin = *t.session.state();
-                Pressed::Content(ContentPress { id: GestureId::new(0), start: at, origin, last: origin, part: origin.part_at(at, reach), begun: false })
+                let part = content_part(&origin, at, reach, t.session.reference_point());
+                Pressed::Content(ContentPress { id: GestureId::new(0), start: at, origin, last: origin, part, begun: false })
             }
             Err(e) => {
                 app.ui.status = e;
@@ -417,6 +420,24 @@ fn press_rule(app: &mut PhotocraftApp, at: KPoint, clicks: u32, reach: f64, styl
         };
     }
     Pressed::Move(FrameMove { layer: id, original: frame.transform, gesture: MoveGesture::press(style, at, mods, Directions::Eight) })
+}
+
+/// The part of the image's box under `at`, as the Free Transform box takes presses: the reference point is a part only
+/// while Show Reference Point is on; hidden, the middle of the box is inside, so a press there moves the image
+/// (production `box_hit`).
+fn content_part(state: &BoxState, at: KPoint, reach: f64, reference_point: bool) -> BoxPart {
+    if reference_point {
+        return state.part_at(at, reach);
+    }
+    let q = state.quad;
+    let corners = (0..4u8).map(|i| (q[usize::from(i)], BoxPart::Corner(i)));
+    let edges = (0..4u8).map(|i| (q[usize::from(i)].midpoint(q[(usize::from(i) + 1) % 4]), BoxPart::Edge(i)));
+    let nearest = corners.chain(edges).map(|(p, part)| (p.distance(at), part)).filter(|(d, _)| *d < reach).min_by(|a, b| a.0.total_cmp(&b.0));
+    match nearest {
+        Some((_, part)) => part,
+        None if state.contains(at) => BoxPart::Inside,
+        None => BoxPart::Outside,
+    }
 }
 
 /// A drag of the open Free Transform's box, as the box's own gesture: Begin at the first move, then Updates.
@@ -537,7 +558,6 @@ impl CanvasTool for FramePass<'_> {
         let at = view.to_doc(pointer.pos);
         let (reach, scope, mods, clicks) = (view.doc_len(cx.reach()), self.scope, pointer.mods, pointer.clicks);
         let style = ConstrainStyle::new(f64::from(cx.slop), f64::from(cx.slop));
-        eprintln!("DIAG {}: frame press {at:?} clicks {clicks}", crate::diag_test());
         match scope.with_app(|app| press_rule(app, at, clicks, reach, &style, mods)) {
             Pressed::Draw => self.state.draw.press(pointer, cx),
             Pressed::Done => ToolAction::Done,
@@ -557,7 +577,6 @@ impl CanvasTool for FramePass<'_> {
         let (scope, time) = (self.scope, cx.time);
         let Some(view) = cx.space().map(|space| space.view) else { return };
         let at = view.to_doc(pointer.pos);
-        eprintln!("DIAG {}: frame drag {at:?} moving {} content {}", crate::diag_test(), self.state.moving.is_some(), self.state.content.is_some());
         if let Some(c) = self.state.content.as_mut() {
             scope.with_app(|app| drag_content(app, c, at, pointer.mods, time));
         } else if let Some(m) = self.state.moving.as_mut() {
@@ -574,7 +593,6 @@ impl CanvasTool for FramePass<'_> {
         let scope = self.scope;
         let Some(view) = cx.space().map(|space| space.view) else { return };
         let at = view.to_doc(pointer.pos);
-        eprintln!("DIAG {}: frame release {at:?} moving {} content {:?}", crate::diag_test(), self.state.moving.is_some(), self.state.content.as_ref().map(|c| c.begun));
         if let Some(c) = self.state.content.take() {
             scope.with_app(|app| release_content(app, &c, at, pointer.mods));
         } else if let Some(m) = self.state.moving.take() {
@@ -602,7 +620,6 @@ impl CanvasTool for FramePass<'_> {
 
     fn cancel(&mut self, reason: CancelReason, cx: &mut ToolContext<'_>) {
         let (scope, time) = (self.scope, cx.time);
-        eprintln!("DIAG {}: frame cancel {reason:?}", crate::diag_test());
         let content = self.state.content.take();
         self.state.moving = None;
         // Escape while a frame is drawn makes it as drawn, as the reference application does (#13866); a drag still
