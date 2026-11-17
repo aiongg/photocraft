@@ -105,7 +105,7 @@ pub(crate) use tabs::tab_title_at;
 #[cfg(test)]
 use tabs::{main_canvas_document, move_target_after_filter, tab_context_items};
 #[cfg(test)]
-pub(crate) use testing::{ToolEvent, tool_event};
+pub(crate) use testing::{ToolEvent, tool_event, tool_event_response};
 pub use textures::MAX_TEXTURE;
 pub(crate) use textures::visible_doc_rect;
 pub(crate) use textures::{damage_since, effect_reach, retain_gpu_documents, shown_as_document};

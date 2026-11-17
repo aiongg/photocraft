@@ -1,7 +1,7 @@
 //! #13870: drawing a frame shows its width and height beside the pointer, live, as the marquee
 //! does, and the readout goes away on release or Escape.
 use super::*;
-use crate::canvas::{ToolEvent, testing, tool_event};
+use crate::canvas::{ToolEvent, testing, tool_event, tool_event_response};
 use egui::Modifiers;
 
 fn app() -> PhotocraftApp {
@@ -15,7 +15,7 @@ fn app() -> PhotocraftApp {
 
 /// The readout's W and H values in the response of the pass `ev` ran, if the tool asked for one.
 fn readout(app: &mut PhotocraftApp, ev: ToolEvent, m: Modifiers) -> Option<(String, String)> {
-    let rows = tool_event(app, ev, m).readout?.rows;
+    let rows = tool_event_response(app, ev, m).readout?.rows;
     match rows.as_slice() {
         [(_, w), (_, h)] => Some((w.clone(), h.clone())),
         _ => None,

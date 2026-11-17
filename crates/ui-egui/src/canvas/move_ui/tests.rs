@@ -54,11 +54,11 @@ fn a_move_drag_reads_out_the_offset_it_will_commit() {
     let rows = |r: craft::ui::canvas::ToolHostResponse| r.readout.map(|r| r.rows.into_iter().map(|(_, v)| v).collect::<Vec<_>>());
     // Pressed on the red square (16..32): with Auto-Select (on by default) an empty spot would
     // start the layer marquee instead of a move.
-    let r = crate::canvas::tool_event(&mut app, ToolEvent::Down { x: 24.0, y: 24.0, pressure: 1.0 }, m);
+    let r = crate::canvas::tool_event_response(&mut app, ToolEvent::Down { x: 24.0, y: 24.0, pressure: 1.0 }, m);
     assert_eq!(rows(r), None, "pressed, not moved yet");
-    let r = crate::canvas::tool_event(&mut app, ToolEvent::Move { x: 34.4, y: 20.8, pressure: 1.0 }, m);
+    let r = crate::canvas::tool_event_response(&mut app, ToolEvent::Move { x: 34.4, y: 20.8, pressure: 1.0 }, m);
     assert_eq!(rows(r), Some(vec!["10 px".to_string(), "-3 px".to_string()]));
-    let r = crate::canvas::tool_event(&mut app, ToolEvent::Up { x: 34.4, y: 20.8 }, m);
+    let r = crate::canvas::tool_event_response(&mut app, ToolEvent::Up { x: 34.4, y: 20.8 }, m);
     assert_eq!(rows(r), None, "released");
 }
 

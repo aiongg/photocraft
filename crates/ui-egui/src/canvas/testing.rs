@@ -51,9 +51,14 @@ pub(crate) enum ToolEvent {
 }
 
 /// Delivers `ev` with `mods` held: `Down` is `press`, `Move` is `move_to` and `Up` is `release`, with the pressure
-/// of `Down` and `Move` fed through the stylus feed first. Returns what the tool host reported in the main canvas's
-/// pass of the last frame the delivery ran (the default when that frame ran no main canvas pass).
-pub(crate) fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> ToolHostResponse {
+/// of `Down` and `Move` fed through the stylus feed first.
+pub(crate) fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) {
+    tool_event_response(app, ev, mods);
+}
+
+/// `tool_event`, returning what the tool host reported in the main canvas's pass of the last frame the delivery ran
+/// (the default when that frame ran no main canvas pass).
+pub(crate) fn tool_event_response(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> ToolHostResponse {
     match ev {
         ToolEvent::Down { x, y, pressure } => {
             pen(app, pressure);
