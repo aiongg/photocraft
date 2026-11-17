@@ -3,7 +3,7 @@ use photocraft_codecs::{ChannelLayout, EncodeOptions, Image};
 use photocraft_engine::Session;
 use photocraft_format::list_recovery;
 use photocraft_ui_egui::{PhotocraftApp, prefs_ui};
-use serde_json::{Value, json};
+use serde_json::json;
 
 /// #6607: a PSD/PSB save streams the file model into the temporary file, which then holds
 /// exactly the exported bytes; a serializer error halfway leaves the old file and no

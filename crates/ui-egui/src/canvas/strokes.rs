@@ -41,7 +41,6 @@ pub(crate) struct CloneSource {
     revision: Revision,
 }
 
-
 impl RasterSource for CloneSource {
     fn size(&self) -> PixelSize {
         let [w, h] = self.pixels.size;

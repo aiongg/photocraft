@@ -96,6 +96,7 @@ fn main() {
         v.clear_pending();
     }
     let ctx = app.ctx().clone();
+    let (doc_w, doc_h) = (w, h);
     let mut h: H = egui_kittest::Harness::builder()
         .with_context(ctx.clone())
         .with_size(egui::vec2(1600.0, 1000.0))
@@ -165,12 +166,12 @@ fn main() {
             row("Free Transform drag update, 2 layers on 24 MP: scale through mip levels", &scale, rss, None),
             row("Free Transform drag update, 2 layers on 24 MP: move", &moving, rss, None),
         ];
-        let rep = report("free_transform_bench", json!({"width": w, "height": h, "layers": 2, "reps": reps, "steps": steps}), rows, None);
+        let rep = report("free_transform_bench", json!({"width": doc_w, "height": doc_h, "layers": 2, "reps": reps, "steps": steps}), rows, None);
         if let Err(e) = write_report(&out, &rep) {
             eprintln!("{e}");
         }
     }
-    println!("{w}×{h}, 2 layers, {reps} reps, {steps} steps per drag");
+    println!("{doc_w}×{doc_h}, 2 layers, {reps} reps, {steps} steps per drag");
     println!(
         "begin: Ctrl+T {:.1} ms + first frame {:.1} ms = {:.1} ms (median; worst {:.1} ms)",
         median(&begin),
