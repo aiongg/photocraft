@@ -496,6 +496,18 @@ pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
 /// A framework command goes to [`crate::app::framework::run_command`], a PhotoCraft id to [`dispatch_as`].
 pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[Fired]) {
     let now = ctx.input(|i| i.time);
+    if std::thread::current().name().is_some_and(|name| name.ends_with("save_in_background_off_blocks_the_app_until_the_file_is_written")) {
+        for f in fired {
+            eprintln!(
+                "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: fired {} {:?} {:?} target {} time {now} tool {:?}",
+                f.command.id,
+                f.phase,
+                f.source,
+                f.target.is_some(),
+                app.ui.tool
+            );
+        }
+    }
     for f in fired {
         if f.target.is_some() {
             continue;

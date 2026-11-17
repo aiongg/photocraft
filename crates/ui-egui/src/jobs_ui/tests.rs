@@ -488,8 +488,25 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
     let st = h.state().session.active().unwrap();
     assert_eq!(st.path.as_deref(), Some("/tmp/photocraft-test/fg.psd"));
     assert!(!st.is_dirty());
+    {
+        let ctx = h.ctx.clone();
+        eprintln!(
+            "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: before B tool={:?} spring={:?} focused={:?} modal={} keys_layer={} time={}",
+            h.state().ui.tool,
+            h.state().ui.spring,
+            craft::ui::runtime::focus::focused_rec(&ctx),
+            craft::ui::runtime::overlay::any_open(&ctx, craft::ui::runtime::overlay::OpenFilter::Modal),
+            craft::ui::runtime::overlay::any_open(&ctx, craft::ui::runtime::overlay::OpenFilter::Keys),
+            ctx.input(|i| i.time)
+        );
+    }
     h.key_press(egui::Key::B);
     h.run_steps(2);
+    eprintln!(
+        "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: after B tool={:?} spring={:?}",
+        h.state().ui.tool,
+        h.state().ui.spring
+    );
     assert_eq!(h.state().ui.tool, crate::state::Tool::Brush, "shortcuts work again");
 }
 
