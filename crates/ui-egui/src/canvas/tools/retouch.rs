@@ -296,9 +296,11 @@ impl CanvasTool for RetouchTool<'_> {
         badge.map_or(Cursor::Painted(PaintedCursor::Crosshair), |badge| PaintedCursor::badged(CursorIcon::Crosshair, badge).into())
     }
 
-    /// Object Selection's outline drag takes every move from the press, as the marquee's own does.
+    /// Object Selection's outline drag takes every move from the press, as the marquee's own does; the Patch and
+    /// Content-Aware Move lasso takes them as the lasso says.
     fn takes_every_move(&self) -> bool {
-        self.state.borrow().drag.active()
+        let mut state = self.state.borrow_mut();
+        state.drag.active() || (self.lassos() && state.lasso.pass(&self.probe).takes_every_move())
     }
 
     fn command_form(&self) -> ToolPath {
