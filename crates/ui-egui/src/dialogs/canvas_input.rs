@@ -101,6 +101,37 @@ pub(crate) fn disarm_dropper(app: &mut PhotocraftApp) {
     app.dialog_dropper = None;
 }
 
+/// Whether `pick` keeps sampling while the primary button stays held and the pointer moves: the one rule of the
+/// dialogs' eyedroppers (the Levels and Curves picker, the Color Picker's, a parameter dialog's, Color Range's), Add and
+/// Subtract samples included: a held drag keeps adding or subtracting. The Properties panel's armed picker, a Curves
+/// point and the preview locator act on the press alone.
+pub(crate) fn follows_drag(app: &PhotocraftApp, pick: DialogPick) -> bool {
+    match pick {
+        DialogPick::TonePicker(_) => app.framework.dialogs.stack().top().is_some(),
+        DialogPick::Color | DialogPick::ParamDropper | DialogPick::ColorRange => true,
+        _ => false,
+    }
+}
+
+/// A drag step at `at` of a pick that [`follows_drag`]: the pick runs again on the press's modifiers.
+pub(crate) fn resample(app: &mut PhotocraftApp, pick: DialogPick, at: [f64; 2], mods: Mods) {
+    match pick {
+        DialogPick::TonePicker(_) => {
+            pick_tone(app, at);
+        }
+        DialogPick::Color => {
+            pick_color(app, at);
+        }
+        DialogPick::ParamDropper => {
+            pick_dropper(app, at, mods);
+        }
+        DialogPick::ColorRange => {
+            pick_color_range(app, at, mods);
+        }
+        _ => {}
+    }
+}
+
 /// A press at `at` with the armed Levels or Curves point picker (the dialog's, or the Properties panel's when no dialog
 /// is open). Consumes the press even when nothing changes: a refused mode or a point off the image.
 pub(crate) fn pick_tone(app: &mut PhotocraftApp, at: [f64; 2]) -> bool {

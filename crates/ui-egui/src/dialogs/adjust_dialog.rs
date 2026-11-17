@@ -677,7 +677,10 @@ pub fn open_last(app: &mut PhotocraftApp, command: &str) -> Result<DialogId, Str
             .ok()
             .map(|a| photocraft_engine::adjust_params::to_params(&a))
             .unwrap_or(Value::Null);
-        let combined = if last.get("__combinedLab").and_then(Value::as_bool) == Some(true) { &last } else { &neutral };
+        let flagged = last.get("__combinedLab").and_then(Value::as_bool) == Some(true);
+        let combined = if flagged { &last } else { &neutral };
+        // The editor reads the combined record only when flagged, as the colour-set seed flags it.
+        restored["__combinedLab"] = json!(flagged);
         for key in ["points", "inBlack", "inWhite", "gamma", "outBlack", "outWhite"] {
             if let Some(value) = combined.get(key) {
                 restored[key] = value.clone();

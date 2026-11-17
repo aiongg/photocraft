@@ -61,20 +61,22 @@ impl CanvasTool for DialogTool<'_> {
         let (pick, mods) = (self.pick, pointer.mods);
         let state = &mut *self.state;
         // `(took the press, the press is the whole gesture)`
-        let (took, click) = self.scope.with_app(|app| match pick {
-            DialogPick::TonePicker(_) => (canvas_input::pick_tone(app, at), true),
-            DialogPick::CurvesPoint => (canvas_input::add_curve_point(app, at, mods.shift), true),
-            // The pipette keeps sampling while the button is held.
-            DialogPick::Color => (canvas_input::pick_color(app, at), false),
-            DialogPick::ParamDropper => (canvas_input::pick_dropper(app, at, mods), true),
-            DialogPick::ColorRange => (canvas_input::pick_color_range(app, at, mods), true),
-            // A drag after the locator's press does nothing (#9648).
-            DialogPick::Locator => (canvas_input::locate(app, at), true),
-            DialogPick::ShadowDrag => (canvas_input::drag_shadow(app, at, [0.0, 0.0]), false),
-            DialogPick::GradientDrag => (canvas_input::drag_gradient(app, at, [0.0, 0.0]), false),
-            DialogPick::PatternPhase => {
-                state.phase = pattern_fill_ui::press(app, at);
-                (state.phase.is_some(), false)
+        let (took, click) = self.scope.with_app(|app| {
+            let follows = canvas_input::follows_drag(app, pick);
+            match pick {
+                DialogPick::TonePicker(_) => (canvas_input::pick_tone(app, at), !follows),
+                DialogPick::CurvesPoint => (canvas_input::add_curve_point(app, at, mods.shift), true),
+                DialogPick::Color => (canvas_input::pick_color(app, at), !follows),
+                DialogPick::ParamDropper => (canvas_input::pick_dropper(app, at, mods), !follows),
+                DialogPick::ColorRange => (canvas_input::pick_color_range(app, at, mods), !follows),
+                // A drag after the locator's press does nothing (#9648).
+                DialogPick::Locator => (canvas_input::locate(app, at), true),
+                DialogPick::ShadowDrag => (canvas_input::drag_shadow(app, at, [0.0, 0.0]), false),
+                DialogPick::GradientDrag => (canvas_input::drag_gradient(app, at, [0.0, 0.0]), false),
+                DialogPick::PatternPhase => {
+                    state.phase = pattern_fill_ui::press(app, at);
+                    (state.phase.is_some(), false)
+                }
             }
         });
         if !took {
@@ -95,7 +97,7 @@ impl CanvasTool for DialogTool<'_> {
         let Some(start) = self.state.press else { return };
         let at = doc_point(pointer, cx);
         let total = [at[0] - start[0], at[1] - start[1]];
-        let pick = self.pick;
+        let (pick, mods) = (self.pick, self.state.mods);
         let state = &mut *self.state;
         self.scope.with_app(|app| match pick {
             DialogPick::ShadowDrag => {
@@ -103,9 +105,6 @@ impl CanvasTool for DialogTool<'_> {
             }
             DialogPick::GradientDrag => {
                 canvas_input::drag_gradient(app, start, total);
-            }
-            DialogPick::Color => {
-                canvas_input::pick_color(app, at);
             }
             DialogPick::PatternPhase => {
                 // `false`: a pick change, an unlink or an outside phase change ended the gesture.
@@ -115,7 +114,8 @@ impl CanvasTool for DialogTool<'_> {
                     state.phase = Some(drag);
                 }
             }
-            _ => {}
+            // The pipettes keep sampling while the button is held.
+            _ => canvas_input::resample(app, pick, at, mods),
         });
     }
 
