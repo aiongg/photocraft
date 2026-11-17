@@ -102,7 +102,7 @@ mod tests {
                     let rest = &line[at + form.len()..];
                     let Some(end) = rest.find('"') else { continue };
                     seen += 1;
-                    if !has_icon(&IconId::new(&rest[..end])) {
+                    if !has_icon(&IconId::new(String::leak(rest[..end].to_owned()))) {
                         unknown.push(format!("{}:{}: {:?}", file.display(), number + 1, &rest[..end]));
                     }
                 }
