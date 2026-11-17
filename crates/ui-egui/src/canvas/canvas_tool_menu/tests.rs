@@ -151,26 +151,12 @@ pub(super) fn screen_of(app: &PhotocraftApp, doc: [f32; 2]) -> Pos2 {
     crate::canvas::testing::to_screen(app, [f64::from(doc[0]), f64::from(doc[1])])
 }
 
-/// What a right-click must leave as it was.
+/// What a right-click must leave as it was. The journal counts only strokes: the type edit menu reads its spelling
+/// suggestions through `edit.checkSpelling`'s `list`, a journaled read.
 fn document_state(app: &PhotocraftApp) -> impl PartialEq + use<> {
     let state = app.session.active().unwrap();
-    (state.doc.clone(), state.revision, state.history.past_len(), state.active_layer, state.selected_layers(), app.session.journal.len())
-}
-
-/// DIAG: the parts of [`document_state`] apart from the document, and the journal's last entry.
-fn diag_state(app: &PhotocraftApp) -> String {
-    let state = app.session.active().unwrap();
-    format!(
-        "revision {:?} history {:?} active {:?} selected {:?} journal {} last {:?} text_edit {} layers {}",
-        state.revision,
-        state.history.past_len(),
-        state.active_layer,
-        state.selected_layers(),
-        app.session.journal.len(),
-        app.session.journal.last(),
-        app.ui.text_edit.is_some(),
-        state.doc.layers.len()
-    )
+    let strokes = app.session.journal.iter().filter(|(id, _)| id == "paint.stroke").count();
+    (state.doc.clone(), state.revision, state.history.past_len(), state.active_layer, state.selected_layers(), strokes)
 }
 
 fn view_of(app: &PhotocraftApp) -> Option<(craft::behavior::kurbo::Point, f64)> {
@@ -426,13 +412,8 @@ fn context_popup_table() {
             Place::Guide => screen_of(h.state(), [16.0, 8.0]),
         };
         let before = document_state(h.state());
-        let (diag_before, doc_before) = (diag_state(h.state()), h.state().session.active().unwrap().doc.clone());
         let view = view_of(h.state());
         secondary_press(&mut h, at, row.mods, row.gesture);
-        if row.name == "type edit" {
-            let same = h.state().session.active().unwrap().doc == doc_before;
-            eprintln!("DIAG context_popup_table type edit: before {diag_before} after {} same doc {same}", diag_state(h.state()));
-        }
         let menu = h.state().ui.canvas_tool_menu.as_ref().map(|m| (kind_name(&m.kind), m.tool));
         let picker = h.state().ui.brush_picker.is_some();
         match row.want {
