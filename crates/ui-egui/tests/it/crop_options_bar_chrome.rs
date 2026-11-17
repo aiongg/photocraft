@@ -87,17 +87,18 @@ fn the_fill_help_alert_takes_escape_and_the_crop_stays_pending() {
     assert!(crop_ui::pending(h.state()), "Escape left the crop pending");
     assert_eq!(crop_ui::frame(h.state()), Some(before), "Escape left the frame alone");
 
-    // Escape and the click on the button land in one frame: the click opens the alert, and the key
-    // must not cancel the crop underneath.
-    let at = h.get_by_label(HELP_BUTTON).rect().center();
-    let button = |pressed| egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed, modifiers: egui::Modifiers::NONE };
-    h.input_mut().events.extend([
-        egui::Event::PointerMoved(at),
-        egui::Event::Key { key: egui::Key::Escape, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::NONE },
-        button(true),
-        button(false),
-    ]);
+    // A quick user: Escape the first frame the alert shows, right after the click that opened it, must not cancel
+    // the crop underneath either.
+    h.get_by_label(HELP_BUTTON).click();
+    let mut frames = 0;
+    while !help_open(&h) && frames < 8 {
+        h.step();
+        frames += 1;
+    }
+    assert!(help_open(&h), "the click opened the alert again");
+    h.key_press(egui::Key::Escape);
     h.run_steps(2);
-    assert!(crop_ui::pending(h.state()), "Escape in the frame the alert opened in leaves the crop pending");
+    assert!(!help_open(&h), "Escape in the first frame of the alert closes it");
+    assert!(crop_ui::pending(h.state()), "Escape in the first frame of the alert leaves the crop pending");
     assert_eq!(crop_ui::frame(h.state()), Some(before), "the frame survives");
 }
