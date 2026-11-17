@@ -129,12 +129,6 @@ pub(super) fn handle_event(app: &mut PhotocraftApp, event: impl Into<Option<Crop
     match event.into() {
         Some(CropEvent::Apply(commit)) => apply_commit(app, &commit),
         Some(CropEvent::Discard(key)) => {
-            eprintln!(
-                "DIAG {}: crop discard, escape this pass {}, pass {}",
-                crate::diag_test(),
-                crate::window_keys::escape_this_pass(app.ctx()),
-                app.ctx().cumulative_pass_nr()
-            );
             upright_view(app, key);
             false
         }
