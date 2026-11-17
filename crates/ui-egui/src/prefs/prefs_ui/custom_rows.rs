@@ -6,7 +6,7 @@
 use craft::theme::variant::Tone;
 use craft::theme::{ModeChoice, ThemeId};
 use craft::theme_store::ui::AppearancePage;
-use craft::theme_store::{SelectionChange, SuiteClient};
+use craft::theme_store::{SelectionChange, SuiteView};
 use craft::ui::buttons::Button;
 use craft::ui::choice::Checkbox;
 use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};
@@ -40,10 +40,11 @@ pub(super) const AGENTS_PAGE: &str = "integrations";
 /// The scratch disk entry that names the system's temporary folder rather than a path.
 const SYSTEM_TEMP: &str = "(system temp)";
 
-/// The custom rows of the Preferences window. It copies what the rows read from the app when the window's pass
-/// starts, except the suite, which the Appearance page reads through a shared borrow of the framework's `suite` field.
-pub(super) struct PrefsCustom<'a> {
-    suite: &'a SuiteClient,
+/// The custom rows of the Preferences window. They read a copy of what they need from the app, taken before each pass
+/// of the dialog host (`PrefsCustom::new`), because the dialog runs inside the host and has no app to read.
+#[derive(Clone)]
+pub(super) struct PrefsCustom {
+    suite: SuiteView,
     picker_open: bool,
     lang: crate::i18n::Lang,
     gpu_info: Vec<String>,
@@ -57,14 +58,14 @@ pub(super) struct PrefsCustom<'a> {
     mcp_flag: bool,
 }
 
-impl<'a> PrefsCustom<'a> {
-    /// The rows for one pass. `picker_open` is this pass's answer from the dialog host: whether a Color Picker opened
-    /// from the window is open.
-    pub(super) fn new(app: &PhotocraftApp, suite: &'a SuiteClient, picker_open: bool) -> Self {
+impl PrefsCustom {
+    /// The rows for the next pass. `picker_open` is the dialog host's answer: whether a Color Picker opened from the
+    /// window is open.
+    pub(super) fn new(app: &PhotocraftApp, picker_open: bool) -> Self {
         let mut gpu_info = app.perf.gpu_info.lines();
         gpu_info.extend(gpu_memory_lines(app));
         PrefsCustom {
-            suite,
+            suite: app.framework.suite().view(),
             picker_open,
             lang: crate::i18n::Lang::from_pref(&app.session.prefs().interface.language),
             gpu_info,
@@ -78,7 +79,7 @@ impl<'a> PrefsCustom<'a> {
     }
 }
 
-impl CustomSettings<PrefPages> for PrefsCustom<'_> {
+impl CustomSettings<PrefPages> for PrefsCustom {
     fn row(&mut self, ui: &mut egui::Ui, key: &str, draft: &mut SettingsDraft) {
         match key {
             MEMORY_PERCENT => memory_percent_row(ui, draft),
@@ -167,7 +168,7 @@ fn memory_percent_row(ui: &mut egui::Ui, draft: &mut SettingsDraft) {
     }
 }
 
-impl PrefsCustom<'_> {
+impl PrefsCustom {
     /// The per-document RAM limit with the installed-RAM line and its help.
     fn memory_mb_row(&self, ui: &mut egui::Ui, draft: &mut SettingsDraft) {
         let stored: u64 = draft.get(MEMORY_MB).unwrap_or(8192);
@@ -262,7 +263,7 @@ impl PrefsCustom<'_> {
         let favorites: Vec<ThemeId> = draft.get::<Vec<String>>(FAVORITE_THEMES).unwrap_or_default().iter().filter_map(|s| ThemeId::parse(s).ok()).collect();
         // Unknown OS answer previews light, which is what Auto resolves to then.
         let system_dark = system_appearance(ui.ctx()).appearance.mode == Some(craft::theme::Mode::Dark);
-        let out = AppearancePage::new(self.suite, Bind::bound(&mut change)).favorites(&favorites).text_size(false).system_dark(system_dark).show(ui);
+        let out = AppearancePage::new(&self.suite, Bind::bound(&mut change)).favorites(&favorites).text_size(false).system_dark(system_dark).show(ui);
         if change != shown {
             if change.mode != shown.mode {
                 let name = match change.mode {

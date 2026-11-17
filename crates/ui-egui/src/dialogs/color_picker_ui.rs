@@ -248,6 +248,13 @@ pub(crate) fn answer_for_window(app: &mut PhotocraftApp) -> Option<(String, Srgb
     answer_for(app, window_parent())
 }
 
+/// Cancels the picker the Preferences window opened, when it is still open (the window closed over it).
+pub(crate) fn cancel_window_picker(app: &mut PhotocraftApp, ctx: &egui::Context) {
+    if let Some((id, _)) = find(app, |t| matches!(t, PickTarget::Window { .. })) {
+        app.framework.dialogs.cancel_by_id(ctx, id);
+    }
+}
+
 /// Whether the Preferences window's picker is open, as the dialog host knows it.
 pub(crate) fn window_picker_open(app: &PhotocraftApp) -> bool {
     app.color_targets.iter().any(|(id, t)| matches!(t, PickTarget::Window { .. }) && app.framework.dialogs.get_by_id::<ColorPickerDialog>(*id).is_some())

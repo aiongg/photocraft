@@ -263,8 +263,7 @@ impl PhotocraftApp {
         // hosted dialog, then the other OS windows' contents.
         jobs_ui::dialog(self, ui);
         updates_ui::show(self, &ctx);
-        // The Preferences window and the Keyboard Shortcuts dialog draw while their sessions are open.
-        prefs_ui::show(self, ui);
+        // The Keyboard Shortcuts dialog draws while its session is open.
         prefs_ui::show_shortcuts(self, ui);
         crate::dialogs::run(self, ui);
         canvas::extra_windows(self, ui);

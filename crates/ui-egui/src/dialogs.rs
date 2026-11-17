@@ -455,6 +455,7 @@ pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
     crate::workspace_ui::take,
     crate::kys_import::take,
     crate::prefs_ui::take_presets,
+    crate::prefs_ui::take_window,
     crate::layers_panel_ui::take,
     crate::slice_ui::take,
     crate::crop_presets::take,
@@ -473,7 +474,7 @@ pub(crate) fn take_results(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
-/// One pass of the dialogs: the guide edit follows its dialog, the palette shows, the filter preview is fed, the
+/// One pass of the dialogs: the guide edit follows its dialog, the palette shows, the filter preview and the Preferences window are fed, the
 /// framework's host runs every open dialog, and the results are taken. A frame that runs a second pass runs this again;
 /// the host applies only a pass's own input and a result is taken once, so nothing acts twice.
 pub fn run(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
@@ -484,6 +485,7 @@ pub fn run(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     palette::show(app, ui);
     crate::filter_dialog::reconcile_match_color(app);
     filter_preview_ui::feed(app, ui.ctx());
+    crate::prefs_ui::feed(app);
     app.framework.dialogs.run(ui);
     take_results(app, &ui.ctx().clone());
 }
