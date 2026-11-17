@@ -93,7 +93,7 @@ fn main() {
     if let Some(v) = app.ui.views.first_mut() {
         v.zoom = 1.0;
         v.center = [w as f32 / 2.0, h as f32 / 2.0];
-        v.fit_pending = false;
+        v.clear_pending();
     }
     let ctx = app.ctx().clone();
     let mut h: H = egui_kittest::Harness::builder()

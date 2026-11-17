@@ -246,7 +246,7 @@ fn a_curvature_pen_double_click_through_the_canvas_rounds_a_corner() {
     let v = &mut h.state_mut().ui.views[0];
     v.zoom = 1.0;
     v.center = [100.0, 100.0];
-    v.fit_pending = false;
+    v.clear_pending();
     h.run_steps(2);
     let p = testing::to_screen(h.state_mut(), [160.0, 40.0]);
     for _ in 0..2 {

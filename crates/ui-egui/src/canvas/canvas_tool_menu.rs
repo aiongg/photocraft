@@ -577,7 +577,7 @@ pub fn cycle_canvas_color(app: &mut PhotocraftApp, backward: bool) -> Result<(),
 
 /// The Zoom tool's context menu: the fixed zooms of the View menu (plus Fill Screen), then the
 /// zoom steps last, in Photoshop's order (#6005). Photoshop has no View menu command for Fill
-/// Screen; its row fires the canvas's own command.
+/// Screen; its row asks the canvas for its own command.
 pub const VIEW_MENU: &[Row] = &[
     Some(("Fit on Screen", "view.fitOnScreen")),
     Some(("Fill Screen", "view.fillScreen")),
@@ -1497,12 +1497,9 @@ fn capture(app: &mut PhotocraftApp, menu: &mut CanvasToolMenu, doc: [f64; 2], po
     }
 }
 
-/// A view menu row: the canvas's own command when the row is one (zoom, fit, 100%, Fill Screen: the
-/// same command its chord fires, zooming about the centre), else the View menu's item.
+/// A view menu row: the View menu's item, which asks the canvas for its own command when the row is one (zoom, fit,
+/// 100%, Fill Screen: the command its chord fires, zooming about the centre).
 fn choose_view(app: &mut PhotocraftApp, ctx: &Context, command: &str) -> Result<(), String> {
-    if crate::shortcut_dispatch::fire_bridged(ctx, command).is_some() {
-        return Ok(());
-    }
     crate::menus::invoke(app, ctx, command, json!({})).map(|_| ())
 }
 

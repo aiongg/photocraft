@@ -583,7 +583,7 @@ fn fit_shortcut_records_and_f6_fits_the_resized_canvas() {
     h.run_steps(2);
     press(&mut h, "F6");
     let view = &h.state().ui.views[0];
-    assert!(!view.fit_pending, "the real canvas frame consumed Fit on Screen");
+    assert!(!view.asks(craft::ui::canvas::ViewCommands::FitOnScreen), "the real canvas frame consumed Fit on Screen");
     assert!(view.zoom > 0.1 && view.zoom < 1.0, "{}", view.zoom);
     assert_eq!(view.center, [900.0, 540.0]);
     assert_eq!(h.state().ui.status, "Played 2 steps");

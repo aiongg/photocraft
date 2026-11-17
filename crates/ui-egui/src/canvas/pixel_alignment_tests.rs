@@ -28,7 +28,7 @@ fn crop_image_movement_keeps_its_continuous_camera_mapping() {
             ctx.set_pixels_per_point(ppp);
             let screen = Rect::from_min_size(Pos2::ZERO, vec2(700.0, 600.0));
             let rect = Rect::from_min_size(pos2(40.0, 100.0), vec2(523.0, 471.0));
-            let view = View { zoom: 1.0, center: centre, doc_size: [3000, 2000], fit_pending: false, ..Default::default() };
+            let view = View { zoom: 1.0, center: centre, doc_size: [3000, 2000], pending: Vec::new(), ..Default::default() };
             let mut output = ctx.run_ui(egui::RawInput { screen_rect: Some(screen), ..Default::default() }, |ui| {
                 canvas_view(&mut app, ui, CanvasHost::main(0), rect, view.clone(), true);
             });

@@ -125,7 +125,7 @@ fn create(app: &mut PhotocraftApp, options: &DocumentOptions) {
         return;
     }
     if let Some(i) = app.session.active_index() {
-        app.ui.views[i].fit_pending = true;
+        app.ui.views[i].request(craft::ui::canvas::ViewCommands::FitOnScreen);
     }
     // The new document gets the picked ratio, Square Pixels included, whatever View › Pixel Aspect Ratio held before
     // (#14034). The ratio is app-wide, so this sets the view's.

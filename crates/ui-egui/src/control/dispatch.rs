@@ -993,17 +993,15 @@ impl ViewSet {
         if let Some(z) = self.zoom {
             let size = app.session.documents().get(i).map_or(Size::ZERO, |st| Size::new(f64::from(st.doc.size.width), f64::from(st.doc.size.height)));
             app.ui.views[i].zoom = craft::behavior::canvas::ZoomLadder::clamp(z, size) as f32;
-            app.ui.views[i].fit_pending = false;
-            app.ui.views[i].fill_pending = false;
+            app.ui.views[i].clear_pending();
         }
         if let Some(c) = self.center {
             app.ui.views[i].center = c;
-            app.ui.views[i].fit_pending = false;
-            app.ui.views[i].fill_pending = false;
+            app.ui.views[i].clear_pending();
         }
         if self.fit {
-            app.ui.views[i].fit_pending = true;
-            app.ui.views[i].fill_pending = false;
+            app.ui.views[i].clear_pending();
+            app.ui.views[i].request(craft::ui::canvas::ViewCommands::FitOnScreen);
         }
         if let Some(r) = self.rotation {
             app.ui.views[i].rotation = normalized_angle(r) as f32;

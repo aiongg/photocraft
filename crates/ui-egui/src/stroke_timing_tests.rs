@@ -28,7 +28,7 @@ fn harness() -> Harness<'static, PhotocraftApp> {
     let v = &mut h.state_mut().ui.views[0];
     v.zoom = 1.0;
     v.center = [100.0, 50.0];
-    v.fit_pending = false;
+    v.clear_pending();
     h.run_steps(2);
     h
 }

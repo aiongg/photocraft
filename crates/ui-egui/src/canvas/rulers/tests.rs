@@ -35,7 +35,8 @@ fn harness_with_passes(size: [u32; 2], tool: Tool, second_pass: bool) -> AppHarn
     PhotocraftApp::setup_context(&h.ctx, crate::theme::AppTheme::pro());
     h.run_steps(4);
     let v = &mut h.state_mut().ui.views[0];
-    (v.zoom, v.center, v.fit_pending) = (1.0, [size[0] as f32 / 2.0, size[1] as f32 / 2.0], false);
+    (v.zoom, v.center) = (1.0, [size[0] as f32 / 2.0, size[1] as f32 / 2.0]);
+    v.clear_pending();
     h.run_steps(2);
     h
 }

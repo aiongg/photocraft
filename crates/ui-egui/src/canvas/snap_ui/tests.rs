@@ -8,7 +8,7 @@ fn app_with_box() -> PhotocraftApp {
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.sync_views();
     app.ui.views[0].zoom = 1.0;
-    app.ui.views[0].fit_pending = false;
+    app.ui.views[0].clear_pending();
     // Two boxes: a target at (300..350, 200..260) and the moving one at (40..90, 40..80).
     app.run("layer.new.layer", json!({"name": "target"})).unwrap();
     app.run("select.rect", json!({"x": 300, "y": 200, "width": 50, "height": 60})).unwrap();

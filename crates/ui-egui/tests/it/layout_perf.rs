@@ -90,7 +90,7 @@ fn actual_pixels(h: &mut H) {
     let size = app.session.active().map(|s| s.doc.size).expect("doc");
     app.ui.views[0].zoom = 1.0;
     app.ui.views[0].center = [size.width as f32 / 2.0, size.height as f32 / 2.0];
-    app.ui.views[0].fit_pending = false;
+    app.ui.views[0].clear_pending();
     // View › Snap and smart guides would pull the layers onto their neighbours' edges.
     app.ui.extras.snap = false;
     app.ui.view.show.smart_guides = false;

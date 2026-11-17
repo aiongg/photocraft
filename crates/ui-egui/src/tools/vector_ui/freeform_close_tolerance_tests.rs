@@ -19,7 +19,7 @@ fn app(zoom: f32) -> PhotocraftApp {
     crate::canvas::testing::window(&mut app, egui::vec2(2600.0, 2000.0));
     app.ui.views[0].zoom = zoom;
     // The view keeps this zoom: a pending fit would show the document at the window's fit.
-    app.ui.views[0].fit_pending = false;
+    app.ui.views[0].clear_pending();
     app.ui.tool = Tool::FreeformPen;
     app.ui.tool_options.vector_mode = VectorMode::Path;
     app

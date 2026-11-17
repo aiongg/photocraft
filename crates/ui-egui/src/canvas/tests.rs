@@ -659,8 +659,7 @@ fn a_secondary_canvas_hand_pans_while_a_transform_is_open() {
     let mut view0 = app.ui.views[0].clone();
     view0.zoom = 1.0;
     view0.center = [200.0, 150.0];
-    view0.fit_pending = false;
-    view0.fill_pending = false;
+    view0.clear_pending();
     let center0 = view0.center;
     // The same document in a document window of its own, whose canvas is not the main window's.
     let window = CanvasHost { idx: 0, window: Some(1) };
@@ -711,8 +710,7 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     let mut view = app.ui.views[0].clone();
     view.zoom = 1.0;
     view.center = [200.0, 150.0];
-    view.fit_pending = false;
-    view.fill_pending = false;
+    view.clear_pending();
     let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0));
     let input = egui::RawInput { screen_rect: Some(rect), ..Default::default() };
     let mut out = ctx.run_ui(input, |ui| {
@@ -891,8 +889,7 @@ fn torn_off_document_is_not_drawn_again_in_the_main_window() {
 /// The zoom typed into a zoom field: the field's percent, kept inside the zoom range of the document.
 fn type_zoom(view: &mut View, percent: f32) {
     view.zoom = ZoomLadder::clamp(f64::from(percent) / 100.0, Size::new(f64::from(view.doc_size[0]), f64::from(view.doc_size[1]))) as f32;
-    view.fit_pending = false;
-    view.fill_pending = false;
+    view.clear_pending();
 }
 
 /// #11276: Float All in Windows leaves a document that already floats in its one window; a

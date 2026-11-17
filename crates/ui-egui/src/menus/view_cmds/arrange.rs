@@ -145,7 +145,7 @@ fn match_views(app: &mut PhotocraftApp, zoom: bool, loc: bool, rot: bool) -> Res
         if rot && !(crop && d == i) {
             v.rotation = rotation;
         }
-        v.fit_pending = false;
+        v.clear_pending();
     };
     for (d, v) in app.ui.views.iter_mut().enumerate() {
         take(d, v);

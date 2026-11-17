@@ -18,7 +18,7 @@ use craft::draw::ui::{BrushPickerState, GradientRef};
 use craft::imaging::ui::scopes::ScopePanelState;
 use craft::layers::ui::filter::LayerFilter;
 use craft::layers::ui::options::LayersSettings;
-use craft::ui::canvas::SplitAt;
+use craft::ui::canvas::{SplitAt, ViewCommands};
 use craft::ui::patterns::presets::{PresetState, PresetView};
 use photocraft_doc::DocId;
 
@@ -67,11 +67,10 @@ pub struct View {
     pub zoom: f32,
     /// Document-space point shown at the canvas centre.
     pub center: [f32; 2],
-    /// Recompute fit-to-screen on next frame.
-    pub fit_pending: bool,
-    /// Recompute fill-screen on next frame. Unlike fit, this may crop an edge of the document.
-    #[serde(default)]
-    pub fill_pending: bool,
+    /// The view commands asked of this view's canvas (Fit on Screen for a new view, a menu row, an action step), which
+    /// its next pass runs in order (`craft::ui::canvas::Canvas::queued`); never persisted.
+    #[serde(skip, default = "View::first_fit")]
+    pub pending: Vec<ViewCommands>,
     /// Document size this view last showed; a change (Image/Canvas Size, crop) re-centres it.
     #[serde(default)]
     pub doc_size: [u32; 2],
@@ -90,6 +89,26 @@ pub struct View {
 }
 
 impl View {
+    /// A new view's queue: it fits on its first pass.
+    fn first_fit() -> Vec<ViewCommands> {
+        vec![ViewCommands::FitOnScreen]
+    }
+
+    /// Asks this view's canvas to run `command` on its next pass, after the commands already asked.
+    pub fn request(&mut self, command: ViewCommands) {
+        self.pending.push(command);
+    }
+
+    /// Drops the commands asked of this view's canvas: the view set now stands.
+    pub fn clear_pending(&mut self) {
+        self.pending.clear();
+    }
+
+    /// Whether `command` waits for this view's canvas.
+    pub fn asks(&self, command: ViewCommands) -> bool {
+        self.pending.contains(&command)
+    }
+
     /// Asks the canvas to ease the discrete zoom about to be made, from the zoom and centre the view has now, when
     /// Animated Zoom is enabled; otherwise the zoom jumps. Called before the zoom or centre changes.
     pub(crate) fn request_zoom_animation(&mut self, enabled: bool) {
@@ -104,8 +123,7 @@ impl Default for View {
         Self {
             zoom: 1.0,
             center: [0.0, 0.0],
-            fit_pending: true,
-            fill_pending: false,
+            pending: View::first_fit(),
             doc_size: [0, 0],
             rotation: 0.0,
             zoom_animating: false,

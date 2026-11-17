@@ -65,8 +65,7 @@ fn pattern_preview_repeats_the_document_on_gpu_and_cpu_canvases() {
     let v = app.ui.views.get_mut(0).expect("view");
     v.zoom = 1.0;
     v.center = [100.0, 50.0];
-    v.fit_pending = false;
-    v.fill_pending = false;
+    v.clear_pending();
     let blue = [0x20, 0x50, 0xd0];
     let red = [0xe0, 0x10, 0x10];
     // Points past the document: right of its right edge (the next copy's red band), below it

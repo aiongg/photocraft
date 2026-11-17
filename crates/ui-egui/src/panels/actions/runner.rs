@@ -3,8 +3,6 @@
 //! paused playbacks that continue after a step dialog, a Stop message or a Step by Step wait.
 
 use craft::automation::actions::{ActionPlayer, ActionRunner, ActionStep, PlaybackBudget, PlaybackRefusal, PlaybackReport, StepOutcome};
-use craft::behavior::canvas::ZoomLadder;
-use craft::behavior::kurbo::Size;
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::{HostedCanvasSize, HostedImageSize, HostedParamDialog};
 use serde_json::{Value, json};
@@ -607,45 +605,17 @@ fn play_steps(
     })
 }
 
-/// Execute the actual menu command, not a synthetic keystroke. Fit is deferred
-/// until canvas layout, so it uses the dimensions after all preceding action steps.
+/// Runs view command `id` (a view row of `shortcut_dispatch::RUNTIME_COMMANDS`: Zoom In, Fit on Screen, 100%, …) for
+/// app code (menus, action steps, automation): asks the active document's canvas for the framework's command, which its
+/// next pass runs as it runs the command's chord, and journals it now, so an action step plays and records in order.
+/// The canvas runs it on the document as the steps before it left it.
 pub(crate) fn run_view(app: &mut PhotocraftApp, id: &str, params: Value) -> Result<Value, String> {
+    let command = crate::shortcut_dispatch::view_command(id).ok_or_else(|| format!("unsupported view command: {id}"))?;
     app.sync_views();
     let i = app.session.active_index().ok_or("no document")?;
-    let v = app.ui.views.get_mut(i).ok_or("no document view")?;
-    v.fill_pending = false;
-    match id {
-        "view.fitOnScreen" => {
-            v.fit_pending = true;
-            v.request_zoom_animation(app.session.prefs().general.animated_zoom);
-        }
-        "view.zoomIn" => {
-            v.fit_pending = false;
-            v.request_zoom_animation(app.session.prefs().general.animated_zoom);
-            v.zoom = ladder_step(v.zoom, 1, v.doc_size);
-        }
-        "view.zoomOut" => {
-            v.fit_pending = false;
-            v.request_zoom_animation(app.session.prefs().general.animated_zoom);
-            v.zoom = ladder_step(v.zoom, -1, v.doc_size);
-        }
-        "view.actualPixels" => {
-            v.fit_pending = false;
-            v.request_zoom_animation(app.session.prefs().general.animated_zoom);
-            v.zoom = 1.0;
-        }
-        _ => return Err(format!("unsupported view command: {id}")),
-    }
-    v.zoom_anchor = None;
+    app.ui.views.get_mut(i).ok_or("no document view")?.request(command);
     journal_view(app, id, params);
     Ok(Value::Null)
-}
-
-/// Zoom In (`dir` > 0) or Zoom Out (`dir` < 0) from `zoom` on the framework's ladder, for a
-/// document of `doc_size` px. The view keeps `f32` zoom and pixel sizes.
-fn ladder_step(zoom: f32, dir: i32, doc_size: [u32; 2]) -> f32 {
-    let size = Size::new(f64::from(doc_size[0]), f64::from(doc_size[1]));
-    ZoomLadder::step(f64::from(zoom), dir, size) as f32
 }
 
 /// Journals the view command `id` that ran, which records it into the action being recorded.

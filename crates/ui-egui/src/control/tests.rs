@@ -450,7 +450,7 @@ fn agent_right_click_with_the_zoom_tool_opens_and_runs_the_view_menu() {
     assert_eq!(ids, ["view.fitOnScreen", "view.fillScreen", "view.actualPixels", "view.twoHundredPercent", "view.printSize", "view.zoomIn", "view.zoomOut"]);
     assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"select.all"}))["ok"], false);
     assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"view.twoHundredPercent"}))["ok"], true);
-    // The canvas carries out the runtime's view command in its next frame.
+    // The canvas runs the view command the row asked of it in its next frame.
     crate::canvas::testing::frame(&mut app);
     assert_eq!(app.ui.views[0].zoom, 2.0);
     assert!(app.ui.canvas_tool_menu.is_none());
@@ -472,7 +472,7 @@ fn agent_space_right_click_opens_the_hand_view_menu() {
         assert!(crate::canvas_tool_menu::rows(&menu) == crate::canvas_tool_menu::HAND_MENU, "{tool:?}");
         assert_eq!(menu.under, Some(tool), "{tool:?}");
         assert_eq!(call(&mut app, &ctx, "ui.context.choose", json!({"id":"view.twoHundredPercent"}))["ok"], true, "{tool:?}");
-        // The canvas carries out the runtime's view command in its next frame.
+        // The canvas runs the view command the row asked of it in its next frame.
         crate::canvas::testing::frame(&mut app);
         assert_eq!(app.ui.views[0].zoom, 2.0, "{tool:?}");
         assert_eq!(app.ui.tool, tool);

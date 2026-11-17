@@ -421,7 +421,7 @@ fn snap_box() -> PhotocraftApp {
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.sync_views();
     app.ui.views[0].zoom = 1.0;
-    app.ui.views[0].fit_pending = false;
+    app.ui.views[0].clear_pending();
     app.run("layer.new.layer", json!({"name": "target"})).unwrap();
     app.run("select.rect", json!({"x": 300, "y": 200, "width": 50, "height": 60})).unwrap();
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();
@@ -577,7 +577,7 @@ fn free_transform_of_a_shape_keeps_whole_pixels() {
         crate::canvas::testing::window(&mut app, egui::vec2(1400.0, 900.0));
         app.ui.views[0].zoom = 0.6;
         app.ui.views[0].center = [540.0, 540.0];
-        app.ui.views[0].fit_pending = false;
+        app.ui.views[0].clear_pending();
         app.ui.extras.snap = true;
         app.ui.view.show.smart_guides = true;
         app.ui.tool = Tool::Rectangle;
