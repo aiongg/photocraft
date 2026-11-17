@@ -165,8 +165,18 @@ fn frames(h: &mut Harness, c: Case) -> (Pixels, Pixels, Pixels, bool) {
     };
     let drawing = settled(h, held);
     let gpu = h.state().perf.gpu && !c.flip;
+    let view = |h: &Harness| photocraft_ui_egui::canvas::active_view(h.state()).map(|v| (v.rect, v.center, v.zoom));
+    let drawing_view = view(h);
     control(h, "ui.pointer", json!({"events": [{"kind": "up", "x": last.0, "y": last.1}]}));
     let done = canvas(h);
+    if c.zoom < 1.0 {
+        eprintln!(
+            "DIAG {}: {c:?} view while drawing {drawing_view:?} after release {:?} canvas rect {:?}",
+            std::thread::current().name().unwrap_or("?"),
+            view(h),
+            h.state().last_canvas_rect
+        );
+    }
     (before, drawing, done, gpu)
 }
 

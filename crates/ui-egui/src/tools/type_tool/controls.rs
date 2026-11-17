@@ -237,10 +237,11 @@ fn editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &craft::behavior::Ca
     if background_press || out.ended.is_some() || out.selection_changed {
         let at = ui.input(|i| i.pointer.interact_pos());
         eprintln!(
-            "DIAG {}: type editor rect {rect:?} ended {:?} bg {background_press} sel {:?} at {at:?} shapes {:?} editor id {:?}",
+            "DIAG {}: type editor rect {rect:?} ended {:?} bg {background_press} sel {:?} at {at:?} egui targets {:?} shapes {:?} editor id {:?}",
             crate::diag_test(),
             out.ended,
             (selection.anchor, selection.caret),
+            craft::ui::runtime::pointer::with_pass_pointer(ui.ctx(), |p| p.press_targets),
             at.map(|at| craft::ui::runtime::pointer::shapes_at(ui.ctx(), at)),
             out.response.id
         );
