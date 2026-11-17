@@ -110,9 +110,11 @@ fn fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active
     activate(&mut h, 1);
     assert_eq!(fill(&h), CropFill::Background, "switching back: stays at the default");
 
-    // Closing the active document makes another open one active.
+    // Closing the active document makes another open one active. The crop above left it modified, so the close
+    // discards its changes instead of asking to save them.
     h.state_mut().ui.tool_options.crop.fill = CropFill::ContentAware;
-    control(&mut h, "ui.menu.invoke", json!({"id": "file.close"}));
+    h.state_mut().run("file.close", json!({"save": "discard"})).unwrap();
+    h.run_steps(6);
     assert_eq!(h.state().session.documents().len(), 1, "one document closed");
     assert_eq!(fill(&h), CropFill::Background, "closing the active document: back to the default");
 }
