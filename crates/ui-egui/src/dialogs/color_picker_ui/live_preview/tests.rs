@@ -4,7 +4,7 @@ use craft::ui::runtime::requests::ColorRequest;
 use serde_json::{Value, json};
 
 use super::*;
-use crate::color_picker_ui::{answer_for, hex, open_for_request, open_for_target, open_for_window, target, testing};
+use crate::color_picker_ui::{PickWindow, answer_for, hex, open_for_request, open_for_target, open_for_window, target, testing};
 
 fn app() -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
@@ -268,7 +268,7 @@ fn preferences_apply_waits_for_an_open_picker() {
     assert!(crate::prefs_ui::window_open(&app), "Preferences opens");
     let before = app.session.prefs().guides_grid_and_slices.guide_color.clone();
     let request = ColorRequest::new("guidesGridAndSlices.guideColor", Srgba::from_rgb_array([0.0, 1.0, 0.0]));
-    let picker = open_for_window(&mut app, request);
+    let picker = open_for_window(&mut app, PickWindow::Preferences, request);
     pick(&mut app, picker, "#ff8000");
     assert!(crate::prefs_ui::apply_window(&mut app).is_err(), "Apply refuses while the picker is open");
     assert_eq!(app.session.prefs().guides_grid_and_slices.guide_color, before, "nothing is saved");

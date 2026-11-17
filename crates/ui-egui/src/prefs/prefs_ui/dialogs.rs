@@ -23,6 +23,7 @@ use serde_json::{Value, json};
 use super::custom_rows::PrefsCustom;
 use super::fields::{PrefPages, rules};
 use crate::PhotocraftApp;
+use crate::color_picker_ui::PickWindow;
 
 /// The document the window edits between passes. The custom rows borrow the app, so each pass attaches `PrefsCustom`
 /// for its own duration and takes it off again before the app is used mutably.
@@ -270,7 +271,7 @@ fn write_all(app: &mut PhotocraftApp, batches: Vec<Edits>) -> Result<Value, Stri
 /// Hands the open window what it reads of the app, before the host runs it.
 pub(crate) fn feed(app: &mut PhotocraftApp) {
     let Some(shown_rev) = app.framework.dialogs.get::<PrefsDialog>().map(|d| d.saved_rev) else { return };
-    let custom = PrefsCustom::new(&*app, crate::color_picker_ui::window_picker_open(app));
+    let custom = PrefsCustom::new(&*app, crate::color_picker_ui::window_picker_open(app, PickWindow::Preferences));
     let rev = app.session.prefs.rev();
     let saved = (rev != shown_rev).then(|| (rev, PrefPages::of(app.session.prefs())));
     let host = Arc::clone(app.framework.host());
@@ -291,12 +292,12 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
         batches.append(&mut dialog.edits);
         picked = dialog.pick.take();
     } else {
-        crate::color_picker_ui::cancel_window_picker(app, ctx);
+        crate::color_picker_ui::cancel_window_picker(app, ctx, PickWindow::Preferences);
     }
     if let Some(request) = picked {
-        crate::color_picker_ui::open_for_window(app, request);
+        crate::color_picker_ui::open_for_window(app, PickWindow::Preferences, request);
     }
-    if let Some((key, color)) = crate::color_picker_ui::answer_for_window(app)
+    if let Some((key, color)) = crate::color_picker_ui::answer_for_window(app, PickWindow::Preferences)
         && let Some(doc) = app.framework.dialogs.get_mut::<PrefsDialog>().and_then(|d| d.doc.as_mut())
     {
         doc.set_color(&key, color);
