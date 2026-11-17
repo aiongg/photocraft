@@ -1,16 +1,20 @@
 //! Full-resolution refinement of Camera Raw's interactive proxy. Native work is off the
 //! UI thread; only one revision runs at a time, and obsolete results never replace new edits.
 use craft::imaging::raw::RawDevelopSettings as CameraRaw;
-use craft::imaging::scopes::{ClippingMask, clipping};
+use craft::imaging::scopes::ClippingMask;
+#[cfg(test)]
+use craft::imaging::scopes::clipping;
 use craft::ui::canvas::PixelRect as RasterRect;
 use egui::{Color32, ColorImage, Context};
 use photocraft_algo::camera_raw::DevelopInputs;
 use photocraft_geom::Rect as PixelRect;
 use photocraft_raster::Surface;
+#[cfg(test)]
+use std::sync::mpsc::TryRecvError;
 use std::sync::{
     Arc,
     atomic::{AtomicBool, Ordering},
-    mpsc::{Receiver, TryRecvError},
+    mpsc::Receiver,
 };
 
 #[derive(Clone)]

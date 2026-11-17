@@ -228,7 +228,7 @@ fn expand_layer_group_on_click_governs_a_ctrl_click_pick_of_a_position_locked_la
 
 #[test]
 fn a_pick_marker_the_hidden_layers_panel_never_read_does_not_hide_a_later_command_change() {
-    let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     // A Move-way pick of the inner layer while the Layers panel draws nothing (no `track`).
     ctrl_click(&mut app);
@@ -254,7 +254,7 @@ fn a_pick_marker_survives_any_number_of_frames_while_the_layers_panel_is_hidden(
 #[test]
 fn commands_after_a_pick_in_the_same_frame_or_the_next_make_it_a_command_change() {
     for gap in [0, 1] {
-        let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
+        let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
         app.ui.tool_options.move_auto_select = false;
         ctrl_click(&mut app);
         app.frame += gap;
@@ -266,7 +266,7 @@ fn commands_after_a_pick_in_the_same_frame_or_the_next_make_it_a_command_change(
 
 #[test]
 fn a_pick_marker_is_read_once_and_governs_the_next_change_only() {
-    let (mut app, inner, _) = closed_group_doc(Tool::Brush, false);
+    let (mut app, inner, group) = closed_group_doc(Tool::Brush, false);
     app.ui.tool_options.move_auto_select = false;
     ctrl_click(&mut app);
     assert_eq!(track(&mut app), Some((inner, Groups::Keep)));

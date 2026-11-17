@@ -1,14 +1,15 @@
 //! Chrome around the canvas: title bar, options bar, toolbar, status bar, dock cards, Properties.
 
 use craft::ui::patterns::blend_keys::{BlendKeyEntry, BlendShortcut};
-use egui::{Rect, Sense, vec2};
+use egui::vec2;
 use photocraft_color::BlendMode;
 use photocraft_doc::LayerId;
 use photocraft_engine::history_source_cmds::HistorySource;
 use serde_json::{Value, json};
 
 use crate::state::Tool;
-use crate::theme::Tokens;
+#[cfg(test)]
+use crate::theme;
 use crate::{PhotocraftApp, icons};
 
 pub mod actions;

@@ -71,6 +71,8 @@ pub(crate) mod viewport_pages;
 pub(crate) use cursor_policy::alt_samples;
 pub(crate) use display::GPU_OUTPUT;
 #[cfg(test)]
+pub(crate) use display::cache_key;
+#[cfg(test)]
 use display::sync_display_lut;
 use display::texture_key;
 pub(crate) use display::{canvas_display, display_doc, display_image};
@@ -98,6 +100,8 @@ pub(crate) use sampling::composite_color;
 pub(crate) use strokes::live_retouch_points;
 pub(crate) use strokes::multiple_color_target;
 pub use strokes::paint_target;
+#[cfg(test)]
+pub(crate) use strokes::strokes_live;
 pub(crate) use strokes::{CommittedStroke, LiveStroke, unsmoothed_line};
 #[cfg(test)]
 use tabs::{main_canvas_document, move_target_after_filter};
@@ -108,6 +112,10 @@ pub(crate) use textures::visible_doc_rect;
 pub(crate) use textures::{damage_since, effect_reach, retain_gpu_documents, shown_as_document};
 #[cfg(test)]
 use textures::{ensure_gpu, redraw_focus};
+#[cfg(test)]
+pub(crate) use tools::selection::floating_outline;
+#[cfg(test)]
+pub(crate) use transform_controls::layer_edges;
 
 /// One document view's cached display state.
 #[derive(Default)]

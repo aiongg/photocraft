@@ -57,8 +57,6 @@ pub use open::{
     without_develop_note,
 };
 use open::{Target, non_defaults};
-#[cfg(test)]
-use open::{open_raw, replace_raw_document};
 use proxy::{ProxyBase, ProxyJob};
 pub use sidecar::sidecar_path;
 

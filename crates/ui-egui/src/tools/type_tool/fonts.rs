@@ -1,6 +1,6 @@
 use craft::font_manager::picker::{FontFilters, FontPickerSettings, FontPreviewSize};
 use craft::text::ui::character::FontPickerSource;
-use craft::ui::contract::{Bind, Show as _};
+use craft::ui::contract::Bind;
 use photocraft_engine::prefs::FontPreview;
 
 use super::{Arc, PhotocraftApp, PoisonError, json};

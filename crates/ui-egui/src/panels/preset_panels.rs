@@ -9,6 +9,8 @@ use std::collections::BTreeMap;
 
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+#[cfg(test)]
+use serde_json::json;
 
 use crate::PhotocraftApp;
 

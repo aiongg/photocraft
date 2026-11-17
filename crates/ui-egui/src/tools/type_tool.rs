@@ -30,10 +30,11 @@ pub(crate) use controls::canvas_controls;
 #[cfg(test)]
 pub(crate) use craft::text::ui::editor::CharToggle;
 #[cfg(test)]
+use defaults::apply;
+#[cfg(test)]
 use defaults::{default_style_params, default_styles, shown_scale};
 pub use defaults::{foreground_changed, open_color_picker};
 pub(crate) use defaults::{formatting_params, target, target_text};
-use editing::selected_styles;
 pub use editing::{cancel, commit, commit_with, edit_active, edit_at, end_if_left};
 #[cfg(test)]
 pub(crate) use editing::{step_char_metric, toggle_char_style, toggle_hyphenate};
@@ -50,6 +51,8 @@ pub(crate) use options_bar::styles_at;
 pub(crate) use panel::toggle_opentype;
 pub use panel::{character_panel, type_properties};
 #[cfg(test)]
+#[cfg(test)]
+pub(crate) use pointer::PathClick;
 pub(crate) use pointer::path_target;
 pub(crate) use pointer::{TypeState, box_shape, drain, tool};
 pub(crate) use values::doc_unit;

@@ -17,6 +17,8 @@ pub(crate) mod spelling;
 pub(crate) mod style_options;
 pub(crate) mod styles;
 
+#[cfg(test)]
+pub(crate) use spelling::close_spelling;
 pub use spelling::{SPELLING, SpellDialog, open_spelling};
 
 /// View state of the type panels.

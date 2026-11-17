@@ -34,8 +34,6 @@ pub use options::{options_bar, shape_properties};
 #[cfg(test)]
 pub(crate) use overlay::selected_saved_path;
 pub(crate) use overlay::selected_saved_path_index;
-#[cfg(test)]
-pub(crate) use overlay::{BezierShown, show_paths};
 pub use path_ops::{
     active_path_name, make_shape, path_selection_finish, path_to_selection, pick_shape_at, selected_document_path, takes_path_mask, with_active_path,
 };
@@ -51,7 +49,15 @@ pub use pen::{cancel_stale, pen_commit};
 pub use shapes::is_shape_tool;
 pub(crate) use shapes::{create_geometry, kind_of, tool_history_name};
 
+#[cfg(test)]
+use crate::shape_paint_ui::PaintChange;
+#[cfg(test)]
+pub(crate) use host::remove_last;
 pub(crate) use host::{VectorTools, replace_draft};
+#[cfg(test)]
+pub(crate) use path_ops::delete_key_deletes_work_path;
+#[cfg(test)]
+pub(crate) use pen::freeform_finish_owned;
 
 /// Copy only the selected arrow's live parameters into new-arrow defaults.
 /// Existing shapes and geometry are not modified.

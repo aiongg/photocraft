@@ -44,7 +44,7 @@ pub(crate) fn command_id(action: AlignAction) -> Option<&'static str> {
 
 /// The enabled state of every action: the session's, as the Layer menu reads it.
 pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
-    all().map(|action| (CommandRef::new(action.id()), CommandState::new().enabled(app.session.is_enabled(command_id(action))))).collect()
+    all().map(|action| (CommandRef::new(action.id()), CommandState::new().enabled(command_id(action).is_some_and(|id| app.session.is_enabled(id))))).collect()
 }
 
 /// Runs a fired `AlignAction`. False when `command` is not one of them. The context is the

@@ -12,6 +12,8 @@ use craft::host::Host;
 use craft::i18n::Lang;
 use craft::ui::contract::Bind;
 use craft::ui::dialog::{DialogId, DialogResult, DialogStack, StackDialog, dialog_id};
+#[cfg(test)]
+use craft::ui::patterns::preferences::PrefValue;
 use craft::ui::patterns::preferences::{Closed, PageInfo, PreferencesModel, PreferencesState, PreferencesWindow, RowKind, SettingsDocument, StandardPage};
 use craft::ui::runtime::memory::SaveKey;
 use craft::ui::runtime::requests::ColorRequest;
