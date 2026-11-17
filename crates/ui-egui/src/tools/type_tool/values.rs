@@ -7,7 +7,7 @@
 
 use std::sync::PoisonError;
 
-use craft::behavior::{EditEvent, Mixed};
+use craft::behavior::{EditEvent, Mixed, Preview};
 use craft::font_manager::axes::{FontAxis, NamedInstance};
 use craft::text::ui::DocUnit;
 use craft::text::ui::character::{
@@ -245,17 +245,6 @@ fn applied<T: Clone>(event: &EditEvent<T>) -> Option<T> {
     }
 }
 
-/// Any value an event carries, to tell what the gesture is about.
-fn carried<T>(event: &EditEvent<T>) -> Option<&T> {
-    match event {
-        EditEvent::Begin { before: Mixed::Same(value), .. } => Some(value),
-        EditEvent::Update { value, .. } => Some(value),
-        EditEvent::Commit { after, .. } | EditEvent::Set { after, .. } => Some(after),
-        EditEvent::Cancel { before: Some(Mixed::Same(value)), .. } => Some(value),
-        _ => None,
-    }
-}
-
 fn only_key(props: &serde_json::Value, key: &str) -> bool {
     props.as_object().is_some_and(|o| o.len() == 1 && o.contains_key(key))
 }
@@ -476,21 +465,18 @@ pub(crate) fn apply_bar(app: &mut PhotocraftApp, event: &EditEvent<TypeBarChange
     apply_bar_events(app, std::slice::from_ref(event));
 }
 
-/// Whether a family gesture runs or ends in these Character events.
-pub(crate) fn character_family_gesture(events: &[EditEvent<CharacterChange>]) -> bool {
-    events.iter().any(|e| matches!(carried(e), Some(CharacterChange::Family(_))))
-}
-
-/// Whether a family gesture runs or ends in these type bar events.
-pub(crate) fn bar_family_gesture(events: &[EditEvent<TypeBarChange>]) -> bool {
-    events.iter().any(|e| matches!(carried(e), Some(TypeBarChange::Character(CharacterChange::Family(_)))))
-}
-
-/// Feeds the font hover preview from the control whose family gesture runs or ends in this pass. A control with no
-/// such gesture reports nothing and never clears the preview another control shows (#5152).
-pub(crate) fn follow_family(app: &mut PhotocraftApp, preview: Option<&str>, rested: Option<&str>, gesture: bool) {
-    if gesture || preview.is_some() || rested.is_some() {
-        crate::type_font_preview::follow(app, preview, rested);
+/// Feeds the font hover preview from the control whose preview starts, moves or ends in this pass; a control whose
+/// preview did not change reports nothing and never ends the preview another control shows (#5152). A served family
+/// previews once the lead has rested on it.
+pub(crate) fn follow_family(app: &mut PhotocraftApp, preview: Preview<String>, rested: Option<&str>) {
+    match preview {
+        Preview::Shows(family) => crate::type_font_preview::follow(app, Some(&family), rested),
+        Preview::Ended => crate::type_font_preview::follow(app, None, None),
+        _ => {
+            if let Some(family) = rested {
+                crate::type_font_preview::follow(app, Some(family), Some(family));
+            }
+        }
     }
 }
 
