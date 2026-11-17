@@ -383,8 +383,7 @@ fn thumb_clicks_pick_commands_and_targets() {
 // ------------------------------------------------------------------------------------ footer and drops
 
 /// Rules with bug history the footer tests do not cover: Delete with a Smart Filter picked (#4751),
-/// the smart object's own row clearing the pick, filters moved or copied by a drop, masks moved or
-/// copied onto a group (#10485) and refused onto a masked row, and a drop into a frame.
+/// the smart object's own row clearing the pick, and filters moved or copied by a drop.
 #[test]
 fn footer_and_drop_events_follow_the_targets() {
     let fresh = || {
@@ -483,6 +482,11 @@ fn footer_and_drop_events_follow_the_targets() {
     assert!(app.dialog_open(), "Camera Raw opened");
     assert_eq!(active(&app), Some(LayerId(b)), "on the copy's smart object");
 
+}
+
+/// Layer masks moved or copied onto a group (#10485) and refused onto a masked row, and a layer dropped into a frame.
+#[test]
+fn mask_and_frame_drops_follow_the_targets() {
     // #10485: a layer mask dropped on a group moves there, with ⌥ it is copied.
     for copy in [false, true] {
         let (mut s, masked, shape) = session();
