@@ -33,10 +33,9 @@ fn harness_with(builder: egui_kittest::HarnessBuilder<PhotocraftApp>) -> Harness
     h
 }
 
-// PLAN: the sheet's Tests row has `dock_x` read the dock area by its access name, and its Files row keeps
-// `probe::panel_rect`; the Files row holds until the owner of `panel_docking` names the dock's access name.
+/// The middle of the Layers group across the window.
 fn dock_x(h: &Harness<'static, PhotocraftApp>) -> f32 {
-    crate::panel_docking::probe::panel_rect(&h.ctx, "layers").expect("Layers docked").center().x
+    crate::panel_docking::probe::group_rect(h, "layers").expect("Layers docked").center().x
 }
 
 /// Choosing a right-to-left catalog (not just forcing the direction) mirrors the shell, and the

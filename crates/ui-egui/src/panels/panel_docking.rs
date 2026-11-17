@@ -195,8 +195,6 @@ impl DockPanels<String> for Panels<'_> {
             return Some(match at {
                 GroupAt::Measure(width) => super::toolbar::measure(self.app, ui, width),
                 GroupAt::Show(rect) => {
-                    #[cfg(test)]
-                    probe::record(ui.ctx(), TOOLBAR, rect, false);
                     super::toolbar::toolbar(self.app, ui);
                     rect.height()
                 }
@@ -209,20 +207,10 @@ impl DockPanels<String> for Panels<'_> {
             // Protected, the canvas never sits in a flyout, which is what measures.
             GroupAt::Measure(_) => Some(CANVAS_MIN[1]),
             GroupAt::Show(rect) => {
-                #[cfg(test)]
-                probe::record(ui.ctx(), CANVAS, rect, false);
                 crate::canvas::document_area(self.app, ui);
                 Some(rect.height())
             }
         }
-    }
-
-    fn group_header(&mut self, panels: &[String], _: usize, ui: &mut egui::Ui, _: &mut BodyCx<'_>) {
-        #[cfg(test)]
-        if let Some(first) = panels.first() {
-            probe::record(ui.ctx(), first, ui.max_rect(), true);
-        }
-        let _ = (panels, ui);
     }
 
     fn panel_rows(&mut self, panel: &String) -> Vec<PanelRow> {
@@ -233,8 +221,6 @@ impl DockPanels<String> for Panels<'_> {
 /// Draws panel `id`'s body in `ui`, the group's body room. Each body fills that room and scrolls itself.
 pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
     let Some(entry) = registry::entry(id) else { return };
-    #[cfg(test)]
-    probe::record(ui.ctx(), id, ui.max_rect(), false);
     (entry.body)(app, ui);
 }
 
@@ -248,8 +234,6 @@ pub(crate) fn body(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: &str) {
 /// nothing applies twice. A divider drag or window move changes the workspace at each step and remembers the layout
 /// once, when it commits: the area's `edit` says whether its gesture is still running.
 pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, panels_hidden: bool) {
-    #[cfg(test)]
-    probe::clear(ui.ctx());
     let ctx = ui.ctx().clone();
     let workspace = app.ui.docking.clone();
     let locked = app.workspaces.set.locked;
@@ -983,55 +967,27 @@ pub(crate) fn legacy_view(app: &PhotocraftApp) -> Value {
     json!({"panels": panels, "dockTabs": tabs})
 }
 
-/// Where tests find panels as the last dock pass drew them. Only tests record anything.
+/// Where tests find panels as the last dock pass drew them.
 #[cfg(test)]
 pub(crate) mod probe {
     use super::*;
     use egui::Rect;
+    use egui::accesskit::Role;
+    use egui_kittest::Harness;
+    use egui_kittest::kittest::{NodeT, Queryable};
 
     pub(crate) use super::body;
-
-    /// The id of the pass's drawn rects: each a panel's body, or (`header`) the header of the group it leads.
-    fn drawn_id() -> egui::Id {
-        egui::Id::new("photocraft dock drawn")
-    }
-
-    type Drawn = Vec<(String, Rect, bool)>;
-
-    fn drawn(ctx: &egui::Context) -> Drawn {
-        ctx.data(|data| data.get_temp::<Drawn>(drawn_id())).unwrap_or_default()
-    }
-
-    /// Starts the pass's record.
-    pub(super) fn clear(ctx: &egui::Context) {
-        ctx.data_mut(|data| data.insert_temp(drawn_id(), Drawn::new()));
-    }
-
-    /// Notes the body of `panel`, or the header of the group it leads, at `rect`.
-    pub(super) fn record(ctx: &egui::Context, panel: &str, rect: Rect, header: bool) {
-        ctx.data_mut(|data| data.get_temp_mut_or_default::<Drawn>(drawn_id()).push((panel.to_owned(), rect, header)));
-    }
-
-    /// The body of `panel`, when the last pass drew it.
-    pub(crate) fn panel_rect(ctx: &egui::Context, panel: &str) -> Option<Rect> {
-        drawn(ctx).into_iter().find(|(id, _, header)| id == panel && !header).map(|(_, rect, _)| rect)
-    }
 
     /// The panels of the tab group holding `panel`, in tab order.
     pub(crate) fn group_of(app: &PhotocraftApp, panel: &str) -> Vec<String> {
         group_members(&app.ui.docking.layout, &panel.to_owned())
     }
 
-    /// The tab group holding `panel` as the last pass drew it: its header and its shown panel's body.
-    pub(crate) fn group_rect(app: &PhotocraftApp, ctx: &egui::Context, panel: &str) -> Option<Rect> {
-        let members = group_of(app, panel);
-        drawn(ctx).into_iter().filter(|(id, _, _)| members.contains(id)).map(|(_, rect, _)| rect).reduce(|a, b| a.union(b))
-    }
-
-    /// [`group_rect`] of the first laid-out panel of the old group whose first panel is `first`.
-    pub(crate) fn native_group_rect(app: &PhotocraftApp, ctx: &egui::Context, first: &str) -> Option<Rect> {
-        let (_, members) = LEGACY_GROUPS.iter().find(|(_, members)| members.first() == Some(&first))?;
-        members.iter().find(|panel| is_shown(app, panel)).and_then(|panel| group_rect(app, ctx, panel))
+    /// The tab group holding `panel` as the last pass drew it, header and body: the group's node, a tab panel named
+    /// after its shown panel.
+    pub(crate) fn group_rect(h: &Harness<'_, PhotocraftApp>, panel: &str) -> Option<Rect> {
+        let titles: Vec<String> = group_of(h.state(), panel).iter().filter_map(|member| registry::entry(member)).map(|entry| (entry.label)()).collect();
+        h.query_all_by_role(Role::TabPanel).find(|n| n.accesskit_node().label().is_some_and(|label| titles.contains(&label))).map(|n| n.rect())
     }
 
     /// The id of the OS windows the last pass showed floating windows in, by each panel they hold.
