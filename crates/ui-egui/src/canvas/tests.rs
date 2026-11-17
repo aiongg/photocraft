@@ -1013,15 +1013,23 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         app.run("file.new", json!({"width": 400, "height": 300, "name": "floating"})).unwrap();
         app.run("file.new", json!({"width": 400, "height": 300, "name": "docked"})).unwrap();
         app.sync_views();
-        let app_ctx = app.ctx().clone();
-        float_doc(&mut app, &app_ctx, 0).unwrap();
         app
     });
+    h.run_steps(6);
+    // Floated once the window has its size, as from the menu: the floating window takes its size from the window's
+    // content area, which egui doesn't know before the first frame.
+    let ctx = h.ctx.clone();
+    float_doc(h.state_mut(), &ctx, 0).unwrap();
     h.run_steps(6);
     // The panel is shown, not toggled: the menu entry closes a Navigator the workspace already shows.
     crate::panel_docking::show_panel(h.state_mut(), "navigator", Some(true)).unwrap();
     h.run_steps(6);
     assert_eq!(h.state().session.active_index(), Some(0), "the floating document is active");
+    eprintln!(
+        "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: floating windows {:?} content rect {:?}",
+        h.state().ui.document_windows.floating.iter().map(|(g, r)| (g.id, *r)).collect::<Vec<_>>(),
+        h.ctx.content_rect()
+    );
     // The status bar's zoom field (bottom left) and the Navigator's.
     let fields = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
         // The fields are the nodes named Zoom that show the percentage as their value (a field's group and the Navigator's slider carry the name too).
@@ -1037,16 +1045,6 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         f.sort_by(|a, b| a.left().total_cmp(&b.left()));
         f
     };
-    for n in h.query_all_by(|n| n.label().is_some_and(|l| l.contains("Zoom") || l.contains("Navigator"))) {
-        let a = n.accesskit_node();
-        eprintln!(
-            "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: node role={:?} label={:?} value={:?} rect={:?}",
-            a.role(),
-            a.label(),
-            a.value(),
-            a.bounding_box()
-        );
-    }
     assert_eq!(fields(&h).len(), 2, "the status bar's and the Navigator's zoom fields");
     for (field, typed, want) in [(0, "200", 2.0), (1, "50", 0.5), (0, "300", 3.0), (1, "100", 1.0)] {
         let at = fields(&h)[field].center();
