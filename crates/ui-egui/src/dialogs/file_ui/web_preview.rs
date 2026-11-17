@@ -89,7 +89,8 @@ pub struct EncodedPreview {
 
 /// Encodes the proxy `source` makes with `p`. Palette replacements reuse the cached index buffer (kept under `key`
 /// while `signature` and the other options are unchanged): picker drags do not re-quantize or re-encode the proxy,
-/// and `source` does not run then. The GIF payload length is unchanged by RGB table replacements.
+/// and `source` does not run then. The GIF payload length is unchanged by RGB table replacements. The edits
+/// (`colorTableEdits`) index the palette the encode chose, unless `p` fixes a `colorTable` of its own.
 pub fn optimized(
     ctx: &egui::Context,
     key: egui::Id,
@@ -97,11 +98,8 @@ pub fn optimized(
     p: &Value,
     source: impl FnOnce() -> Result<(Vec<[f32; 4]>, u32, u32), String>,
 ) -> Result<EncodedPreview, String> {
-    let settings = WebSettings::from_params(p, "preview").map_err(|e| e.to_string())?;
     let mut base = p.clone();
-    if let Some(m) = base.as_object_mut() {
-        m.remove("colorTableEdits");
-    }
+    let edits = base.as_object_mut().and_then(|m| m.remove("colorTableEdits"));
     let signature = format!("{signature}|{base}");
     let key = key.with("indexed-source");
     let cached: Option<(String, Arc<Optimized>)> = ctx.data(|d| d.get_temp(key));
@@ -117,6 +115,15 @@ pub fn optimized(
         ctx.data_mut(|d| d.insert_temp(key, (signature, encoded.clone())));
         encoded
     };
+    let mut full = base;
+    // A format without a palette has nothing to edit.
+    if let Some(edits) = edits.filter(|_| full.get("colorTable").is_some() || !encoded.color_table.is_empty()) {
+        if full.get("colorTable").is_none() {
+            full["colorTable"] = json!(encoded.color_table.iter().map(|c| web_cmds::rgb_hex(*c)).collect::<Vec<_>>());
+        }
+        full["colorTableEdits"] = edits;
+    }
+    let settings = WebSettings::from_params(&full, "preview").map_err(|e| e.to_string())?;
     let rgba = if settings.color_table_edits.is_empty() || !settings.format.indexed() {
         encoded.preview.clone()
     } else {
