@@ -157,6 +157,22 @@ fn document_state(app: &PhotocraftApp) -> impl PartialEq + use<> {
     (state.doc.clone(), state.revision, state.history.past_len(), state.active_layer, state.selected_layers(), app.session.journal.len())
 }
 
+/// DIAG: the parts of [`document_state`] apart from the document, and the journal's last entry.
+fn diag_state(app: &PhotocraftApp) -> String {
+    let state = app.session.active().unwrap();
+    format!(
+        "revision {:?} history {:?} active {:?} selected {:?} journal {} last {:?} text_edit {} layers {}",
+        state.revision,
+        state.history.past_len(),
+        state.active_layer,
+        state.selected_layers(),
+        app.session.journal.len(),
+        app.session.journal.last(),
+        app.ui.text_edit.is_some(),
+        state.doc.layers.len()
+    )
+}
+
 fn view_of(app: &PhotocraftApp) -> Option<(craft::behavior::kurbo::Point, f64)> {
     crate::canvas::document_display::active_view(app).map(|v| (v.center, v.zoom))
 }
@@ -410,8 +426,13 @@ fn context_popup_table() {
             Place::Guide => screen_of(h.state(), [16.0, 8.0]),
         };
         let before = document_state(h.state());
+        let (diag_before, doc_before) = (diag_state(h.state()), h.state().session.active().unwrap().doc.clone());
         let view = view_of(h.state());
         secondary_press(&mut h, at, row.mods, row.gesture);
+        if row.name == "type edit" {
+            let same = h.state().session.active().unwrap().doc == doc_before;
+            eprintln!("DIAG context_popup_table type edit: before {diag_before} after {} same doc {same}", diag_state(h.state()));
+        }
         let menu = h.state().ui.canvas_tool_menu.as_ref().map(|m| (kind_name(&m.kind), m.tool));
         let picker = h.state().ui.brush_picker.is_some();
         match row.want {
