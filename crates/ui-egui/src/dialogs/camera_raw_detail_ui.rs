@@ -72,25 +72,6 @@ impl DetailPreview {
     }
 
     #[cfg(test)]
-    /// Collects a finished worker and starts the refinement of `revision` when the settings need
-    /// one. Identity settings need none: the source is their develop. Each pass applies only its
-    /// own `revision`, so a second pass in one frame changes nothing the first did not.
-    pub(crate) fn refine(&mut self, ctx: &Context, revision: u64, params: &CameraRaw, inputs: &DevelopInputs) {
-        self.poll(revision);
-        if params.is_identity() {
-            if self.result.as_ref().is_none_or(|(r, _)| *r != revision) {
-                self.result = Some((revision, self.source.clone()));
-                self.mask = None;
-                self.error = None;
-            }
-        } else {
-            self.request(ctx, revision, params, inputs);
-            self.poll(revision);
-        }
-        self.ready = self.result.as_ref().is_some_and(|(r, _)| *r == revision);
-    }
-
-    #[cfg(test)]
     pub(crate) fn poll(&mut self, revision: u64) {
         let Some((requested_revision, rx)) = &self.pending else { return };
         let requested_revision = *requested_revision;
@@ -232,9 +213,9 @@ impl DetailPreview {
         }
         let (w, h) = (self.area.width() as usize, self.area.height() as usize);
         let mut mask = ClippingMask::new([w, h]);
-        if w > 0 {
+        if let Some(band_rows) = CROP_BAND_PIXELS.checked_div(w) {
             // Read in bands of rows: a whole-area float copy of a large refinement would be gigabytes.
-            let band_rows = (CROP_BAND_PIXELS / w).max(1);
+            let band_rows = band_rows.max(1);
             let mut band = vec![[0.0f32; 4]; band_rows * w];
             let mut y = 0;
             while y < h {

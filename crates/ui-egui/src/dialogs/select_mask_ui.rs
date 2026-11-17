@@ -290,14 +290,6 @@ fn command_params(cmd: &SelectMaskCommand, target_mask: bool) -> Value {
     params
 }
 
-#[cfg(test)]
-/// The params OK runs `select.refineEdge` with, over the open workspace.
-pub(crate) fn commit_params(app: &PhotocraftApp) -> Option<Value> {
-    let (id, _, _, source) = app.select_mask_target.as_ref()?;
-    let hosted = app.framework.dialogs.get_by_id::<Hosted>(*id)?;
-    Some(command_params(&hosted.workspace().command(), source.target_mask))
-}
-
 /// The facts of the open workspace for the control surface (merged with the workspace's own fields; a refused OK's
 /// message is the workspace's own, shown through `ok_failed`).
 pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {

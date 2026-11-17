@@ -41,6 +41,13 @@ fn fixture() -> (PhotocraftApp, egui::Context, [LayerId; 2]) {
     (app, ctx, [layers[0], layers[1]])
 }
 
+/// Every layer's bounds are its `old` bounds moved by the drag of 20 and 10 pixels.
+fn assert_translated(app: &PhotocraftApp, layers: [LayerId; 2], old: [Rect; 2], what: &str) {
+    for (id, previous) in layers.into_iter().zip(old) {
+        assert_eq!(bounds(app, id), previous.translate(20, 10), "{what}");
+    }
+}
+
 fn bounds(app: &PhotocraftApp, id: LayerId) -> Rect {
     let state = app.session.active().unwrap();
     photocraft_engine::transform_cmds::transform_bounds(&state.doc, state.doc.layer(id).unwrap())
@@ -145,9 +152,7 @@ fn move_controls_press_zones_start_the_matching_gesture() {
                 assert!(app.ui.transform.is_none(), "{what}");
                 pointer(&mut app, &ctx, "move", to);
                 pointer(&mut app, &ctx, "up", to);
-                for (id, previous) in layers.into_iter().zip(old) {
-                    assert_eq!(bounds(&app, id), previous.translate(20, 10), "{what}");
-                }
+                assert_translated(&app, layers, old, &what);
                 assert!(app.ui.transform.is_none(), "{what}");
                 assert_eq!(app.session.active().unwrap().history.past_len(), steps + 1, "{what}");
                 continue;
