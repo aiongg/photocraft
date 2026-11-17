@@ -461,7 +461,15 @@ fn smoothed_stroke_shows_its_catch_up_tail_while_drawing() {
     pts.extend(xs.iter().map(|&x| json!([x, 40.0 + (x / 7.0).sin() * 8.0, 1.0])));
     // (Round tips without dynamics draw the same for any seed.)
     s.execute("paint.stroke", json!({"points": pts, "seed": 0})).unwrap();
-    assert!(same_pixels(&s.active().unwrap().doc, &done));
+    // The drag reaches the tool through the pointer, as f32 screen points, so its points carry f32 rounding that
+    // these f64 points don't: the two strokes may differ by one 8-bit level where a dab edge falls.
+    assert!(within_a_level(&s.active().unwrap().doc, &done));
+}
+
+/// Whether `a` and `b` differ by at most one 8-bit level in every channel of every pixel.
+fn within_a_level(a: &Document, b: &Document) -> bool {
+    let (a, b) = (a.layers[0].surface().unwrap(), b.layers[0].surface().unwrap());
+    (0..80).all(|y| (0..200).all(|x| a.rgba(x, y).iter().zip(b.rgba(x, y)).all(|(p, q)| (p - q).abs() <= 1.0 / 255.0 + 1e-6)))
 }
 
 /// #10074: painting a group looked as if it worked (the stroke's trail followed the pointer) and

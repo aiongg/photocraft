@@ -372,7 +372,10 @@ impl CanvasTool for Preflight<'_, '_> {
                 if self.alt_stand_in && self.scope.with_app(|app| super::cursor_policy::shape_alt_samples(app, pointer.mods, at[0], at[1])) {
                     return ToolAction::Ignored;
                 }
-                if self.refused(pointer, at) {
+                // The Control+Alt resize drag changes the brush, not the layer: it runs where a stroke would be refused
+                // (a hidden layer, a Clone Stamp without a source), as quick pick does before it.
+                let resizes = crate::brush_resize::PaintResize::chord(tool, pointer.button, pointer.mods);
+                if !resizes && self.refused(pointer, at) {
                     return ToolAction::Done;
                 }
             }

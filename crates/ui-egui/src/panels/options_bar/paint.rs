@@ -13,7 +13,7 @@ use photocraft_paint::BrushSettings;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::brush_mode_menu::{self, Item};
+use crate::brush_mode_menu;
 use crate::state::Tool;
 
 /// The blend key of the Brush's and Pencil's Mode list: a blend mode, or one of the two
@@ -68,9 +68,10 @@ fn eraser_mode_name(mode: EraserMode) -> &'static str {
     }
 }
 
-/// The Mode list of the Brush and Pencil: the blend modes with Behind and Clear after Dissolve, the
-/// two painting-only ones greyed where the active layer has no transparency.
-fn mode_entries(app: &PhotocraftApp) -> Vec<Entry<PaintMode>> {
+/// The Mode list of the Brush and Pencil: the blend modes with Behind and Clear after Dissolve. Unlike the
+/// Shift+right-click menu and the Pattern Stamp's list, it keeps both on the Background, so the wheel steps through
+/// them there too.
+fn mode_entries() -> Vec<Entry<PaintMode>> {
     let keys: Vec<BlendKeyEntry<PaintMode>> = brush_mode_menu::choices()
         .into_iter()
         .map(|((mode, behind), _)| match (mode, behind) {
@@ -80,13 +81,6 @@ fn mode_entries(app: &PhotocraftApp) -> Vec<Entry<PaintMode>> {
         })
         .collect();
     blend_entries(&keys, |entry| Label::from(tl!(entry.key.text()).to_string()))
-        .into_iter()
-        .map(|entry| match entry.value().copied() {
-            Some(PaintMode::Behind) => entry.enabled(brush_mode_menu::enabled(app, Item::Behind)),
-            Some(PaintMode::Clear) => entry.enabled(brush_mode_menu::enabled(app, Item::Clear)),
-            _ => entry,
-        })
-        .collect()
 }
 
 /// The bar's values for `tool` from its brush `b` and the tool options. Opacity, Flow and Hardness
@@ -223,7 +217,7 @@ pub(super) fn members(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool) ->
     let before = paint_values(app, tool, &brush_before);
     let mut values = before.clone();
     let mut eraser = eraser_mode_of(&app.ui.tool_options.eraser_mode);
-    let modes = if matches!(tool, Tool::Brush | Tool::Pencil) { mode_entries(app) } else { Vec::new() };
+    let modes = if matches!(tool, Tool::Brush | Tool::Pencil) { mode_entries() } else { Vec::new() };
     let mut bar = PaintBar::new(paint, &mut values).modes(&modes);
     if tool == Tool::Eraser {
         bar = bar.eraser_mode(&mut eraser);
