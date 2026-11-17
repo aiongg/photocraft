@@ -279,11 +279,10 @@ fn encode(ctx: &egui::Context, app: &PhotocraftApp, wanted: &WantedVariant, fram
     };
     let k = (2048.0 / fw.max(fh)).min(1.0);
     let signature = format!("{}|{rev}|{frame:?}", doc.id.0);
-    let source = || {
-        let settings = WebSettings::from_params(&p, "preview").map_err(|e| e.to_string())?;
+    let source = |settings: &WebSettings| {
         let doc = web_frame_document(&doc, frame).map_err(|e| e.to_string())?;
         let size = json!({"width": (fw * k).round().max(1.0), "height": (fh * k).round().max(1.0), "resample": web_preview::proxy_resample(&p, k)});
-        let (proxy, _, _) = web_cmds::web_document(&doc, &size, &settings).map_err(|e| e.to_string())?;
+        let (proxy, _, _) = web_cmds::web_document(&doc, &size, settings).map_err(|e| e.to_string())?;
         let (w, h) = (proxy.size.width, proxy.size.height);
         Ok((photocraft_compose::flatten(&proxy).into_px(), w, h))
     };

@@ -87,16 +87,16 @@ pub struct EncodedPreview {
     pub height: u32,
 }
 
-/// Encodes the proxy `source` makes with `p`. Palette replacements reuse the cached index buffer (kept under `key`
-/// while `signature` and the other options are unchanged): picker drags do not re-quantize or re-encode the proxy,
-/// and `source` does not run then. The GIF payload length is unchanged by RGB table replacements. The edits
+/// Encodes the proxy `source` makes with `p`; `source` gets the settings of `p` without the palette edits. Palette
+/// replacements reuse the cached index buffer (kept under `key` while `signature` and the other options are
+/// unchanged): picker drags do not re-quantize or re-encode the proxy, and `source` does not run then. The GIF payload length is unchanged by RGB table replacements. The edits
 /// (`colorTableEdits`) index the palette the encode chose, unless `p` fixes a `colorTable` of its own.
 pub fn optimized(
     ctx: &egui::Context,
     key: egui::Id,
     signature: &str,
     p: &Value,
-    source: impl FnOnce() -> Result<(Vec<[f32; 4]>, u32, u32), String>,
+    source: impl FnOnce(&WebSettings) -> Result<(Vec<[f32; 4]>, u32, u32), String>,
 ) -> Result<EncodedPreview, String> {
     let mut base = p.clone();
     let edits = base.as_object_mut().and_then(|m| m.remove("colorTableEdits"));
@@ -106,8 +106,8 @@ pub fn optimized(
     let encoded = if let Some((_, encoded)) = cached.filter(|(sig, _)| sig == &signature) {
         encoded
     } else {
-        let (px, w, h) = source()?;
         let settings = WebSettings::from_params(&base, "preview").map_err(|e| e.to_string())?;
+        let (px, w, h) = source(&settings)?;
         let encoded = Arc::new(
             web_cmds::optimize(&px, w as usize, photocraft_geom::Rect::new(0, 0, w as i32, h as i32), &settings, None, None, None, 72.0, true)
                 .map_err(|e| e.to_string())?,
@@ -157,7 +157,7 @@ mod tests {
         let ctx = egui::Context::default();
         let key = egui::Id::new("test-web-preview");
         let px = vec![[1.0, 0.0, 0.0, 1.0], [0.0, 0.0, 1.0, 1.0]];
-        let run = |p: &Value| optimized(&ctx, key, "fixture", p, || Ok((px.clone(), 2, 1))).unwrap().rgba;
+        let run = |p: &Value| optimized(&ctx, key, "fixture", p, |_| Ok((px.clone(), 2, 1))).unwrap().rgba;
         let cached = || ctx.data(|d| d.get_temp::<(String, Arc<Optimized>)>(key.with("indexed-source"))).unwrap().1;
         let mut p = json!({"format": "gif", "colorTable": ["#ff0000", "#0000ff"], "dither": "none"});
         assert_eq!(run(&p), [255, 0, 0, 255, 0, 0, 255, 255]);
