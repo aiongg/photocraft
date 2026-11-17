@@ -490,7 +490,10 @@ fn canvas_controls(
     }
     crate::type_tool::canvas_controls(app, ui, rect);
     crate::type_path_placement::show(app, ui, rect);
-    let session = crate::transform_tool::show_in_canvas(app, ui, rect, now);
+    // Only the main window's canvas shows and drives the open Free Transform (production's `paint_primary_overlays`):
+    // a secondary window of the document shows no box, and its tool keeps its presses.
+    let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
+    let session = if primary { crate::transform_tool::show_in_canvas(app, ui, rect, now) } else { crate::transform_tool::SessionShown::default() };
     let session_box_shown = session.shown;
     reported.transform_snapped = session.snapped;
     crate::cam_transform::show(app, ui, rect);
@@ -506,7 +509,7 @@ fn canvas_controls(
     crate::symmetry_ui::canvas_controls(ui, app, rect);
     crate::perspective_crop_ui::body(app, ui, rect);
     crate::analysis::canvas::body(app, ui, rect);
-    if host.window.is_none() && host.viewport == egui::ViewportId::ROOT {
+    if primary {
         reported.crop = super::tools::crop::show_frame(app, ui, rect);
     }
     // One contextual task bar per window: the active document's tile carries it, not the tile drawn last.
