@@ -441,7 +441,9 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
     while (h.query_all_by_label("Saving fg.psd").count() == 0 || h.query_by_label("Esc to cancel").is_none()) && t.elapsed() < Duration::from_secs(30) {
         h.step();
     }
-    let cancel_text = |t: Option<String>| t.is_some_and(|t| t.to_lowercase().contains("cancel") || t.contains("Saving"));
+    fn cancel_text(t: Option<String>) -> bool {
+        t.is_some_and(|t| t.to_lowercase().contains("cancel") || t.contains("Saving"))
+    }
     for n in h.query_all_by(|n| cancel_text(n.value()) || cancel_text(n.label())) {
         let a = n.accesskit_node();
         eprintln!(
