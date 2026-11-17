@@ -3,7 +3,8 @@ use craft::automation::actions::ActionStep;
 use craft::automation::ui::actions::ActionsHost as _;
 use egui_kittest::{Harness, kittest::Queryable};
 
-use crate::panels::panel_docking::{is_front, is_shown, show_panel};
+use crate::panels::panel_docking::{apply, is_front, is_shown, show_panel};
+use craft::behavior::dock::Action as DockAction;
 
 fn new_app() -> PhotocraftApp {
     PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default())
@@ -248,7 +249,8 @@ fn reopening_the_actions_panel_keeps_the_selected_set_and_empty_sets() {
     app.run("actions.newSet", json!({"name": "Print"})).unwrap();
     show_panel(&mut app, "actions", Some(true)).unwrap();
     app.ui.actions.panel.selected = Some(ActionSelection::Set("Web".into()));
-    show_panel(&mut app, "actions", Some(false)).unwrap();
+    // Essentials keeps Actions with History as an icon, whose Window menu row only closes its flyout: close the panel.
+    apply(&mut app, vec![DockAction::close("actions".to_owned())]).unwrap();
     assert!(!is_shown(&app, "actions"), "closed");
     show_panel(&mut app, "actions", Some(true)).unwrap();
     assert!(is_shown(&app, "actions") && is_front(&app, "actions"), "open again");

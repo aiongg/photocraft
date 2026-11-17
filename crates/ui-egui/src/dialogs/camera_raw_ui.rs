@@ -297,6 +297,14 @@ impl PcRawSource {
     }
 }
 
+impl PcRawSource {
+    /// `at`, a point in the previewed area's pixels (the workspace's image pixels: its hover and sampler points), as
+    /// fractions of that area, which the proxy pictures cover.
+    fn fraction(&self, at: [f64; 2]) -> [f64; 2] {
+        [at[0] / self.full_w.max(1) as f64, at[1] / self.full_h.max(1) as f64]
+    }
+}
+
 impl RawDevelopSource for PcRawSource {
     fn after(&self) -> &dyn RasterSource {
         &self.after
@@ -376,7 +384,7 @@ impl RawDevelopSource for PcRawSource {
         };
         let pixels: &[[f32; 4]] = if before { &self.proxy } else { &developed.processed };
         let hover = at
-            .and_then(|at| scope_ui::pixel_at(at, [self.pw, self.ph], pixels, |_| None))
+            .and_then(|at| scope_ui::pixel_at(self.fraction(at), [self.pw, self.ph], pixels, |_| None))
             .and_then(|pixel| scope_ui::hover_target(pixel, &self.scope_transform));
         developed.scope.show(before, region, hover, show);
     }
@@ -388,7 +396,7 @@ impl RawDevelopSource for PcRawSource {
     fn sample(&self, at: [f64; 2], before: bool, lab: bool) -> Option<ScopeReadout> {
         let developed = self.developed()?;
         let pixels: &[[f32; 4]] = if before { &self.proxy } else { &developed.processed };
-        let pixel = scope_ui::pixel_at(at, [self.pw, self.ph], pixels, |_| None)?;
+        let pixel = scope_ui::pixel_at(self.fraction(at), [self.pw, self.ph], pixels, |_| None)?;
         Some(scope_ui::readout(pixel, lab, &self.lab_transform))
     }
 

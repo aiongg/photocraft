@@ -1,5 +1,5 @@
-//! The content versions of the settling regions (`Lazy::content`): the shell's options bar, tool rail and status bar,
-//! and every docked panel body. A version covers the app data its region shows that can change while no input reaches
+//! The content versions of the settling regions (`Lazy::content`): the shell's options bar and status bar, and every
+//! docked panel body. A version covers the app data its region shows that can change while no input reaches
 //! the region: what a command changes, the active document and layer, the tool, the colours and the brush, and what
 //! a region shows of the canvas view, a job or the pointer. Input inside a region runs it whatever its version, and so
 //! does a repaint it asks for itself.
@@ -11,11 +11,6 @@ use super::{PhotocraftApp, chrome_ui};
 /// The version of the options bar: the Zoom tool's members show the active view.
 pub(crate) fn options_bar(app: &PhotocraftApp) -> u64 {
     version(app, view(app))
-}
-
-/// The version of the tool rail: the tool and the colour chips, which every version holds.
-pub(crate) fn tool_rail(app: &PhotocraftApp) -> u64 {
-    version(app, ())
 }
 
 /// The version of the status bar: the zoom readout of the active view, the status message and the item it shows, the

@@ -418,7 +418,7 @@ pub struct UiSetParams {
     /// ("normal", "fixedRatio" or "fixedSize") and marqueeSize ([width, height] for that style),
     /// actionsPanel (an object patching buttonMode and collapsed for the Actions panel),
     /// presetBrowsers (an object keyed by preset panel, each patching view ("grid" or "list") and
-    /// zoom of its browser), toolbarColumns (1 or 2, the tool rail's columns) and recentView
+    /// zoom of its browser), toolbarColumns (1 up to the toolbar's cells, its width in tool columns) and recentView
     /// ("grid" or "list", the Home screen's recent files). Other fields are an error.
     pub fields: Value,
 }

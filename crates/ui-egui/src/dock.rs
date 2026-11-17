@@ -50,12 +50,8 @@ fn apply_panels(app: &mut PhotocraftApp, v: &Value) {
     if let Some(saved) = v.get("panels")
         && let Ok(mut panels) = serde_json::from_value::<Panels>(saved.clone())
     {
-        // The embedding host owns these flags, including for layouts that serialize them.
+        // The embedding host owns this flag, including for layouts that serialize it.
         panels.menu_bar = app.ui.panels.menu_bar;
-        panels.rail = app.ui.panels.rail;
-        // A layout saved before the toolbar could move (or with an unreadable side) keeps the current side; a valid
-        // saved side still belongs to the workspace.
-        panels.toolbar_side = saved.get("toolbar_side").and_then(|side| serde_json::from_value(side.clone()).ok()).unwrap_or(app.ui.panels.toolbar_side);
         app.ui.panels = panels;
     }
 }

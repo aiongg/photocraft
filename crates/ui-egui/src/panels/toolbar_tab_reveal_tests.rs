@@ -5,14 +5,15 @@ use egui_kittest::kittest::Queryable;
 const HEIGHT: f32 = 360.0;
 
 /// Whether the rail's button for `tool` has the focus. A tool's button is a node inside a node of the same name (the
-/// slot and the button in it), so the name matches two.
+/// slot and the button in it), so the name matches two. The name matches whole: "Move Toolbar to the Right" contains
+/// "Move Tool".
 fn focused(harness: &egui_kittest::Harness<'_, PhotocraftApp>, tool: &str) -> bool {
-    harness.query_all_by_label_contains(tool).any(|node| node.is_focused())
+    harness.query_all_by_label(tool).any(|node| node.is_focused())
 }
 
 /// The rect of the rail's button for `tool`: the innermost of the nodes carrying its name.
 fn button_rect(harness: &egui_kittest::Harness<'_, PhotocraftApp>, tool: &str) -> egui::Rect {
-    harness.query_all_by_label_contains(tool).last().unwrap_or_else(|| panic!("no {tool} button")).rect()
+    harness.query_all_by_label(tool).last().unwrap_or_else(|| panic!("no {tool} button")).rect()
 }
 
 /// A harness that draws the toolbar in a window much shorter than its tools, so the rail scrolls.
@@ -57,10 +58,11 @@ fn tab_reveals_and_activates_the_last_tool() {
     assert!(entered, "Tab must reach the rail's buttons");
     // The node's rect is its visible part, so a button the rail clipped is shorter than a whole one.
     let full_height = button_rect(&harness, "Move Tool").height();
-    // The grid wraps, so Up from the first slot goes backwards from the end of the rail.
+    // Right walks the grid in reading order and goes on to the next row at a row's end; Up and Down stop at the first
+    // and last rows.
     let mut reached = false;
-    for _ in 0..10 {
-        harness.key_press(egui::Key::ArrowUp);
+    for _ in 0..60 {
+        harness.key_press(egui::Key::ArrowRight);
         harness.run_steps(3);
         reached = focused(&harness, "Zoom Tool");
         if reached {

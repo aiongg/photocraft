@@ -24,7 +24,7 @@ fn mods_of(m: Modifiers) -> Mods {
     Mods { cmd: false, ctrl: m.ctrl, alt: m.alt, shift: m.shift }
 }
 
-/// A 200 × 100 document, red on the left half and green on the right, the foreground blue and a 40 px brush.
+/// A 200 × 100 document, red on the left half and green on the right, the foreground blue and `tool`'s brush at 40 px.
 fn app(tool: Tool) -> PhotocraftApp {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     app.run("file.new", json!({"width": 200, "height": 100, "background": "white"})).unwrap();
@@ -35,8 +35,11 @@ fn app(tool: Tool) -> PhotocraftApp {
     app.run("edit.fill", json!({"color": "#00ff00"})).unwrap();
     app.run("select.deselect", json!({})).unwrap();
     app.run("tools.setColors", json!({"foreground": BLUE, "background": [1.0, 1.0, 1.0, 1.0]})).unwrap();
-    app.run("tools.setBrush", json!({"brush": {"size": 40, "hardness": 0.2}})).unwrap();
+    // The tool's own brush first (a tool seen for the first time loads its starting tip, the Background Eraser's
+    // 13 px), then the 40 px brush on it, as production's tests pick the tool before setting the brush.
     app.ui.tool = tool;
+    crate::paint_mouse::sync_tool_brush(&mut app);
+    app.run("tools.setBrush", json!({"brush": {"size": 40, "hardness": 0.2}})).unwrap();
     app.sync_views();
     // The Ctrl+Alt chord is a Mac gesture: off macOS the window host reports Ctrl as the command key.
     testing::on_a_mac(&app);
@@ -77,6 +80,7 @@ fn drive(app: &mut PhotocraftApp, button: PointerButton, from: [f64; 2], to: [f6
         testing::release(app, to, m);
         return;
     }
+    testing::shown(app);
     let host = WindowHost::of(&testing::ctx(app));
     let pos = testing::to_screen(app, from);
     host.inject_click(egui::ViewportId::ROOT, pos, button, 1, mods_of(m), true);

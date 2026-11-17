@@ -21,6 +21,8 @@ fn whole_app(animated_zoom: bool) -> Harness<'static, PhotocraftApp> {
         app.sync_views();
         app
     });
+    // The harness sets egui's animation time to zero, which turns the framework's motion off; the ease needs it on.
+    h.ctx.all_styles_mut(|style| style.animation_time = egui::Style::default().animation_time);
     h.run_steps(6);
     let view = &mut h.state_mut().ui.views[0];
     view.fit_pending = false;

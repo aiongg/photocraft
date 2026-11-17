@@ -207,9 +207,13 @@ pub fn io_result_warnings(app: &mut PhotocraftApp, result: &serde_json::Value, w
 /// Hand the outbox to the window's toast queue and collect how the queued notices ended. Auto-hide
 /// (Interface › Notification) is the queue's timeout; the queue holds a card while the pointer rests
 /// on it. A second pass in the same frame finds the outbox empty and the ends already reported, so
-/// it posts and writes nothing.
+/// it posts and writes nothing. A measuring run of the shell's body does none of it: the queue skips
+/// a post there, so the notice would leave the outbox without reaching the window; the real run posts it.
 pub fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let ctx = ui.ctx().clone();
+    if craft::ui::runtime::measure::active(&ctx) {
+        return;
+    }
     let (auto_hide, seconds) = {
         let i = &app.session.prefs().interface;
         (i.notification_auto_hide, i.notification_duration_seconds.max(1) as f32)

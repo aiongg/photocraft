@@ -153,7 +153,7 @@ pub(crate) mod params {
         save: Option<SaveKey>,
         build: impl for<'b> Fn(&'b mut DialogFields) -> ParamDialog<'b> + Send + 'static,
     ) -> DialogId {
-        let canvas = app.session.active_index().map(|idx| CanvasHost::main(idx).canvas_id());
+        let canvas = app.session.active_index().map(|idx| CanvasHost::primary(app, idx).canvas_id());
         let dialog = HostedParamDialog::new(app.ctx(), key, fields, move |fields| {
             let mut dialog = build(fields).history(true);
             if let Some(save) = &save {
@@ -714,7 +714,7 @@ pub mod gallery_ui;
 pub(crate) mod guide_edit;
 pub mod guide_layout_ui;
 pub mod history_options_ui;
-mod image_processor_ui;
+pub(crate) mod image_processor_ui;
 pub mod jpeg_options_ui;
 pub mod layer_picker;
 pub mod layer_style;

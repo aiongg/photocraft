@@ -663,7 +663,7 @@ fn a_secondary_canvas_hand_pans_while_a_transform_is_open() {
     view0.fill_pending = false;
     let center0 = view0.center;
     // The same document in a document window of its own, whose canvas is not the main window's.
-    let window = CanvasHost { idx: 0, viewport: egui::ViewportId::ROOT, window: Some(1) };
+    let window = CanvasHost { idx: 0, window: Some(1) };
     let rect = Rect::from_min_size(Pos2::ZERO, vec2(400.0, 300.0));
     let frame = |app: &mut PhotocraftApp, events: Vec<egui::Event>| -> View {
         let input = egui::RawInput { screen_rect: Some(rect), events, ..Default::default() };
@@ -694,7 +694,8 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     // the moving pixels. The preview is image content, drawn before the grid and guides like
     // the document is; the box and handles still go over them, as in Photoshop. The document
     // picture and the controls are on different paint layers, so the order is read from the
-    // pass's shapes, which egui hands over merged in paint order.
+    // pass's shapes, which egui hands over merged in paint order. The canvas's picture slot holds the document and the
+    // preview as one list shape at its place, so the order is read from the shapes with every list opened in place.
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), Default::default());
     let ctx = app.ctx().clone();
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
@@ -721,7 +722,17 @@ fn guides_draw_over_the_transform_preview_and_under_its_box() {
     // At 100 % centred on the document, screen and document coordinates coincide.
     let layer = Rect::from_min_max(pos2(100.0, 100.0), pos2(200.0, 160.0));
     let near = |r: Rect| (r.min - layer.min).length() < 1.0 && (r.max - layer.max).length() < 1.0;
-    let position = |pred: &dyn Fn(&egui::Shape) -> bool| out.shapes.iter().position(|s| pred(&s.shape));
+    fn open<'a>(shape: &'a egui::Shape, into: &mut Vec<&'a egui::Shape>) {
+        match shape {
+            egui::Shape::Vec(list) => list.iter().for_each(|shape| open(shape, into)),
+            shape => into.push(shape),
+        }
+    }
+    let mut shapes = Vec::new();
+    for clipped in &out.shapes {
+        open(&clipped.shape, &mut shapes);
+    }
+    let position = |pred: &dyn Fn(&egui::Shape) -> bool| shapes.iter().position(|s| pred(s));
     // The moving pixels: the mesh that spans the layer's box.
     let preview = position(&|s| matches!(s, egui::Shape::Mesh(m) if near(m.calc_bounds())));
     // The guide: a vertical line at x = 150, which the framework's rule puts on a pixel centre (within a pixel).
@@ -1016,7 +1027,11 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         // The fields are the nodes named Zoom that show the percentage as their value (a field's group and the Navigator's slider carry the name too).
         let mut f: Vec<egui::Rect> = h
             .query_all_by_label("Zoom")
-            .filter(|n| n.accesskit_node().role() != egui::accesskit::Role::Slider && n.accesskit_node().value().is_some())
+            .filter(|n| {
+                let a = n.accesskit_node();
+                // A node without bounds is not on screen (nothing to click).
+                a.role() != egui::accesskit::Role::Slider && a.value().is_some() && a.bounding_box().is_some()
+            })
             .map(|n| n.rect())
             .collect();
         f.sort_by(|a, b| a.left().total_cmp(&b.left()));
@@ -1032,9 +1047,14 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
         h.event(egui::Event::Text(typed.into()));
         h.key_press(egui::Key::Enter);
-        h.run_steps(60);
+        h.run_steps(2);
+        h.run_steps(58);
         assert!(h.state().ui.window_views.is_empty(), "the window keeps no copy of the view");
-        assert!((h.state().ui.views[0].zoom - want).abs() < 1e-3, "field {field}, typed {typed}: not written back over by the window");
+        assert!(
+            (h.state().ui.views[0].zoom - want).abs() < 1e-3,
+            "field {field}, typed {typed}: not written back over by the window: {}",
+            h.state().ui.views[0].zoom
+        );
     }
 }
 

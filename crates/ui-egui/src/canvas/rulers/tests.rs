@@ -228,7 +228,22 @@ fn command_drag_over_a_guide_moves_the_guide_with_any_tool() {
         app.run("view.newGuide", json!({"orientation": "vertical", "position": 50})).unwrap();
         h.run_steps(2);
         let (from, to) = (canvas_at(&h, 50.0, 40.0), canvas_at(&h, 65.0, 40.0));
-        drag(&mut h, from, &steps(from, to), Modifiers::COMMAND, true);
+        h.event_modifiers(egui::Event::PointerMoved(from), Modifiers::COMMAND);
+        h.run_steps(1);
+        h.event_modifiers(
+            egui::Event::PointerButton { pos: from, button: egui::PointerButton::Primary, pressed: true, modifiers: Modifiers::COMMAND },
+            Modifiers::COMMAND,
+        );
+        h.run_steps(1);
+        for at in steps(from, to) {
+            h.event_modifiers(egui::Event::PointerMoved(at), Modifiers::COMMAND);
+            h.run_steps(2);
+        }
+        h.event_modifiers(
+            egui::Event::PointerButton { pos: to, button: egui::PointerButton::Primary, pressed: false, modifiers: Modifiers::COMMAND },
+            Modifiers::COMMAND,
+        );
+        h.run_steps(2);
         let doc = &h.state().session.active().unwrap().doc;
         let moved = doc.layer(layer).unwrap().surface().unwrap().rgba(12, 12)[3] == 0.0;
         if locked {

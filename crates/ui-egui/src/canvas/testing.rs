@@ -12,6 +12,7 @@ use craft::ui::runtime::windows::{Released, WindowHost};
 use craft::ui::testing::Frames;
 use egui::{Modifiers, Pos2};
 
+use super::document_display::CanvasHost;
 use super::{active_view, tools};
 use crate::PhotocraftApp;
 use crate::stylus::PenSample;
@@ -172,18 +173,24 @@ pub(crate) fn to_screen(app: &PhotocraftApp, at: [f64; 2]) -> Pos2 {
 }
 
 /// Runs frames until the canvas's view holds still, so an input maps through the layout the next pass shows: the first
-/// passes lay the window out (the document area is resized once the chrome has its room), and an input mapped through
-/// an earlier pass's view would land on the later layout.
-fn shown(app: &mut PhotocraftApp) {
+/// passes lay the window out (the document area is resized once the chrome has its room), and a zoom eases over several
+/// passes (the shown view moves toward the zoom asked for); an input mapped through an earlier pass's view would land
+/// on the later layout.
+pub(crate) fn shown(app: &mut PhotocraftApp) {
     let mut last = view(app).map(|v| v.rect);
     for _ in 0..MAX_FRAMES {
         run_frame(app);
         let now = view(app).map(|v| v.rect);
-        if now.is_some() && now == last {
+        if now.is_some() && now == last && !easing(app) {
             return;
         }
         last = now;
     }
+}
+
+/// Whether the active document's main canvas is easing a zoom.
+fn easing(app: &PhotocraftApp) -> bool {
+    app.session.active_index().is_some_and(|idx| craft::ui::canvas::easing_view(app.ctx(), CanvasHost::main(idx).canvas_id()).is_some())
 }
 
 /// Presses the primary button at the document point `at` with `mods` held, and leaves it down.

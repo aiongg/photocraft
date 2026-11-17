@@ -86,14 +86,16 @@ fn fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active
     assert_eq!(fill(&h), CropFill::ContentAware, "a new document keeps it");
 
     // A committed crop keeps it.
-    draw_frame(&mut h, [4.0, 4.0], [20.0, 16.0]);
+    // Each press starts clear of the untouched default frame's handles and edges (their reach is at most a quarter
+    // of the frame's shortest side on screen), so it draws a frame instead of resizing the default one.
+    draw_frame(&mut h, [10.0, 10.0], [26.0, 22.0]);
     assert!(crop_ui::pending(h.state()), "the drawn frame is pending");
     control(&mut h, "ui.menu.invoke", json!({"id": "image.crop"}));
     assert_eq!(size(&h), (16, 12), "the crop was committed");
     assert_eq!(fill(&h), CropFill::ContentAware, "a committed crop keeps it");
 
     // A cancelled crop keeps it.
-    draw_frame(&mut h, [2.0, 2.0], [10.0, 8.0]);
+    draw_frame(&mut h, [5.0, 4.0], [12.0, 9.0]);
     assert!(crop_ui::pending(h.state()));
     control(&mut h, "ui.key", json!({"key": "Escape"}));
     assert!(!crop_ui::pending(h.state()), "Escape cancelled the crop");
@@ -108,9 +110,11 @@ fn fill_goes_back_to_the_default_entry_when_another_open_document_becomes_active
     activate(&mut h, 1);
     assert_eq!(fill(&h), CropFill::Background, "switching back: stays at the default");
 
-    // Closing the active document makes another open one active.
+    // Closing the active document makes another open one active. The crop above left it modified, so the close
+    // discards its changes instead of asking to save them.
     h.state_mut().ui.tool_options.crop.fill = CropFill::ContentAware;
-    control(&mut h, "ui.menu.invoke", json!({"id": "file.close"}));
+    h.state_mut().run("file.close", json!({"save": "discard"})).unwrap();
+    h.run_steps(6);
     assert_eq!(h.state().session.documents().len(), 1, "one document closed");
     assert_eq!(fill(&h), CropFill::Background, "closing the active document: back to the default");
 }

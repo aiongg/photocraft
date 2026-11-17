@@ -43,20 +43,40 @@ impl View {
     }
 }
 
-/// Where a document canvas is shown: document `idx` in `viewport`, in document window `window` (Window › New Window,
-/// a floating document) or in the main document area (`None`). One document can show in both in one viewport, so the
-/// window is part of the canvas's identity.
+/// Where a document canvas is shown: document `idx` in document window `window` (Window › New Window, a floating
+/// document) or in the main document area (`None`). A window id names one canvas wherever the window draws (its own
+/// viewport or the main one), and one document can show in both the main area and a window, so the window is the
+/// canvas's identity.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct CanvasHost {
     pub idx: usize,
-    pub viewport: egui::ViewportId,
     pub window: Option<u64>,
 }
 
 impl CanvasHost {
     /// Document `idx`'s canvas in the main window's document area.
     pub fn main(idx: usize) -> Self {
-        Self { idx, viewport: egui::ViewportId::ROOT, window: None }
+        Self { idx, window: None }
+    }
+
+    /// The canvas that shows document `idx`'s own view, the one the Navigator, the status bar's zoom, the tools and
+    /// the dialogs' canvas picks work on: the floating document window that draws it, else the main document area.
+    /// A New Window for Document keeps a view of its own, so it is never the document's own canvas.
+    pub(crate) fn primary(app: &PhotocraftApp, idx: usize) -> Self {
+        let window = app
+            .ui
+            .document_windows
+            .floating
+            .iter()
+            .filter(|(g, _)| !app.ui.window_views.contains_key(&g.id))
+            .find(|(g, _)| g.shown.or_else(|| g.documents.first().copied()).and_then(|d| super::tabs::document_index(app, d)) == Some(idx))
+            .map(|(g, _)| g.id);
+        Self { idx, window }
+    }
+
+    /// Whether this canvas shows document `idx`'s own view ([`primary`](Self::primary)).
+    pub(crate) fn is_primary(self, app: &PhotocraftApp) -> bool {
+        self == Self::primary(app, self.idx)
     }
 
     /// The canvas's id, under which it keeps its zoom ease and its tool host's state.
@@ -75,11 +95,11 @@ pub(crate) fn shown_camera(ctx: &egui::Context, host: CanvasHost, view: &View, p
     }
 }
 
-/// The active document's main canvas as its last pass showed it, rect included: the tool host keeps the space it ran
-/// in, so no view is stored beside it. `None` before the first pass and with no document.
+/// The active document's own canvas ([`CanvasHost::primary`]) as its last pass showed it, rect included: the tool
+/// host keeps the space it ran in, so no view is stored beside it. `None` before the first pass and with no document.
 pub fn active_view(app: &PhotocraftApp) -> Option<CanvasView> {
     let idx = app.session.active_index()?;
-    ToolHost::shown_space(app.ctx(), CanvasHost::main(idx).canvas_id()).map(|space| space.view)
+    ToolHost::shown_space(app.ctx(), CanvasHost::primary(app, idx).canvas_id()).map(|space| space.view)
 }
 
 /// The document point under the screen point `pos` of the active document's main canvas; `None` when `pos` is outside
@@ -220,12 +240,17 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let (ctx, host, idx, doc, output, rect, ppp) = (pass.ctx, pass.host, pass.host.idx, pass.doc, pass.output, pass.rect, pass.ppp);
     let given = view.canvas_view(rect, ppp, pass.flip, pass.aspect);
     let id = host.canvas_id();
-    // A discrete zoom eases from the view it was asked for in.
+    // A discrete zoom eases from the view it was asked for in. A measuring run starts no ease, so the request waits for
+    // the pass that shows the canvas.
+    let measuring = craft::ui::runtime::measure::active(ctx);
     let from = view.zoom_from.map_or(given, |(zoom, center)| View { zoom, center, ..view.clone() }.canvas_view(rect, ppp, pass.flip, pass.aspect));
-    let ease = view.zoom_animating.then(|| (from, view.zoom_anchor.map(|(doc, screen)| (Point::new(doc[0], doc[1]), Pos2::new(screen[0], screen[1])))));
-    view.zoom_animating = false;
-    view.zoom_anchor = None;
-    view.zoom_from = None;
+    let ease = (view.zoom_animating && !measuring)
+        .then(|| (from, view.zoom_anchor.map(|(doc, screen)| (Point::new(doc[0], doc[1]), Pos2::new(screen[0], screen[1])))));
+    if !measuring {
+        view.zoom_animating = false;
+        view.zoom_anchor = None;
+        view.zoom_from = None;
+    }
     // What is on screen until the canvas runs: the view of a zoom ease running, else the view given.
     let drawn = easing_view(ctx, id).map_or(given, |mut eased| {
         eased.rect = rect;
@@ -258,7 +283,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     let (fit_doc, active, selected) = (std::sync::Arc::clone(&state.doc), state.active_layer, state.selected_layers.clone());
     let fit_layers = move || Some(layer_bounds(&fit_doc, active, &selected));
     let pasteboard = pasteboard_color(app);
-    let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
+    let primary = host.is_primary(app);
     // Where the tool takes a press over the canvas controls this pass, asked before the canvas shows.
     let regions = tools::claimed_regions(app, ctx, host);
 
@@ -271,6 +296,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         .snap(snap)
         .pasteboard(pasteboard)
         .navigation(navigation)
+        // The view lies inside the rulers' strips, which `rulers::show` draws along the body's top and left edges.
+        .show_rulers(app.ui.extras.rulers)
         .view_follows_pointer(follows_pointer)
         .precise_cursors(app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise)
         .tool_regions(regions);
@@ -317,7 +344,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         // The tools run after the controls, which take a press first, and before the picture, which shows the stroke
         // or edit they made from this pass's input.
         if let Some(input) = tool_pass(&body.env) {
-            // An ⌥-click the window manager took never arrives; say so (alt_grab.rs). Tools run in the main window only.
+            // An ⌥-click the window manager took never arrives; say so (alt_grab.rs). Tools run on the document's own canvas only.
             if primary {
                 let (tool, active) = (app.ui.tool, !app.dialog_open());
                 crate::alt_grab::watch(app, ui.ctx(), egui::Id::unique(("pc-alt-grab", host.idx)), input.rect, tool, active);
@@ -490,7 +517,10 @@ fn canvas_controls(
     }
     crate::type_tool::canvas_controls(app, ui, rect);
     crate::type_path_placement::show(app, ui, rect);
-    let session = crate::transform_tool::show_in_canvas(app, ui, rect, now);
+    // Only the document's own canvas shows and drives the open Free Transform (production's `paint_primary_overlays`):
+    // a New Window copy of the document shows no box, and its tool keeps its presses.
+    let primary = host.is_primary(app);
+    let session = if primary { crate::transform_tool::show_in_canvas(app, ui, rect, now) } else { crate::transform_tool::SessionShown::default() };
     let session_box_shown = session.shown;
     reported.transform_snapped = session.snapped;
     crate::cam_transform::show(app, ui, rect);
@@ -506,7 +536,7 @@ fn canvas_controls(
     crate::symmetry_ui::canvas_controls(ui, app, rect);
     crate::perspective_crop_ui::body(app, ui, rect);
     crate::analysis::canvas::body(app, ui, rect);
-    if host.window.is_none() && host.viewport == egui::ViewportId::ROOT {
+    if primary {
         reported.crop = super::tools::crop::show_frame(app, ui, rect);
     }
     // One contextual task bar per window: the active document's tile carries it, not the tile drawn last.

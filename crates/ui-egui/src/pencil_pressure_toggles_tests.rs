@@ -97,7 +97,11 @@ fn the_brush_keeps_its_own_pressure_flags() {
     h.run_steps(4);
     assert_eq!(flags(&h), (true, false), "the mixed pair came back unchanged");
     // And the bar draws that pair, not just stores it.
-    let on = |h: &Harness<'static, PhotocraftApp>, label: &str| h.get_by_label(label).accesskit_node().toggled() == Some(egui::accesskit::Toggled::True);
+    // The toggle button, not the tooltip of the same name the pointer resting on the opacity toggle shows. An off
+    // toggle button reports no toggled state.
+    let on = |h: &Harness<'static, PhotocraftApp>, label: &str| {
+        h.get_by_role_and_label(egui::accesskit::Role::Button, label).accesskit_node().toggled() == Some(egui::accesskit::Toggled::True)
+    };
     assert!(on(&h, OPACITY), "the opacity toggle reads as on");
     assert!(!on(&h, SIZE), "the size toggle reads as off");
 }

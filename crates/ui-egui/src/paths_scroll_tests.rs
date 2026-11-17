@@ -1,7 +1,8 @@
 //! Scrolling the Paths panel moves only its list (#6238).
 
 use egui::vec2;
-use egui_kittest::{Harness, kittest::Queryable};
+use egui_kittest::Harness;
+use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -25,6 +26,11 @@ fn harness(paths: usize, size: egui::Vec2, ppp: f32) -> Harness<'static, Photocr
     h
 }
 
+/// The rect of the list row named `name` (its name cell carries the name too).
+fn row(h: &Harness<'_, PhotocraftApp>, name: &str) -> Option<egui::Rect> {
+    h.query_all_by_label(name).find(|n| n.accesskit_node().role() == egui::accesskit::Role::ListItem).map(|n| n.rect())
+}
+
 /// Scrolling the path list moves the rows and nothing else: the footer's buttons stay where they
 /// are. The Paths panel lays out its own list and footer, but the dock also wrapped it in a
 /// scroll area; at 125 % scaling and some window heights that outer area overflowed by one
@@ -36,7 +42,7 @@ fn scrolling_the_paths_list_does_not_move_the_footer() {
         let mut h = harness(30, vec2(1440.0, height), ppp);
         let footer = |h: &Harness<'_, PhotocraftApp>| h.query_by_label("Delete current path").map(|r| r.rect().min.y);
         let rest = footer(&h).unwrap_or_else(|| panic!("the footer shows at {ppp}x, {height} high"));
-        let first_row = h.query_by_label("Path 1").unwrap().rect();
+        let first_row = row(&h, "Path 1").unwrap();
         h.hover_at(first_row.center());
         h.run_steps(2);
         for i in 0..40 {
@@ -53,7 +59,7 @@ fn scrolling_the_paths_list_does_not_move_the_footer() {
             assert_eq!(footer(&h), Some(rest), "{ppp}x, {height} high, notch {i}: the footer stayed put");
         }
         // The list itself did scroll (the first row is out of view or has moved).
-        let moved = h.query_by_label("Path 1").map(|r| r.rect().min.y) != Some(first_row.min.y);
-        assert!(moved || h.query_by_label("Path 1").is_none(), "{ppp}x, {height} high: the list scrolled");
+        let moved = row(&h, "Path 1").map(|r| r.min.y) != Some(first_row.min.y);
+        assert!(moved, "{ppp}x, {height} high: the list scrolled");
     }
 }

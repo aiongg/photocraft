@@ -31,8 +31,24 @@ pub(crate) fn nest(map: &mut Map<String, Value>) {
     }
 }
 
-/// The `ParamFamily::check` of the dialog: OK is refused, and the dialog stays open, while no file type is ticked.
-pub(crate) fn check(_app: &mut PhotocraftApp, result: &ParamResult) -> Result<(), Label> {
+/// Whether the Image Processor on the source `source` waits for the open Free Transform: document sources read
+/// committed pixels, not the pending preview; Folder processing stays usable. The command (`run_command_at_depth`)
+/// and the dialog's OK ([`check`]) both refuse by it.
+pub(crate) fn waits_for_transform(app: &PhotocraftApp, source: Option<&str>) -> bool {
+    app.ui.transform.is_some()
+        && match source {
+            Some("open") => true,
+            Some("current") => app.transform_preview.as_ref().is_none_or(|preview| app.session.active().is_some_and(|st| st.doc.id == preview.doc.id)),
+            _ => false,
+        }
+}
+
+/// The `ParamFamily::check` of the dialog: OK is refused, and the dialog stays open, while a document source waits for
+/// the open Free Transform or no file type is ticked.
+pub(crate) fn check(app: &mut PhotocraftApp, result: &ParamResult) -> Result<(), Label> {
+    if waits_for_transform(app, result.fields.text("source")) {
+        return Err(Label::from(tl!("Commit or cancel the transform first")));
+    }
     if FORMATS.iter().any(|format| result.fields.bool(&format!("{format}/enabled")) == Some(true)) {
         Ok(())
     } else {

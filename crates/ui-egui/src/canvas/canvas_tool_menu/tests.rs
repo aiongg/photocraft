@@ -151,10 +151,12 @@ pub(super) fn screen_of(app: &PhotocraftApp, doc: [f32; 2]) -> Pos2 {
     crate::canvas::testing::to_screen(app, [f64::from(doc[0]), f64::from(doc[1])])
 }
 
-/// What a right-click must leave as it was.
+/// What a right-click must leave as it was. The journal counts only strokes: the type edit menu reads its spelling
+/// suggestions through `edit.checkSpelling`'s `list`, a journaled read.
 fn document_state(app: &PhotocraftApp) -> impl PartialEq + use<> {
     let state = app.session.active().unwrap();
-    (state.doc.clone(), state.revision, state.history.past_len(), state.active_layer, state.selected_layers(), app.session.journal.len())
+    let strokes = app.session.journal.iter().filter(|(id, _)| id == "paint.stroke").count();
+    (state.doc.clone(), state.revision, state.history.past_len(), state.active_layer, state.selected_layers(), strokes)
 }
 
 fn view_of(app: &PhotocraftApp) -> Option<(craft::behavior::kurbo::Point, f64)> {
@@ -301,9 +303,9 @@ const ROWS: &[Case] = &[
     row("zoom outside the image", Tool::Zoom, NO, Place::Pasteboard, Setup::Plain, Held::Nothing, Want::Menu("Pasteboard")),
     row("hand outside the image", Tool::Hand, NO, Place::Pasteboard, Setup::Plain, Held::Nothing, Want::Menu("Pasteboard")),
     row("hand with Space held", Tool::Hand, NO, Place::Image, Setup::Plain, Held::Space, Want::Menu("View")),
-    row("brush with Cmd+Space held", Tool::Brush, Modifiers::COMMAND, Place::Image, Setup::Plain, Held::CmdSpace, Want::Nothing),
+    row("brush with Cmd+Space held", Tool::Brush, Modifiers::COMMAND, Place::Image, Setup::Plain, Held::CmdSpace, Want::Menu("Layers")),
     row("brush with Alt+Space held", Tool::Brush, Modifiers::ALT, Place::Image, Setup::Plain, Held::AltSpace, Want::Nothing),
-    row("hand with Cmd+Space held", Tool::Hand, Modifiers::COMMAND, Place::Image, Setup::Plain, Held::CmdSpace, Want::Nothing),
+    row("hand with Cmd+Space held", Tool::Hand, Modifiers::COMMAND, Place::Image, Setup::Plain, Held::CmdSpace, Want::Menu("Layers")),
     row("hand with Alt+Space held", Tool::Hand, Modifiers::ALT, Place::Image, Setup::Plain, Held::AltSpace, Want::Nothing),
     row("brush: picker", Tool::Brush, NO, Place::Image, Setup::Plain, Held::Nothing, Want::Picker),
     row("eraser: picker", Tool::Eraser, NO, Place::Image, Setup::Plain, Held::Nothing, Want::Picker),

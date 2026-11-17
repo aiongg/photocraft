@@ -473,7 +473,9 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
     assert_eq!(st.path.as_deref(), Some("/tmp/photocraft-test/fg.psd"));
     assert!(!st.is_dirty());
     h.key_press(egui::Key::B);
-    h.run_steps(2);
+    for _ in 0..2 {
+        h.step();
+    }
     assert_eq!(h.state().ui.tool, crate::state::Tool::Brush, "shortcuts work again");
 }
 

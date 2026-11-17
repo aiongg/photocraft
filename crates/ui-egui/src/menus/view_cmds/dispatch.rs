@@ -141,7 +141,7 @@ pub fn checked(app: &PhotocraftApp, id: &str) -> Option<bool> {
         return Some(app.ui.panels.context_task_bar);
     }
     if PANEL_IDS.contains(&id) {
-        return Some(crate::panel_docking::toggle_panel(id).is_some_and(|panel| crate::panel_docking::is_shown(app, panel)));
+        return Some(crate::panel_docking::toggle_panel(id).is_some_and(|panel| crate::panel_docking::is_checked(app, panel)));
     }
     if let Some(c) = type_checked(app, id) {
         return Some(c);

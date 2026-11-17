@@ -251,7 +251,8 @@ fn filter_and_adjustment_previews_retain_permissions_before_evaluation() {
         assert!(PREVIEW_CHECKS.load(Ordering::SeqCst) > 0, "the changed actual request was refused before evaluation: {command}");
         assert_eq!(h.state().session.actions.list, original);
         assert_eq!(h.state().session.active().unwrap().revision, revision);
-        assert!(confirm(&mut h, dialog).is_err());
+        let answer = confirm(&mut h, dialog);
+        assert!(answer.is_err(), "OK with the changed settings is refused: {command}");
         assert_eq!(h.state().session.actions.list, original);
     }
 }

@@ -75,7 +75,10 @@ fn shows(h: &Harness<'_, PhotocraftApp>, value: &str) -> bool {
 #[test]
 fn in_an_indexed_document_another_mode_keeps_the_list() {
     let mut h = bar(true);
-    h.state_mut().session.tools.brush.mode = BlendMode::Dissolve;
+    // A brush setter notes the change (`brush_changed`), which the options bar's content version holds.
+    let tools = &mut h.state_mut().session.tools;
+    tools.brush.mode = BlendMode::Dissolve;
+    tools.brush_changed();
     h.run_steps(4);
     assert!(shows(&h, "Dissolve"));
     assert!(!shows(&h, "Threshold"));

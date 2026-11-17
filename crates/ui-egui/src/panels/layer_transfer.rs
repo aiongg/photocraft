@@ -12,6 +12,7 @@
 //! A Move drag with a pixel selection copies only those pixels into a new layer.
 
 use craft::layers::ui::panel::{LayersDrag, document_hash};
+use craft::ui::canvas::ToolHost;
 use craft::ui::runtime::drag;
 use photocraft_doc::{DocId, LayerId};
 use serde_json::json;
@@ -106,7 +107,7 @@ fn layer_drag(app: &PhotocraftApp) -> Option<MoveLayerDrag> {
 fn move_drag(app: &PhotocraftApp, ctx: &egui::Context) -> Option<[f64; 2]> {
     let d = layer_drag(app)?;
     let st = app.session.active()?;
-    let canvas = CanvasHost::main(app.session.active_index()?).canvas_id();
+    let canvas = CanvasHost::primary(app, app.session.active_index()?).canvas_id();
     let plain = app.ui.transform.is_none()
         && craft::ui::canvas_controls::reading::running(ctx, canvas).is_none()
         && ((st.doc.selection.is_none() && st.floating.is_none()) || d.moves_selection);
@@ -152,7 +153,8 @@ fn arm_move_transfer(app: &mut PhotocraftApp, ctx: &egui::Context, index: usize)
         // The Move drag ends without moving anything (the tool also drops its preview); an ⌥-drag's
         // copy is taken back.
         if let Some(index) = app.session.active_index() {
-            crate::canvas::tools::tool_changed(app, ctx, CanvasHost::main(index));
+            let host = CanvasHost::primary(app, index);
+            crate::canvas::tools::tool_changed(app, ctx, host);
         }
         crate::move_mods::abandon(app);
         // The rollback raised the revision; the restored document is the one the float was
@@ -242,18 +244,17 @@ fn target_at(app: &PhotocraftApp, p: egui::Pos2) -> Option<(usize, Option<[f64; 
     if !app.last_canvas_rect.contains(p) {
         return None;
     }
-    // The document point under `p` in document `d`'s view of `rect`.
-    let doc_point = |d: usize, rect: egui::Rect| -> Option<[f64; 2]> {
-        let view = app.ui.views.get(d)?;
-        let canvas = view.canvas_view(rect, app.canvas_ppp(), app.ui.view.flip_horizontal, app.ui.view.display_aspect());
-        let at = canvas.to_doc(p);
+    // The document point under `p` in the view document `d`'s main canvas showed last, rulers' inset included.
+    let doc_point = |d: usize| -> Option<[f64; 2]> {
+        let view = ToolHost::shown_space(app.ctx(), CanvasHost::main(d).canvas_id())?.view;
+        let at = view.to_doc(p);
         Some([at.x, at.y])
     };
     match crate::canvas::arranged_cells(app, app.last_canvas_rect) {
-        Some(cells) => cells.into_iter().find(|(_, r)| r.contains(p)).map(|(d, r)| (d, doc_point(d, r.shrink(1.0)))),
+        Some(cells) => cells.into_iter().find(|(_, r)| r.contains(p)).map(|(d, _)| (d, doc_point(d))),
         None => {
             let d = app.session.active_index()?;
-            Some((d, doc_point(d, app.last_canvas_rect)))
+            Some((d, doc_point(d)))
         }
     }
 }

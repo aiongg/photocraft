@@ -97,14 +97,10 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     }
     // Files opening in the background (#210) have tabs before they have documents.
     let opening = !app.jobs.opens.is_empty();
-    let rail = app.ui.panels.rail;
     // The tabs region and the document run one after the other inside `show`, each with the app to itself.
     let out = {
         let shared = RefCell::new(&mut *app);
-        let mut panel = CanvasPanel::new().tabs(|ui, cx| tabs::strip(&mut **shared.borrow_mut(), ui, cx)).opening(opening);
-        if rail {
-            panel = panel.rail(tl!("Panels"), |ui, _| crate::panels::rail_commands::rail(ui));
-        }
+        let panel = CanvasPanel::new().tabs(|ui, cx| tabs::strip(&mut **shared.borrow_mut(), ui, cx)).opening(opening);
         panel.show(ui, |ui, cx| document(&mut **shared.borrow_mut(), ui, cx.rect))
     };
     // Auto Show the Home Screen off: double-clicking the empty workspace shows File › Open, as in Photoshop (#5367).

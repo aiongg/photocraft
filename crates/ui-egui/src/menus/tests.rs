@@ -179,9 +179,10 @@ fn menu_rows_sit_where_photoshop_puts_them_and_show_their_state() {
 fn window_panel_and_workspace_ids_drive_the_shell() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
     let ctx = app.ctx().clone();
-    assert!(!crate::panel_docking::is_shown(&app, "history"));
+    // Essentials keeps History as an icon: its Window id opens the icon's flyout, which checks its row.
+    assert!(!crate::panel_docking::is_checked(&app, "history"));
     invoke(&mut app, &ctx, "window.panel.history", Value::Null).unwrap();
-    assert!(crate::panel_docking::is_shown(&app, "history"));
+    assert!(crate::panel_docking::is_checked(&app, "history"));
 
     invoke(&mut app, &ctx, "window.workspace.painting", Value::Null).unwrap();
     assert_eq!(app.workspaces.set.current, "painting");

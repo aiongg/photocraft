@@ -21,6 +21,8 @@ use crate::pattern_fill_ui::{self, PhaseDrag};
 pub(crate) struct DialogTools {
     /// The press point in document units.
     press: Option<[f64; 2]>,
+    /// The pick the press began under.
+    pick: Option<DialogPick>,
     /// The modifiers held at the press.
     mods: Mods,
     /// The Pattern Fill drag, from its press to its release.
@@ -42,6 +44,16 @@ pub(super) fn doc_point(pointer: &ToolPointer, cx: &ToolContext<'_>) -> [f64; 2]
 pub(crate) fn dialog_tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut DialogTools, host: CanvasHost) -> Option<FamilyTool<'a>> {
     let pick = scope.with_app(|app| (app.session.active_index() == Some(host.idx)).then(|| canvas_input::armed(app)).flatten())?;
     Some(Box::new(DialogTool { scope, state, pick }))
+}
+
+/// Ends the gesture of a dialog's pick when a pass of its press runs without that pick: a dialog opened above the one
+/// that armed it, or the pick disarmed or changed. Nothing of the gesture resumes when the pick comes back; what it
+/// applied stays (production stops the Pattern Fill drag on a nested dialog).
+pub(crate) fn end_if_disarmed(app: &crate::PhotocraftApp, state: &mut DialogTools, host: CanvasHost) {
+    let armed = (app.session.active_index() == Some(host.idx)).then(|| canvas_input::armed(app)).flatten();
+    if state.pick.is_some() && armed != state.pick {
+        *state = DialogTools::default();
+    }
 }
 
 /// Whether the pick samples a colour from the image, so the precise cursor (Caps Lock) shows a crosshair.
@@ -81,14 +93,17 @@ impl CanvasTool for DialogTool<'_> {
         });
         if !took {
             self.state.press = None;
+            self.state.pick = None;
             return ToolAction::Ignored;
         }
         if click {
             self.scope.with_app(|app| canvas_input::release(app, pick));
             self.state.press = None;
+            self.state.pick = None;
             return ToolAction::Done;
         }
         self.state.press = Some(at);
+        self.state.pick = Some(pick);
         self.state.mods = mods;
         ToolAction::Claimed
     }
@@ -131,15 +146,21 @@ impl CanvasTool for DialogTool<'_> {
             canvas_input::release(app, pick);
         });
         self.state.press = None;
+        self.state.pick = None;
     }
 
     fn cancel(&mut self, _reason: CancelReason, _cx: &mut ToolContext<'_>) {
-        self.state.phase = None;
-        self.state.press = None;
+        *self.state = DialogTools::default();
     }
 
     fn view_only(&self) -> bool {
         false
+    }
+
+    /// The drags that move content (the pattern's phase, a shadow's offset, a gradient's offset) follow every move from
+    /// the press, so a move of a pixel or two moves it, as production's dialog drags; none of them reads a click.
+    fn takes_every_move(&self) -> bool {
+        self.state.press.is_some() && matches!(self.pick, DialogPick::PatternPhase | DialogPick::ShadowDrag | DialogPick::GradientDrag)
     }
 
     fn paint(&self, _draw: &Draw<'_>, _cx: &ToolContext<'_>) {}
