@@ -99,7 +99,3 @@ fn shift_alt_click_on_a_sampler_samples_the_foreground_as_before() {
     assert_eq!(samplers(&mut app), before, "no second point on the first");
     assert_eq!(foreground(&app)[..3], [1.0, 0.0, 0.0], "the red under the pointer, as an Alt+click");
 }
-
-fn samplers_of(app: &PhotocraftApp) -> Vec<[f64; 2]> {
-    app.session.active().map(|d| d.color_samplers.clone()).unwrap_or_default()
-}

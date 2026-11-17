@@ -3,8 +3,6 @@
 //! selects nothing. A drag that encloses an area still makes the selection; a drag with a
 //! selection keeps its behaviour.
 
-use std::path::PathBuf;
-use std::sync::Arc;
 
 use egui::Modifiers;
 use serde_json::json;
@@ -101,16 +99,4 @@ fn a_lasso_that_selects_no_pixel_warns_and_changes_nothing() {
             Outcome::Silent => assert!(alerts(&app).is_empty(), "{name}: not measured with a selection: no alert"),
         }
     }
-}
-
-/// An app whose preferences live in `files`, and the path of its settings file.
-fn app_over(files: &Arc<craft::settings::testing::MemoryFiles>) -> (PhotocraftApp, PathBuf) {
-    let options = craft::settings::OpenOptions::new(craft::settings::Location::Dir("/preferences".into())).files(files.clone());
-    let (store, report) = craft::settings::SettingsStore::open_with(options);
-    let services = crate::Services { settings: Some((store, report)), ..Default::default() };
-    let path = services.settings.as_ref().and_then(|(store, _)| store.path()).expect("a settings file").to_path_buf();
-    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), services);
-    app.run("file.new", json!({"width": 200, "height": 100, "background": "white"})).unwrap();
-    app.ui.tool = Tool::ContentAwareMove;
-    (app, path)
 }

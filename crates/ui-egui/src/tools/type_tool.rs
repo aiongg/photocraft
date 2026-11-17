@@ -45,14 +45,12 @@ use fonts::preview_text;
 pub(crate) use fonts::{FontSourceState, finish_font_state, font_field, font_state, selected_style};
 pub use fonts::{families, style_label, styles, warm_fonts};
 pub(crate) use host::LayerHost;
-#[cfg(test)]
-pub(crate) use host::type_text;
 pub use layout::layout;
 pub(crate) use layout::{hit_layer, offset_at, shows_own_layout};
 pub use options_bar::options_bar;
 pub(crate) use options_bar::styles_at;
 #[cfg(test)]
-pub(crate) use panel::{OPENTYPE_BUTTONS, toggle_opentype};
+pub(crate) use panel::toggle_opentype;
 pub use panel::{character_panel, type_properties};
 #[cfg(test)]
 pub(crate) use pointer::path_target;

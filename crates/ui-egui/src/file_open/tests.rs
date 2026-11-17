@@ -510,25 +510,6 @@ fn os_quit_and_empty_events_do_not_panic() {
     assert!(app.session.documents().is_empty());
 }
 
-/// A raw egui drop for the eframe harness, which the runtime turns into an `OsFile` for the drop targets.
-// The eframe harness needs an egui handle to push a raw drop.
-#[derive(Debug)]
-struct FakeDrop(std::path::PathBuf, Result<Vec<u8>, String>);
-
-impl egui::DroppedFile for FakeDrop {
-    fn path(&self) -> &std::path::Path {
-        &self.0
-    }
-    fn bytes(&self) -> Result<Vec<u8>, String> {
-        self.1.clone()
-    }
-}
-
-/// A raw egui drop of `path` for the harness's input.
-fn raw_drop(path: impl Into<std::path::PathBuf>, bytes: Result<Vec<u8>, String>) -> egui::DroppedFileHandle {
-    std::sync::Arc::new(FakeDrop(path.into(), bytes))
-}
-
 /// A dropped file as the drop targets hand it over: an absolute `path` is a native drop (path, no bytes); any other
 /// path is a drop that carries its `bytes` (none for `Err`).
 fn dropped(path: impl Into<std::path::PathBuf>, bytes: Result<Vec<u8>, String>) -> OsFile {

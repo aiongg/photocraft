@@ -16,10 +16,6 @@ fn app(tool: Tool) -> PhotocraftApp {
     app
 }
 
-fn steps(app: &PhotocraftApp) -> usize {
-    app.session.active().unwrap().history.past_len()
-}
-
 /// Every drag pick applies, not only the release: the swatch follows the pointer.
 #[test]
 fn eyedropper_drag_updates_the_sampled_colour() {
