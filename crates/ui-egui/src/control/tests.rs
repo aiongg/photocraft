@@ -1,7 +1,7 @@
 use super::*;
 use crate::canvas_tool_menu::MenuKind;
 use craft::automation::actions::{Action, ActionList, ActionStep};
-use craft::color::ui::{SampleSize, SampleSource};
+use craft::color_ui::ui::{SampleSize, SampleSource};
 use craft::keymap::CommandRef;
 
 /// An action named `name` whose steps run the given commands.

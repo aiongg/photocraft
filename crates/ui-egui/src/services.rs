@@ -504,7 +504,7 @@ pub struct Services {
     /// Explicit interactive SVG smart-object editing; unavailable in browser and automation.
     pub open_external_svg: Option<OpenExternalSvgFn>,
     /// A capture source for the screen picker; `None` uses the platform capture (`ScreenPick::tick`).
-    pub screen_capture: Option<std::sync::Arc<dyn Fn() -> Box<dyn craft::color::ui::CaptureSource> + Send + Sync>>,
+    pub screen_capture: Option<std::sync::Arc<dyn Fn() -> Box<dyn craft::color_ui::ui::CaptureSource> + Send + Sync>>,
     /// The file service the app's host answers file picks with (`HostBuilder::files`); `None` in tests that install none.
     pub files: Option<std::sync::Arc<dyn craft::host::Files>>,
     /// The main-thread side of the native file panels, pumped by the app.

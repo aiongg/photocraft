@@ -4,12 +4,12 @@
 //!
 //! The library is [`PresetState::swatches`](crate::presets::PresetState) (model and colour
 //! conversions in [`crate::presets::swatches`]); the file formats are craft-color's
-//! (`craft::color::palette`). Swatches are addressed by name (names are kept unique across the
+//! (`craft::color_ui::palette`). Swatches are addressed by name (names are kept unique across the
 //! library, as for the other presets), optionally narrowed by `group`, or by `index` (position
 //! across all groups, in panel order). Like the other preset commands they change the
 //! preferences document, not a document's history.
 
-use craft::color::palette::{SwatchFormat, SwatchNote, default_swatches, read_swatches, write_swatches};
+use craft::color_ui::palette::{SwatchFormat, SwatchNote, default_swatches, read_swatches, write_swatches};
 use serde_json::{Value, json};
 
 use crate::commands::CommandSpec;

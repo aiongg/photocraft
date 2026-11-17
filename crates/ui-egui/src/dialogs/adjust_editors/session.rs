@@ -4,7 +4,7 @@
 use std::hash::{Hash as _, Hasher as _};
 
 use craft::behavior::EditEvent;
-use craft::color::ui::ColorPickerDialog;
+use craft::color_ui::ui::ColorPickerDialog;
 use craft::imaging::ui::adjust::{AdjustContext, AdjustDialogCx, AdjustSession, ColorBalanceTone, LevelsClip, TonePicker};
 use craft::theme::Srgba;
 use craft::ui::dialog::DialogId;

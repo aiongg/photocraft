@@ -9,7 +9,7 @@
 //! answer with [`answer_for_window`].
 
 use craft::cms::convert::CmykConverter;
-use craft::color::ui::{ColorPickerDialog, ColorPickerResult, PickedColor};
+use craft::color_ui::ui::{ColorPickerDialog, ColorPickerResult, PickedColor};
 use craft::theme::{ModelValues, Srgba};
 use craft::ui::dialog::{DialogId, DialogResult};
 use craft::ui::runtime::requests::ColorRequest;
@@ -463,7 +463,7 @@ mod tests;
 #[cfg(test)]
 mod screen_integration_tests {
     use super::*;
-    use craft::color::ui::StillCapture;
+    use craft::color_ui::ui::StillCapture;
     use egui::vec2;
     use egui_kittest::{Harness, kittest::Queryable};
 

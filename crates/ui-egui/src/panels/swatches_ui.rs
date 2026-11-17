@@ -13,9 +13,9 @@ use std::ffi::OsStr;
 use serde_json::{Value, json};
 
 use craft::cms::convert::CmykConverter;
-use craft::color::palette::SwatchColor;
-use craft::color::ui::PickedColor;
-use craft::color::ui::{SwatchAt, SwatchEdit, SwatchKey, SwatchesCommand, SwatchesMenu, SwatchesPanel, SwatchesWords};
+use craft::color_ui::palette::SwatchColor;
+use craft::color_ui::ui::PickedColor;
+use craft::color_ui::ui::{SwatchAt, SwatchEdit, SwatchKey, SwatchesCommand, SwatchesMenu, SwatchesPanel, SwatchesWords};
 use craft::theme::Srgba;
 use craft::theme::variant::Tone;
 use craft::ui::bars::StatusMessage;

@@ -2,7 +2,7 @@
 //! L2 for a protractor), with X/Y the ruler's start point (a protractor's second arm end) and W/H
 //! its size, in ruler units and never in the measurement scale.
 
-use craft::color::ui::InfoMeasure;
+use craft::color_ui::ui::InfoMeasure;
 use craft::ui::runtime::env::Label;
 use serde_json::json;
 

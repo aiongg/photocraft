@@ -1,7 +1,7 @@
 //! Shape fill and stroke paints shared by the options bar and the Properties panel.
 
-use craft::color::palette::SwatchGroup;
-use craft::color::ui::{GradientPreview, Paint, PaintChip, PaintChipOutput, SwatchKey};
+use craft::color_ui::palette::SwatchGroup;
+use craft::color_ui::ui::{GradientPreview, Paint, PaintChip, PaintChipOutput, SwatchKey};
 use craft::draw::stroke::StrokeStyle;
 use craft::draw::ui::GradientRef;
 use craft::draw::ui::shape::{ShapeAppearance, ShapePaint};

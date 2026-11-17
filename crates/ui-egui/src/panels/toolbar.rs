@@ -1,6 +1,6 @@
 use super::{PhotocraftApp, Tool, json, vec2};
 use craft::behavior::overlay::Side;
-use craft::color::ui::{PairWell, SwatchPair, Well};
+use craft::color_ui::ui::{PairWell, SwatchPair, Well};
 use craft::ui::contract::{Bind, Gap, Props as _, Show as _, ShowContainer as _, clicked};
 use craft::ui::layout::RowAlign;
 use craft::ui::layout_components::{Row, Stack};

@@ -8,7 +8,7 @@ use egui_kittest::Harness;
 use egui_kittest::kittest::Queryable;
 use serde_json::json;
 
-use craft::color::ui::{ColorPanelCommand, ColorPanelMode, ColorPanelRamp};
+use craft::color_ui::ui::{ColorPanelCommand, ColorPanelMode, ColorPanelRamp};
 
 use crate::PhotocraftApp;
 use crate::theme::AppTheme;

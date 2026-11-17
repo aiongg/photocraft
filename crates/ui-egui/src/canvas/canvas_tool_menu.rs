@@ -1562,12 +1562,12 @@ pub fn choose(app: &mut PhotocraftApp, ctx: &Context, command: &str) {
 /// Color row puts the colour read at the right-click on the clipboard, as the Color panel's menu
 /// does. Neither touches the foreground colour or the history.
 fn choose_eyedropper(app: &mut PhotocraftApp, ctx: &Context, menu: &CanvasToolMenu, command: &str) -> Result<(), String> {
-    if let Some(size) = eyedropper_size(command).and_then(craft::color::ui::SampleSize::from_pixels) {
+    if let Some(size) = eyedropper_size(command).and_then(craft::color_ui::ui::SampleSize::from_pixels) {
         app.ui.tool_options.eyedropper.size = size;
         return Ok(());
     }
     let rgb = menu.color.ok_or("No colour under the pointer")?;
-    use craft::color::ui::{ColorPanelCommand, ColorPanelMenu, ColorPanelState};
+    use craft::color_ui::ui::{ColorPanelCommand, ColorPanelMenu, ColorPanelState};
     let copy = if command == EYEDROPPER_COPY_HTML { ColorPanelCommand::CopyHtml } else { ColorPanelCommand::CopyHex };
     let color = craft::theme::Srgba::rgb(rgb[0], rgb[1], rgb[2]);
     if let Some(text) = ColorPanelMenu::run_command(&mut ColorPanelState::default(), copy, color) {

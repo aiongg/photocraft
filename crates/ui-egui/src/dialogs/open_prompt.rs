@@ -7,7 +7,7 @@
 
 use std::sync::Arc;
 
-use craft::color::ui::{ProfileAction, ProfileMismatchDialog, ProfileMode, ProfileQuestion};
+use craft::color_ui::ui::{ProfileAction, ProfileMismatchDialog, ProfileMode, ProfileQuestion};
 use craft::ui::dialog::{DialogResult, PromptAnswer, PromptChoice, StandardPrompt};
 use craft::ui::runtime::env::Label;
 use photocraft_doc::{ColorMode, Document};

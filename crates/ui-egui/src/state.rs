@@ -13,7 +13,7 @@ mod transform;
 use std::collections::{BTreeSet, HashMap};
 
 use craft::behavior::dock::DocumentWindows;
-use craft::color::ui::{SwatchKey, SwatchesState};
+use craft::color_ui::ui::{SwatchKey, SwatchesState};
 use craft::draw::ui::{BrushPickerState, GradientRef};
 use craft::imaging::ui::scopes::ScopePanelState;
 use craft::layers::ui::filter::LayerFilter;

@@ -1,4 +1,4 @@
-use craft::color::ui::EyedropperOptions;
+use craft::color_ui::ui::EyedropperOptions;
 use craft::draw::ui::crop::{CropSettings, CropSizeFields};
 use craft::draw::ui::{PathOptionsSettings, TransformSettings, VectorMode};
 use craft::imaging::ui::select::MagneticSettings;

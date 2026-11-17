@@ -112,7 +112,7 @@ impl Default for PresetState {
             export_presets: Vec::new(),
             clone: Default::default(),
             layer_defaults: BTreeMap::new(),
-            swatches: craft::color::palette::default_swatches(),
+            swatches: craft::color_ui::palette::default_swatches(),
             contours: Vec::new(),
             rev: 0,
         }

@@ -2,7 +2,7 @@
 //! `GradientStops`. The command's `stops` is `[[position, "#rrggbb"], …]` and `opacityStops` is
 //! `[[position, opacity %], …]`: what `layer.layerStyle.gradientOverlay` receives.
 
-use craft::color::gradient::{ColorStop, GradientStops, OpacityStop};
+use craft::color_ui::gradient::{ColorStop, GradientStops, OpacityStop};
 use craft::theme::Srgba;
 use photocraft_color::Color;
 use serde_json::{Value, json};

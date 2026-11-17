@@ -103,11 +103,11 @@ fn already_shown(change: &ShapeChange, appearance: &ShapeAppearance, settings: &
 
 /// The paint change a chip's paint stands for; a gradient is [`gradient_fill`] over `gradient`, the chip's
 /// [`ChipLibrary::gradient`].
-fn paint_change(paint: &craft::color::ui::Paint, gradient: &Fill) -> Option<PaintChange> {
+fn paint_change(paint: &craft::color_ui::ui::Paint, gradient: &Fill) -> Option<PaintChange> {
     match paint {
-        craft::color::ui::Paint::None => Some(PaintChange::None),
-        craft::color::ui::Paint::Solid(c) => Some(PaintChange::Color(rgba(*c))),
-        craft::color::ui::Paint::Gradient(preview) => Some(PaintChange::Gradient(gradient_fill(preview, gradient))),
+        craft::color_ui::ui::Paint::None => Some(PaintChange::None),
+        craft::color_ui::ui::Paint::Solid(c) => Some(PaintChange::Color(rgba(*c))),
+        craft::color_ui::ui::Paint::Gradient(preview) => Some(PaintChange::Gradient(gradient_fill(preview, gradient))),
         _ => None,
     }
 }

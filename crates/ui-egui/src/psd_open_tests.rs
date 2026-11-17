@@ -8,7 +8,7 @@ mod recovery_psd;
 use crate::dialogs::alerts;
 use crate::open_prompt::{DamageTag, MemoryTag};
 use crate::{PhotocraftApp, Services, control};
-use craft::color::ui::ProfileMismatchDialog;
+use craft::color_ui::ui::ProfileMismatchDialog;
 use photocraft_engine::Session;
 use serde_json::{Value, json};
 use std::{cell::RefCell, rc::Rc};

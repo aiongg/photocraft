@@ -1,9 +1,9 @@
 //! PhotoCraft's driver over its one framework [`ScreenPick`]: every screen colour pick, from the
 //! Color Picker dialog and from colour popovers, runs through these functions. The capture, the
 //! capture windows, the loupe and the pixel mapping are the framework's
-//! (`craft::color::ui::{ScreenPick, ScreenColorPicker}`).
+//! (`craft::color_ui::ui::{ScreenPick, ScreenColorPicker}`).
 use crate::PhotocraftApp;
-use craft::color::ui::{ScreenColorPicker, ScreenPickGesture, ScreenPickerWords};
+use craft::color_ui::ui::{ScreenColorPicker, ScreenPickGesture, ScreenPickerWords};
 use craft::theme::Srgba;
 use craft::ui::runtime::env::Env;
 use egui::Context;

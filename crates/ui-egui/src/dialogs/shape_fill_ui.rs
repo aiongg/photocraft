@@ -7,7 +7,7 @@
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
-use craft::color::ui::{ColorPickerDialog, PickedColor};
+use craft::color_ui::ui::{ColorPickerDialog, PickedColor};
 use craft::theme::Srgba;
 use craft::ui::dialog::DialogId;
 use photocraft_color::Color;

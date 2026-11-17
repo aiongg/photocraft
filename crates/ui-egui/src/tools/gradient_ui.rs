@@ -48,7 +48,7 @@ pub struct LiveGradient {
     /// `gradient.fill.set` params (previewed like a canvas drag).
     panel: Option<(LayerId, Value)>,
     /// Pending edit from the Gradient Editor panel's stop bar over the tool gradient.
-    preset: Option<craft::color::ui::gradient::GradientStops>,
+    preset: Option<craft::color_ui::ui::gradient::GradientStops>,
     /// Cached preview document by key.
     preview: Option<(u64, Arc<Document>)>,
 }

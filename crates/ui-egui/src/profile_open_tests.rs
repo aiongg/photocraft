@@ -4,7 +4,7 @@
 //! the next; Cancel opens neither it nor the files still to come.
 
 use crate::{PhotocraftApp, Services};
-use craft::color::ui::ProfileMismatchDialog;
+use craft::color_ui::ui::ProfileMismatchDialog;
 use craft::ui::dialog::DialogId;
 use egui::vec2;
 use egui_kittest::Harness;

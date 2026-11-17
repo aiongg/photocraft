@@ -2,7 +2,7 @@
 //! Properties section, and the stroke's JSON for the engine.
 
 use craft::behavior::EditEvents;
-use craft::color::ui::{ColorPopover, PickedColor};
+use craft::color_ui::ui::{ColorPopover, PickedColor};
 use craft::theme::Srgba;
 use craft::ui::choice::Checkbox;
 use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};

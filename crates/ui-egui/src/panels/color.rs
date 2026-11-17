@@ -2,7 +2,7 @@
 //! `tools.setColors` (one history step per gesture) and recolour what is selected (`apply_color`).
 
 use craft::behavior::EditEvent;
-use craft::color::ui::{ColorPanel, ColorPanelCommand, ColorPanelMenu, PanelTarget, PickedColor};
+use craft::color_ui::ui::{ColorPanel, ColorPanelCommand, ColorPanelMenu, PanelTarget, PickedColor};
 use craft::theme::Srgba;
 use craft::ui::contract::Bind;
 use serde_json::json;

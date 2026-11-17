@@ -1,6 +1,6 @@
 use super::*;
 use crate::canvas;
-use craft::color::ui::PickedColor;
+use craft::color_ui::ui::PickedColor;
 
 fn fixture(kind: Kind, depth: u32) -> (PhotocraftApp, u32) {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());

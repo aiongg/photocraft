@@ -11,7 +11,7 @@
 use std::collections::VecDeque;
 use std::sync::Arc;
 
-use craft::color::ui::{ColorPickerDialog, PickedColor};
+use craft::color_ui::ui::{ColorPickerDialog, PickedColor};
 use photocraft_doc::{DocId, Document, LayerId};
 use photocraft_geom::Rect;
 use serde_json::Value;

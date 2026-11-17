@@ -2,7 +2,7 @@
 //! by the key the dialog's colour request carries (`"fx2/color"`, or `"fx2/stops/1"` for colour stop 1 of
 //! a gradient).
 
-use craft::color::ui::{ColorPickerDialog, ColorPickerResult};
+use craft::color_ui::ui::{ColorPickerDialog, ColorPickerResult};
 use craft::imaging::layer_style::{EffectId, EffectSpec, FieldKind, LayerStyle, LayerStyleDraft, StyleValue};
 use craft::imaging::ui::layer_style::{HostedLayerStyle, LayerStyleDialog};
 use craft::theme::Srgba;

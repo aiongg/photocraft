@@ -2,7 +2,7 @@
 
 use craft::behavior::IconId;
 use craft::behavior::kurbo::Point;
-use craft::color::ui::SamplerOptions;
+use craft::color_ui::ui::SamplerOptions;
 use craft::draw::ui::measure::{RulerBar, RulerLine};
 use craft::theme::Srgba;
 use craft::ui::buttons::{Button, IconButton, ToggleButton};

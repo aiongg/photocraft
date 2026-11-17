@@ -1,7 +1,7 @@
 //! A modal color transaction for a named text style; the canvas preview never edits the session.
 use std::sync::Arc;
 
-use craft::color::ui::{ColorPickerDialog, ColorPickerResult};
+use craft::color_ui::ui::{ColorPickerDialog, ColorPickerResult};
 use craft::theme::Srgba;
 use craft::ui::dialog::{DialogId, DialogResult};
 use photocraft_doc::{Color, DocId, Document};

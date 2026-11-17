@@ -10,7 +10,7 @@
 //! the dialog's own value and the point they are given.
 
 use craft::behavior::{Cursor, CursorIcon, IconId, PaintedCursor};
-use craft::color::ui::ColorPickerDialog;
+use craft::color_ui::ui::ColorPickerDialog;
 use craft::draw::ui::pattern::PatternFillDialog;
 use craft::imaging::layer_style::EffectSpec;
 use craft::imaging::ui::adjust::TonePicker;

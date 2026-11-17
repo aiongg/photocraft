@@ -1,4 +1,4 @@
-use craft::color::ui::{InfoColor, InfoMeasure, InfoPanel, InfoReadings, SamplerReadout};
+use craft::color_ui::ui::{InfoColor, InfoMeasure, InfoPanel, InfoReadings, SamplerReadout};
 use craft::ui::runtime::env::Label;
 
 use super::{PhotocraftApp, Value, json};

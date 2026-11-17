@@ -407,8 +407,8 @@ struct ToolSet {
     tool: Option<Tool>,
     gradient_classic: Option<bool>,
     stroke_trace: Option<&'static str>,
-    eyedropper_size: Option<craft::color::ui::SampleSize>,
-    eyedropper_sample: Option<craft::color::ui::SampleSource>,
+    eyedropper_size: Option<craft::color_ui::ui::SampleSize>,
+    eyedropper_sample: Option<craft::color_ui::ui::SampleSource>,
     eyedropper_ring: Option<bool>,
     cam_transform_on_drop: Option<bool>,
     move_show_transform: Option<bool>,
@@ -657,16 +657,16 @@ fn stroke_trace_param(p: &Value) -> std::result::Result<Option<&'static str>, St
     }
 }
 
-fn eyedropper_size_param(p: &Value) -> std::result::Result<Option<craft::color::ui::SampleSize>, String> {
-    use craft::color::ui::SampleSize;
+fn eyedropper_size_param(p: &Value) -> std::result::Result<Option<craft::color_ui::ui::SampleSize>, String> {
+    use craft::color_ui::ui::SampleSize;
     let Some(v) = p.get("eyedropperSampleSize") else { return Ok(None) };
     let refused = || format!("eyedropperSampleSize must be \"point\" or one of {:?}", photocraft_engine::sample_cmds::SAMPLE_SIZES);
     let pixels = photocraft_engine::sample_cmds::size_param("ui.set", &json!({"size": v})).map_err(|_| refused())?;
     SampleSize::from_pixels(pixels).map(Some).ok_or_else(refused)
 }
 
-fn eyedropper_sample_param(p: &Value) -> std::result::Result<Option<craft::color::ui::SampleSource>, String> {
-    use craft::color::ui::SampleSource;
+fn eyedropper_sample_param(p: &Value) -> std::result::Result<Option<craft::color_ui::ui::SampleSource>, String> {
+    use craft::color_ui::ui::SampleSource;
     let Some(v) = p.get("eyedropperSample") else { return Ok(None) };
     let ids: Vec<&str> = photocraft_engine::sample_cmds::SampleLayers::ALL.iter().map(|(_, n)| *n).collect();
     let refused = || format!("eyedropperSample must be one of {}", ids.join(", "));
