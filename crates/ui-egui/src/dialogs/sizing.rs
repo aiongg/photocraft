@@ -10,7 +10,7 @@ use craft::ui::dialog::{DialogId, DialogResult, dialog_id};
 use craft::ui::patterns::form_dialogs::{
     CanvasExtension, CanvasSize, CanvasSizeResult, CanvasSizeValues, HostedCanvasSize, HostedImageSize, ImageSize, ImageSizeResult, ImageSizeValues, Resample,
 };
-use craft::ui::runtime::env::{ColumnSize, UnitKind};
+use craft::ui::runtime::env::{ColumnSize, Label, UnitKind};
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -198,8 +198,28 @@ fn seed(app: &mut PhotocraftApp, id: DialogId, image: bool, params: &Value) {
     }
 }
 
+/// Judges the held OK of the sizing editor of Record Again or of a paused menu step (the only sizing dialogs that hold
+/// their OK): a stale step, a changed document or a denied size refuses it and the editor stays open.
+fn answer_held(app: &mut PhotocraftApp) {
+    let id = dialog_id(HostedImageSize::KEY);
+    if let Some(result) = app.framework.dialogs.get_mut_by_id::<HostedImageSize>(id).and_then(HostedImageSize::take_ok) {
+        let answer = crate::actions::check_editor(app, id, IMAGE_COMMAND, &image_params(app, &result));
+        if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedImageSize>(id) {
+            dialog.answer_ok(answer.map_err(Label::from));
+        }
+    }
+    let id = dialog_id(HostedCanvasSize::KEY);
+    if let Some(result) = app.framework.dialogs.get_mut_by_id::<HostedCanvasSize>(id).and_then(HostedCanvasSize::take_ok) {
+        let answer = crate::actions::check_editor(app, id, CANVAS_COMMAND, &canvas_params(&result));
+        if let Some(dialog) = app.framework.dialogs.get_mut_by_id::<HostedCanvasSize>(id) {
+            dialog.answer_ok(answer.map_err(Label::from));
+        }
+    }
+}
+
 /// Runs the answer of Image Size or Canvas Size, when one finished this pass.
 pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
+    answer_held(app);
     if let Some(result) = app.framework.dialogs.take::<HostedImageSize>() {
         let params = match result {
             DialogResult::Ok(r) => Some(image_params(app, &r)),

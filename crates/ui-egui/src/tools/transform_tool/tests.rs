@@ -1484,9 +1484,11 @@ fn a_thin_layer_scaled_then_warped_commits_the_curve() {
         s.read_pixel(x, y, &mut p);
         p[3]
     };
-    // The middle sags below the band's old bottom edge (y 60); near the end the edge hangs less.
+    // The middle sags below the band's old bottom edge (y 60). The pulled edge is a cubic with its inner points 40 px
+    // down: it hangs 30 px in the middle and about 8 px at x 80, a tenth of the band's 90 px from its right end, so
+    // y 70 is below it there.
     assert!(alpha(41, 70) > 0.99, "middle {}", alpha(41, 70));
-    assert!(alpha(15, 70) < 0.01 && alpha(15, 40) > 0.99, "end {} {}", alpha(15, 70), alpha(15, 40));
+    assert!(alpha(80, 70) < 0.01 && alpha(80, 40) > 0.99, "end {} {}", alpha(80, 70), alpha(80, 40));
 }
 
 /// #7885: a surface drag (a press inside a cell, on no anchor or handle) commits exactly as

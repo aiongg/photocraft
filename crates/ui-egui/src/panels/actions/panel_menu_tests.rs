@@ -177,13 +177,13 @@ fn preview_routes(app: &mut PhotocraftApp, ctx: &egui::Context) {
 static MENU_PREVIEW_CHECKS: AtomicUsize = AtomicUsize::new(0);
 static MENU_PREVIEW_DENIALS: AtomicUsize = AtomicUsize::new(0);
 
-/// Count actual menu preview checks and deny an edited map path.
-fn deny_menu_map_path(id: &str, params: &Value) -> photocraft_engine::Result<()> {
+/// Count actual menu preview checks and deny an edited radius (the step's own radius is 1).
+fn deny_menu_radius(id: &str, params: &Value) -> photocraft_engine::Result<()> {
     if id == "filter.blur.gaussianBlur" {
         MENU_PREVIEW_CHECKS.fetch_add(1, Ordering::SeqCst);
-        if params.get("mapPath").and_then(Value::as_str).is_some_and(|path| !path.is_empty()) {
+        if params.get("radius").and_then(Value::as_f64).is_some_and(|radius| radius > 2.0) {
             MENU_PREVIEW_DENIALS.fetch_add(1, Ordering::SeqCst);
-            return Err(EngineError::Other("map path denied".into()));
+            return Err(EngineError::Other("radius denied".into()));
         }
     }
     Ok(())
@@ -194,7 +194,7 @@ fn deny_menu_map_path(id: &str, params: &Value) -> photocraft_engine::Result<()>
 fn paused_menu_preview_keeps_the_requesting_gate_and_rejects_retargeting() {
     let mut h = harness();
     h.state_mut().run("actions.insertMenuItem", json!({"action":"A","id":"filter.blur.gaussianBlur"})).unwrap();
-    h.state_mut().session.authorize = Some(deny_menu_map_path);
+    h.state_mut().session.authorize = Some(deny_menu_radius);
     let paused = h.state_mut().run("actions.play", json!({"action":"A"})).unwrap();
     let dialog = paused_dialog(&paused);
     h.state_mut().session.authorize = None;
@@ -206,10 +206,10 @@ fn paused_menu_preview_keeps_the_requesting_gate_and_rejects_retargeting() {
 
     let revision = h.state().session.active().unwrap().revision;
     let before = steps(h.state());
-    set_field(&mut h, dialog, "mapPath", json!("/outside/map.psd"));
+    set_field(&mut h, dialog, "radius", json!(8));
     let denials = MENU_PREVIEW_DENIALS.load(Ordering::SeqCst);
     preview_routes(h.state_mut(), &context);
-    assert!(MENU_PREVIEW_DENIALS.load(Ordering::SeqCst) > denials, "the retained gate denies the edited path");
+    assert!(MENU_PREVIEW_DENIALS.load(Ordering::SeqCst) > denials, "the retained gate denies the edited radius");
 
     // The stored step now names another command than the editor opened for.
     h.state_mut()

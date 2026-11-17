@@ -838,7 +838,12 @@ fn run_confirmed(app: &mut PhotocraftApp, ctx: &egui::Context, open: &OpenAdjust
     crate::actions::authorize_panel_preview(app, open.id, &open.command, &params)?;
     let captured = open.smart_filter.as_ref().map_or(Value::Null, |(_, target)| target.clone());
     let (command, run_params) = crate::smart_ui::confirm_command(app, &captured, open.command.clone(), params.clone())?;
-    crate::actions::run_step_dialog(app, open.id, &command, run_params)?;
+    // The editor Record Again opened answers the step it was opened for, not a new run of the command.
+    if crate::actions::record_again::owns_dialog(app, open.id) {
+        crate::actions::record_again::confirm(app, open.id, &command, run_params)?;
+    } else {
+        crate::actions::run_step_dialog(app, open.id, &command, run_params)?;
+    }
     remember(app, ctx, open, &value.cx, &params);
     Ok(())
 }
