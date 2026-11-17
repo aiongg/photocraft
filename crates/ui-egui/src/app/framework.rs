@@ -564,6 +564,7 @@ impl PhotocraftApp {
         let gate = crate::menus::command_gate(self);
         let latched = self.ui.shell.latched;
         embed::before_input(ctx, |output: FrameOutput| {
+            crate::shortcut_dispatch::record_chrome_toggles(ctx, &output.chrome_toggles);
             self.framework.fired.extend(output.fired);
             self.framework.delivered.extend(output.delivered);
             self.framework.refused |= output.refused;

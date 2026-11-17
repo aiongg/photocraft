@@ -19,6 +19,7 @@ use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
 use craft::ui::docking::WorkspaceCommands;
 use craft::ui::rails::{LastUsed, RailTool};
 use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, CommandSet, EditCommands, FirePhase, FireSource, Fired};
+use craft::ui::runtime::frame::ChromeToggle;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -488,6 +489,17 @@ pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
         if let Some((id, Bridged::View(_))) = bridge_of(&fired.command) {
             crate::panels::actions::journal_view(app, id, json!({}));
             record(&app.ctx(), id, Outcome::Ran);
+        }
+    }
+}
+
+/// Records each chrome toggle a key ran since the last frame as its row of [`RUNTIME_COMMANDS`]: the runtime runs a key's
+/// toggle in its key stage and fires no command for it, and the window's shell hides its panels.
+pub(crate) fn record_chrome_toggles(ctx: &egui::Context, toggles: &[(egui::ViewportId, ChromeToggle)]) {
+    for (_, toggle) in toggles {
+        let row = RUNTIME_COMMANDS.iter().find(|(_, bridged)| matches!(bridged, Bridged::Chrome(command) if command.toggle() == *toggle));
+        if let Some((id, _)) = row {
+            record(ctx, id, Outcome::Ran);
         }
     }
 }
