@@ -305,6 +305,8 @@ fn freeform_refuses_a_locked_shape_before_starting_a_stroke() {
         assert!(app.ui.status_error, "{lock}");
         assert_eq!(shape_path(&app), (id, body), "{lock}");
         assert_eq!(app.session.active().unwrap().history.past_len(), steps, "{lock}");
+        // The refused press ends with its button, as a user's does, before the next one.
+        tool_event(&mut app, ToolEvent::Up { x: 50.0, y: 50.0 }, egui::Modifiers::NONE);
         app.session.undo();
         tool_event(&mut app, ToolEvent::Down { x: 50.0, y: 50.0, pressure: 1.0 }, egui::Modifiers::NONE);
         assert!(testing::in_gesture(&app), "{lock}: unlocked stroke can start");
