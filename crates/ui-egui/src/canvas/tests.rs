@@ -1034,11 +1034,6 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
     h.run_steps(6);
     assert!(crate::panel_docking::is_front(h.state(), "navigator"), "the Navigator shows as a panel");
     assert_eq!(h.state().session.active_index(), Some(0), "the floating document is active");
-    eprintln!(
-        "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: floating windows {:?} content rect {:?}",
-        h.state().ui.document_windows.floating.iter().map(|(g, r)| (g.id, *r)).collect::<Vec<_>>(),
-        h.ctx.content_rect()
-    );
     // The status bar's zoom field (bottom left) and the Navigator's.
     let fields = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
         // The fields are the nodes named Zoom that show the percentage as their value (a field's group and the Navigator's slider carry the name too).
@@ -1056,15 +1051,6 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
     };
     assert_eq!(fields(&h).len(), 2, "the status bar's and the Navigator's zoom fields");
     for (field, typed, want) in [(0, "200", 2.0), (1, "50", 0.5), (0, "300", 3.0), (1, "100", 1.0)] {
-        if fields(&h).len() != 2 {
-            eprintln!(
-                "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: before field {field}: fields {:?} flyout {:?} navigator in front {} in a flyout {}",
-                fields(&h),
-                h.state().ui.flyout,
-                crate::panel_docking::is_front(h.state(), "navigator"),
-                h.state().ui.docking.layout.opens_in_flyout(&"navigator".to_owned())
-            );
-        }
         let at = fields(&h)[field].center();
         h.event(egui::Event::PointerMoved(at));
         h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
@@ -1072,18 +1058,8 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         h.run_steps(2);
         h.key_press_modifiers(egui::Modifiers::COMMAND, egui::Key::A);
         h.event(egui::Event::Text(typed.into()));
-        eprintln!(
-            "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: field {field} typed {typed}: before Enter zoom {} focused {:?}",
-            h.state().ui.views[0].zoom,
-            h.ctx.memory(|m| m.focused())
-        );
         h.key_press(egui::Key::Enter);
         h.run_steps(2);
-        eprintln!(
-            "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: field {field} after Enter zoom {} shown {:?}",
-            h.state().ui.views[0].zoom,
-            crate::canvas::active_view(h.state()).map(|v| v.zoom)
-        );
         h.run_steps(58);
         assert!(h.state().ui.window_views.is_empty(), "the window keeps no copy of the view");
         assert!(

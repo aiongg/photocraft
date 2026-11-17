@@ -213,13 +213,6 @@ fn a_full_cpu_refresh_draws_in_the_background_with_the_synchronous_pixels() {
     // Held, so the frame's later runs can't see the redraw already finished.
     let held = hold_redraws();
     g.harness.step();
-    if !g.harness.state().redraws.contains_key(&doc) {
-        eprintln!(
-            "DIAG a_full_cpu_refresh_draws_in_the_background_with_the_synchronous_pixels: no redraw; last refresh {:?} fallback {:?}",
-            g.harness.state().perf.last_refresh,
-            g.harness.state().perf.gpu_fallback
-        );
-    }
     assert!(g.harness.state().redraws.contains_key(&doc), "the frame started a redraw instead of compositing inline");
     drop(held);
     settle(&mut g);

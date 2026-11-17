@@ -65,23 +65,6 @@ pub(crate) struct GpuPicture {
 /// when one is shown, else the viewport pages when the document's texture set does not fit, else its texture set.
 /// `None` when the GPU canvas cannot show it (no GPU canvas, a device fault), and the CPU canvas draws it.
 pub(crate) fn gpu_picture(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Option<GpuPicture> {
-    let picture = gpu_picture_of(app, req);
-    let test = crate::diag_test();
-    if test.starts_with("the_canvas_shows_the_committed_stroke") && req.zoom < 0.9 {
-        eprintln!(
-            "DIAG {test}: gpu picture zoom {} render_zoom {} live proposal {} shows {:?} k {:?} live stroke busy {}",
-            req.zoom,
-            req.render_zoom,
-            req.live.is_some(),
-            picture.as_ref().map(|p| p.shows),
-            picture.as_ref().map(|p| p.k),
-            app.live_stroke_busy()
-        );
-    }
-    picture
-}
-
-fn gpu_picture_of(app: &mut PhotocraftApp, req: &GpuRequest<'_>) -> Option<GpuPicture> {
     let (ctx, idx, doc, output) = (req.ctx, req.idx, req.doc, req.output);
     let doc_size = [doc.size.width, doc.size.height];
     let base = |doc_key: u64, size: [u32; 2], view_key: u64, display: u8, hdr: Option<[f32; 2]>| ViewParams {

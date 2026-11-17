@@ -164,52 +164,10 @@ fn frames(h: &mut Harness, c: Case) -> (Pixels, Pixels, Pixels, bool) {
         canvas(h)
     };
     let drawing = settled(h, held);
-    if c.zoom < 1.0 {
-        shapes_over_the_stroke(h, c, "while drawing");
-    }
     let gpu = h.state().perf.gpu && !c.flip;
-    let view = |h: &Harness| photocraft_ui_egui::canvas::active_view(h.state()).map(|v| (v.rect, v.center, v.zoom));
-    let drawing_view = view(&*h);
     control(h, "ui.pointer", json!({"events": [{"kind": "up", "x": last.0, "y": last.1}]}));
     let done = canvas(h);
-    if c.zoom < 1.0 {
-        shapes_over_the_stroke(h, c, "after release");
-        eprintln!(
-            "DIAG {}: {c:?} view while drawing {drawing_view:?} after release {:?} canvas rect {:?}",
-            std::thread::current().name().unwrap_or("?"),
-            view(&*h),
-            h.state().last_canvas_rect
-        );
-    }
     (before, drawing, done, gpu)
-}
-
-/// DIAG: every shape of the last frame that covers the screen point of document pixel (132, 142), where round J's
-/// worst differing pixel lies, in paint order.
-fn shapes_over_the_stroke(h: &Harness, c: Case, when: &str) {
-    fn flat<'s>(shape: &'s egui::Shape, out: &mut Vec<&'s egui::Shape>) {
-        match shape {
-            egui::Shape::Vec(v) => v.iter().for_each(|s| flat(s, out)),
-            other => out.push(other),
-        }
-    }
-    let at = h.state().last_canvas_rect.center() + egui::vec2((132.0 - 150.0) * c.zoom, (142.0 - 100.0) * c.zoom) + egui::vec2(0.5, 0.5);
-    let test = std::thread::current().name().unwrap_or("?").to_owned();
-    for clipped in &h.output().shapes {
-        let mut shapes = Vec::new();
-        flat(&clipped.shape, &mut shapes);
-        for shape in shapes {
-            if !clipped.clip_rect.contains(at) || !shape.visual_bounding_rect().contains(at) {
-                continue;
-            }
-            let kind = match shape {
-                egui::Shape::Mesh(m) => format!("Mesh texture {:?} vertices {} first colour {:?}", m.texture_id, m.vertices.len(), m.vertices.first().map(|v| v.color)),
-                egui::Shape::Callback(cb) => format!("Callback rect {:?}", cb.rect),
-                other => format!("{other:?}").chars().take(200).collect(),
-            };
-            eprintln!("DIAG {test}: {c:?} {when} at {at:?}: clip {:?} {kind}", clipped.clip_rect);
-        }
-    }
 }
 
 /// The canvas once the live stroke has stopped changing (#13477). The stroke paints on its own

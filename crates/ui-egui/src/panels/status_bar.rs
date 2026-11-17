@@ -63,14 +63,6 @@ pub fn status_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some(picked) = picked {
         chrome_ui::set_status_item(&mut app.ui.chrome, picked);
     }
-    if crate::diag_test() == "a_floating_document_follows_navigator_and_status_bar_zoom" && (view_edited || invalid_zoom.is_some()) {
-        eprintln!(
-            "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: status bar edited {view_edited} new {:?} invalid {:?} active {:?}",
-            view.as_ref().map(|v| v.zoom),
-            invalid_zoom.is_some(),
-            app.session.active_index()
-        );
-    }
     if view_edited
         && let Some(new) = &view
         && let Some(i) = app.session.active_index()
