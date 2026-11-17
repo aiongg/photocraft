@@ -473,7 +473,8 @@ fn menu_local(id: &str) -> bool {
 fn every_canvas_menu_row_runs_a_known_command() {
     let app = app();
     let items = crate::menus::menu_rows(&app);
-    let tables: [(&str, &[Option<(&str, &str)>]); 16] = [
+    type Table<'a> = (&'a str, &'a [Option<(&'a str, &'a str)>]);
+    let tables: [Table<'_>; 16] = [
         ("SELECTION_MENU", SELECTION_MENU),
         ("NO_SELECTION_MENU", NO_SELECTION_MENU),
         ("MEASURED_SELECTION_MENU", MEASURED_SELECTION_MENU),

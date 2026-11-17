@@ -4,7 +4,6 @@
 //! Selection Change History step; each Operation runs `path.toSelection` with its mode. The
 //! combining operations keep the Make Selection step (not measured).
 
-use egui::accesskit::Toggled;
 use egui_kittest::Harness;
 use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::{Value, json};

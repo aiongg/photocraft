@@ -28,7 +28,7 @@ pub use items::{MenuModel, base_rows, is_live, menu_rows, model, row};
 pub use state::is_enabled;
 pub(crate) use state::reveal_label;
 #[cfg(test)]
-use state::{checked, translated_menu_label};
+use state::translated_menu_label;
 
 /// What may run from the menus now: the gate (a dialog, the shortcut recorder) and the per-command
 /// rules (a full-window workspace, a pending crop). Both bars, the runtime's command gate and
@@ -269,7 +269,7 @@ mod window_documents_tests {
 
             assert_eq!(invoke(&mut app, &ctx, "window.document.0", json!({})).unwrap(), json!({"document": 0}));
             assert_eq!(app.session.active_index(), Some(0));
-            assert_eq!(listed(&app)[0].2, true);
+            assert!(listed(&app)[0].2);
             invoke(&mut app, &ctx, &format!("window.document.{}", docs - 1), json!({})).unwrap();
             let (req, _rx) = crate::control::ControlRequest::new("ui.menu.invoke", json!({"id": "window.document.0"}));
             let crate::control::Reply::Done(r) = crate::control::handle(&mut app, &ctx, &req) else { panic!("expected an immediate reply") };

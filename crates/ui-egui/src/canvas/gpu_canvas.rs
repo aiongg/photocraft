@@ -437,17 +437,6 @@ impl GpuCanvas {
         }
     }
 
-    /// Act as if the driver couldn't build the compositor's pipelines (the DX12 FXC X3507 case,
-    /// #8733): every later refresh goes to the CPU compositor with `msg` as the reason.
-    #[cfg(test)]
-    pub(crate) fn fail_compositor(&self, msg: &str) {
-        let mut r = self.rs.renderer.write();
-        if let Some(res) = r.callback_resources.get_mut::<Resources>() {
-            res.compositor = None;
-            res.compositor_failed = Some(photocraft_gpu::Unsupported(msg.into()));
-        }
-    }
-
     #[cfg(test)]
     pub(crate) fn simulate_compositor_build(&self) {
         *self.compositor_build.lock().unwrap() = compositor_build::BuildState::Building;

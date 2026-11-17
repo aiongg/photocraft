@@ -4,7 +4,7 @@
 
 use egui::Color32;
 #[cfg(test)]
-use egui::Pos2;
+use egui::vec2;
 use photocraft_doc::vector::Path;
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Affine;
@@ -31,9 +31,11 @@ pub(crate) use options::enabled_stroke_width;
 #[cfg(test)]
 use options::{corner_radii_patch, solid_paint};
 pub use options::{options_bar, shape_properties};
+#[cfg(test)]
+pub(crate) use overlay::selected_saved_path;
 pub(crate) use overlay::selected_saved_path_index;
 #[cfg(test)]
-pub(crate) use overlay::{selected_saved_path, shows_anchors};
+pub(crate) use overlay::{BezierShown, show_paths};
 pub use path_ops::{
     active_path_name, make_shape, path_selection_finish, path_to_selection, pick_shape_at, selected_document_path, takes_path_mask, with_active_path,
 };

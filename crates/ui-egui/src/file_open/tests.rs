@@ -423,7 +423,7 @@ fn open_failures_are_errors_and_leave_no_document() {
 #[test]
 fn a_picked_file_that_cannot_be_read_is_reported_like_any_open_failure() {
     let missing = std::env::temp_dir().join("photocraft-missing-dir").join("big.psb").to_string_lossy().into_owned();
-    let picked = || chosen(&[missing.clone()]);
+    let picked = || chosen(std::slice::from_ref(&missing));
     let (mut app, _) = app_with(vec![picked(), picked(), Picked::Cancelled]);
     app.open_dialog_file().unwrap();
     answer(&mut app);
@@ -508,25 +508,6 @@ fn os_quit_and_empty_events_do_not_panic() {
     app.services.os_events = Some(Box::new(move || std::mem::take(&mut queue)));
     app.drain_os_events(&egui::Context::default());
     assert!(app.session.documents().is_empty());
-}
-
-/// A raw egui drop for the eframe harness, which the runtime turns into an `OsFile` for the drop targets.
-// The eframe harness needs an egui handle to push a raw drop.
-#[derive(Debug)]
-struct FakeDrop(std::path::PathBuf, Result<Vec<u8>, String>);
-
-impl egui::DroppedFile for FakeDrop {
-    fn path(&self) -> &std::path::Path {
-        &self.0
-    }
-    fn bytes(&self) -> Result<Vec<u8>, String> {
-        self.1.clone()
-    }
-}
-
-/// A raw egui drop of `path` for the harness's input.
-fn raw_drop(path: impl Into<std::path::PathBuf>, bytes: Result<Vec<u8>, String>) -> egui::DroppedFileHandle {
-    std::sync::Arc::new(FakeDrop(path.into(), bytes))
 }
 
 /// A dropped file as the drop targets hand it over: an absolute `path` is a native drop (path, no bytes); any other
@@ -1264,7 +1245,7 @@ fn a_transformed_place_is_one_history_step() {
     app.open_dropped(&ctx, vec![dropped("dot.png", Ok(png_bytes(2, 2)))], DropTo::Canvas { at: None });
     app.place_next_dropped(&ctx);
     let t = app.ui.transform.as_mut().expect("in Free Transform");
-    let before = t.session.state().clone();
+    let before = *t.session.state();
     let moved = before.moved(craft::behavior::kurbo::Vec2::new(-1.0, -1.0));
     let event = craft::behavior::EditEvent::set(craft::behavior::Mixed::Same(before), moved, "Move".into(), None);
     t.session.apply(craft::draw::ui::transform::TransformEdit::Box(event), 0.0);

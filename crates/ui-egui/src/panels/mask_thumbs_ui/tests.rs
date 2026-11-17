@@ -15,7 +15,7 @@ use serde_json::json;
 
 use super::super::layers_events::apply_layers_events;
 use super::super::layers_events::tests::{canvas_px, dotted, session};
-use super::super::layers_tree::{self, PhotoLayers, PhotoThumbs};
+use super::super::layers_tree::{PhotoLayers, PhotoThumbs};
 use super::{MaskKind, vector_thumb_image};
 use crate::PhotocraftApp;
 
@@ -295,7 +295,7 @@ fn selecting_mask_thumbnail_toggles_swatches_to_mask_colors_and_back() {
     const WHITE: [f32; 4] = [1.0, 1.0, 1.0, 1.0];
     const BLACK: [f32; 4] = [0.0, 0.0, 0.0, 1.0];
 
-    let (mut s, masked, _) = dotted();
+    let (s, masked, _) = dotted();
     let mut app = app_of(s);
     app.run("tools.setColors", json!({"foreground": "#ff0000", "background": "#0000ff"})).unwrap();
     let ctx = app.ctx().clone();

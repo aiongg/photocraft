@@ -74,13 +74,13 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, field: &str, value: serde_j
 /// OK on the newest open dialog.
 fn confirm(app: &mut PhotocraftApp) {
     let id = app.framework.dialogs.open_dialogs().pop().expect("an open dialog").id;
-    crate::dialogs::testing::confirm(app, id);
+    crate::dialogs::testing::confirm(app, id).unwrap();
 }
 
 /// Cancel on the newest open dialog.
 fn cancel(app: &mut PhotocraftApp) {
     let id = app.framework.dialogs.open_dialogs().pop().expect("an open dialog").id;
-    crate::dialogs::testing::cancel(app, id);
+    crate::dialogs::testing::cancel(app, id).unwrap();
 }
 
 /// An adjustment on a Smart Object reopens its editor with the stored values and OK updates it in one step; Invert has no editor.
@@ -467,7 +467,7 @@ fn rabbit_invalid_whole_curves_alias_does_not_turn_neutral() {
             let (mut app, layer) = app(8, mode);
             app.run("image.adjustments.curves", json!({"points":[[0,255],[255,0]]})).unwrap();
             let before = app.session.active().unwrap().doc.clone();
-            let target = crate::smart_filter_dialog::target(&mut app, layer, 2).unwrap();
+            let target = crate::smart_filter_dialog::target(&app, layer, 2).unwrap();
             assert!(crate::adjust_dialog::open_smart_filter(&mut app, "image.adjustments.curves", &bad, target).is_some());
             assert!(fields(&app).get("points").is_none(), "invalid aliases cannot be hidden by defaults");
             let idx = app.session.active_index().unwrap();

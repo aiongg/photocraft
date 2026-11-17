@@ -23,7 +23,7 @@ fn layers(h: &egui_kittest::Harness<'static, PhotocraftApp>) -> usize {
 }
 
 fn dialog_open(h: &egui_kittest::Harness<'static, PhotocraftApp>) -> bool {
-    h.state().framework.dialogs.get::<HostedParamDialog>().is_some_and(|d| d.key().is_some_and(|k| crate::new_layer_ui::owns(&k)))
+    h.state().framework.dialogs.get::<HostedParamDialog>().is_some_and(|d| d.key().is_some_and(|k| crate::new_layer_ui::owns(k)))
 }
 
 #[test]

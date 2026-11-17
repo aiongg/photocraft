@@ -794,7 +794,7 @@ fn layer_style_opened_during_free_transform_applies_the_box_and_previews() {
             crate::transform_tool::begin(&mut app, &ctx).unwrap();
             let moved = BoxState::from_rect(craft::behavior::kurbo::Rect::new(28.0, 8.0, 44.0, 24.0));
             let session = &mut app.ui.transform.as_mut().unwrap().session;
-            let before = Mixed::Same(session.state().clone());
+            let before = Mixed::Same(*session.state());
             session.apply(TransformEdit::Box(EditEvent::set(before, moved, "Move".into(), None)), 0.0);
             20
         };

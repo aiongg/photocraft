@@ -36,7 +36,7 @@ fn fixture() -> (PhotocraftApp, egui::Context, [LayerId; 2]) {
     app.ui.tool_options.move_auto_select = false;
     app.ui.extras.snap = false;
     app.ui.view.show.smart_guides = false;
-    let ctx = crate::canvas::testing::ctx(&mut app);
+    let ctx = crate::canvas::testing::ctx(&app);
     accepted(&mut app, "ui.set", json!({"tool": "Move", "moveShowTransform": true, "zoom": 1.0, "center": [500, 350]}));
     (app, ctx, [layers[0], layers[1]])
 }
@@ -96,6 +96,19 @@ enum Opens {
     Move,
     /// Nothing.
     Nothing,
+}
+
+/// The bounds each of `old` takes under the homography that maps the open session's rectangle onto `preview`; both
+/// committed layer bounds follow it, so a translation or a one-layer rotation fails.
+fn bounds_under_preview(app: &PhotocraftApp, old: [Rect; 2], preview: [[f64; 2]; 4]) -> [[f64; 4]; 2] {
+    let r = app.ui.transform.as_ref().unwrap().session.rect();
+    let homography = photocraft_algo::transform::Homography::rect_to_quad([r.x0, r.y0, r.x1, r.y1], preview).unwrap();
+    old.map(|r| {
+        [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]]
+            .map(|[x, y]| homography.apply(f64::from(x), f64::from(y)))
+            .into_iter()
+            .fold([f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY], |b, (x, y)| [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)])
+    })
 }
 
 /// Where a press lands decides the gesture: a corner, the rotation band at 100 %, the visible corner at 200 %, a handle
@@ -158,17 +171,7 @@ fn move_controls_press_zones_start_the_matching_gesture() {
         assert_ne!(preview, initial, "{what}");
         let expected = if expect == Opens::Rotate {
             assert!((preview[1][1] - preview[0][1]).abs() > 1.0, "{what}: the upper edge rotates");
-            // Both committed layer bounds follow the preview homography; a translation or one-layer rotation fails.
-            let r = app.ui.transform.as_ref().unwrap().session.rect();
-            let homography = photocraft_algo::transform::Homography::rect_to_quad([r.x0, r.y0, r.x1, r.y1], preview).unwrap();
-            Some(old.map(|r| {
-                [[r.x0, r.y0], [r.x1, r.y0], [r.x1, r.y1], [r.x0, r.y1]]
-                    .map(|[x, y]| homography.apply(f64::from(x), f64::from(y)))
-                    .into_iter()
-                    .fold([f64::INFINITY, f64::INFINITY, f64::NEG_INFINITY, f64::NEG_INFINITY], |b, (x, y)| {
-                        [b[0].min(x), b[1].min(y), b[2].max(x), b[3].max(y)]
-                    })
-            }))
+            Some(bounds_under_preview(&app, old, preview))
         } else {
             None
         };
@@ -347,7 +350,7 @@ fn move_pointer_still_reaches_the_liquify_workspace() {
     app.run("file.new", json!({"width": 120, "height": 80, "depth": 8})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.sync_views();
-    let ctx = crate::canvas::testing::ctx(&mut app);
+    let ctx = crate::canvas::testing::ctx(&app);
     accepted(&mut app, "ui.set", json!({"tool": "Move", "moveShowTransform": true}));
     crate::menus::invoke(&mut app, &ctx, "filter.liquify", json!({})).unwrap();
     let before = app.session.active().unwrap().doc.clone();

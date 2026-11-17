@@ -180,7 +180,7 @@ fn pick_from_swatch(app: &mut PhotocraftApp, color: Option<&str>) {
     if let Some(c) = color {
         crate::color_picker_ui::testing::set_color(app, id, c);
     }
-    crate::dialogs::testing::confirm(app, id);
+    crate::dialogs::testing::confirm(app, id).unwrap();
 }
 
 fn colours(app: &PhotocraftApp) -> Vec<ArtboardBackground> {
@@ -259,7 +259,7 @@ fn other_opens_the_color_picker_and_ok_sets_the_option() {
     assert!(!open_before && app.dialog_open(), "the picker opened");
     // Cancel leaves the option alone; OK sets it.
     assert_eq!(app.ui.artboard_tool.background, "black");
-    crate::dialogs::testing::confirm(&mut app, id);
+    crate::dialogs::testing::confirm(&mut app, id).unwrap();
     assert_eq!((app.ui.artboard_tool.background.as_str(), app.ui.artboard_tool.background_color.as_str()), ("custom", "#123456"));
 }
 

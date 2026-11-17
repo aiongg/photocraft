@@ -383,8 +383,7 @@ fn thumb_clicks_pick_commands_and_targets() {
 // ------------------------------------------------------------------------------------ footer and drops
 
 /// Rules with bug history the footer tests do not cover: Delete with a Smart Filter picked (#4751),
-/// the smart object's own row clearing the pick, filters moved or copied by a drop, masks moved or
-/// copied onto a group (#10485) and refused onto a masked row, and a drop into a frame.
+/// the smart object's own row clearing the pick, and filters moved or copied by a drop.
 #[test]
 fn footer_and_drop_events_follow_the_targets() {
     let fresh = || {
@@ -482,7 +481,11 @@ fn footer_and_drop_events_follow_the_targets() {
     send(&mut app, vec![LayersEvent::activate(LayerRowKey::Filters(LayerId(b), Some(0)), ActivateOn::Row)]);
     assert!(app.dialog_open(), "Camera Raw opened");
     assert_eq!(active(&app), Some(LayerId(b)), "on the copy's smart object");
+}
 
+/// Layer masks moved or copied onto a group (#10485) and refused onto a masked row, and a layer dropped into a frame.
+#[test]
+fn mask_and_frame_drops_follow_the_targets() {
     // #10485: a layer mask dropped on a group moves there, with ⌥ it is copied.
     for copy in [false, true] {
         let (mut s, masked, shape) = session();
@@ -588,7 +591,7 @@ fn activate_and_fx_events_open_the_right_editor() {
     assert_eq!(active(&app), Some(LayerId(a)), "the smart object becomes active");
     let dialog = top(&app);
     assert!(crate::smart_filter_dialog::owns(dialog.key.as_deref().unwrap_or_default()));
-    crate::dialogs::testing::cancel(&mut app, dialog.id);
+    crate::dialogs::testing::cancel(&mut app, dialog.id).unwrap();
 
     // The row opens the filter's editor on the recorded values; OK edits it in place.
     send(&mut app, vec![select(&[c], None)]);
@@ -597,7 +600,7 @@ fn activate_and_fx_events_open_the_right_editor() {
     let dialog = top(&app);
     assert_eq!(dialog.fields.as_ref().unwrap()["radius"].as_f64(), Some(1.0), "the recorded radius");
     app.framework.dialogs.set_json_field(&ctx, dialog.id, "radius", json!(3.0)).unwrap();
-    crate::dialogs::testing::confirm(&mut app, dialog.id);
+    crate::dialogs::testing::confirm(&mut app, dialog.id).unwrap();
     assert!(!app.ui.status_error, "{}", app.ui.status);
     assert_eq!(filter_commands(&app, a).len(), 2, "edited in place, not added");
     let LayerContent::Smart(sm) = &layer(&app, a).content else { panic!("smart object") };
@@ -643,7 +646,6 @@ fn a_select_commits_an_open_text_edit_before_changing_the_selection() {
     for same in [true, false] {
         for thumbnail in [true, false] {
             let mut app = app_of(Session::new());
-            let ctx = app.ctx().clone();
             app.run("file.new", json!({"width": 200, "height": 200})).unwrap();
             let text = LayerId(app.run("type.create", json!({"text": "Before", "size": 24, "x": 20, "y": 80})).unwrap()["layer"].as_u64().unwrap());
             let other = LayerId(app.run("layer.new.layer", json!({"name": "Other pixels"})).unwrap()["layer"].as_u64().unwrap());

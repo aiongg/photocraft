@@ -131,10 +131,6 @@ mod tests {
         (app, ctx)
     }
 
-    fn boards(app: &PhotocraftApp) -> Vec<photocraft_geom::Rect> {
-        app.session.active().unwrap().doc.artboards().iter().map(|b| b.2.rect).collect()
-    }
-
     #[test]
     fn layers_outside_the_boards_show_over_the_pasteboard() {
         // #5712: a board drawn left of earlier work must not cover it with pasteboard.

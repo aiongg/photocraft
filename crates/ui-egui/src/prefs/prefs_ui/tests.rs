@@ -168,7 +168,7 @@ fn chord(text: &str) -> Chord {
 /// The shortcut the menu shows for `id`.
 fn menu_shortcut(app: &PhotocraftApp, id: &str) -> Option<Chord> {
     let rows = crate::menus::menu_rows(app);
-    rows.iter().find(|row| row.command.id == id).unwrap_or_else(|| panic!("no menu row {id}")).shortcut.clone()
+    rows.iter().find(|row| row.command.id == id).unwrap_or_else(|| panic!("no menu row {id}")).shortcut
 }
 
 // --- the preferences' own rules ---------------------------------------------------------------------------------
@@ -689,6 +689,9 @@ fn ui_font_size_commands_follow_themes_and_dpi_and_reset_live() {
 
 // --- remembered state -----------------------------------------------------------------------------------------------
 
+type SetState = Box<dyn Fn(&mut PhotocraftApp, &egui::Context)>;
+type CheckState = Box<dyn Fn(&mut PhotocraftApp, &egui::Context, &Value)>;
+
 /// One case of a remembered-state table: what is set (or seeded) in the first app, and what holds after a restart
 /// on the same store.
 struct Case {
@@ -696,9 +699,9 @@ struct Case {
     /// A hand-written file the first app starts on.
     seed: Option<Value>,
     /// State set in the first app; the table ticks afterwards.
-    set: Box<dyn Fn(&mut PhotocraftApp, &egui::Context)>,
+    set: SetState,
     /// What holds in the restarted app, given the file's contents.
-    check: Box<dyn Fn(&mut PhotocraftApp, &egui::Context, &Value)>,
+    check: CheckState,
 }
 
 fn run_cases(cases: Vec<Case>) {
@@ -871,7 +874,7 @@ fn restart_cases() -> Vec<Case> {
         Case {
             name: "untouched View items store nothing",
             seed: None,
-            set: Box::new(|app, ctx| crate::view_cmds::persist(app, ctx)),
+            set: Box::new(crate::view_cmds::persist),
             check: Box::new(|_, _, stored| {
                 // So later default changes still reach the user.
                 assert!(stored.get("viewExtras").is_none_or(Value::is_null));

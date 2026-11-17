@@ -40,13 +40,6 @@ fn anchors(v: &Value) -> Vec<(f64, f64)> {
     knots.iter().map(|k| (k["anchor"][0].as_f64().unwrap(), k["anchor"][1].as_f64().unwrap())).collect()
 }
 
-fn close(got: &[(f64, f64)], want: &[(f64, f64)], tol: f64) {
-    assert_eq!(got.len(), want.len(), "{got:?}");
-    for (g, w) in got.iter().zip(want) {
-        assert!((g.0 - w.0).abs() <= tol && (g.1 - w.1).abs() <= tol, "{got:?} vs {want:?}");
-    }
-}
-
 #[test]
 fn a_drag_fills_its_box_in_either_direction() {
     for (from, to) in [([400.0, 300.0], [600.0, 400.0]), ([600.0, 400.0], [400.0, 300.0])] {

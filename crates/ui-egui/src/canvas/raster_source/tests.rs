@@ -292,7 +292,8 @@ fn a_size_changing_preview_lies_centred_on_the_document() {
 /// dropped without committing shows the channel as it was. One row per view target.
 #[test]
 fn channel_views_show_live_strokes_and_drop_discarded_ones() {
-    let targets: [(&str, fn(&mut PhotocraftApp)); 5] = [
+    type Target = fn(&mut PhotocraftApp);
+    let targets: [(&str, Target); 5] = [
         ("quick mask", |app| {
             app.run("select.rect", json!({"x": 0, "y": 0, "width": 120, "height": 60})).unwrap();
             app.run("select.editInQuickMaskMode", json!({})).unwrap();

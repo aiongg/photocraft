@@ -241,7 +241,8 @@ fn a_launch_and_capture_request_waits_for_the_first_ui_pass() {
 #[test]
 fn a_capture_in_flight_follows_the_app_document_identity() {
     let activate = |index: u64| ("document.activate", json!({"document": index}));
-    let cases: [(&str, Vec<(&str, Value)>, bool); 3] = [
+    type Case<'a> = (&'a str, Vec<(&'a str, Value)>, bool);
+    let cases: [Case<'_>; 3] = [
         ("switch to another document", vec![activate(0)], false),
         ("switch away and back", vec![activate(0), activate(1)], false),
         ("edit in the same document", vec![("layer.new.layer", json!({}))], true),

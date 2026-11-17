@@ -1,7 +1,7 @@
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use craft::menu::{Backend, Chord, CommandRef, Dispatch, Event, ItemRole, MenuBar, MenuRole, Node};
+use craft::menu::{Backend, CommandRef, Dispatch, Event, ItemRole, MenuBar, MenuRole, Node};
 use egui_kittest::Harness;
 use serde_json::json;
 
@@ -58,11 +58,6 @@ fn click(h: &mut Harness<'static, PhotocraftApp>, events: &Events, id: &str) {
     let ctx = h.ctx.clone();
     poll(h.state_mut(), &ctx);
     h.run_steps(3);
-}
-
-fn showing(layout: &Layout, key: &str) -> Vec<String> {
-    let chord = Chord::parse(key).unwrap();
-    layout.bar.items().into_iter().filter(|it| it.shortcut.as_ref() == Some(&chord)).map(|it| it.command.id.clone()).collect()
 }
 
 fn laid(app: &mut PhotocraftApp) -> Layout {

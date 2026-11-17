@@ -81,7 +81,7 @@ fn painting_a_hidden_layer_is_refused_at_the_press() {
         app.ui.tool_options.gradient_classic = true;
         let n = steps(&app);
         tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 30.0, pressure: 1.0 }, egui::Modifiers::NONE);
-        assert!(!crate::canvas::testing::in_gesture(&mut app) && app.live_stroke.is_none(), "{tool:?}: no stroke started");
+        assert!(!crate::canvas::testing::in_gesture(&app) && app.live_stroke.is_none(), "{tool:?}: no stroke started");
         // The Brush (#11898) and the Classic gradient (#12017) say so in an alert, the other tools
         // in the status bar.
         let alerts = alerts(&app);

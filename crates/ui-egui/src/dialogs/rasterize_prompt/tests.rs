@@ -186,7 +186,7 @@ fn a_stale_prompt_fails_gracefully() {
 #[test]
 fn the_control_channel_sees_and_confirms_the_prompt() {
     let mut app = app_with(Kind::Shape);
-    let ctx = crate::canvas::testing::ctx(&mut app);
+    let ctx = crate::canvas::testing::ctx(&app);
     app.ui.tool = Tool::Pencil;
     // The canvas shows once before a pointer event can be mapped onto the document.
     crate::canvas::testing::frame(&mut app);

@@ -61,8 +61,6 @@ mod startup;
 pub(crate) use appearance::{appearance_button, cycle_appearance, interface_zoom, show_selected_theme, step_brightness, sync_appearance, theme_menu};
 pub use appearance::{canvas_style, pasteboard_color};
 #[cfg(test)]
-use appearance::{display_scale, selected_theme};
-#[cfg(test)]
 pub(crate) use dialogs::set_draft;
 pub use dialogs::{apply_window, invoke, open_preferences, window_open};
 pub(crate) use dialogs::{feed, take as take_window};
@@ -75,7 +73,7 @@ pub(crate) use startup::{on_recovery_event, remember_rulers};
 
 // Test modules stay after the production code: the prefs_usage test reads each file up to
 // its first `#[cfg(test)] mod`.
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod agents_tests;
 #[cfg(test)]
 mod recovery_tests;

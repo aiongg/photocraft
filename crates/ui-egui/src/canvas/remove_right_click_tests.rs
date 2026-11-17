@@ -77,13 +77,3 @@ fn a_control_channel_right_click_with_strokes_waiting_opens_nothing_and_keeps_th
     assert!(nothing_open(h.state()), "no picker, no menu");
     assert_eq!(snapshot(h.state()), before, "the strokes, their tint and the document stay");
 }
-
-/// A key press through the app's shortcut handling: ↩ applies the waiting strokes, Esc drops them.
-fn key(h: &mut Harness<'static, PhotocraftApp>, key: egui::Key) {
-    let ctx = egui::Context::default();
-    let event = egui::Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: egui::Modifiers::NONE };
-    ctx.begin_pass(egui::RawInput { events: vec![event], ..Default::default() });
-    crate::shortcuts::handle(h.state_mut(), &ctx);
-    ctx.end_pass().textures_delta.clear();
-    h.run_steps(2);
-}

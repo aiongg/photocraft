@@ -414,7 +414,7 @@ fn keys_wait_while_the_overlay_colour_picker_is_open() {
     assert!(crate::color_picker_ui::top(h.state()).is_some(), "the swatch opened the colour picker over the workspace");
     let picker = crate::color_picker_ui::top(h.state()).expect("the colour picker is open");
     crate::color_picker_ui::testing::set_color(h.state_mut(), picker, "#0000ff");
-    crate::dialogs::testing::confirm(h.state_mut(), picker);
+    crate::dialogs::testing::confirm(h.state_mut(), picker).unwrap();
     h.run_steps(4);
     assert_eq!(h.state().caf.as_ref().map(|_| sampled(h.state())), Some(less), "the strokes survive the picker");
     let c = h.state().caf.as_ref().unwrap();
