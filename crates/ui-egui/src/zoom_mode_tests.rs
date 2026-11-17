@@ -32,6 +32,8 @@ fn gpu_zoom_animation_reuses_the_document_composite() {
         app.run("edit.fill", json!({"color": "#2060c0"})).unwrap();
         app
     });
+    // The harness sets egui's animation time to zero, which turns the framework's motion off; the ease needs it on.
+    h.ctx.all_styles_mut(|style| style.animation_time = egui::Style::default().animation_time);
     let shown = |h: &Harness<'static, PhotocraftApp>| shown_camera(&h.ctx, CanvasHost::main(0), &h.state().ui.views[0], 1.0).0;
     h.run_steps(4);
     h.state_mut().run("view.actualPixels", json!({})).unwrap();
@@ -58,12 +60,6 @@ fn gpu_zoom_animation_reuses_the_document_composite() {
         assert!(h.state().perf.gpu, "{name}: keep the GPU canvas");
         assert_eq!(h.state().perf.last_refresh, "", "{name}: reuse the composite");
         let zoom = shown(&h);
-        eprintln!(
-            "DIAG gpu_zoom_animation_reuses_the_document_composite: {name} shown {zoom} view {} target {target} animating {} time {:?}",
-            h.state().ui.views[0].zoom,
-            h.state().ui.views[0].zoom_animating,
-            h.ctx.input(|i| i.time)
-        );
         midway |= zoom > 1.0 && zoom < target;
         let image = h.render().unwrap();
         let center = h.state().last_canvas_rect.center();
