@@ -8,7 +8,7 @@
 //! does (#13364).
 
 use craft::behavior::{CancelReason, Cursor, PointerButton};
-use craft::color::ui::{EyedropperTool, SampleSize, SampleSource};
+use craft::color_ui::ui::{EyedropperTool, SampleSize, SampleSource};
 use craft::keymap::Mods;
 use craft::theme::Srgba;
 use craft::ui::canvas::{CanvasTool, ToolAction, ToolContext, ToolHostResponse, ToolPath, ToolPointer};

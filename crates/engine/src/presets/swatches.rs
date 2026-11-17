@@ -1,6 +1,6 @@
 //! Window › Swatches: named colours in groups (folders), as in Photoshop's Swatches panel.
 //!
-//! The swatch model is craft-color's (`craft::color::palette`), re-exported here: a swatch keeps
+//! The swatch model is craft-color's (`craft::color_ui::palette`), re-exported here: a swatch keeps
 //! its colour in the model it was made in (RGB, HSB, CMYK, Lab or grayscale) as `f32` components
 //! that hold 16-bit file values exactly, plus colour-book entries we cannot evaluate kept
 //! verbatim. Nothing assumes sRGB: RGB and HSB components are in the RGB working space, CMYK and
@@ -19,7 +19,7 @@ use serde_json::{Value, json};
 
 use crate::Session;
 
-pub use craft::color::palette::{SwatchColor, SwatchEntry, SwatchGroup, SwatchKind};
+pub use craft::color_ui::palette::{SwatchColor, SwatchEntry, SwatchGroup, SwatchKind};
 
 /// Rewrites a saved `swatches` value from the shape before craft-color's model (groups holding
 /// `items`) to the current one (`entries`). Called once, where the preferences are read.

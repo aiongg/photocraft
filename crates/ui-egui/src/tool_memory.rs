@@ -16,7 +16,7 @@
 //! `Preferences::group_tools` (#3569), so a tool picked from a flyout stays on its toolbar slot
 //! and its key after a restart. A name this version doesn't know is skipped, as with the options.
 
-use craft::color::ui::{SampleSize, SampleSource};
+use craft::color_ui::ui::{SampleSize, SampleSource};
 use craft::draw::ui::crop::{FIELD_MAX, RATIO_MAX};
 use craft::draw::ui::{LINE_WEIGHT_RANGE, RADIUS_RANGE};
 use craft::imaging::ui::select::MagneticSettings;

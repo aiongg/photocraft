@@ -1,4 +1,4 @@
-use craft::color::ui::{ColorPickerDialog, PickedColor};
+use craft::color_ui::ui::{ColorPickerDialog, PickedColor};
 use craft::theme::Srgba;
 use egui::vec2;
 use egui_kittest::Harness;

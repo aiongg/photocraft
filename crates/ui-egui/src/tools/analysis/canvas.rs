@@ -6,7 +6,7 @@
 
 use craft::behavior::kurbo::Point;
 use craft::behavior::{CancelReason, CountMark, Cursor, CursorBadge, CursorIcon, EditEvent, Input, Metrics, Mixed, PaintedCursor};
-use craft::color::ui::{ColorSamplerMarks, ColorSamplerTool, ColorSamplers, SamplerEvent};
+use craft::color_ui::ui::{ColorSamplerMarks, ColorSamplerTool, ColorSamplers, SamplerEvent};
 use craft::draw::ui::{RulerLine, RulerTool};
 use craft::ui::canvas::{CanvasTool, NoTool, ToolAction, ToolClaims, ToolContext, ToolHostResponse, ToolKey, ToolPath, ToolPointer, canvas_space};
 use craft::ui::contract::{Access, Common, Component, Cx, MeasureCx, PaintUi, Props as _, Role, Show as _};

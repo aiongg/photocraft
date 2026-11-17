@@ -8,7 +8,7 @@ use super::*;
 use crate::PhotocraftApp;
 
 // PLAN: assumed facade paths for the framework types; the other layer-style test files import them from here.
-pub(super) use craft::color::gradient::{ColorStop, GradientStops};
+pub(super) use craft::color_ui::gradient::{ColorStop, GradientStops};
 pub(super) use craft::imaging::layer_style::{
     EffectId, EffectKind, EffectSpec, FieldKind, LayerStyle, LayerStyleDraft, LayerStylePage, StyleParams, StyleValue,
 };

@@ -2,7 +2,7 @@
 //! a workspace switch restores.
 
 use craft::behavior::dock::{Action, Workspace};
-use craft::color::ui::ColorPanelMode;
+use craft::color_ui::ui::ColorPanelMode;
 use serde_json::json;
 
 use super::*;

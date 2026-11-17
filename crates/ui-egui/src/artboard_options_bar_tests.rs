@@ -204,9 +204,9 @@ fn an_unchanged_ok_with_only_web_colors_leaves_the_boards_alone() {
     let mut app = app();
     // Only Web Colors is the framework picker's remembered memory, read when the picker opens.
     // PLAN: assumed `app.framework.host()` is the `Host` that `Remembered` reads and writes.
-    let mut memory = craft::color::ui::ColorPickerMemory::default();
+    let mut memory = craft::color_ui::ui::ColorPickerMemory::default();
     memory.web_colors = true;
-    craft::settings::Remembered::<craft::color::ui::ColorPickerMemory>::new("colorPicker.memory").store(app.framework.host(), &memory);
+    craft::settings::Remembered::<craft::color_ui::ui::ColorPickerMemory>::new("colorPicker.memory").store(app.framework.host(), &memory);
     let (a, _) = two_boards(&mut app);
     app.run("layer.artboard.set", json!({"layer": a, "background": "custom", "color": [0.2, 0.4, 0.61, 1.0]})).unwrap();
     let before = (steps(&app), colours(&app));

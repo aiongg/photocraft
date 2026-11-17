@@ -7,7 +7,7 @@
 //! live foreground colour and 2 for the background.
 
 use craft::behavior::kurbo::Vec2;
-use craft::color::ui::gradient::{ColorStop, GradientStops, OpacityStop};
+use craft::color_ui::ui::gradient::{ColorStop, GradientStops, OpacityStop};
 use craft::draw::ui::gradient::{GradientFill, GradientStyle};
 use craft::theme::Srgba;
 use photocraft_compose::gradient_fill as gf;

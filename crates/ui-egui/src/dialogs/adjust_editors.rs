@@ -13,7 +13,7 @@
 use std::sync::Arc;
 
 use craft::behavior::{EditEvent, EditEvents, Mixed};
-use craft::color::ui::gradient::{ColorStop, GradientStops};
+use craft::color_ui::ui::gradient::{ColorStop, GradientStops};
 use craft::draw::ui::gradient::{GradientGroup, GradientItem, GradientMap, GradientMapEditor, GradientMapOutput};
 use craft::imaging::ui::adjust::{
     AdjustDialogCx, AdjustField, AdjustSliders, AdjustWords, BlackWhite, BlackWhiteEditor, BrightnessContrast, BrightnessContrastEditor, ChannelMixer,

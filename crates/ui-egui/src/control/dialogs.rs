@@ -158,12 +158,12 @@ pub(crate) fn is_save_answer(app: &PhotocraftApp, id: DialogId) -> bool {
 }
 
 fn is_profile(app: &PhotocraftApp, id: DialogId) -> bool {
-    host(app).get_by_id::<craft::color::ui::ProfileMismatchDialog>(id).is_some()
+    host(app).get_by_id::<craft::color_ui::ui::ProfileMismatchDialog>(id).is_some()
 }
 
 fn is_color_picker(app: &PhotocraftApp, id: DialogId) -> bool {
     // PLAN: assumed facade path of `ColorPickerDialog`.
-    host(app).get_by_id::<craft::color::ui::ColorPickerDialog>(id).is_some()
+    host(app).get_by_id::<craft::color_ui::ui::ColorPickerDialog>(id).is_some()
 }
 
 /// Export As's `scale` (percent) is the dialog's `size`, as the scale variant of its serde form.

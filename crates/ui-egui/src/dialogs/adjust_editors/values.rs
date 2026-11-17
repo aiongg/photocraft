@@ -5,7 +5,7 @@
 //! an editor does not show (Gradient Map's smoothness and method, the other records of a partial Lab set) travel in
 //! [`ValueCx::base`], the params the dialog opened with, and [`to_params`] writes the edited fields over them.
 
-use craft::color::ui::gradient::{ColorStop, GradientStops};
+use craft::color_ui::ui::gradient::{ColorStop, GradientStops};
 use craft::draw::ui::gradient::GradientMap;
 use craft::imaging::ui::adjust::{
     BlackWhite, BrightnessContrast, ChannelMixer, ColorBalance, CurvesMode, HueRangeValue, HueSaturation, Levels, PhotoFilter, SelectiveColor, SelectiveMethod,

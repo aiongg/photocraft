@@ -1,7 +1,7 @@
 //! Colour sampling at a document point: the Eyedropper's pick, and the composite colour the dialog
 //! eyedroppers read.
 
-use craft::color::ui::{SampleSize, SampleSource};
+use craft::color_ui::ui::{SampleSize, SampleSource};
 use serde_json::json;
 
 use super::PhotocraftApp;

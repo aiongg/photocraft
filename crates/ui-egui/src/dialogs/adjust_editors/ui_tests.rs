@@ -4,7 +4,7 @@
 //! editors' own gestures are the framework's tests; these cover what the app wires around them.
 
 use craft::behavior::dock::Action;
-use craft::color::ui::{ColorPickerDialog, PickedColor};
+use craft::color_ui::ui::{ColorPickerDialog, PickedColor};
 use craft::theme::Srgba;
 use egui::accesskit::{Role, Toggled};
 use egui::{Pos2, Rect, vec2};

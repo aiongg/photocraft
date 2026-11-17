@@ -2,7 +2,7 @@
 //! (the current one checked), then Copy Color as HTML and Copy Color's Hex Code for the colour
 //! under the pointer, read from all layers with the Sample Size, whatever the Sample setting.
 
-use craft::color::ui::{SampleSize, SampleSource};
+use craft::color_ui::ui::{SampleSize, SampleSource};
 use craft::keymap::Mods;
 use serde_json::{Value, json};
 

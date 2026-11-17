@@ -6,7 +6,7 @@
 //! values; the shield is set and put back to what it was when the picker opened. The document is
 //! never touched.
 
-use craft::color::ui::ColorPickerDialog;
+use craft::color_ui::ui::ColorPickerDialog;
 use craft::theme::Srgba;
 use craft::ui::canvas::ShieldColor;
 use craft::ui::dialog::DialogId;

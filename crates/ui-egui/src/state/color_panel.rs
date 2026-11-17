@@ -7,5 +7,5 @@ use super::{Deserialize, Serialize};
 pub struct ColorPanelState {
     /// What the panel shows, its ramp and which colour it edits (#6000).
     #[serde(flatten)]
-    pub panel: craft::color::ui::ColorPanelState,
+    pub panel: craft::color_ui::ui::ColorPanelState,
 }

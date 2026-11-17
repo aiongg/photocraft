@@ -1,5 +1,5 @@
 use craft::behavior::EditEvent;
-use craft::color::ui::Paint;
+use craft::color_ui::ui::Paint;
 use craft::draw::ui::pen::PathOptionsPopover;
 use craft::draw::ui::shape::{self as fw, Arrowheads, ArrowheadsPopover, ShapePanel, StrokeCells, VectorMode, VectorModeSelect};
 use craft::theme::Srgba;

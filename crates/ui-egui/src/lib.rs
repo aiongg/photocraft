@@ -456,7 +456,7 @@ pub struct PhotocraftApp {
     /// Colours a Color Picker answered with OK, waiting for their owner: (dialog, field, colour).
     pub(crate) color_answers: Vec<(craft::ui::dialog::DialogId, String, craft::theme::Srgba)>,
     /// The screen-colour pick in progress (`screen_picker`).
-    pub(crate) screen_pick: craft::color::ui::ScreenPick,
+    pub(crate) screen_pick: craft::color_ui::ui::ScreenPick,
     /// Select and Mask / Content-Aware Fill / Liquify / Gallery / Vanishing Point sessions.
     pub(crate) caf: Option<caf_ui::CafApp>,
     pub(crate) liquify: Option<liquify_ui::LiquifyApp>,

@@ -12,7 +12,7 @@
 
 use std::collections::HashSet;
 
-use craft::color::ui::SwatchesCommand;
+use craft::color_ui::ui::SwatchesCommand;
 use craft::keymap::{Binding, Chord, CommandDef, CommandKind, Overrides, Scope};
 use craft::layers::ui::panel::LayersPanelCommands;
 use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};

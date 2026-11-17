@@ -11,7 +11,7 @@
 //! module owns the gesture's state ([`Hud`]) and writes each picked colour to the foreground.
 
 use craft::behavior::EditEvent;
-use craft::color::ui::ColorHud;
+use craft::color_ui::ui::ColorHud;
 use craft::theme::Srgba;
 use craft::ui::contract::Bind;
 use egui::{PointerButton, pos2};

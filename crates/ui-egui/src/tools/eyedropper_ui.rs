@@ -4,7 +4,7 @@
 //! (`canvas::sampling::eyedropper_color`). The Sample Size is shared with the painting tools'
 //! ⌥-click eyedropper, the dialog eyedroppers and the Info panel, as in Photoshop.
 
-use craft::color::ui::EyedropperBar;
+use craft::color_ui::ui::EyedropperBar;
 
 use crate::PhotocraftApp;
 
@@ -15,7 +15,7 @@ pub fn options(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 
 #[cfg(test)]
 mod tests {
-    use craft::color::ui::SampleSize;
+    use craft::color_ui::ui::SampleSize;
     use serde_json::json;
 
     use crate::PhotocraftApp;

@@ -1,6 +1,6 @@
 //! Render synthetic color-picker evidence without capturing the user's desktop.
 //! cargo run -p photocraft-ui-egui --example color_picker_demo -- /tmp/color-picker
-use craft::color::ui::{CaptureSource, StillCapture};
+use craft::color_ui::ui::{CaptureSource, StillCapture};
 use craft::platform::screen::{Capture, ScreenImage};
 use craft::theme::Srgba;
 use egui_kittest::{Harness, kittest::Queryable};

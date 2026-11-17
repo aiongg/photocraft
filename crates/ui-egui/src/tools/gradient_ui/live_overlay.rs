@@ -4,7 +4,7 @@
 
 use craft::behavior::EditEvent;
 use craft::behavior::kurbo::Point;
-use craft::color::gradient::{StopRows, StopRules};
+use craft::color_ui::gradient::{StopRows, StopRules};
 use craft::draw::ui::gradient::{GradientLine, GradientOverlay, GradientStyle as OverlayStyle, LineGradient};
 use craft::ui::contract::{Bind, Show as _};
 use egui::{Rect, Ui};

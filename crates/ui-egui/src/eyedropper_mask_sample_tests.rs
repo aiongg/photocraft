@@ -1,4 +1,4 @@
-use craft::color::ui::{SampleSize, SampleSource};
+use craft::color_ui::ui::{SampleSize, SampleSource};
 use egui::Modifiers;
 use photocraft_geom::Rect;
 use serde_json::json;

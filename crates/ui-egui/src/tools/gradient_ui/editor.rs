@@ -3,7 +3,7 @@
 
 use craft::behavior::EditEvent;
 // The stop bar is craft-color's.
-use craft::color::ui::gradient::{GradientEditor, StopRef, StopRows, StopRules};
+use craft::color_ui::ui::gradient::{GradientEditor, StopRef, StopRows, StopRules};
 use craft::ui::buttons::Button;
 use craft::ui::contract::{Bind, Props as _, Show as _, ShowContainer as _};
 use craft::ui::display::{Shade, Text};
