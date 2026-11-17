@@ -210,8 +210,18 @@ fn a_full_cpu_refresh_draws_in_the_background_with_the_synchronous_pixels() {
     let _gpu = photocraft_testkit::gpu_lock();
     let Some(mut g) = gpu_app() else { return };
     let doc = cpu_only_document(g.harness.state_mut(), 2600, 1700);
+    // Held, so the frame's later runs can't see the redraw already finished.
+    let held = hold_redraws();
     g.harness.step();
+    if !g.harness.state().redraws.contains_key(&doc) {
+        eprintln!(
+            "DIAG a_full_cpu_refresh_draws_in_the_background_with_the_synchronous_pixels: no redraw; last refresh {:?} fallback {:?}",
+            g.harness.state().perf.last_refresh,
+            g.harness.state().perf.gpu_fallback
+        );
+    }
     assert!(g.harness.state().redraws.contains_key(&doc), "the frame started a redraw instead of compositing inline");
+    drop(held);
     settle(&mut g);
     let app = g.harness.state();
     assert_eq!(app.perf.last_refresh, "background");
