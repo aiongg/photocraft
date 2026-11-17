@@ -372,7 +372,7 @@ fn dropping_onto_the_trash() {
             crate::layers_panel_nodes::drag(h, at, to, Modifiers::NONE);
             let id = trash_prompt(h, false);
             let ctx = h.ctx.clone();
-            h.state_mut().framework.dialogs.set_json_field(&ctx, id, "choice", json!("delete")).unwrap();
+            h.state_mut().framework.dialogs.set_json_field(&ctx, id, "choice", json!("alternate")).unwrap();
             confirm(h, id);
             assert!(layer(h, "Masked").unwrap().mask.is_none());
             assert_eq!(pixels(h), before, "deleted, not applied");

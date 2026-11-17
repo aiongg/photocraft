@@ -1005,14 +1005,18 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         app
     });
     h.run_steps(6);
-    let ctx = h.ctx.clone();
-    crate::menus::invoke(h.state_mut(), &ctx, "window.panel.navigator", json!({})).unwrap();
+    // The panel is shown, not toggled: the menu entry closes a Navigator the workspace already shows.
+    crate::panel_docking::show_panel(h.state_mut(), "navigator", Some(true)).unwrap();
     h.run_steps(6);
     assert_eq!(h.state().session.active_index(), Some(0), "the floating document is active");
     // The status bar's zoom field (bottom left) and the Navigator's.
     let fields = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {
-        // The fields are the nodes named Zoom that show the percentage as their value (a field's group carries the name too).
-        let mut f: Vec<egui::Rect> = h.query_all_by_label("Zoom").filter(|n| n.accesskit_node().value().is_some()).map(|n| n.rect()).collect();
+        // The fields are the nodes named Zoom that show the percentage as their value (a field's group and the Navigator's slider carry the name too).
+        let mut f: Vec<egui::Rect> = h
+            .query_all_by_label("Zoom")
+            .filter(|n| n.accesskit_node().role() != egui::accesskit::Role::Slider && n.accesskit_node().value().is_some())
+            .map(|n| n.rect())
+            .collect();
         f.sort_by(|a, b| a.left().total_cmp(&b.left()));
         f
     };

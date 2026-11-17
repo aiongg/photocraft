@@ -310,6 +310,9 @@ fn photo_filter_color(a: &Adjustment) -> [f32; 3] {
 
 /// Clicks the colour well labelled `label` and returns the Color Picker it opened.
 fn open_picker(h: &mut Harness<'_, PhotocraftApp>, label: &str) -> craft::ui::dialog::DialogId {
+    // The panel scrolls: bring the well into view before the pointer goes to it.
+    h.get_by_role_and_label(Role::ColorWell, label).scroll_to_me();
+    h.run_steps(2);
     h.get_by_role_and_label(Role::ColorWell, label).click();
     h.run_steps(3);
     crate::color_picker_ui::top(h.state()).expect("the colour well opens the Color Picker")
