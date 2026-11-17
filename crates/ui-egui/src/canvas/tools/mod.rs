@@ -115,8 +115,8 @@ impl Default for CanvasTools {
     fn default() -> Self {
         let options = NavigationOptions::default();
         Self {
-            momentary: Momentary::new(options.clone()),
-            hand: HandTool::new(options.clone()),
+            momentary: Momentary::new(options),
+            hand: HandTool::new(options),
             zoom: ZoomTool::new(options),
             rotate: RotateViewTool::default(),
             selection: Default::default(),
@@ -362,8 +362,7 @@ impl CanvasTool for Preflight<'_, '_> {
     fn press(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> ToolAction {
         let tool = self.tool;
         let doc = cx.space().map(|space| space.view.to_doc(pointer.pos));
-        if pointer.button == PointerButton::Primary && !self.dialog {
-            if let Some(doc) = doc {
+        if pointer.button == PointerButton::Primary && !self.dialog && let Some(doc) = doc {
                 if self.scope.with_app(|app| super::quick_pick::press(app, pointer, doc)) {
                     return ToolAction::Done;
                 }
@@ -378,7 +377,6 @@ impl CanvasTool for Preflight<'_, '_> {
                 if !resizes && self.refused(pointer, at) {
                     return ToolAction::Done;
                 }
-            }
         }
         self.inner.press(pointer, cx)
     }
@@ -688,8 +686,8 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     // A pick a dialog arms on the canvas stands in for the selected tool, so the Hand's Cmd and Alt zoom is not in effect.
     let dialog_picks = app.session.active_index() == Some(host.idx) && crate::dialogs::canvas_input::armed(app).is_some();
     tools.momentary.hand_selected(tool == Tool::Hand && app.ui.transform.is_none() && !dialog_picks);
-    tools.momentary.set_options(navigation.clone());
-    tools.hand.options = navigation.clone();
+    tools.momentary.set_options(navigation);
+    tools.hand.options = navigation;
     // Zoom In or Out and Scrubby Zoom are the selected Zoom tool's own options, never the momentary Zoom's.
     tools.zoom.out = !app.ui.tool_options.zoom_in && !crate::spring_tools::holds(app, Tool::Zoom);
     tools.zoom.options = navigation;
@@ -700,7 +698,7 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     if let (Some(scroll), Some(space)) = (response.scroll, out.space.as_ref()) {
         let size = app.session.documents().get(host.idx).map(|state| Size::new(f64::from(state.doc.size.width), f64::from(state.doc.size.height)));
         if let Some(size) = size {
-            let mut view = response.view.clone().unwrap_or(space.view);
+            let mut view = response.view.unwrap_or(space.view);
             if Autoscroll::scroll(&mut view, scroll, size).is_some() {
                 response.view = Some(view);
             }

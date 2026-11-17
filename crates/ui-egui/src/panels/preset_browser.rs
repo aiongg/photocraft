@@ -376,7 +376,7 @@ pub(crate) fn styles_run(app: &mut PhotocraftApp, ctx: &egui::Context, cmd: &Com
     let Some((action, count)) = action else { return true };
     let result = match action {
         PresetMenuAction::View(view) => {
-            app.ui.presets_ui.browsers.entry(STYLES.id.to_string()).or_insert_with(PresetState::new).view = view;
+            app.ui.presets_ui.browsers.entry(STYLES.id.to_string()).or_default().view = view;
             Ok(Value::Null)
         }
         PresetMenuAction::NewGroup => {
@@ -513,7 +513,7 @@ fn picker_state(presets: &PresetUi, id: &str) -> PresetState<String> {
 /// Keeps the view state of a picker's popover in `browsers[id]`.
 // PLAN: `browsers` holds `PresetState<PresetKey>`; a picker keys its rows by `String`, so its view, zoom and filter are copied.
 fn keep_picker_state(presets: &mut PresetUi, id: &str, state: PresetState<String>) {
-    let saved = presets.browsers.entry(id.to_string()).or_insert_with(PresetState::new);
+    let saved = presets.browsers.entry(id.to_string()).or_default();
     saved.view = state.view;
     saved.zoom = state.zoom;
     saved.filter = state.filter;

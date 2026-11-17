@@ -520,9 +520,9 @@ pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
         match bridge_of(&fired.command) {
             Some((id, Bridged::View(_))) => {
                 crate::panels::actions::journal_view(app, id, json!({}));
-                record(&app.ctx(), id, Outcome::Ran);
+                record(app.ctx(), id, Outcome::Ran);
             }
-            Some((id, Bridged::ScreenMode(_))) if fired.phase == FirePhase::Press => record(&app.ctx(), id, Outcome::Ran),
+            Some((id, Bridged::ScreenMode(_))) if fired.phase == FirePhase::Press => record(app.ctx(), id, Outcome::Ran),
             _ => {}
         }
     }

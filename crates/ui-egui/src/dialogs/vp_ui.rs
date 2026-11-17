@@ -460,14 +460,14 @@ impl VanishingScene for PcVanishingScene {
     fn resolve(&self, planes: &[VanishingPlane], torn: &[Option<TornPlane>]) -> Vec<VanishingPlane> {
         let Some(first) = planes.first() else { return Vec::new() };
         let mut sc = Scene::new(algo_plane(first), self.center, None, self.fallback);
-        for i in 1..planes.len() {
+        for (i, plane) in planes.iter().enumerate().skip(1) {
             match torn.get(i).and_then(Option::as_ref).filter(|t| t.from < i) {
                 Some(t) => {
                     if algo_edge(t.edge).and_then(|e| sc.tear_off(t.from, e, t.angle, t.depth)).is_none() {
                         sc.planes.push(VpPlane { corners: [[0.0; 2]; 4] });
                     }
                 }
-                None => sc.planes.push(algo_plane(&planes[i])),
+                None => sc.planes.push(algo_plane(plane)),
             }
         }
         sc.planes.into_iter().map(plane_of).collect()
@@ -540,7 +540,7 @@ pub fn begin(app: &mut PhotocraftApp, _ctx: &egui::Context) -> Result<(), String
     let mut settings = VanishingPointSettings::default();
     settings.paste = source.has_paste();
 
-    let open = VanishingPointOpen::new([canvas.width() as u32, canvas.height() as u32], name, StampLimits::new(MAX_CLONE_STROKES, MAX_CLONE_DABS))
+    let open = VanishingPointOpen::new([canvas.width(), canvas.height()], name, StampLimits::new(MAX_CLONE_STROKES, MAX_CLONE_DABS))
         .settings(settings)
         .navigation(crate::canvas::document_display::navigation(app))
         .checkerboard(crate::canvas::document_display::checkerboard(app).unwrap_or_default());

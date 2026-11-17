@@ -290,7 +290,6 @@ fn open_sized(app: &mut PhotocraftApp, stem: String, title: Option<String>, sour
 }
 
 /// Layer › Export As…: the same dialog for just the active layer (trimmed to its pixels).
-
 pub fn open_layer(app: &mut PhotocraftApp, layer: LayerId) -> Result<DialogId, String> {
     let st = app.session.active().ok_or("no document")?;
     let ldoc = photocraft_engine::layer_menu_cmds::layer_document(&st.doc, layer).map_err(|e| e.to_string())?;

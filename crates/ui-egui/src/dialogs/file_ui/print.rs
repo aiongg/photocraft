@@ -403,7 +403,7 @@ fn picture(ctx: &egui::Context, doc: &photocraft_doc::Document, revision: u64, m
         if mirror {
             for row in pixels.chunks_exact_mut(w * 4) {
                 let mut mirrored = Vec::with_capacity(row.len());
-                for px in row.chunks_exact(4).rev() {
+                for px in row.as_chunks::<4>().0.iter().rev() {
                     mirrored.extend_from_slice(px);
                 }
                 row.copy_from_slice(&mirrored);

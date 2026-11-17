@@ -755,8 +755,8 @@ fn panels_patch(app: &PhotocraftApp, patch: Option<&Value>) -> std::result::Resu
         let merged = merged_object(&app.ui.panels.task_bar, Some(bar), "panels.task_bar")?;
         own_patch.insert("task_bar".into(), serde_json::to_value(merged).map_err(|e| e.to_string())?);
     }
-    let own_patch = (!own_patch.is_empty()).then(|| Value::Object(own_patch));
-    let legacy = (!legacy.is_empty()).then(|| Value::Object(legacy));
+    let own_patch = (!own_patch.is_empty()).then_some(Value::Object(own_patch));
+    let legacy = (!legacy.is_empty()).then_some(Value::Object(legacy));
     Ok((own_patch, legacy))
 }
 

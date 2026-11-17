@@ -147,7 +147,7 @@ fn outline(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rect, id: L
             for poly in photocraft_vector::flatten::flatten_path(&path, 0.5) {
                 let mut line = BezPath::new();
                 for (i, &(x, y)) in poly.pts.iter().enumerate() {
-                    let p = doc_pt(aff.apply(photocraft_geom::Point::new(f64::from(x), f64::from(y))));
+                    let p = doc_pt(aff.apply(photocraft_geom::Point::new(x, y)));
                     if i == 0 { line.move_to(p) } else { line.line_to(p) }
                 }
                 if poly.pts.len() >= 2 {

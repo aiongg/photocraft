@@ -137,7 +137,6 @@ fn paint_values(app: &PhotocraftApp, tool: Tool, b: &BrushSettings) -> PaintValu
 
 /// Writes the bar's `after` values onto `brush` and the tool options. Only what differs from
 /// `before` is written, so a Mode list that shows Clear because `~` is held does not store it.
-
 fn apply_values(app: &mut PhotocraftApp, tool: Tool, brush: &mut BrushSettings, before: &PaintValues<PaintMode>, after: &PaintValues<PaintMode>) {
     // The brush keeps at least 1 % opacity and flow (0 % paints nothing, #11812).
     // PLAN: PaintBar's Opacity and Flow fields range over 0..=100, so a typed 0 on the Eraser reports no

@@ -869,7 +869,9 @@ pub(crate) fn batch_preview(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool 
         let thumb = photocraft_compose::thumbnail(&preview.document, 1024);
         let flat: Vec<u8> = thumb
             .pixels
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|px| {
                 let alpha = u32::from(px[3]);
                 let over_white = |c: u8| ((u32::from(c) * alpha + 255 * (255 - alpha) + 127) / 255) as u8;

@@ -151,8 +151,8 @@ pub(crate) fn open_with(app: &mut PhotocraftApp, command: &str, params: &Value) 
     let seeded = params.get("width").is_some() || params.get("height").is_some();
     // A recorded size is in pixels, whatever the ruler unit.
     let unit = if seeded { UnitKind::Pixels } else { pref_unit(ur.rulers) };
-    let points = f64::from(ur.point_size.per_inch());
-    let columns = ColumnSize::new(f64::from(ur.column_width), f64::from(ur.gutter));
+    let points = ur.point_size.per_inch();
+    let columns = ColumnSize::new(ur.column_width, ur.gutter);
     let interpolation = prefs.general.image_interpolation;
     let d = &app.session.active()?.doc;
     let size = PixelSize::new(d.size.width, d.size.height);

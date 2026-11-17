@@ -166,7 +166,7 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
     let mut settings = ShapeToolSettings::default();
     settings.fill_on = o.shape_fill;
     settings.corner_radius = match target.as_ref().and_then(|s| s.live.as_ref()) {
-        Some(photocraft_doc::LiveShape::Rect { radii, .. }) if rect_target => f64::from(radii[0]),
+        Some(photocraft_doc::LiveShape::Rect { radii, .. }) if rect_target => radii[0],
         _ => f64::from(o.corner_radius),
     };
     settings.sides = o.polygon_sides;

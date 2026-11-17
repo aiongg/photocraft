@@ -123,7 +123,7 @@ pub(crate) fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
 fn whole_seconds(seconds: f64) -> Option<u8> {
     let range = Actions::PAUSE_SECONDS;
     let whole = seconds.is_finite() && seconds.fract() == 0.0 && seconds >= f64::from(*range.start()) && seconds <= f64::from(*range.end());
-    whole.then(|| seconds as u8)
+    whole.then_some(seconds as u8)
 }
 
 /// The dialog's rows over the saved options: Performance (Accelerated, Step by Step, Pause For: n seconds, whose

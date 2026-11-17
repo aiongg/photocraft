@@ -573,7 +573,7 @@ struct Frame<'c> {
 impl Frame<'_> {
     fn apply<'d>(&self, display: RasterDisplay<'d>) -> RasterDisplay<'d> {
         let display = match self.checker {
-            Some(checker) => display.checkerboard(checker.clone()),
+            Some(checker) => display.checkerboard(*checker),
             None => display,
         };
         let display = if self.edge { display.outlined() } else { display };

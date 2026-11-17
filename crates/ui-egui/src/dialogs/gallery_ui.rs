@@ -151,7 +151,7 @@ impl PcGallerySource {
         let (tw, th) = (THUMB[0] as i32 * k as i32, THUMB[1] as i32 * k as i32);
         let (cx, cy) = ((cb.x0 + cb.x1) / 2, (cb.y0 + cb.y1) / 2);
         let thumb_src = sample(&src, Rect::new(cx - tw / 2, cy - th / 2, cx - tw / 2 + tw, cy - th / 2 + th), k);
-        let preview = SharedPicture::new(PixelSize::new(canvas.width().max(1) as u32, canvas.height().max(1) as u32));
+        let preview = SharedPicture::new(PixelSize::new(canvas.width().max(1), canvas.height().max(1)));
         PcGallerySource { src: Arc::new(src), canvas, target, foreground: colours[0], background: colours[1], thumb_src, catalog: PcCatalog, preview }
     }
 
@@ -505,7 +505,7 @@ fn open_on(
     if !effects.is_empty() {
         session.effects = effects;
     }
-    let size = PixelSize::new(canvas.width().max(1) as u32, canvas.height().max(1) as u32);
+    let size = PixelSize::new(canvas.width().max(1), canvas.height().max(1));
     let source = Arc::new(PcGallerySource::new(src, canvas, target, colours));
     let workspace = FilterGalleryWorkspace::new(FilterGalleryOpen::new(size, layer_name, session));
 

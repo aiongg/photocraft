@@ -32,7 +32,7 @@ const FLOAT_AT: [f32; 2] = [400.0, 140.0];
 const FLOAT_SIZE: [f32; 2] = [300.0, 400.0];
 
 /// What the workspace allows `panel`, as the dock and every command apply it.
-fn permissions(panel: &String) -> Permissions {
+fn permissions(panel: &str) -> Permissions {
     registry::permissions(panel)
 }
 

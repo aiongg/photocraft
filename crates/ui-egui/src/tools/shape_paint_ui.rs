@@ -179,8 +179,8 @@ pub(crate) fn decorate_chip<'c>(chip: PaintChip<'c>, which: ShapePaint, library:
     let default_preview = gradient_preview(&library.default_gradient);
     let ChipLibrary { recent, swatches, folders, gradients, gradient_state, edited, .. } = library;
     let edited = &mut edited[slot(which)];
-    chip.recent(*recent)
-        .swatches(*swatches, Bind::bound(&mut **folders))
+    chip.recent(recent)
+        .swatches(swatches, Bind::bound(&mut folders))
         .full_picker(true)
         .gradient_editor(default_preview, move |ui: &mut egui::Ui| {
             // A second run in the same pass starts from what the first produced.

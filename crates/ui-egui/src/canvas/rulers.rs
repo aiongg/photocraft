@@ -273,7 +273,7 @@ fn run_guides(app: &mut PhotocraftApp, ctx: &egui::Context, shown: &[Guide], out
             }
         }
         let mut gone: Vec<(bool, usize)> = shown.iter().filter(|g| !after.iter().any(|a| a.key == g.key)).map(|g| guide_select::unkey(g.key)).collect();
-        gone.sort_by(|a, b| b.1.cmp(&a.1));
+        gone.sort_by_key(|a| std::cmp::Reverse(a.1));
         for (vertical, index) in gone {
             status = status.and(app.run("view.deleteGuide", guide_select::delete_params(vertical, index)).map(drop));
         }

@@ -582,10 +582,8 @@ pub(crate) fn selection_actions(change: SelectionChange<LayerId>, selected: &[La
         }
         SelectionChange::Set(ids) => actions.push(("layer.select".into(), json!({"layers": ids.iter().map(|id| id.0).collect::<Vec<_>>()}))),
         SelectionChange::Toggle(id) => actions.push(("layer.select".into(), json!({"layer": id.0, "mode": "toggle"}))),
-        SelectionChange::Clear => {
-            if !selected.is_empty() {
-                actions.push(("select.deselectLayers".into(), json!({})));
-            }
+        SelectionChange::Clear if !selected.is_empty() => {
+            actions.push(("select.deselectLayers".into(), json!({})));
         }
         _ => {}
     }

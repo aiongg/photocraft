@@ -284,7 +284,7 @@ fn insert(app: &mut PhotocraftApp, r: PathRef, knot: KnotRef, t: f64) {
 fn context(app: &mut PhotocraftApp, hit: &BezierHit, at: Pos2, tool: Tool, mods: Mods) {
     let Some(r) = PathRef::from_key(hit.path()) else { return };
     let Some(doc) = crate::canvas::document_display::doc_point_at(app, at) else { return };
-    crate::canvas_tool_menu::open_at(app, tool, mods, at, [doc.x, doc.y], Some((r, hit.clone())));
+    crate::canvas_tool_menu::open_at(app, tool, mods, at, [doc.x, doc.y], Some((r, *hit)));
 }
 
 /// The `path.deleteAnchor` parameters for one anchor of `path`.

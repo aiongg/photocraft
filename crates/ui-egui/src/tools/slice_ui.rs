@@ -222,7 +222,6 @@ fn draw(app: &mut PhotocraftApp, rect: DocRect) {
 
 /// One step of a Move or Resize of the slice `number`. The gesture's value is shown as the preview;
 /// its end moves each edge of the stored slice by what the piece's edge moved.
-
 fn edit_slice(app: &mut PhotocraftApp, number: usize, event: EditEvent<DocRect>) {
     match event {
         EditEvent::Begin { .. } => {}

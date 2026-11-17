@@ -18,7 +18,7 @@ pub(crate) fn open(app: &mut PhotocraftApp, kind: ShapeKind, at: Point) -> Optio
     }
     let ur = &app.session.prefs().units_and_rulers;
     let ruler = crate::sizing::pref_unit(ur.rulers);
-    let points = f64::from(ur.point_size.per_inch());
+    let points = ur.point_size.per_inch();
     let (dpi, size) = app
         .session
         .active()

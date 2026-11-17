@@ -174,7 +174,7 @@ impl Pane<'_> {
 
     /// `label`'s select over the mask modes.
     fn mode(&mut self, ui: &mut Ui, label: &str, mode: &mut MaskMode) {
-        let entries: Vec<Entry<MaskMode>> = MASK_MODES.iter().map(|(m, l)| Entry::new(m.clone(), tl!(*l).to_string())).collect();
+        let entries: Vec<Entry<MaskMode>> = MASK_MODES.iter().map(|(m, l)| Entry::new(*m, tl!(*l).to_string())).collect();
         Field::new(label.to_owned()).show(ui, |ui, _| {
             let edit = Select::new(label.to_owned(), Bind::bound(&mut *mode), &entries).show(ui);
             self.out.note(&edit);
@@ -228,7 +228,7 @@ impl Pane<'_> {
         let controls: Vec<DynamicControl<Control>> = CONTROLS[..n]
             .iter()
             .map(|(control, label)| {
-                let entry = DynamicControl::new(control.clone(), tl!(*label));
+                let entry = DynamicControl::new(*control, tl!(*label));
                 match control {
                     Control::Fade if !angle => entry.fade().curve(),
                     Control::PenPressure | Control::PenTilt | Control::StylusWheel | Control::Rotation if !angle => entry.curve(),

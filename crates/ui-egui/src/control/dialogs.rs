@@ -429,10 +429,8 @@ fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value
     // The unsaved-changes prompt answers Save when no choice is named.
     let judged = choice.unwrap_or("save");
     // A Save writes the document back, so it is judged as `file.save` before the question closes.
-    if is_save_answer(app, id) {
-        if let Err(error) = crate::discard_ui::authorize_save(app, true) {
+    if is_save_answer(app, id) && let Err(error) = crate::discard_ui::authorize_save(app, true) {
             return err(error);
-        }
     }
     if let Some((command, params)) = command_of(app, id, judged)
         && let Some(authorize) = app.services.automation_command.as_ref()

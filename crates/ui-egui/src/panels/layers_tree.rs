@@ -673,7 +673,7 @@ impl ThumbSource<LayerThumb<LayerId>> for PhotoThumbs<'_> {
     fn render(&self, key: &LayerThumb<LayerId>, request: &ThumbRequest) -> ThumbRender {
         let Some(l) = self.source(key) else { return ThumbRender::Blank };
         let canvas = self.doc.bounds();
-        let size = |r: photocraft_geom::Rect| craft::behavior::PixelSize::new(r.width().max(1) as u32, r.height().max(1) as u32);
+        let size = |r: photocraft_geom::Rect| craft::behavior::PixelSize::new(r.width().max(1), r.height().max(1));
         let gray = |surface: &photocraft_raster::Surface| {
             let mut v = [0.0f32; 1];
             thumb_image(size(canvas), request.side, |x, y| {

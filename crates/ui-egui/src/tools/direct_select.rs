@@ -411,7 +411,6 @@ pub(crate) fn selected_open_end(app: &PhotocraftApp) -> Option<(PathRef, usize, 
 }
 
 /// The tools that keep a selection across each other: Direct Selection and Convert Point.
-
 fn owns(tool: Tool) -> bool {
     matches!(tool, Tool::DirectSelection | Tool::ConvertPoint)
 }

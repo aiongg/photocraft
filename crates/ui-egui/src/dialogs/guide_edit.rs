@@ -75,7 +75,7 @@ pub(crate) fn begin(app: &mut PhotocraftApp, dialog: DialogId, values: &NewGuide
     }
     app.guide_edit = Some(Draft {
         dialog,
-        target: Target { vertical, index, original: values.clone() },
+        target: Target { vertical, index, original: *values },
         edit: EditSession::new(value, context),
         params: None,
         guides: None,
@@ -171,7 +171,7 @@ pub(crate) fn cancel(app: &mut PhotocraftApp, id: DialogId) {
 pub(crate) fn sync(app: &mut PhotocraftApp) -> bool {
     let Some(id) = app.guide_edit.as_ref().map(|d| d.dialog) else { return false };
     // A dialog that finished this pass is read by `new_guide_ui::take`, which ends the draft.
-    let Some(values) = app.framework.dialogs.get_by_id::<HostedNewGuideDialog>(id).map(|d| d.values().clone()) else { return false };
+    let Some(values) = app.framework.dialogs.get_by_id::<HostedNewGuideDialog>(id).map(|d| *d.values()) else { return false };
     let old = app.guide_edit.as_ref().and_then(|d| d.params.clone());
     let result = update(app, &values);
     let changed = old != app.guide_edit.as_ref().and_then(|d| d.params.clone());

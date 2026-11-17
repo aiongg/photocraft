@@ -318,11 +318,9 @@ pub fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
 /// The workspace switcher of the title bar.
 pub fn switcher(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let out = WorkspaceSwitcher::new(&app.workspaces.set).show(ui);
-    if let Some(id) = out.switched {
-        if let Err(message) = select(app, &id) {
+    if let Some(id) = out.switched && let Err(message) = select(app, &id) {
             app.ui.status = message;
             app.ui.status_error = true;
-        }
     }
 }
 

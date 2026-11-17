@@ -140,7 +140,7 @@ fn constraint_fields(app: &mut PhotocraftApp, ui: &mut egui::Ui, enabled: bool) 
     let kind = FIXED_SIZE_UNITS.iter().find(|(u, _)| *u == unit).map_or(UnitKind::Pixels, |(_, k)| *k);
     let entries: Vec<Entry<UnitKind>> = FIXED_SIZE_UNITS.iter().map(|(u, k)| Entry::new(*k, label(unit_text(*u)))).collect();
     let (dpi, size) = app.session.active().map_or((72.0, PixelSize::new(1, 1)), |d| {
-        (f64::from(d.doc.resolution_dpi.max(1.0)), PixelSize::new(d.doc.size.width as u32, d.doc.size.height as u32))
+        (f64::from(d.doc.resolution_dpi.max(1.0)), PixelSize::new(d.doc.size.width, d.doc.size.height))
     });
     let out = ConstraintFields::new(Bind::bound(&mut constraint)).enabled(enabled).size_units(kind, &entries, dpi, size).show(ui);
     if out.changed {

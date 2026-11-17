@@ -299,7 +299,7 @@ fn lut_choice(fields: &DialogFields) -> LutChoice {
         return LutChoice::Folder(PathBuf::from(file));
     }
     let look = fields.text("lut").unwrap_or("none");
-    photocraft_engine::adjust_cmds::LOOKS.iter().find(|(known, _)| *known == look).map_or(LutChoice::None, |(known, _)| LutChoice::Builtin(*known))
+    photocraft_engine::adjust_cmds::LOOKS.iter().find(|(known, _)| known == look).map_or(LutChoice::None, |(known, _)| LutChoice::Builtin(*known))
 }
 
 /// Writes a picked choice as the command's `lut` / `file` parameters; the loaded LUT already held is no pick.

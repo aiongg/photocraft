@@ -206,7 +206,7 @@ pub(crate) fn assign_shortcut(app: &mut PhotocraftApp, name: &str, shortcut: &st
         }
         for (other, assigned) in &prefs.alternate_shortcuts {
             if other.starts_with(SHORTCUT_PREFIX) && other != &id && assigned.iter().any(same) {
-                alternates.insert(other.clone(), json!(assigned.iter().filter(|a| !same(*a)).collect::<Vec<_>>()));
+                alternates.insert(other.clone(), json!(assigned.iter().filter(|a| !same(a)).collect::<Vec<_>>()));
             }
         }
     }

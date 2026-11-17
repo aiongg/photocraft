@@ -181,9 +181,7 @@ pub(crate) fn show(ui: &mut egui::Ui, app: &mut PhotocraftApp, rect: egui::Rect)
         let tone = trail.tone;
         trail.show_as(ui, rect, tl!("Stroke footprint"), tone);
     }
-    if app.remove_trail.is_some() && crate::retouch_ui::remove_pending_live(app) {
-        if let Some(trail) = app.remove_trail.as_mut() {
+    if app.remove_trail.is_some() && crate::retouch_ui::remove_pending_live(app) && let Some(trail) = app.remove_trail.as_mut() {
             trail.show_as(ui, rect, tl!("Waiting removals"), TrailTone::Danger);
-        }
     }
 }

@@ -526,11 +526,9 @@ fn fit_with_straight_segments(trace: &[[f64; 2]], straight: &[usize], fit: f64, 
         start = end;
     }
     let closed = close && knots.len() > 3;
-    if closed && let Some(last) = knots.pop() {
-        if let Some(k) = knots.first_mut() {
+    if closed && let Some(last) = knots.pop() && let Some(k) = knots.first_mut() {
             k.in_ctrl = Point::new(last.in_ctrl.x - last.anchor.x + k.anchor.x, last.in_ctrl.y - last.anchor.y + k.anchor.y);
             k.smooth = false;
-        }
     }
     (PenPath { draft: EditSubpath::new(knots, closed), ..Default::default() }, closed)
 }

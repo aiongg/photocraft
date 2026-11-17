@@ -112,7 +112,7 @@ fn step(app: &mut PhotocraftApp, now: f64) -> Option<(Arc<Document>, u64)> {
         return None;
     };
     let st = app.session.active()?;
-    let session = PreviewSession::new(st.doc.id.0, st.revision, st.active_layer.map_or(0, |l| u64::from(l.0) + 1));
+    let session = PreviewSession::new(st.doc.id.0, st.revision, st.active_layer.map_or(0, |l| l.0 + 1));
     let b = st.doc.bounds();
     if app.cam_preview.as_ref().is_some_and(|p| p.live.session() != Some(session)) {
         app.cam_preview = None;

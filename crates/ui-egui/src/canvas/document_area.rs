@@ -100,8 +100,8 @@ fn documents(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // The tabs region and the document run one after the other inside `show`, each with the app to itself.
     let out = {
         let shared = RefCell::new(&mut *app);
-        let panel = CanvasPanel::new().tabs(|ui, cx| tabs::strip(&mut **shared.borrow_mut(), ui, cx)).opening(opening);
-        panel.show(ui, |ui, cx| document(&mut **shared.borrow_mut(), ui, cx.rect))
+        let panel = CanvasPanel::new().tabs(|ui, cx| tabs::strip(&mut shared.borrow_mut(), ui, cx)).opening(opening);
+        panel.show(ui, |ui, cx| document(&mut shared.borrow_mut(), ui, cx.rect))
     };
     // Auto Show the Home Screen off: double-clicking the empty workspace shows File › Open, as in Photoshop (#5367).
     if out.empty_double && app.session.documents().is_empty() && app.jobs.opens.is_empty() {
