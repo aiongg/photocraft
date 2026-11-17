@@ -68,11 +68,15 @@ struct Cache {
     proxy: Arc<Document>,
 }
 
+/// The ants surface, its own revision and the size of the reduced copy it covers, behind the lock the preview job and
+/// the overlay share.
+type AntsCell = Mutex<Option<(Arc<Surface>, u64, [u32; 2])>>;
+
 /// The refined selection the Marching Ants view outlines, owned so the framework's overlay can read it through
 /// [`MaskSource`] while the preview job replaces it.
 pub(crate) struct SharedMask {
     /// The ants surface, its own revision and the size of the reduced copy it covers.
-    cell: Mutex<Option<(Arc<Surface>, u64, [u32; 2])>>,
+    cell: AntsCell,
     /// Document pixels per mask pixel.
     k: AtomicU32,
     next_revision: AtomicU64,

@@ -94,6 +94,9 @@ fn canvas_zone(app: &PhotocraftApp) -> DropZone {
     DropZone::new(app.last_canvas_layer, canvas_drop_rect(app))
 }
 
+/// The browser footer's own controls.
+type Footer<'a> = Box<dyn Fn(&mut egui::Ui) + 'a>;
+
 /// How one panel's browser differs from the common one.
 #[derive(Default)]
 struct Look<'a> {
@@ -106,7 +109,7 @@ struct Look<'a> {
     /// The notice of a browser with no presets.
     empty: Option<&'a str>,
     /// The footer's own controls.
-    leading: Option<Box<dyn Fn(&mut egui::Ui) + 'a>>,
+    leading: Option<Footer<'a>>,
     /// The panel has no folders: no New Group button and no reordering.
     flat: bool,
 }

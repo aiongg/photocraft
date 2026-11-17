@@ -27,8 +27,15 @@ pub(crate) mod params {
     use photocraft_doc::DocId;
     use serde_json::Value;
 
-    use super::*;
+    use super::{
+        PhotocraftApp, alerts, canvas_input, channel_options_ui, color_picker_ui, color_table_ui, count_group_name_ui, duplicate_layer_ui, equalize_ui, file_forms,
+        fill_ui, filter_dialog, brush_preset_dialog, history_options_ui, image_processor_ui, merge_channels_ui, new_group_ui, new_layer_ui, smart_filter_dialog,
+        snapshot_dialog, stack_dialog, stroke_ui,
+    };
     use crate::canvas::document_display::CanvasHost;
+
+    /// Judges a held OK: a refusal's label, or `Ok`.
+    type OkCheck = fn(&mut PhotocraftApp, &ParamResult) -> Result<(), Label>;
 
     /// One family of parameter dialogs: the dialogs whose key it owns, and what it does with their answers.
     #[derive(Clone, Copy)]
@@ -39,7 +46,7 @@ pub(crate) mod params {
         /// [`captured`].
         pub run: fn(&mut PhotocraftApp, &egui::Context, ParamResult),
         /// Judges a held OK before the dialog closes; a refusal shows under the rows and keeps the dialog open.
-        pub check: Option<fn(&mut PhotocraftApp, &ParamResult) -> Result<(), Label>>,
+        pub check: Option<OkCheck>,
         /// The files of a folder, for a files row of the family's dialogs.
         pub listing: Option<fn(&PhotocraftApp, &Path) -> Vec<PathBuf>>,
         /// A footer button the dialog reported (the button's id comes last).
