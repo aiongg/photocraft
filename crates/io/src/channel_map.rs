@@ -90,9 +90,7 @@ pub(crate) fn display_spaces(data: &[u8], versioned: bool, skip: usize) -> Vec<u
 /// DisplayInfo colour in a space it does not document (psd-tools cmyk-alpha-spot.psd: 0x2331)
 /// and its ink here, in Lab.
 pub(crate) fn alternate_spot_colors(data: &[u8]) -> Vec<(u32, Color)> {
-    craft_psd::channel_resources::alternate_spot_colors(data)
-        .filter_map(|rec| decode_known_color(rec.space, rec.components).map(|c| (rec.id, c)))
-        .collect()
+    craft_psd::channel_resources::alternate_spot_colors(data).filter_map(|rec| decode_known_color(rec.space, rec.components).map(|c| (rec.id, c))).collect()
 }
 
 /// Whether a DisplayInfo resource 1077 marks any channel as a spot (kind 2), in 13-byte records
