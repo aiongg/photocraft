@@ -311,6 +311,8 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
 /// Applies the open window's draft as its Apply button does and keeps the window open. `Err` when it is closed, a
 /// colour picker it opened is still open, or the engine refuses a value.
 pub fn apply_window(app: &mut PhotocraftApp) -> Result<Value, String> {
+    // The window judges Apply on what it reads of the app (an open picker among it), as its button does after a feed.
+    feed(app);
     let Some(dialog) = app.framework.dialogs.get_mut::<PrefsDialog>() else { return Err("Preferences is not open".into()) };
     let applied = dialog.apply().map(|()| std::mem::take(&mut dialog.edits));
     let result = applied.and_then(|batches| write_all(app, batches));
