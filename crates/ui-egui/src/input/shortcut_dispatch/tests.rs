@@ -156,7 +156,10 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
         Place::FocusedWidget => {
             h.get_by_role_and_label(Role::TreeItem, "paint").scroll_to_me();
             h.run_steps(4);
-            eprintln!("DIAG every_displayed_shortcut_dispatches_from_where_focus_usually_is: row before focus {:?}", h.get_by_role_and_label(Role::TreeItem, "paint"));
+            eprintln!(
+                "DIAG every_displayed_shortcut_dispatches_from_where_focus_usually_is: row before focus {:?}",
+                h.get_by_role_and_label(Role::TreeItem, "paint")
+            );
             h.get_by_role_and_label(Role::TreeItem, "paint").focus();
             h.run_steps(2);
             eprintln!(

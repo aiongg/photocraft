@@ -1070,7 +1070,11 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         );
         h.run_steps(58);
         assert!(h.state().ui.window_views.is_empty(), "the window keeps no copy of the view");
-        assert!((h.state().ui.views[0].zoom - want).abs() < 1e-3, "field {field}, typed {typed}: not written back over by the window: {}", h.state().ui.views[0].zoom);
+        assert!(
+            (h.state().ui.views[0].zoom - want).abs() < 1e-3,
+            "field {field}, typed {typed}: not written back over by the window: {}",
+            h.state().ui.views[0].zoom
+        );
     }
 }
 

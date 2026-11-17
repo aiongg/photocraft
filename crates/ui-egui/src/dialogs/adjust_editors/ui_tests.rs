@@ -148,7 +148,10 @@ fn every_adjustment_layer_edits_through_properties() {
                     .into_iter()
                     .map(|(owner, part)| (owner, part, h.ctx.read_response(owner).map(|resp| resp.rect)))
                     .collect();
-                eprintln!("DIAG every_adjustment_layer_edits_through_properties: {kind} {mode}: slider node {r:?}, shapes under its centre {under:?}, sliders {:?}", sliders(&h));
+                eprintln!(
+                    "DIAG every_adjustment_layer_edits_through_properties: {kind} {mode}: slider node {r:?}, shapes under its centre {under:?}, sliders {:?}",
+                    sliders(&h)
+                );
                 drag(&mut h, r.center() - vec2(r.width() * 0.2, 0.0), r.center() + vec2(r.width() * 0.2, 0.0));
             } else if kind == "gradientMap" {
                 let r = label_rect(&h, "Reverse").unwrap_or_else(|| panic!("{kind} {mode}: Reverse"));

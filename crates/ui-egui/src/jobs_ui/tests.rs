@@ -514,11 +514,7 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
             h.state().ui.spring
         );
     }
-    eprintln!(
-        "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: after B tool={:?} spring={:?}",
-        h.state().ui.tool,
-        h.state().ui.spring
-    );
+    eprintln!("DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: after B tool={:?} spring={:?}", h.state().ui.tool, h.state().ui.spring);
     assert_eq!(h.state().ui.tool, crate::state::Tool::Brush, "shortcuts work again");
 }
 

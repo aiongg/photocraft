@@ -1,8 +1,8 @@
 //! Scrolling the Paths panel moves only its list (#6238).
 
 use egui::vec2;
-use egui_kittest::kittest::{NodeT, Queryable};
 use egui_kittest::Harness;
+use egui_kittest::kittest::{NodeT, Queryable};
 use serde_json::json;
 
 use crate::PhotocraftApp;
