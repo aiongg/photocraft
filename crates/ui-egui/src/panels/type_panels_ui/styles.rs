@@ -4,7 +4,7 @@
 use craft::text::ui::style_panel::{TextStyleAction, TextStyleKind, TextStyleRow, TextStylesPanel};
 use craft::ui::contract::Bind;
 use craft::ui::menu::PanelRow;
-use craft::ui::runtime::commands::{CommandRef, CommandState};
+use craft::ui::runtime::commands::CommandRef;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;

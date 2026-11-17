@@ -43,9 +43,7 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
         return None;
     }
     Some(match id {
-        "file.export.saveForWebLegacy" => {
-            Ok(opened(open_web(app)?))
-        }
+        "file.export.saveForWebLegacy" => Ok(opened(open_web(app)?)),
         "file.print" => {
             app.session.active()?;
             Ok(opened(open_print(app)))

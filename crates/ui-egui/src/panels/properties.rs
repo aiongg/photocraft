@@ -5,10 +5,9 @@ use craft::behavior::IconId;
 use craft::ui::buttons::Button;
 use craft::ui::choice::Switch;
 use craft::ui::contract::{Bind, Props as _, Show as _, Sizing, clicked};
-use craft::ui::menu::PanelRow;
 use craft::ui::patterns::panels::Inspector;
 use craft::ui::primitives::IconSpec;
-use craft::ui::runtime::commands::{CommandRef, CommandState};
+
 use photocraft_doc::{Layer, LayerContent, LayerId};
 use serde_json::json;
 

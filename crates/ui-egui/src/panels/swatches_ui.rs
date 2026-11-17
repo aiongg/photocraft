@@ -21,7 +21,7 @@ use craft::theme::variant::Tone;
 use craft::ui::bars::StatusMessage;
 use craft::ui::contract::{Bind, CommandSet};
 use craft::ui::menu::PanelRow;
-use craft::ui::patterns::presets::{PresetFileEvent, PresetFileRequest, PresetWords};
+use craft::ui::patterns::presets::{PresetFileRequest, PresetWords};
 use craft::ui::runtime::commands::{CommandRef, CommandState};
 
 use crate::PhotocraftApp;

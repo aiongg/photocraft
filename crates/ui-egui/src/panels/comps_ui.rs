@@ -8,7 +8,7 @@ use craft::behavior::{EditEvent, Mixed};
 use craft::layers::ui::comps::{CompOption, LayerCompRow, LayerCompsEvent, LayerCompsPanel};
 use craft::ui::contract::Bind;
 use craft::ui::menu::PanelRow;
-use craft::ui::runtime::commands::{CommandRef, CommandState};
+use craft::ui::runtime::commands::CommandRef;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;

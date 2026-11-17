@@ -1,11 +1,8 @@
-use craft::behavior::IconId;
 use craft::theme::variant::Tone;
 use craft::ui::contract::Show as _;
-use craft::ui::display::Icon;
 use craft::ui::notices::{Notice, NoticeLayout};
-use craft::ui::primitives::IconSpec;
 
-use super::{BlendMode, LayerId, PhotocraftApp, Rect, Sense, Tokens, vec2};
+use super::{BlendMode, LayerId, PhotocraftApp};
 
 // ----------------------------------------------------------------------------- layers
 

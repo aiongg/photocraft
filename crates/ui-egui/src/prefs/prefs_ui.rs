@@ -7,10 +7,9 @@
 //! change them with `prefs.get` / `prefs.set`); this module only edits a working copy in a dialog
 //! and commits it with those commands on Apply or OK.
 
-use std::collections::{HashMap, VecDeque};
+use std::collections::VecDeque;
 
 use egui::Color32;
-use photocraft_doc::DocId;
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome, Started};
 use photocraft_engine::prefs::{self, AppearanceMode};
 use serde_json::{Value, json};

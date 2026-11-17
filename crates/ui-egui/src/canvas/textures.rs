@@ -5,7 +5,6 @@ use super::filter_preview::filter_channel_preview;
 use super::navigator::navigator_waits_for_drag;
 use super::strokes::live_stroke;
 use super::{Document, PhotocraftApp};
-use egui::TextureOptions;
 use photocraft_doc::LayerContent;
 use photocraft_geom::Rect as DRect;
 

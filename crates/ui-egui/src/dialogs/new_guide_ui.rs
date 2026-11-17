@@ -19,7 +19,6 @@ use craft::ui::dialog::{DialogId, DialogResult, StackDialog};
 use craft::ui::patterns::form_dialogs::{HostRequests, HostedNewGuideDialog, NewGuideDialog, NewGuideValues};
 use craft::ui::runtime::env::Label;
 use craft::ui::runtime::memory::SaveKey;
-use photocraft_engine::edit_cmds::GUIDE_COLORS;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;

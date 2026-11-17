@@ -1,5 +1,5 @@
 use super::defaults::{target, target_doc};
-use super::{LayerId, PhotocraftApp, byte_of, fonts, insertion_style, json, selected_styles, text_layer, values};
+use super::{LayerId, PhotocraftApp, byte_of, fonts, insertion_style, json, text_layer, values};
 use craft::text::ui::type_bar::TypeBar;
 
 /// Photoshop's Type options bar: the members of the type tool, shown inside the host's options `Bar`, which adds
