@@ -21,6 +21,8 @@ use crate::pattern_fill_ui::{self, PhaseDrag};
 pub(crate) struct DialogTools {
     /// The press point in document units.
     press: Option<[f64; 2]>,
+    /// The pick the press began under.
+    pick: Option<DialogPick>,
     /// The modifiers held at the press.
     mods: Mods,
     /// The Pattern Fill drag, from its press to its release.
@@ -44,11 +46,12 @@ pub(crate) fn dialog_tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut DialogToo
     Some(Box::new(DialogTool { scope, state, pick }))
 }
 
-/// Ends the gesture of a dialog's pick when a pass of its press runs without the pick: a dialog opened above the one
-/// that armed it, or the pick disarmed. Nothing of the gesture resumes when the pick comes back; what it applied
-/// stays (production stops the Pattern Fill drag on a nested dialog).
+/// Ends the gesture of a dialog's pick when a pass of its press runs without that pick: a dialog opened above the one
+/// that armed it, or the pick disarmed or changed. Nothing of the gesture resumes when the pick comes back; what it
+/// applied stays (production stops the Pattern Fill drag on a nested dialog).
 pub(crate) fn end_if_disarmed(app: &crate::PhotocraftApp, state: &mut DialogTools, host: CanvasHost) {
-    if app.session.active_index() != Some(host.idx) || canvas_input::armed(app).is_none() {
+    let armed = (app.session.active_index() == Some(host.idx)).then(|| canvas_input::armed(app)).flatten();
+    if state.pick.is_some() && armed != state.pick {
         *state = DialogTools::default();
     }
 }
@@ -90,14 +93,17 @@ impl CanvasTool for DialogTool<'_> {
         });
         if !took {
             self.state.press = None;
+            self.state.pick = None;
             return ToolAction::Ignored;
         }
         if click {
             self.scope.with_app(|app| canvas_input::release(app, pick));
             self.state.press = None;
+            self.state.pick = None;
             return ToolAction::Done;
         }
         self.state.press = Some(at);
+        self.state.pick = Some(pick);
         self.state.mods = mods;
         ToolAction::Claimed
     }
@@ -140,11 +146,11 @@ impl CanvasTool for DialogTool<'_> {
             canvas_input::release(app, pick);
         });
         self.state.press = None;
+        self.state.pick = None;
     }
 
     fn cancel(&mut self, _reason: CancelReason, _cx: &mut ToolContext<'_>) {
-        self.state.phase = None;
-        self.state.press = None;
+        *self.state = DialogTools::default();
     }
 
     fn view_only(&self) -> bool {
