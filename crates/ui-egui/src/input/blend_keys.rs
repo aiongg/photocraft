@@ -251,7 +251,7 @@ pub(crate) fn fired(app: &mut PhotocraftApp, f: &Fired) -> bool {
 #[cfg(test)]
 pub(crate) fn test_fired(command: craft::ui::runtime::commands::CommandRef) -> Fired {
     use craft::ui::runtime::commands::{FirePhase, FireSource};
-    Fired::new(command, FireSource::Key, FirePhase::Press)
+    Fired::new(command, FireSource::Key, FirePhase::Press, 0.0)
 }
 
 #[cfg(test)]

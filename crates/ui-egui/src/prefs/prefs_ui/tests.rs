@@ -1152,7 +1152,7 @@ fn selected_tool_excludes_temporary_switches() {
     tick(&mut app, &ctx);
     assert_eq!(stored(&store)["selectedTool"], json!("Brush"));
     // A quick tap commits the choice once the letter is up (its command's release) and spring_tools clears the switch.
-    crate::spring_tools::released(&mut app, 'Z');
+    crate::spring_tools::released(&mut app, 'Z', 0.0);
     crate::spring_tools::tick(&mut app, &ctx);
     crate::tool_memory::persist(&mut app, &ctx);
     tick(&mut app, &ctx);
