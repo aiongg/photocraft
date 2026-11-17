@@ -442,7 +442,7 @@ fn build_sheet(ctx: &egui::Context, doc: &photocraft_doc::Document, revision: u6
 /// It drains the dialog's request queues (`take_refresh`, `take_moves`, the Browse request), so a
 /// second pass in the same frame finds them empty and applies only what its own input raised.
 /// The sheet is rebuilt only when the fields' parameters or the document's revision differ from
-/// the last sheet's.
+/// the last sheet's; the open dialog gets it every pass.
 pub(super) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
     match app.framework.dialogs.take::<HostedPrint>() {
         Some(DialogResult::Ok(answer)) => return finish(app, answer),
@@ -479,13 +479,18 @@ pub(super) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
             }
         }
     }
+    // The last sheet built, with the parameters and revision it was built from. Every pass hands the open dialog the
+    // sheet: a dialog opened again over the same settings starts without one and shows nothing until it has it.
     let key = format!("{}|{}|{revision}", print_params(&fields), doc.id.0);
-    let slot = egui::Id::new("print-sheet-key");
-    if ctx.data(|d| d.get_temp::<String>(slot)).as_deref() != Some(key.as_str())
-        && let Some(sheet) = build_sheet(ctx, &doc, revision, &fields)
-    {
+    let slot = egui::Id::new("print-sheet");
+    let cached = ctx.data(|d| d.get_temp::<(String, PrintSheet)>(slot)).filter(|(built, _)| *built == key).map(|(_, sheet)| sheet);
+    let sheet = cached.or_else(|| {
+        let sheet = build_sheet(ctx, &doc, revision, &fields)?;
+        ctx.data_mut(|d| d.insert_temp(slot, (key, sheet.clone())));
+        Some(sheet)
+    });
+    if let Some(sheet) = sheet {
         dialog.set_sheet(sheet);
-        ctx.data_mut(|d| d.insert_temp(slot, key));
     }
     if browse.is_some() {
         let current = fields.text("output").unwrap_or_default().to_string();
