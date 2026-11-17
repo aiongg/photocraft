@@ -689,8 +689,7 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     tools.zoom.options = navigation;
     tools.zoom.options.scrubby_zoom = app.ui.tool_options.zoom_scrubby;
     let smart = super::snap_ui::smart_guide_color(app);
-    let mut response =
-        with_rig(app, &ctx, host, &mut tools, primary, shown, |selected, tool_host| tool_host.smart_guide_color(smart).run(ui, out, selected));
+    let mut response = with_rig(app, &ctx, host, &mut tools, primary, shown, |selected, tool_host| tool_host.smart_guide_color(smart).run(ui, out, selected));
     // The autoscroll moves the view the pass ended with; the caller copies the response's view into its own.
     if let (Some(scroll), Some(space)) = (response.scroll, out.space.as_ref()) {
         let size = app.session.documents().get(host.idx).map(|state| Size::new(f64::from(state.doc.size.width), f64::from(state.doc.size.height)));

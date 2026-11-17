@@ -34,9 +34,7 @@ use state::{checked, translated_menu_label};
 /// rules (a full-window workspace, a pending crop). Both bars, the runtime's command gate and
 /// [`allows`] read this one function.
 pub(crate) fn menu_gate(app: &PhotocraftApp) -> (Gate, ModalRules) {
-    let gate = Gate::default()
-        .modal(app.dialog_open() || crate::prefs_ui::shortcuts_open(app))
-        .recording_shortcut(crate::prefs_ui::recording(app));
+    let gate = Gate::default().modal(app.dialog_open() || crate::prefs_ui::shortcuts_open(app)).recording_shortcut(crate::prefs_ui::recording(app));
     let workspace = app.smart_svg.modal_open() || crate::distort_ui::modal_workspace(app).is_some();
     let pending = crate::crop_ui::pending(app);
     let rule = pending.then(|| Arc::new(|c: &CommandRef| crate::crop_ui::available_while_pending(&c.id)) as PendingRule);
