@@ -10,7 +10,8 @@ use craft::keymap::Mods;
 use craft::ui::canvas::{CanvasOutput, MomentaryTool, ToolHostResponse};
 use craft::ui::canvas_controls::GuidesOutput;
 use craft::ui::contract::overlay::{Anchor, Trigger};
-use craft::ui::contract::{Bind, Entry};
+use craft::ui::contract::{Bind, CommandSet, Entry};
+use craft::ui::runtime::commands::CommandRef;
 use craft::ui::menu::Menu;
 use craft::ui::runtime::env::{Env, UnitKind};
 use egui::{Context, Pos2};
@@ -539,8 +540,33 @@ fn choose_crop(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) ->
 const CANVAS_COLORS: [CanvasColor; 6] =
     [CanvasColor::Default, CanvasColor::Black, CanvasColor::DarkGray, CanvasColor::MediumGray, CanvasColor::LightGray, CanvasColor::Custom];
 
-/// Photoshop's Space+F (⇧Space+F backwards): the next pasteboard colour, round and round. Saved
-/// like a choice in the pasteboard menu (`interface.canvasColor`).
+/// Photoshop's Space+F and ⇧Space+F: F while the Hand key is held steps the pasteboard colour in place of Cycle Screen
+/// Mode. The keys are the held Hand's scope (`canvasHand`, which `MomentaryCommands::Hand` holds), so they work only
+/// while Space is down.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, CommandSet)]
+#[command(prefix = "canvasColor", scope = "canvasHand")]
+pub(crate) enum CanvasColorCommands {
+    #[command(label = "Next Pasteboard Color", default = "F")]
+    Next,
+    #[command(label = "Previous Pasteboard Color", default = "Shift+F")]
+    Previous,
+}
+
+impl CanvasColorCommands {
+    pub(crate) const ALL: [CanvasColorCommands; 2] = [CanvasColorCommands::Next, CanvasColorCommands::Previous];
+}
+
+/// Runs a fired [`CanvasColorCommands`]; whether `command` is one.
+pub(crate) fn run_canvas_color(app: &mut PhotocraftApp, _ctx: &Context, command: &CommandRef) -> bool {
+    let Some(step) = CanvasColorCommands::from_ref(command) else { return false };
+    if let Err(e) = cycle_canvas_color(app, step == CanvasColorCommands::Previous) {
+        app.ui.status = e;
+    }
+    true
+}
+
+/// The next pasteboard colour, round and round (`backward`: the previous). Saved like a choice in the pasteboard menu
+/// (`interface.canvasColor`).
 pub fn cycle_canvas_color(app: &mut PhotocraftApp, backward: bool) -> Result<(), String> {
     let n = CANVAS_COLORS.len();
     let at = CANVAS_COLORS.iter().position(|c| *c == app.session.prefs().interface.canvas_color).unwrap_or(0);

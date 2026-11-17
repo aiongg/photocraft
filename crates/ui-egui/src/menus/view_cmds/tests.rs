@@ -102,6 +102,14 @@ fn fire(app: &mut PhotocraftApp, ctx: &egui::Context, command: craft::ui::canvas
     frame(app, ctx);
 }
 
+/// Runs a View › Screen Mode command as its menu item does, with the frames around it: the window's shell takes the
+/// command once a frame has shown the shell, and applies it in that pass.
+fn screen_mode(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str) {
+    frame(app, ctx);
+    menu(app, ctx, id, json!({})).unwrap();
+    frame(app, ctx);
+}
+
 /// The form must list every source first and default to Current only when a document exists.
 #[test]
 fn image_processor_source_choices_include_current_and_all_open_documents() {
@@ -236,7 +244,7 @@ fn show_snap_extras_and_screen_modes_are_state() {
     assert!(app.ui.view.extras);
     // F cycles the screen modes.
     for want in ["fullScreenWithMenuBar", "fullScreen", "standard"] {
-        menu(&mut app, &ctx, "view.screenMode.cycle", json!({})).unwrap();
+        screen_mode(&mut app, &ctx, "view.screenMode.cycle");
         assert_mode(&app, want);
     }
 }
@@ -768,13 +776,13 @@ fn esc_leaves_full_screen_with_the_crop_tool_showing_its_default_frame() {
     let default_frame = |app: &PhotocraftApp| crate::crop_ui::frame(app).is_some() && crate::crop_ui::is_default_frame(app);
     assert!(default_frame(&app));
     for mode in ["fullScreen", "fullScreenWithMenuBar"] {
-        menu(&mut app, &ctx, &format!("view.screenMode.{mode}"), json!({})).unwrap();
+        screen_mode(&mut app, &ctx, &format!("view.screenMode.{mode}"));
         press_esc(&mut app, &ctx);
         assert_mode(&app, "standard");
         assert!(default_frame(&app), "{mode}: the default frame stays");
     }
     // With Straighten armed, Esc drops it first and the mode stays.
-    menu(&mut app, &ctx, "view.screenMode.fullScreen", json!({})).unwrap();
+    screen_mode(&mut app, &ctx, "view.screenMode.fullScreen");
     crate::crop_ui::toggle_straighten(&mut app);
     assert!(crate::crop_ui::straightening(&app));
     press_esc(&mut app, &ctx);
@@ -790,7 +798,7 @@ fn esc_leaves_full_screen_modes_unless_something_else_owns_it() {
     let (mut app, ctx) = app_with(1);
     // Both full screen modes return to Standard, and the menu check follows (#4116).
     for mode in ["fullScreen", "fullScreenWithMenuBar"] {
-        menu(&mut app, &ctx, &format!("view.screenMode.{mode}"), json!({})).unwrap();
+        screen_mode(&mut app, &ctx, &format!("view.screenMode.{mode}"));
         press_esc(&mut app, &ctx);
         assert_mode(&app, "standard");
     }
@@ -798,7 +806,7 @@ fn esc_leaves_full_screen_modes_unless_something_else_owns_it() {
     press_esc(&mut app, &ctx);
     assert_mode(&app, "standard");
     // An open dialog takes Esc first.
-    menu(&mut app, &ctx, "view.screenMode.fullScreen", json!({})).unwrap();
+    screen_mode(&mut app, &ctx, "view.screenMode.fullScreen");
     menu(&mut app, &ctx, "image.canvasSize", json!({})).unwrap();
     assert_eq!(app.framework.dialogs.open_dialogs().len(), 1);
     press_esc(&mut app, &ctx);
