@@ -77,8 +77,6 @@ pub struct EncodedPreview {
     pub bytes: usize,
     /// The palette size of an indexed format.
     pub colors: Option<usize>,
-    /// The file extension.
-    pub ext: &'static str,
     /// The palette the encode chose, as red, green and blue.
     pub palette: Vec<[u8; 3]>,
     /// The proxy's width in pixels.
@@ -141,7 +139,6 @@ pub fn optimized(
         rgba,
         bytes: encoded.bytes.len(),
         colors: encoded.colors,
-        ext: encoded.ext,
         palette: encoded.color_table.clone(),
         width: encoded.width as u32,
         height: encoded.height as u32,

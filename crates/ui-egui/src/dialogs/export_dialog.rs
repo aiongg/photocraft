@@ -187,7 +187,8 @@ pub(crate) fn settings_from(options: &ExportOptions, source: PixelSize) -> Map<S
 /// source size its settings are for, the preview in progress and the texture it shows. The dialog
 /// has one id, so the app keeps one of these.
 pub(crate) struct ExportOpen {
-    /// The dialog's id.
+    /// The dialog's id, which the tests read to drive it.
+    #[cfg(test)]
     pub(crate) dialog: DialogId,
     /// The layers Layer › Export As exports; empty for the whole document, several for one file each.
     pub(crate) layers: Vec<LayerId>,
@@ -285,7 +286,16 @@ fn open_sized(app: &mut PhotocraftApp, stem: String, title: Option<String>, sour
         dialog = dialog.title(title);
     }
     let id = app.framework.dialogs.open(dialog);
-    app.export_open = Some(ExportOpen { dialog: id, layers, source, texture: None, picking: false, work: None, last: None });
+    app.export_open = Some(ExportOpen {
+        #[cfg(test)]
+        dialog: id,
+        layers,
+        source,
+        texture: None,
+        picking: false,
+        work: None,
+        last: None,
+    });
     Ok(id)
 }
 

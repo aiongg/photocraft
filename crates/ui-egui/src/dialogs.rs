@@ -442,6 +442,7 @@ pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
     layer_style::take,
     color_picker_ui::take,
     crate::type_panels_ui::color_picker::take,
+    crate::type_panels_ui::spelling::take,
     color_range_ui::take,
     select_mask_ui::take,
     caf_ui::take,

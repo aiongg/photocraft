@@ -61,6 +61,7 @@ pub(crate) struct Update {
     /// The object to highlight.
     pub shown: Option<Arc<Region>>,
     /// A lookup is pending or running: a repaint is already asked for.
+    #[cfg(test)]
     pub busy: bool,
     /// Why nothing can be found here: [`empty_layer_hint`] when the sampled layer has no pixels under the pointer.
     pub hint: Option<&'static str>,
@@ -110,7 +111,12 @@ pub(crate) fn update(app: &mut PhotocraftApp, at: Option<[f64; 2]>, pressed: boo
     // The click reports an empty sampled layer; the hover says so too instead of showing nothing.
     let here = photocraft_geom::Rect::from_xywh(px[0], px[1], 1, 1);
     if doc_arc.bounds().contains(px[0], px[1]) && empty_sampled_area(&doc_arc, layer, all_layers, here).is_some() {
-        return Update { shown: None, busy: false, hint: Some(empty_layer_hint()) };
+        return Update {
+            shown: None,
+            #[cfg(test)]
+            busy: false,
+            hint: Some(empty_layer_hint()),
+        };
     }
     let Some(f) = app.object_finder.as_mut() else { return Update::default() };
     if f.at != px {
@@ -155,8 +161,14 @@ pub(crate) fn update(app: &mut PhotocraftApp, at: Option<[f64; 2]>, pressed: boo
     if resting {
         ctx.request_repaint_after(std::time::Duration::from_secs_f64(DEBOUNCE - (now - f.since)));
     }
+    #[cfg(test)]
     let busy = f.job.is_some() || resting;
-    Update { shown: f.shown.clone(), busy, hint: None }
+    Update {
+        shown: f.shown.clone(),
+        #[cfg(test)]
+        busy,
+        hint: None,
+    }
 }
 
 /// Starts the lookup at `at`; the job asks `ctx` for a repaint when it has sent its result.

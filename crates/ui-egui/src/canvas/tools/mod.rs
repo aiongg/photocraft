@@ -242,21 +242,20 @@ pub(crate) fn takes_command_stand_in(tool: Tool) -> bool {
 /// canvas's `Ui` and the tool coexist.
 pub(crate) struct ToolScope<'a> {
     app: RefCell<&'a mut PhotocraftApp>,
-    host: CanvasHost,
     ctx: egui::Context,
 }
 
 impl<'a> ToolScope<'a> {
-    fn new(app: &'a mut PhotocraftApp, ctx: egui::Context, host: CanvasHost) -> Self {
-        Self { app: RefCell::new(app), host, ctx }
+    fn new(app: &'a mut PhotocraftApp, ctx: egui::Context) -> Self {
+        Self { app: RefCell::new(app), ctx }
     }
 
     /// A scope for a family tool's unit test, with no canvas pass.
     // PLAN: the contract takes `&PhotocraftApp`, but `with_app` hands out `&mut PhotocraftApp`; the constructor takes `&mut`.
     #[cfg(test)]
-    pub(crate) fn for_test(app: &'a mut PhotocraftApp, host: CanvasHost) -> Self {
+    pub(crate) fn for_test(app: &'a mut PhotocraftApp) -> Self {
         let ctx = super::testing::ctx(app);
-        Self::new(app, ctx, host)
+        Self::new(app, ctx)
     }
 
     /// Runs `f` on the app. A nested call panics: a tool method calls `with_app` once at a time.
@@ -551,7 +550,7 @@ fn with_rig<R>(
     } = tools;
     let outline_open = selection.outline_open();
     let result = {
-        let scope = ToolScope::new(app, ctx.clone(), host);
+        let scope = ToolScope::new(app, ctx.clone());
         let mut boxed: Option<FamilyTool<'_>> = None;
         let mut command_t: Option<FamilyTool<'_>> = None;
         let mut alt_t: Option<FamilyTool<'_>> = None;

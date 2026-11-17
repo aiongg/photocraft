@@ -98,7 +98,7 @@ fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Re
     let Some(id) = str_param(p, "id") else { return err("missing `id`") };
     let Some(menu) = app.ui.canvas_tool_menu.as_ref() else { return err("no canvas context menu is open") };
     if matches!(menu.kind, MenuKind::BrushMode { .. }) {
-        return mode_menu_choose(app, ctx, id);
+        return mode_menu_choose(app, id);
     }
     if !crate::canvas_tool_menu::available(app, menu, id) {
         return err("context action is unavailable");
@@ -115,7 +115,7 @@ fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Re
 }
 
 /// A row of the painting tools' Shift+right-click menu, by its English label (`brushModeMenu.choices`).
-fn mode_menu_choose(app: &mut PhotocraftApp, ctx: &egui::Context, label: &str) -> Reply {
+fn mode_menu_choose(app: &mut PhotocraftApp, label: &str) -> Reply {
     let item = match crate::brush_mode_menu::find(app, label) {
         Ok(item) => item,
         Err(e) => return err(e),

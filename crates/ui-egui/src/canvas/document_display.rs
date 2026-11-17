@@ -203,8 +203,6 @@ pub(crate) struct CanvasPass<'a> {
 
 /// What a canvas pass leaves for the caller.
 pub(crate) struct Shown {
-    /// The view on screen.
-    pub view: CanvasView,
     /// The canvas's output, for the canvas menu.
     pub output: CanvasOutput,
     /// What the tool host did this pass.
@@ -319,7 +317,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         let Some(space) = canvas_space(&body.env) else { return };
         pasteboards(app, ui, body.rect, idx, border, label.clone());
         guides = super::rulers::show(app, ui, host);
-        selection_controls(app, ui, body.rect, idx, output, &label);
+        selection_controls(app, ui, body.rect, idx, &label);
         // The Levels clipping display, over the picture and under the controls: it joins the canvas's picture slot
         // after the picture.
         let clipping = if primary { crate::levels_clipping::shapes(app, ctx, &space.view, idx) } else { Vec::new() };
@@ -449,8 +447,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     if let Some(next) = response.view.as_ref() {
         view.set_from(next, ppp);
     }
-    let view = canvas_output.space.map_or(given, |space| space.view);
-    Shown { view, output: canvas_output, response, guides, overlay_context }
+    Shown { output: canvas_output, response, guides, overlay_context }
 }
 
 /// The document's pasteboard, and for an artboard document a second one over the boards that leaves the shown layers
@@ -469,7 +466,7 @@ fn pasteboards(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, idx: usiz
 }
 
 /// The selection's marching ants, the Layer Edges outline and the pixel grid.
-fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, idx: usize, output: Option<u32>, label: &str) {
+fn selection_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, rect: Rect, idx: usize, label: &str) {
     let ants = ants_shown(app, idx);
     if let Some(state) = app.session.documents().get(idx) {
         let doc = state.doc.clone();

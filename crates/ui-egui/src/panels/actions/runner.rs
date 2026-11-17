@@ -976,7 +976,6 @@ pub(crate) fn prepare_history(app: &mut PhotocraftApp, token: u64) -> Result<(),
     Ok(())
 }
 
-#[cfg(test)]
 /// Check Spelling owns each correction only while it runs; the open window owns a bound token.
 pub(crate) fn spelling_change(app: &mut PhotocraftApp, params: Value) -> Result<Value, String> {
     let Some(token) = app.ui.type_panels.spell.as_ref().and_then(|dialog| dialog.resume) else {
@@ -1009,7 +1008,6 @@ pub(crate) fn spelling_change(app: &mut PhotocraftApp, params: Value) -> Result<
     result
 }
 
-#[cfg(test)]
 /// Check Spelling's Done for the action paused at its step: the action continues when the document
 /// it was playing on is still the active one, and otherwise ends there with the reason in the
 /// status bar. Returns `Ok` when nothing failed.

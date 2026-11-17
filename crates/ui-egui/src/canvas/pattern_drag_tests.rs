@@ -286,7 +286,7 @@ fn the_dialog_tool_serves_only_the_active_documents_canvas() {
     assert!(app.session.set_active(0));
     frame(&mut app);
     let active = app.session.active_index().unwrap();
-    let scope = ToolScope::for_test(&mut app, CanvasHost::main(active));
+    let scope = ToolScope::for_test(&mut app);
     let mut state = DialogTools::default();
     assert!(dialog_tool(&scope, &mut state, CanvasHost::main(active)).is_some(), "the active document's canvas runs the dialog tool");
     let mut state = DialogTools::default();

@@ -21,11 +21,6 @@ use crate::PhotocraftApp;
 #[derive(Default)]
 pub struct Runtime {
     loaded: bool,
-    next_autosave_ms: f64,
-    /// Last revision whose recovery file was actually written successfully.
-    autosaved: HashMap<DocId, u64>,
-    /// Queued writes must not masquerade as durable snapshots.
-    autosave_pending: HashMap<DocId, u64>,
     recovery_started: bool,
     recovery_queue: VecDeque<crate::Recoverable>,
     recovery_pending: Option<(JobId, String)>,

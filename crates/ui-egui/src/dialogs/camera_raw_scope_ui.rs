@@ -12,6 +12,8 @@ use photocraft_algo::histogram::RgbHistogram;
 use photocraft_algo::vectorscope::{HUES, SATURATIONS, Vectorscope, hue_saturation};
 use std::sync::Arc;
 
+/// Most colour samplers (probes) on the preview.
+pub(crate) const MAX_SAMPLERS: usize = 9;
 /// Vectorscope analysis samples at most this many proxy pixels.
 const SCOPE_SAMPLES: usize = 8192;
 
@@ -38,7 +40,8 @@ pub(crate) struct ScopeInputs<'a> {
 /// The counts of one develop: both pictures' histograms, the vectorscope of each picture over the
 /// whole frame and over the selected region, and the After picture's clipping mask.
 pub(crate) struct ScopeData {
-    /// Indexed by [`side`].
+    /// Indexed by [`side`]; the tests read the counts through [`ScopeData::histogram`].
+    #[cfg(test)]
     histograms: [RgbHistogram; 2],
     /// Per [`side`]: the composite (sum of the three channels), then red, green, blue.
     bins: [[Vec<u32>; 4]; 2],
@@ -100,7 +103,15 @@ impl ScopeData {
             })
         });
         let mask = ClippingMask::from_rgba(size, developed).unwrap_or_else(|| ClippingMask::new(size));
-        Self { histograms, bins, clipped, vectorscopes, mask: Arc::new(mask), revision: Revision::new(revision) }
+        Self {
+            #[cfg(test)]
+            histograms,
+            bins,
+            clipped,
+            vectorscopes,
+            mask: Arc::new(mask),
+            revision: Revision::new(revision),
+        }
     }
 
     /// Hands `show` the frame of the picture before or after the settings, counted over the whole
@@ -126,6 +137,12 @@ impl ScopeData {
     /// The After picture's clipping mask and the revision of the develop it was made from.
     pub(crate) fn clipping(&self) -> (Arc<ClippingMask>, Revision) {
         (self.mask.clone(), self.revision)
+    }
+
+    #[cfg(test)]
+    /// The counts of the picture before or after the settings, for the control channel's reply.
+    pub(crate) fn histogram(&self, before: bool) -> &RgbHistogram {
+        &self.histograms[side(before)]
     }
 
     /// The vectorscope of the picture before or after the settings over the whole frame or the

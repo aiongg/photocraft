@@ -2,12 +2,13 @@
 use super::PARALLEL_MIN_PIXELS;
 use super::open::raw_stage;
 use craft::imaging::raw::RawDevelopSettings as CameraRaw;
+#[cfg(test)]
 use craft::imaging::ui::raw_develop::RawPreviewRequest;
 use photocraft_algo::camera_raw::DevelopInputs;
 use photocraft_algo::histogram::RgbHistogram;
 
 /// What every develop of one open raw shares: the proxy and the inputs the source keeps between
-/// requests. A request adds the settings and the revision ([`ProxyJob::from_request`]).
+/// requests. A request adds the settings.
 #[derive(Clone)]
 pub(crate) struct ProxyBase {
     pub(crate) proxy: std::sync::Arc<Vec<[f32; 4]>>,
@@ -28,20 +29,15 @@ pub(crate) struct ProxyJob {
     pub(crate) base: ProxyBase,
     /// The settings as the request carries them.
     pub(crate) params: CameraRaw,
-    /// The request's revision; the frame carries it back so a landing can drop a frame older than the source's.
-    pub(crate) revision: u64,
 }
 
 /// A developed proxy, ready to show.
 pub(crate) struct ProxyFrame {
-    /// The revision of the request this frame answers.
-    pub(crate) revision: u64,
     pub(crate) px: Vec<[f32; 4]>,
     pub(crate) histogram: RgbHistogram,
     pub(crate) histogram_ms: f64,
     /// The developed pixels as the canvas shows them: the after raster's pixels.
     pub(crate) image: egui::ColorImage,
-    pub(crate) display: std::sync::Arc<photocraft_engine::display_color::CanvasDisplay>,
     pub(crate) ms: f64,
     pub(crate) develop_ms: f64,
     pub(crate) backend: &'static str,
@@ -59,8 +55,14 @@ pub(crate) fn display_pixels(px: &[[f32; 4]], w: usize, h: usize, display: &phot
 }
 
 impl ProxyJob {
+    /// The develop of `request` over `base`: its settings as they are.
+    #[cfg(test)]
+    pub(crate) fn from_request(request: &RawPreviewRequest, base: &ProxyBase) -> Self {
+        Self { base: base.clone(), params: request.settings.clone() }
+    }
+
     pub(crate) fn run(self) -> ProxyFrame {
-        let ProxyJob { base, params, revision } = self;
+        let ProxyJob { base, params } = self;
         let ProxyBase { proxy, selection, raw_curve, float, size, full_w, display, gpu, source_key, inputs } = base;
         let t0 = crate::gpu_canvas::now_ms();
         let (pw, ph) = size;
@@ -79,14 +81,15 @@ impl ProxyJob {
         let develop_start = crate::gpu_canvas::now_ms();
         let key = retoned.is_none().then_some(source_key);
         let input = retoned.as_deref().unwrap_or(&proxy);
-        let (mut px, backend) = match gpu.as_ref().and_then(|g| g.develop(input, key, pw, ph, &p, &inputs, float)) {
-            Some(out) => (out, "gpu"),
-            None => {
-                let mut px = retoned.unwrap_or_else(|| proxy.to_vec());
-                photocraft_algo::camera_raw::develop(&mut px, pw, ph, &p, &inputs, float);
-                (px, "cpu")
-            }
-        };
+        let (mut px, backend) =
+            match gpu.as_ref().and_then(|g| g.develop(crate::camera_raw_gpu::ProxyPixels { px: input, key, w: pw, h: ph }, &p, &inputs, float)) {
+                Some(out) => (out, "gpu"),
+                None => {
+                    let mut px = retoned.unwrap_or_else(|| proxy.to_vec());
+                    photocraft_algo::camera_raw::develop(&mut px, pw, ph, &p, &inputs, float);
+                    (px, "cpu")
+                }
+            };
         let develop_ms = crate::gpu_canvas::now_ms() - develop_start;
         if let Some(mask) = &selection {
             let blend = |(out, (original, coverage)): (&mut [f32; 4], (&[f32; 4], &f32))| {
@@ -107,6 +110,6 @@ impl ProxyJob {
         let histogram = RgbHistogram::from_rgba(&px);
         let histogram_ms = crate::gpu_canvas::now_ms() - histogram_start;
         let image = display_pixels(&px, pw, ph, &display);
-        ProxyFrame { revision, px, histogram, histogram_ms, image, display, ms: crate::gpu_canvas::now_ms() - t0, develop_ms, backend }
+        ProxyFrame { px, histogram, histogram_ms, image, ms: crate::gpu_canvas::now_ms() - t0, develop_ms, backend }
     }
 }

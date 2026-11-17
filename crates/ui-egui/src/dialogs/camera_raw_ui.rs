@@ -286,8 +286,8 @@ impl PcRawSource {
     }
 
     /// One develop of the proxy with `settings`.
-    fn proxy_job(&self, settings: &CameraRaw, revision: u64) -> ProxyJob {
-        ProxyJob { base: self.proxy_base(), params: settings.clone(), revision }
+    fn proxy_job(&self, settings: &CameraRaw) -> ProxyJob {
+        ProxyJob { base: self.proxy_base(), params: settings.clone() }
     }
 
     /// Whether the view shows more pixels than the proxy has, so the visible part is worth refining.
@@ -320,7 +320,7 @@ impl RawDevelopSource for PcRawSource {
         // The request's revision only counts source changes; the develops of one source are told apart by this order, so
         // an older job that finishes after a newer one does not replace its result.
         let order = self.issued.fetch_add(1, Ordering::Relaxed) + 1;
-        let job = self.proxy_job(&request.settings, order);
+        let job = self.proxy_job(&request.settings);
         let settings = request.settings.clone();
         let picture = self.after.picture.clone();
         let developed = self.developed.clone();
@@ -415,7 +415,8 @@ pub(crate) struct RawSession {
     pub(crate) original: CameraRaw,
     /// The develop the workspace reads.
     pub(crate) source: Arc<PcRawSource>,
-    /// The GPU develop, when the app may use one.
+    /// The GPU develop, when the app may use one; the tests read it to check the pass.
+    #[cfg(test)]
     pub(crate) gpu: Option<CameraRawGpu>,
 }
 

@@ -67,6 +67,51 @@ impl DetailPreview {
         self.pending.is_some()
     }
 
+    #[cfg(test)]
+    /// Collects a finished worker and starts the refinement of `revision` when the settings need
+    /// one. Identity settings need none: the source is their develop. Each pass applies only its
+    /// own `revision`, so a second pass in one frame changes nothing the first did not.
+    pub(crate) fn refine(&mut self, ctx: &Context, revision: u64, params: &CameraRaw, inputs: &DevelopInputs) {
+        self.poll(revision);
+        if params.is_identity() {
+            if self.result.as_ref().is_none_or(|(r, _)| *r != revision) {
+                self.result = Some((revision, self.source.clone()));
+                self.mask = None;
+                self.error = None;
+            }
+        } else {
+            self.request(ctx, revision, params, inputs);
+            self.poll(revision);
+        }
+        self.ready = self.result.as_ref().is_some_and(|(r, _)| *r == revision);
+    }
+
+    #[cfg(test)]
+    pub(crate) fn poll(&mut self, revision: u64) {
+        let Some((requested_revision, rx)) = &self.pending else { return };
+        let requested_revision = *requested_revision;
+        let result = match rx.try_recv() {
+            Ok(result) => result,
+            Err(TryRecvError::Empty) => return,
+            Err(TryRecvError::Disconnected) => Err("RAW Develop detail preview worker stopped".into()),
+        };
+        self.pending = None;
+        match result {
+            Ok((r, surface)) if r == revision => {
+                self.result = Some((r, surface));
+                self.mask = None;
+                self.error = None;
+            }
+            Ok(_) => {} // A parameter changed while the worker was developing this revision.
+            Err(e) => {
+                if requested_revision == revision {
+                    self.error = Some(e);
+                }
+                self.failed_revision = Some(requested_revision);
+            }
+        }
+    }
+
     /// Starts the full-resolution develop of `revision` unless one runs, one is ready or it failed.
     /// `inputs` carry the seed and encoding gamma; the refinement runs at pixel scale 1.
     pub(crate) fn request(&mut self, ctx: &Context, revision: u64, params: &CameraRaw, inputs: &DevelopInputs) {
@@ -169,6 +214,60 @@ impl DetailPreview {
             }
         }
         true
+    }
+
+    #[cfg(test)]
+    /// The clipped channels of every pixel of the refined area, with the revision they were made
+    /// from; `None` while the area is not refined for the current revision. Made once per revision.
+    pub(crate) fn clipping(&mut self) -> Option<(Arc<ClippingMask>, u64)> {
+        let (revision, surface) = self.result.as_ref().filter(|_| self.ready)?;
+        if let Some((r, mask)) = &self.mask
+            && r == revision
+        {
+            return Some((mask.clone(), *r));
+        }
+        let (w, h) = (self.area.width() as usize, self.area.height() as usize);
+        let mut mask = ClippingMask::new([w, h]);
+        if w > 0 {
+            // Read in bands of rows: a whole-area float copy of a large refinement would be gigabytes.
+            let band_rows = (CROP_BAND_PIXELS / w).max(1);
+            let mut band = vec![[0.0f32; 4]; band_rows * w];
+            let mut y = 0;
+            while y < h {
+                let rows = band_rows.min(h - y);
+                let y0 = self.area.y0 + y as i32;
+                surface.read_rgba_into(PixelRect::new(self.area.x0, y0, self.area.x1, y0 + rows as i32), &mut band[..rows * w]);
+                for (i, pixel) in band[..rows * w].iter().enumerate() {
+                    let clipped = clipping(*pixel);
+                    mask.shadows[y * w + i] = clipped.shadows;
+                    mask.highlights[y * w + i] = clipped.highlights;
+                }
+                y += rows;
+            }
+        }
+        let mask = Arc::new(mask);
+        let revision = *revision;
+        self.mask = Some((revision, mask.clone()));
+        Some((mask, revision))
+    }
+
+    #[cfg(test)]
+    pub(crate) fn sample(&self, p: [f32; 2], revision: u64, before: bool, params: &CameraRaw) -> Option<[f32; 4]> {
+        if !self.ready || !p.iter().all(|v| v.is_finite() && (0.0..=1.0).contains(v)) {
+            return None;
+        }
+        let source = if before || params.is_identity() {
+            &self.source
+        } else if let Some((r, source)) = &self.result
+            && *r == revision
+        {
+            source
+        } else {
+            return None;
+        };
+        let x = self.area.x0 + ((p[0] * self.area.width() as f32) as i32).min((self.area.width() - 1) as i32);
+        let y = self.area.y0 + ((p[1] * self.area.height() as f32) as i32).min((self.area.height() - 1) as i32);
+        Some(source.rgba(x, y))
     }
 }
 
