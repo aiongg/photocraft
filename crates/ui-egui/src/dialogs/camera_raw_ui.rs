@@ -50,12 +50,10 @@ mod open;
 pub(crate) mod proxy;
 mod sidecar;
 
-#[cfg(test)]
-use convert::open_pixels;
 pub use filmstrip::HeldRaw;
 pub use menu::menu;
 #[cfg(test)]
-use open::{Coverage, commit_open_raw, document_index, finish_redevelop, open_raw, replace_raw_document};
+use open::{open_raw, replace_raw_document};
 pub use open::{
     REDEVELOP_JOB, RawOpen, Redevelop, on_redevelop_event, open, open_smart_filter, opened_without_dialog, queue_open_dialog, wants_open_dialog,
     without_develop_note,
@@ -63,8 +61,6 @@ pub use open::{
 use open::{Target, non_defaults};
 use proxy::{ProxyBase, ProxyJob};
 pub use sidecar::sidecar_path;
-#[cfg(test)]
-use sidecar::{existing_sidecar_is_ours, read_bounded};
 
 const PROXY_SIDE: usize = 900;
 /// Smallest run of proxy pixels one rayon task takes in the per-pixel passes: below it the

@@ -155,7 +155,7 @@ mod tests {
     #[test]
     fn palette_picker_reuses_indices_and_updates_preview_pixels() {
         let ctx = egui::Context::default();
-        let key = egui::Id::new("test-web-preview");
+        let key = egui::Id::unique("test-web-preview");
         let px = vec![[1.0, 0.0, 0.0, 1.0], [0.0, 0.0, 1.0, 1.0]];
         let run = |p: &Value| optimized(&ctx, key, "fixture", p, |_| Ok((px.clone(), 2, 1))).unwrap().rgba;
         let cached = || ctx.data(|d| d.get_temp::<(String, Arc<Optimized>)>(key.with("indexed-source"))).unwrap().1;

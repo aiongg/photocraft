@@ -19,8 +19,6 @@ mod dispatch;
 mod options;
 
 pub(crate) use arrange::document_is_floating;
-#[cfg(test)]
-use dialogs::front;
 pub(crate) use dialogs::write_copy;
 #[cfg(test)]
 use dispatch::is_enabled_with_engine;

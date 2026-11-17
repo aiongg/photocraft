@@ -77,7 +77,7 @@ pub use title_bar::{title_bar, window_title};
 pub(crate) use toolbar::QUICK_MASK;
 pub use toolbar::toolbar;
 #[cfg(test)]
-use toolbar::{TOOL_SECTIONS, color_chips};
+use toolbar::color_chips;
 
 /// Photoshop's Shift+Alt letter position of blend mode `m`; `None` for the modes without a letter (Darker Color,
 /// Lighter Color, Subtract, Divide) and for PhotoCraft's own extra modes.

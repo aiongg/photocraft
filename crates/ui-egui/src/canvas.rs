@@ -12,7 +12,7 @@ use crate::PhotocraftApp;
 use crate::state::View;
 
 #[cfg(test)]
-use egui::{Color32, Mesh, PointerButton, Pos2, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
+use egui::{Color32, Pos2, Stroke, TextureOptions, Vec2, pos2, vec2};
 #[cfg(test)]
 use photocraft_doc::LayerContent;
 #[cfg(test)]
@@ -89,8 +89,6 @@ use filter_preview::filter_channel_preview;
 use filter_preview::filter_preview_display_doc;
 pub(crate) use filter_preview::filter_preview_factor;
 pub(crate) use navigator::NavigatorCache;
-#[cfg(test)]
-use navigator::navigator_waits_for_drag;
 pub use navigator::{NAVIGATOR_SIDE, navigator_gpu_view, navigator_texture, navigator_waits_for_gpu};
 #[cfg(test)]
 pub(crate) use raster_source::CompositePrep;
@@ -103,7 +101,7 @@ pub use strokes::paint_target;
 pub(crate) use strokes::{CommittedStroke, LiveStroke, strokes_live, unsmoothed_line};
 pub(crate) use tabs::tab_title_at;
 #[cfg(test)]
-use tabs::{main_canvas_document, move_target_after_filter, tab_context_items};
+use tabs::{main_canvas_document, move_target_after_filter};
 #[cfg(test)]
 pub(crate) use testing::{ToolEvent, tool_event, tool_event_response};
 pub use textures::MAX_TEXTURE;

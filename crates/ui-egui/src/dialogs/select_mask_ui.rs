@@ -206,26 +206,6 @@ impl PcSelectMaskSource {
             cache: lock(&self.shared.cache).clone(),
         }
     }
-
-    #[cfg(test)]
-    pub(crate) fn cached_edits(&self) -> Option<usize> {
-        lock(&self.shared.cache).as_ref().map(|c| c.base.edits.len())
-    }
-
-    #[cfg(test)]
-    pub(crate) fn cached_revision(&self) -> Option<u64> {
-        lock(&self.shared.cache).as_ref().map(|c| c.base.revision)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn ants_reduction(&self) -> Option<u32> {
-        self.shared.ants.holds_mask().then(|| self.shared.ants.reduction())
-    }
-
-    #[cfg(test)]
-    pub(crate) fn last_request(&self) -> Option<SelectMaskPreviewRequest> {
-        lock(&self.shared.last_request).clone()
-    }
 }
 
 impl SelectMaskSource for PcSelectMaskSource {

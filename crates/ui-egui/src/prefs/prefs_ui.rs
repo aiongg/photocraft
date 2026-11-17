@@ -68,8 +68,6 @@ mod startup;
 pub(crate) use appearance::{appearance_button, cycle_appearance, interface_zoom, show_selected_theme, step_brightness, sync_appearance, theme_menu};
 pub use appearance::{canvas_style, pasteboard_color};
 #[cfg(test)]
-use appearance::{display_scale, selected_theme};
-#[cfg(test)]
 pub(crate) use dialogs::set_draft;
 pub use dialogs::{apply_window, invoke, open_preferences, window_open};
 pub(crate) use dialogs::{feed, take as take_window};

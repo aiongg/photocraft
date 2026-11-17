@@ -992,7 +992,7 @@ pub(crate) mod probe {
 
     /// The id of the OS windows the last pass showed floating windows in, by each panel they hold.
     fn windows_id() -> egui::Id {
-        egui::Id::new("photocraft dock windows")
+        egui::Id::unique("photocraft dock windows")
     }
 
     type Windows = Vec<(String, egui::ViewportId)>;

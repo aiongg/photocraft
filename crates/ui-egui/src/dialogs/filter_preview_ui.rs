@@ -338,7 +338,7 @@ mod tests {
         crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
         let id = top_dialog(&app);
         let ctx = app.ctx().clone();
-        let cache_id = egui::Id::new(("filter-preview-ui", id.value()));
+        let cache_id = egui::Id::unique(("filter-preview-ui", id.value()));
         let original = |ctx: &egui::Context| ctx.data(|d| d.get_temp::<Cache>(cache_id).unwrap().original.unwrap().tex.id());
         ctx.run_ui(Default::default(), |ui| feed(&mut app, ui.ctx())).textures_delta.clear();
         let before = original(&ctx);
