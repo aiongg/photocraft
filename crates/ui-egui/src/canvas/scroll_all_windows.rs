@@ -199,7 +199,8 @@ mod tests {
     fn a_view_pan_moves_every_other_shown_view() {
         use Spot::{Doc, Window};
         // (name, layout, hidden, source, scroll_all, delta, expected centers; a view not listed stays)
-        let rows: Vec<(&str, Layout, Hidden, Source, bool, [f64; 2], Vec<(Spot, [f32; 2])>)> = vec![
+        type Row<'a> = (&'a str, Layout, Hidden, Source, bool, [f64; 2], Vec<(Spot, [f32; 2])>);
+        let rows: Vec<Row<'_>> = vec![
             (
                 "a tile's pan moves the other tile and the window by the same document pixels, not the hidden tab",
                 Layout::Tiles,

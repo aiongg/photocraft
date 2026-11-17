@@ -689,6 +689,9 @@ fn ui_font_size_commands_follow_themes_and_dpi_and_reset_live() {
 
 // --- remembered state -----------------------------------------------------------------------------------------------
 
+type SetState = Box<dyn Fn(&mut PhotocraftApp, &egui::Context)>;
+type CheckState = Box<dyn Fn(&mut PhotocraftApp, &egui::Context, &Value)>;
+
 /// One case of a remembered-state table: what is set (or seeded) in the first app, and what holds after a restart
 /// on the same store.
 struct Case {
@@ -696,9 +699,9 @@ struct Case {
     /// A hand-written file the first app starts on.
     seed: Option<Value>,
     /// State set in the first app; the table ticks afterwards.
-    set: Box<dyn Fn(&mut PhotocraftApp, &egui::Context)>,
+    set: SetState,
     /// What holds in the restarted app, given the file's contents.
-    check: Box<dyn Fn(&mut PhotocraftApp, &egui::Context, &Value)>,
+    check: CheckState,
 }
 
 fn run_cases(cases: Vec<Case>) {

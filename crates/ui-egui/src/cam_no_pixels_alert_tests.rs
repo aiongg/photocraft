@@ -64,7 +64,8 @@ enum Outcome {
 #[test]
 fn a_lasso_that_selects_no_pixel_warns_and_changes_nothing() {
     // (name, anti-alias, a selection that exists before, points, outcome)
-    let rows: [(&str, bool, bool, &[[f64; 2]], Outcome); 9] = [
+    type Row<'a> = (&'a str, bool, bool, &'a [[f64; 2]], Outcome);
+    let rows: [Row<'_>; 9] = [
         ("line", true, false, LINE, Outcome::Warns),
         ("diagonal", true, false, DIAGONAL, Outcome::Warns),
         ("click", true, false, &[[40.0, 40.0]], Outcome::Warns),
