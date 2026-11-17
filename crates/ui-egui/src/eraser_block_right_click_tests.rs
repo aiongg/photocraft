@@ -43,8 +43,10 @@ fn right_click(mode: &str, shift: bool, erase_preference: bool) -> Outcome {
     } else if crate::brush_picker::opened_at(&app).is_some() {
         Outcome::Picker
     } else {
-        // An erase is a `paint.stroke` command whose parameters carry `erase: true`.
-        let erased = app.session.journal[journal..].iter().any(|(id, p)| id == "paint.stroke" && p["erase"] == json!(true));
+        // An erase is a stroke command whose parameters carry `erase: true`: `paint.stroke` in Brush mode,
+        // `paint.pencil` in Pencil and Block mode (`strokes.rs`, as production).
+        let erased =
+            app.session.journal[journal..].iter().any(|(id, p)| (id == "paint.stroke" || id == "paint.pencil") && p["erase"] == json!(true));
         assert!(erased, "a right-click that opened nothing erases: {mode}, shift {shift}, erase preference {erase_preference}");
         Outcome::Erase
     }
