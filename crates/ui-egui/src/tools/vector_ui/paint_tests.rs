@@ -227,7 +227,7 @@ fn zero_width_style_can_be_inspected_removed_or_reenabled_explicitly() {
         assert_eq!(shape(h.state()), &zero);
         h.run_steps(2);
 
-        stroke_style_button(&mut h).click();
+        stroke_style_button(&h).click();
         h.run_steps(3);
         h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
         h.run_steps(3);
@@ -375,12 +375,12 @@ fn selected_shape_style_is_available_when_absent_and_dismissal_does_not_enable_i
     let doc = app.session.active().unwrap().doc.clone();
     let before = history(&app);
     let mut h = harness(app, true);
-    stroke_style_button(&mut h).click();
+    stroke_style_button(&h).click();
     h.run_steps(3);
     h.key_press(Key::Escape);
     h.run_steps(2);
     assert_eq!(h.state().session.active().unwrap().doc, doc);
-    stroke_style_button(&mut h).click();
+    stroke_style_button(&h).click();
     h.run_steps(3);
     h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
     h.run_steps(3);
@@ -597,7 +597,7 @@ fn width_and_stroke_type_give_a_strokeless_shape_the_tool_stroke_gradient() {
         if via_width {
             stroke_width(&mut h, "5");
         } else {
-            stroke_style_button(&mut h).click();
+            stroke_style_button(&h).click();
             h.run_steps(3);
             h.get_by_role_and_label(egui::accesskit::Role::ListItem, "Dotted").click();
             h.run_steps(3);

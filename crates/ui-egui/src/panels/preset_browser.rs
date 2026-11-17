@@ -94,6 +94,9 @@ fn canvas_zone(app: &PhotocraftApp) -> DropZone {
     DropZone::new(app.last_canvas_layer, canvas_drop_rect(app))
 }
 
+/// The browser footer's own controls.
+type Footer<'a> = Box<dyn Fn(&mut egui::Ui) + 'a>;
+
 /// How one panel's browser differs from the common one.
 #[derive(Default)]
 struct Look<'a> {
@@ -106,7 +109,7 @@ struct Look<'a> {
     /// The notice of a browser with no presets.
     empty: Option<&'a str>,
     /// The footer's own controls.
-    leading: Option<Box<dyn Fn(&mut egui::Ui) + 'a>>,
+    leading: Option<Footer<'a>>,
     /// The panel has no folders: no New Group button and no reordering.
     flat: bool,
 }
@@ -376,7 +379,7 @@ pub(crate) fn styles_run(app: &mut PhotocraftApp, ctx: &egui::Context, cmd: &Com
     let Some((action, count)) = action else { return true };
     let result = match action {
         PresetMenuAction::View(view) => {
-            app.ui.presets_ui.browsers.entry(STYLES.id.to_string()).or_insert_with(PresetState::new).view = view;
+            app.ui.presets_ui.browsers.entry(STYLES.id.to_string()).or_default().view = view;
             Ok(Value::Null)
         }
         PresetMenuAction::NewGroup => {
@@ -513,7 +516,7 @@ fn picker_state(presets: &PresetUi, id: &str) -> PresetState<String> {
 /// Keeps the view state of a picker's popover in `browsers[id]`.
 // PLAN: `browsers` holds `PresetState<PresetKey>`; a picker keys its rows by `String`, so its view, zoom and filter are copied.
 fn keep_picker_state(presets: &mut PresetUi, id: &str, state: PresetState<String>) {
-    let saved = presets.browsers.entry(id.to_string()).or_insert_with(PresetState::new);
+    let saved = presets.browsers.entry(id.to_string()).or_default();
     saved.view = state.view;
     saved.zoom = state.zoom;
     saved.filter = state.filter;
@@ -538,7 +541,7 @@ pub fn shape_picker(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let mut value = Some(app.ui.presets_ui.shape().to_string());
     let before = value.clone();
     let mut state = picker_state(&app.ui.presets_ui, ID);
-    PresetPicker::new(tl!("Shape"), Bind::bound(&mut value), &rows, Bind::bound(&mut state)).columns(7).show(ui);
+    let _ = PresetPicker::new(tl!("Shape"), Bind::bound(&mut value), &rows, Bind::bound(&mut state)).columns(7).show(ui); // the picked value comes back through `value`
     keep_picker_state(&mut app.ui.presets_ui, ID, state);
     if let Some(picked) = value.filter(|picked| before.as_ref() != Some(picked) && !picked.starts_with(GROUP)) {
         app.ui.presets_ui.custom_shape = picked;

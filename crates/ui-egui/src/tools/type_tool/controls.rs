@@ -27,7 +27,6 @@ use serde_json::json;
 use super::editing::{cancel, commit_with, edit_home, end_if_left};
 use super::host::LayerHost;
 use super::layout::{doc_point, layout, path_warp};
-use super::pointer::box_shape;
 use super::{Affine, LayerId, PhotocraftApp, text_layer};
 
 /// The document key of the text editor. One editing session is open at a time, so one key is enough; the session
@@ -148,7 +147,7 @@ fn outline(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rect, id: L
             for poly in photocraft_vector::flatten::flatten_path(&path, 0.5) {
                 let mut line = BezPath::new();
                 for (i, &(x, y)) in poly.pts.iter().enumerate() {
-                    let p = doc_pt(aff.apply(photocraft_geom::Point::new(f64::from(x), f64::from(y))));
+                    let p = doc_pt(aff.apply(photocraft_geom::Point::new(x, y)));
                     if i == 0 { line.move_to(p) } else { line.line_to(p) }
                 }
                 if poly.pts.len() >= 2 {

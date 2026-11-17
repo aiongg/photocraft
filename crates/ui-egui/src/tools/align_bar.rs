@@ -21,37 +21,38 @@ fn all() -> impl Iterator<Item = AlignAction> {
 }
 
 /// The engine command an action runs.
-pub(crate) fn command_id(action: AlignAction) -> &'static str {
+pub(crate) fn command_id(action: AlignAction) -> Option<&'static str> {
     match action {
-        AlignAction::AlignLeftEdges => "layer.align.leftEdges",
-        AlignAction::AlignHorizontalCenters => "layer.align.horizontalCenters",
-        AlignAction::AlignRightEdges => "layer.align.rightEdges",
-        AlignAction::AlignTopEdges => "layer.align.topEdges",
-        AlignAction::AlignVerticalCenters => "layer.align.verticalCenters",
-        AlignAction::AlignBottomEdges => "layer.align.bottomEdges",
-        AlignAction::DistributeTopEdges => "layer.distribute.topEdges",
-        AlignAction::DistributeVerticalCenters => "layer.distribute.verticalCenters",
-        AlignAction::DistributeBottomEdges => "layer.distribute.bottomEdges",
-        AlignAction::DistributeLeftEdges => "layer.distribute.leftEdges",
-        AlignAction::DistributeHorizontalCenters => "layer.distribute.horizontalCenters",
-        AlignAction::DistributeRightEdges => "layer.distribute.rightEdges",
-        AlignAction::DistributeHorizontally => "layer.distribute.horizontally",
-        AlignAction::DistributeVertically => "layer.distribute.vertically",
-        // `AlignAction` is `#[non_exhaustive]`; `all()` yields only the actions listed above.
-        _ => unreachable!("an AlignAction without an engine command"),
+        AlignAction::AlignLeftEdges => Some("layer.align.leftEdges"),
+        AlignAction::AlignHorizontalCenters => Some("layer.align.horizontalCenters"),
+        AlignAction::AlignRightEdges => Some("layer.align.rightEdges"),
+        AlignAction::AlignTopEdges => Some("layer.align.topEdges"),
+        AlignAction::AlignVerticalCenters => Some("layer.align.verticalCenters"),
+        AlignAction::AlignBottomEdges => Some("layer.align.bottomEdges"),
+        AlignAction::DistributeTopEdges => Some("layer.distribute.topEdges"),
+        AlignAction::DistributeVerticalCenters => Some("layer.distribute.verticalCenters"),
+        AlignAction::DistributeBottomEdges => Some("layer.distribute.bottomEdges"),
+        AlignAction::DistributeLeftEdges => Some("layer.distribute.leftEdges"),
+        AlignAction::DistributeHorizontalCenters => Some("layer.distribute.horizontalCenters"),
+        AlignAction::DistributeRightEdges => Some("layer.distribute.rightEdges"),
+        AlignAction::DistributeHorizontally => Some("layer.distribute.horizontally"),
+        AlignAction::DistributeVertically => Some("layer.distribute.vertically"),
+        // `AlignAction` is `#[non_exhaustive]`; `all()` yields only the actions listed above, and a later one has no engine command here.
+        _ => None,
     }
 }
 
 /// The enabled state of every action: the session's, as the Layer menu reads it.
 pub(crate) fn command_states(app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
-    all().map(|action| (CommandRef::new(action.id()), CommandState::new().enabled(app.session.is_enabled(command_id(action))))).collect()
+    all().map(|action| (CommandRef::new(action.id()), CommandState::new().enabled(command_id(action).is_some_and(|id| app.session.is_enabled(id))))).collect()
 }
 
 /// Runs a fired `AlignAction`. False when `command` is not one of them. The context is the
 /// command-source shape's; these commands need none.
 pub(crate) fn run_fired(app: &mut PhotocraftApp, _ctx: &egui::Context, command: &CommandRef) -> bool {
     let Some(action) = AlignAction::from_ref(command) else { return false };
-    if let Err(e) = app.run(command_id(action), json!({})) {
+    let Some(id) = command_id(action) else { return false };
+    if let Err(e) = app.run(id, json!({})) {
         app.ui.status = e;
     }
     true
@@ -103,7 +104,7 @@ mod tests {
         let specs = photocraft_engine::command_specs();
         let mut count = 0;
         for action in all() {
-            let id = command_id(action);
+            let id = command_id(action).expect("an engine command");
             assert!(specs.iter().any(|c| c.id == id), "{id} is not a command");
             count += 1;
         }

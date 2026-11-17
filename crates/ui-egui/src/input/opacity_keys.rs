@@ -184,7 +184,8 @@ mod tests {
     #[test]
     fn digit_keys_set_each_tools_value() {
         // (name, tool, airbrush build-up, command, what changes)
-        let rows: &[(&str, Tool, bool, D, &[(usize, f32)])] = &[
+        type Row<'a> = (&'a str, Tool, bool, D, &'a [(usize, f32)]);
+        let rows: &[Row<'_>] = &[
             ("brush plain sets opacity", Tool::Brush, false, D::OpacityFive, &[(OPACITY, 0.5)]),
             ("brush shift sets flow", Tool::Brush, false, D::SecondTwo, &[(FLOW, 0.2)]),
             ("build-up swaps plain to flow", Tool::Brush, true, D::OpacityThree, &[(FLOW, 0.3)]),

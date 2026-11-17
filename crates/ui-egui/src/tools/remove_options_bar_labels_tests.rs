@@ -41,16 +41,6 @@ fn control<'a>(h: &'a Harness<'static, PhotocraftApp>, role: Role, label: &str) 
     h.query_all_by_role(role).find(|n| n.accesskit_node().label().as_deref() == Some(label)).unwrap_or_else(|| panic!("missing {role:?} {label:?}"))
 }
 
-/// Hovers the control until its tooltip shows, and asserts the tooltip text.
-fn hover(h: &mut Harness<'static, PhotocraftApp>, role: Role, label: &str, tip: &str) {
-    control(h, role, label).scroll_to_me();
-    h.run_steps(4);
-    let rect = control(h, role, label).rect();
-    h.hover_at(rect.center());
-    h.run_steps(60);
-    assert!(h.query_all_by_role(Role::Label).any(|n| n.accesskit_node().value().as_deref() == Some(tip)), "hovering {label:?} must display {tip:?}");
-}
-
 fn checked(h: &Harness<'static, PhotocraftApp>, label: &str) -> bool {
     control(h, Role::CheckBox, label).accesskit_node().toggled() == Some(egui::accesskit::Toggled::True)
 }

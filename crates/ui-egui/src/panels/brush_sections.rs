@@ -94,6 +94,15 @@ impl SectionOut {
     }
 }
 
+/// One jitter row of a dynamics section: its control id, label, whether the Control row offers the direction
+/// controls, and the Minimum row's label when the block has one.
+struct DynamicRow<'a> {
+    id: &'static str,
+    label: &'a str,
+    angle: bool,
+    minimum: Option<&'a str>,
+}
+
 /// How a stored number shows: `shown = stored × factor`, rounded to whole units within `min..=max`.
 #[derive(Clone, Copy)]
 struct Shown {
@@ -174,7 +183,7 @@ impl Pane<'_> {
 
     /// `label`'s select over the mask modes.
     fn mode(&mut self, ui: &mut Ui, label: &str, mode: &mut MaskMode) {
-        let entries: Vec<Entry<MaskMode>> = MASK_MODES.iter().map(|(m, l)| Entry::new(m.clone(), tl!(*l).to_string())).collect();
+        let entries: Vec<Entry<MaskMode>> = MASK_MODES.iter().map(|(m, l)| Entry::new(*m, tl!(*l).to_string())).collect();
         Field::new(label.to_owned()).show(ui, |ui, _| {
             let edit = Select::new(label.to_owned(), Bind::bound(&mut *mode), &entries).show(ui);
             self.out.note(&edit);
@@ -228,7 +237,7 @@ impl Pane<'_> {
         let controls: Vec<DynamicControl<Control>> = CONTROLS[..n]
             .iter()
             .map(|(control, label)| {
-                let entry = DynamicControl::new(control.clone(), tl!(*label));
+                let entry = DynamicControl::new(*control, tl!(*label));
                 match control {
                     Control::Fade if !angle => entry.fade().curve(),
                     Control::PenPressure | Control::PenTilt | Control::StylusWheel | Control::Rotation if !angle => entry.curve(),
@@ -262,7 +271,8 @@ impl Pane<'_> {
 
     /// A jitter row, its Control row and (optionally) the Minimum row: one Photoshop block. Minimum belongs to the
     /// control: Off disables editing without discarding its saved value.
-    fn dynamic(&mut self, ui: &mut Ui, id: &'static str, label: &str, d: &mut Dynamic, reset: &Dynamic, angle: bool, minimum: Option<&str>) {
+    fn dynamic(&mut self, ui: &mut Ui, row: DynamicRow<'_>, d: &mut Dynamic, reset: &Dynamic) {
+        let DynamicRow { id, label, angle, minimum } = row;
         self.field(ui, label, &mut d.jitter, reset.jitter, AMOUNT, true);
         self.control_row(ui, id, d, angle);
         if let Some(label) = minimum {
@@ -341,8 +351,13 @@ impl Pane<'_> {
         // Tilt Scale applies with the size control on Pen Tilt (greyed out otherwise, like Photoshop).
         let tilt = sd.size.control == Control::PenTilt;
         self.field(ui, tl!("Tilt Scale"), &mut sd.tilt_scale, dd.tilt_scale, Shown::percent(0.0, 200.0), tilt);
-        self.dynamic(ui, "brush-angle-ctl", tl!("Angle Jitter"), &mut sd.angle, &dd.angle, true, None);
-        self.dynamic(ui, "brush-round-ctl", tl!("Roundness Jitter"), &mut sd.roundness, &dd.roundness, false, Some(tl!("Minimum Roundness")));
+        self.dynamic(ui, DynamicRow { id: "brush-angle-ctl", label: tl!("Angle Jitter"), angle: true, minimum: None }, &mut sd.angle, &dd.angle);
+        self.dynamic(
+            ui,
+            DynamicRow { id: "brush-round-ctl", label: tl!("Roundness Jitter"), angle: false, minimum: Some(tl!("Minimum Roundness")) },
+            &mut sd.roundness,
+            &dd.roundness,
+        );
         Row::new().show(ui, |ui, _| {
             self.check(ui, tl!("Flip X Jitter"), &mut sd.flip_x_jitter);
             self.check(ui, tl!("Flip Y Jitter"), &mut sd.flip_y_jitter);
@@ -355,7 +370,7 @@ impl Pane<'_> {
         self.scatter(ui, &mut sc.scatter.jitter, &mut sc.both_axes, dd.scatter.jitter);
         self.control_row(ui, "brush-scatter-ctl", &mut sc.scatter, false);
         self.whole(ui, tl!("Count"), &mut sc.count, dd.count, 1.0..=16.0, None);
-        self.dynamic(ui, "brush-count-ctl", tl!("Count Jitter"), &mut sc.count_jitter, &dd.count_jitter, false, None);
+        self.dynamic(ui, DynamicRow { id: "brush-count-ctl", label: tl!("Count Jitter"), angle: false, minimum: None }, &mut sc.count_jitter, &dd.count_jitter);
     }
 
     /// The pick of a library pattern as the brush's tile.
@@ -439,7 +454,7 @@ impl Pane<'_> {
     fn color_dynamics(&mut self, ui: &mut Ui, b: &mut BrushSettings, d: &BrushSettings) {
         let (c, dd) = (&mut b.color_dynamics, &d.color_dynamics);
         self.check(ui, tl!("Apply Per Tip"), &mut c.per_tip);
-        self.dynamic(ui, "brush-fgbg-ctl", tl!("Foreground/Background Jitter"), &mut c.fg_bg, &dd.fg_bg, false, None);
+        self.dynamic(ui, DynamicRow { id: "brush-fgbg-ctl", label: tl!("Foreground/Background Jitter"), angle: false, minimum: None }, &mut c.fg_bg, &dd.fg_bg);
         self.field(ui, tl!("Hue Jitter"), &mut c.hue_jitter, dd.hue_jitter, AMOUNT, true);
         self.field(ui, tl!("Saturation Jitter"), &mut c.saturation_jitter, dd.saturation_jitter, AMOUNT, true);
         self.field(ui, tl!("Brightness Jitter"), &mut c.brightness_jitter, dd.brightness_jitter, AMOUNT, true);
@@ -449,13 +464,13 @@ impl Pane<'_> {
     fn transfer(&mut self, ui: &mut Ui, b: &mut BrushSettings, d: &BrushSettings, tool: Tool) {
         let (tr, dd) = (&mut b.transfer, &d.transfer);
         let minimum = Some(tl!("Minimum"));
-        self.dynamic(ui, "brush-opacity-ctl", tl!("Opacity Jitter"), &mut tr.opacity, &dd.opacity, false, minimum);
-        self.dynamic(ui, "brush-flow-ctl", tl!("Flow Jitter"), &mut tr.flow, &dd.flow, false, minimum);
+        self.dynamic(ui, DynamicRow { id: "brush-opacity-ctl", label: tl!("Opacity Jitter"), angle: false, minimum }, &mut tr.opacity, &dd.opacity);
+        self.dynamic(ui, DynamicRow { id: "brush-flow-ctl", label: tl!("Flow Jitter"), angle: false, minimum }, &mut tr.flow, &dd.flow);
         // Wetness and mix only affect the Mixer Brush. Keep their settings visible and saved for other tools, but
         // disable the whole blocks, including controllers and minimums.
         Stack::new().enabled(tool == Tool::MixerBrush).show(ui, |ui, _| {
-            self.dynamic(ui, "brush-wet-ctl", tl!("Wetness Jitter"), &mut tr.wetness, &dd.wetness, false, minimum);
-            self.dynamic(ui, "brush-mix-ctl", tl!("Mix Jitter"), &mut tr.mix, &dd.mix, false, minimum);
+            self.dynamic(ui, DynamicRow { id: "brush-wet-ctl", label: tl!("Wetness Jitter"), angle: false, minimum }, &mut tr.wetness, &dd.wetness);
+            self.dynamic(ui, DynamicRow { id: "brush-mix-ctl", label: tl!("Mix Jitter"), angle: false, minimum }, &mut tr.mix, &dd.mix);
         });
         self.mixer_options(ui, &mut b.mixer, &d.mixer);
     }

@@ -50,12 +50,8 @@ mod open;
 pub(crate) mod proxy;
 mod sidecar;
 
-#[cfg(test)]
-use convert::open_pixels;
 pub use filmstrip::HeldRaw;
 pub use menu::menu;
-#[cfg(test)]
-use open::{Coverage, commit_open_raw, document_index, finish_redevelop, open_raw, replace_raw_document};
 pub use open::{
     REDEVELOP_JOB, RawOpen, Redevelop, on_redevelop_event, open, open_smart_filter, opened_without_dialog, queue_open_dialog, wants_open_dialog,
     without_develop_note,
@@ -63,15 +59,12 @@ pub use open::{
 use open::{Target, non_defaults};
 use proxy::{ProxyBase, ProxyJob};
 pub use sidecar::sidecar_path;
-#[cfg(test)]
-use sidecar::{existing_sidecar_is_ours, read_bounded};
 
 const PROXY_SIDE: usize = 900;
 /// Smallest run of proxy pixels one rayon task takes in the per-pixel passes: below it the
 /// split costs more than the work.
 #[cfg(not(target_arch = "wasm32"))]
 pub(crate) const PARALLEL_MIN_PIXELS: usize = 16 * 1024;
-const BANDS: [&str; 8] = ["Red", "Orange", "Yellow", "Green", "Aqua", "Blue", "Purple", "Magenta"];
 
 /// The hosted workspace this module opens.
 pub(crate) type Hosted = HostedWorkspace<RawDevelopWorkspace>;
@@ -287,8 +280,8 @@ impl PcRawSource {
     }
 
     /// One develop of the proxy with `settings`.
-    fn proxy_job(&self, settings: &CameraRaw, revision: u64) -> ProxyJob {
-        ProxyJob { base: self.proxy_base(), params: settings.clone(), revision }
+    fn proxy_job(&self, settings: &CameraRaw) -> ProxyJob {
+        ProxyJob { base: self.proxy_base(), params: settings.clone() }
     }
 
     /// Whether the view shows more pixels than the proxy has, so the visible part is worth refining.
@@ -321,7 +314,7 @@ impl RawDevelopSource for PcRawSource {
         // The request's revision only counts source changes; the develops of one source are told apart by this order, so
         // an older job that finishes after a newer one does not replace its result.
         let order = self.issued.fetch_add(1, Ordering::Relaxed) + 1;
-        let job = self.proxy_job(&request.settings, order);
+        let job = self.proxy_job(&request.settings);
         let settings = request.settings.clone();
         let picture = self.after.picture.clone();
         let developed = self.developed.clone();
@@ -416,7 +409,8 @@ pub(crate) struct RawSession {
     pub(crate) original: CameraRaw,
     /// The develop the workspace reads.
     pub(crate) source: Arc<PcRawSource>,
-    /// The GPU develop, when the app may use one.
+    /// The GPU develop, when the app may use one; the tests read it to check the pass.
+    #[cfg(test)]
     pub(crate) gpu: Option<CameraRawGpu>,
 }
 

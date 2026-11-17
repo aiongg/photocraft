@@ -40,18 +40,21 @@ const POLL_MS: u64 = 30;
 /// Results whose damage areas are remembered for canvas invalidation.
 const MAX_AREAS: usize = 128;
 
+#[cfg(test)]
+type Gate = Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>;
+
 /// Test-only controls of the worker. Empty (and free) outside tests.
 #[derive(Clone, Default)]
 struct Hooks {
     /// While `Some` and closed, a render waits before computing, so a test can hold one in flight.
     #[cfg(test)]
-    gate: Option<Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>>,
+    gate: Option<Gate>,
 }
 
 #[cfg(test)]
 thread_local! {
     /// The gate every drag begun on this thread starts with (see `tests::hold`).
-    static GATE: std::cell::RefCell<Option<Arc<(std::sync::Mutex<bool>, std::sync::Condvar)>>> = const { std::cell::RefCell::new(None) };
+    static GATE: std::cell::RefCell<Option<Gate>> = const { std::cell::RefCell::new(None) };
 }
 
 impl Hooks {

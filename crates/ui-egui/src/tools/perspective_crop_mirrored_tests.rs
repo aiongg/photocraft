@@ -41,10 +41,6 @@ fn drag(app: &mut PhotocraftApp, from: [f64; 2], to: [f64; 2], mods: Modifiers) 
     tool_event(app, ToolEvent::Up { x: to[0], y: to[1] }, mods);
 }
 
-fn click(app: &mut PhotocraftApp, p: [f64; 2]) {
-    drag(app, p, p, Modifiers::NONE);
-}
-
 fn set_quad(app: &mut PhotocraftApp, q: [[f64; 2]; 4]) {
     app.canvas_tools.perspective.tool.set(Some(q.map(|[x, y]| Point::new(x, y))));
 }

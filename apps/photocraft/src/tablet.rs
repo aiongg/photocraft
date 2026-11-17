@@ -208,7 +208,7 @@ impl DisplayKind {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use photocraft_tablet::{Update, appkit, xi};
+    use photocraft_tablet::{Update, appkit};
     use photocraft_ui_egui::PhotocraftApp;
     use photocraft_ui_egui::state::Tool;
     use serde_json::{Value, json};

@@ -22,13 +22,13 @@ fn refresh(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1600.0, 1000.0));
     let view = app.ui.views.first().cloned().unwrap_or_default();
     let _ = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), ..Default::default() }, |ui| {
-        let (_, _) = photocraft_ui_egui::canvas::canvas_view(app, ui, photocraft_ui_egui::canvas::CanvasHost::main(0), rect, view, true);
+        let (_, _) = photocraft_ui_egui::canvas::canvas_view(app, ui, photocraft_ui_egui::canvas::CanvasHost::main(0), rect, view.clone(), true);
     });
 }
 
 /// A context set up as the app's.
 fn context() -> egui::Context {
-    let ctx = context();
+    let ctx = egui::Context::default();
     PhotocraftApp::setup_context(&ctx, Default::default());
     ctx
 }
@@ -107,7 +107,7 @@ fn main() {
     }
     eprintln!("{w}×{h}, {n} type layers created in {:.0} ms", t0.elapsed().as_secs_f64() * 1e3);
     app.sync_views();
-    let ctx = context();
+    let ctx = egui::Context::default();
     let t0 = Instant::now();
     refresh(&mut app, &ctx);
     eprintln!("first canvas composite: {:.0} ms", t0.elapsed().as_secs_f64() * 1e3);

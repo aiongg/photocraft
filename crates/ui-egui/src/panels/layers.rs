@@ -1,11 +1,8 @@
-use craft::behavior::IconId;
 use craft::theme::variant::Tone;
 use craft::ui::contract::Show as _;
-use craft::ui::display::Icon;
 use craft::ui::notices::{Notice, NoticeLayout};
-use craft::ui::primitives::IconSpec;
 
-use super::{BlendMode, LayerId, PhotocraftApp, Rect, Sense, Tokens, vec2};
+use super::{BlendMode, LayerId, PhotocraftApp};
 
 // ----------------------------------------------------------------------------- layers
 
@@ -77,32 +74,4 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         None => app.reorder_preview = None,
     }
     super::layers_events::apply_layers_events(app, &ctx, out.events);
-}
-
-/// The small down-arrow makes it clear that the footer icon expands into a menu.
-fn footer_menu_arrow(ui: &mut egui::Ui, rect: Rect) {
-    let arrow = Rect::from_min_size(rect.right_bottom() - vec2(11.0, 10.0), vec2(9.0, 9.0));
-    ui.scope_builder(egui::UiBuilder::new().max_rect(arrow), |ui| {
-        Icon::new(IconSpec::svg(IconId::new("chevron-down"))).show(ui);
-    });
-}
-
-/// Photoshop's italic "fx" footer button (no icon-font equivalent).
-pub(crate) fn fx_button(ui: &mut egui::Ui, size: f32, tip: &str) -> egui::Response {
-    let t = Tokens::get(ui.ctx());
-    let (r, resp) = ui.allocate_exact_size(vec2(size, size), Sense::click());
-    if resp.hovered() {
-        ui.painter().rect_filled(r, t.radius_sm, t.hover);
-    }
-    let mut job = egui::text::LayoutJob::default();
-    job.append("fx", 0.0, egui::TextFormat { font_id: egui::FontId::proportional(15.0), color: t.icon, italics: true, ..Default::default() });
-    let g = ui.painter().layout_job(job);
-    ui.painter().galley(r.center() - g.size() / 2.0, g, t.icon);
-    footer_menu_arrow(ui, r);
-    resp.widget_info(|| egui::WidgetInfo::labeled(egui::Role::Button, true, tip));
-    resp.on_hover_text(tip)
-}
-
-pub(super) fn channels(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
-    crate::channels_panel::show(app, ui);
 }

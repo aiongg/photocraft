@@ -1,6 +1,6 @@
 //! The Paint Bucket's members of the options bar, and the Mode list of the Paint Bucket and the stamp tools.
 
-use craft::ui::contract::{Bind, Entry, Props as _, Show as _};
+use craft::ui::contract::{Bind, Entry, Show as _};
 use craft::ui::patterns::blend_keys::{BlendKeyEntry, blend_entries};
 use craft::ui::pickers::Select;
 use photocraft_doc::BlendMode;

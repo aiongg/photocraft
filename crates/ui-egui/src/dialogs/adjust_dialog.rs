@@ -113,6 +113,7 @@ pub(crate) fn hosted(app: &PhotocraftApp, id: DialogId) -> Option<&HostedAdjustD
     app.framework.dialogs.get_by_id::<HostedAdjustDialog>(id)
 }
 
+#[cfg(test)]
 /// The hosted dialog `id` names, for tests and automation that arm its picker or edit its value.
 ///
 /// # Panics

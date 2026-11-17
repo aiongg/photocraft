@@ -394,7 +394,7 @@ fn fields_set_position(f: &mut DialogFields, left: f64, top: f64) {
 /// draws the picture unmirrored in the box). The texture lives in the context's memory under the
 /// document's id and revision.
 fn picture(ctx: &egui::Context, doc: &photocraft_doc::Document, revision: u64, mirror: bool) -> egui::load::SizedTexture {
-    let key = egui::Id::new(("print-thumb", doc.id.0, revision, mirror));
+    let key = egui::Id::unique(("print-thumb", doc.id.0, revision, mirror));
     let tex: Option<std::sync::Arc<egui::TextureHandle>> = ctx.data(|d| d.get_temp(key));
     let tex = tex.unwrap_or_else(|| {
         let th = photocraft_compose::thumbnail(doc, 400);
@@ -403,7 +403,7 @@ fn picture(ctx: &egui::Context, doc: &photocraft_doc::Document, revision: u64, m
         if mirror {
             for row in pixels.chunks_exact_mut(w * 4) {
                 let mut mirrored = Vec::with_capacity(row.len());
-                for px in row.chunks_exact(4).rev() {
+                for px in row.as_chunks::<4>().0.iter().rev() {
                     mirrored.extend_from_slice(px);
                 }
                 row.copy_from_slice(&mirrored);
@@ -482,7 +482,7 @@ pub(super) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
     // The last sheet built, with the parameters and revision it was built from. Every pass hands the open dialog the
     // sheet: a dialog opened again over the same settings starts without one and shows nothing until it has it.
     let key = format!("{}|{}|{revision}", print_params(&fields), doc.id.0);
-    let slot = egui::Id::new("print-sheet");
+    let slot = egui::Id::unique("print-sheet");
     let cached = ctx.data(|d| d.get_temp::<(String, PrintSheet)>(slot)).filter(|(built, _)| *built == key).map(|(_, sheet)| sheet);
     let sheet = cached.or_else(|| {
         let sheet = build_sheet(ctx, &doc, revision, &fields)?;

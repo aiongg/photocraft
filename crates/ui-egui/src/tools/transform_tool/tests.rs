@@ -108,7 +108,7 @@ fn pull_mesh(app: &mut PhotocraftApp, id: u64, to: WarpMesh) {
     events.push(EditEvent::begin(gesture, Mixed::Same(before.clone()), "Warp".into(), None));
     events.push(EditEvent::update(gesture, to.clone()));
     events.push(EditEvent::commit(gesture, Mixed::Same(before), to));
-    let _ = grid_edit(app, &events, false);
+    grid_edit(app, &events, false);
 }
 
 /// The cylinder's values as the warp holds them.
@@ -123,7 +123,7 @@ fn drag_cylinder(app: &mut PhotocraftApp, id: u64, to: [f64; 7]) {
     events.push(EditEvent::begin(gesture, Mixed::Same(before), "Cylinder".into(), None));
     events.push(EditEvent::update(gesture, after));
     events.push(EditEvent::commit(gesture, Mixed::Same(before), after));
-    let _ = cylinder_edit(app, &events);
+    cylinder_edit(app, &events);
 }
 
 // ---- Dropped files and placing ----
@@ -1567,7 +1567,7 @@ fn an_armed_split_places_one_line_and_disarms() {
     let cut = before.split(WarpSplit::Vertical, 0, 0, 0.5, 0.5);
     let mut events = EditEvents::new();
     events.push(EditEvent::set(Mixed::Same(before.clone()), cut, "Split warp".into(), None));
-    let _ = grid_edit(&mut app, &events, true);
+    grid_edit(&mut app, &events, true);
     assert_eq!(warp_mesh(&app).us.len(), before.us.len() + 1, "one column of anchors at the cut");
     assert_eq!(warp_mesh(&app).vs, before.vs, "no row");
     assert!(app.transform_preview.as_ref().unwrap().split.is_none(), "the mode ends after one split");
@@ -1581,7 +1581,7 @@ fn a_press_on_a_preset_warp_converts_it_only_when_it_grabs_the_grid() {
     let preset = Warp::preset(WarpStyle::Arc, 50.0, rect_of(open(&app)));
     set_warp(&mut app, preset.clone());
     // A press that misses the grid reports no edit.
-    let _ = grid_edit(&mut app, &EditEvents::new(), false);
+    grid_edit(&mut app, &EditEvents::new(), false);
     assert_eq!(session_warp(&app).warp, preset, "no edit changes nothing");
     // An edit of the grid: the preset becomes a custom mesh.
     let mut tugged = warp_mesh(&app);
@@ -1615,7 +1615,7 @@ fn texel_alpha(img: &egui::ColorImage, x: usize, y: usize) -> u8 {
 fn shown_texels(app: &PhotocraftApp) -> egui::ColorImage {
     let raw = app.transform_preview.as_ref().unwrap().textures.level_image(0).expect("the moving pixels").0;
     match super::draw::preview_display(app, app.ctx()) {
-        Some(display) => (display.convert)(&*raw),
+        Some(display) => (display.convert)(&raw),
         None => (*raw).clone(),
     }
 }

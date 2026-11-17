@@ -7,26 +7,19 @@
 //! change them with `prefs.get` / `prefs.set`); this module only edits a working copy in a dialog
 //! and commits it with those commands on Apply or OK.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::VecDeque;
 
-use egui::{Color32, RichText, Sense, vec2};
-use photocraft_doc::DocId;
+use egui::Color32;
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome, Started};
-use photocraft_engine::prefs::{self, AppearanceMode, SECTIONS};
-use serde_json::{Map, Value, json};
+use photocraft_engine::prefs::{self, AppearanceMode};
+use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
 /// Shell runtime state for preferences, autosave and snapping (not serialised).
 #[derive(Default)]
 pub struct Runtime {
     loaded: bool,
-    next_autosave_ms: f64,
-    /// Last revision whose recovery file was actually written successfully.
-    autosaved: HashMap<DocId, u64>,
-    /// Queued writes must not masquerade as durable snapshots.
-    autosave_pending: HashMap<DocId, u64>,
     recovery_started: bool,
     recovery_queue: VecDeque<crate::Recoverable>,
     recovery_pending: Option<(JobId, String)>,
@@ -68,12 +61,10 @@ mod startup;
 pub(crate) use appearance::{appearance_button, cycle_appearance, interface_zoom, show_selected_theme, step_brightness, sync_appearance, theme_menu};
 pub use appearance::{canvas_style, pasteboard_color};
 #[cfg(test)]
-use appearance::{display_scale, selected_theme};
-#[cfg(test)]
 pub(crate) use dialogs::set_draft;
 pub use dialogs::{apply_window, invoke, open_preferences, window_open};
 pub(crate) use dialogs::{feed, take as take_window};
-pub(crate) use presets::{PRESETS_FAMILY, open_io, open_manager, take as take_presets};
+pub(crate) use presets::{PRESETS_FAMILY, take as take_presets};
 pub(crate) use save::save_preferences;
 pub use save::{autosave_now, tick};
 pub use shortcuts::{open as open_shortcuts, recording, shortcuts_open, show as show_shortcuts};
@@ -82,7 +73,7 @@ pub(crate) use startup::{on_recovery_event, remember_rulers};
 
 // Test modules stay after the production code: the prefs_usage test reads each file up to
 // its first `#[cfg(test)] mod`.
-#[cfg(all(test, not(target_arch = "wasm32")))]
+#[cfg(test)]
 mod agents_tests;
 #[cfg(test)]
 mod recovery_tests;

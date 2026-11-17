@@ -98,7 +98,8 @@ fn show_session(app: &PhotocraftApp, t: &FreeTransform, pv: &OpenPreview, ui: &m
     }
     if let Some(outline) = path_outline(t, pv) {
         let selection = PathSelection::default();
-        BezierOverlay::new("Transform path outline", Bind::given(vec![outline]), &selection)
+        // The outline is display-only: nothing in its output is acted on.
+        let _ = BezierOverlay::new("Transform path outline", Bind::given(vec![outline]), &selection)
             .tool(BezierTool::Anchors)
             .anchors(AnchorsShown::Hidden)
             .show_at(ui, rect);
@@ -245,7 +246,6 @@ pub(super) fn texture_quad(t: &FreeTransform, pv: &OpenPreview) -> [Point; 4] {
 /// The monitor conversion of the preview, or `None` when the display is the identity. Selection
 /// tint and lone mask or channel values are UI diagnostics, not document colours, so those boxes
 /// show their texels as they are.
-
 pub(super) fn preview_display(app: &PhotocraftApp, ctx: &egui::Context) -> Option<PreviewDisplay> {
     let (t, pv) = (app.ui.transform.as_ref()?, app.transform_preview.as_ref()?);
     if t.selection || t.target.is_some() || t.path.is_some() {

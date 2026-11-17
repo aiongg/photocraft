@@ -1,3 +1,4 @@
+#![cfg(not(target_arch = "wasm32"))]
 //! Agents in the open window (`agents.rs`): the agent link follows the preferences and the
 //! ArtCraft Launcher's switch, and agent requests get the app's policy while it runs. The link, the
 //! switch and the Agents page have their own trials in craft-automation (`tests/it/agents.rs`).

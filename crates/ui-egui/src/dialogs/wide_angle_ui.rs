@@ -195,12 +195,8 @@ pub(crate) struct WideAngleApp {
     document: DocId,
     layer: LayerId,
     target: Value,
+    #[cfg(test)]
     source: Arc<PcWideAngleSource>,
-}
-
-/// The document the open workspace belongs to.
-pub(crate) fn document(app: &PhotocraftApp) -> Option<DocId> {
-    app.wide_angle.as_ref().map(|w| w.document)
 }
 
 /// The open workspace's fields for automation, with the layer it edits.
@@ -265,7 +261,14 @@ pub fn open(app: &mut PhotocraftApp, _ctx: &egui::Context) -> Result<(), String>
     let workspace = WideAngleWorkspace::new(WideAngleOpen::new([w as u32, h as u32], name).session(params));
     let shared: Arc<dyn WideAngleSource> = source.clone();
     let id = app.framework.dialogs.open(HostedWorkspace::new(workspace, shared));
-    app.wide_angle = Some(WideAngleApp { id, document, layer, target, source });
+    app.wide_angle = Some(WideAngleApp {
+        id,
+        document,
+        layer,
+        target,
+        #[cfg(test)]
+        source,
+    });
     Ok(())
 }
 

@@ -77,8 +77,6 @@ pub struct EncodedPreview {
     pub bytes: usize,
     /// The palette size of an indexed format.
     pub colors: Option<usize>,
-    /// The file extension.
-    pub ext: &'static str,
     /// The palette the encode chose, as red, green and blue.
     pub palette: Vec<[u8; 3]>,
     /// The proxy's width in pixels.
@@ -141,7 +139,6 @@ pub fn optimized(
         rgba,
         bytes: encoded.bytes.len(),
         colors: encoded.colors,
-        ext: encoded.ext,
         palette: encoded.color_table.clone(),
         width: encoded.width as u32,
         height: encoded.height as u32,
@@ -155,7 +152,7 @@ mod tests {
     #[test]
     fn palette_picker_reuses_indices_and_updates_preview_pixels() {
         let ctx = egui::Context::default();
-        let key = egui::Id::new("test-web-preview");
+        let key = egui::Id::unique("test-web-preview");
         let px = vec![[1.0, 0.0, 0.0, 1.0], [0.0, 0.0, 1.0, 1.0]];
         let run = |p: &Value| optimized(&ctx, key, "fixture", p, |_| Ok((px.clone(), 2, 1))).unwrap().rgba;
         let cached = || ctx.data(|d| d.get_temp::<(String, Arc<Optimized>)>(key.with("indexed-source"))).unwrap().1;

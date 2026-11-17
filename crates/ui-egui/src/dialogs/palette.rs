@@ -52,15 +52,10 @@ pub(crate) fn note_recent(app: &mut PhotocraftApp, id: &str) {
 
 #[cfg(test)]
 mod tests {
-    use egui::{Event, Key, Modifiers};
     use serde_json::json;
 
     use super::entries;
     use crate::PhotocraftApp;
-
-    fn key(key: Key) -> Event {
-        Event::Key { key, physical_key: None, pressed: true, repeat: false, modifiers: Modifiers::NONE }
-    }
 
     /// The entries carry the English name of each menu command, so a query in English finds a translated command.
     #[test]

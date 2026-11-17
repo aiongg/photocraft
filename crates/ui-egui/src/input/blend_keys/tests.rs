@@ -94,6 +94,12 @@ fn blend_keys_reach_each_tools_target() {
     a.session.tools.brush.mode = BlendMode::Overlay;
     key(&mut a, BlendStep::Next);
     assert_eq!(tool_mode(&mut a), Some(BlendMode::Multiply), "steps from Normal");
+}
+
+/// The Brush's Clear and Behind rows and the steps through the menu's rows, and the Pencil's own Clear.
+#[test]
+fn brush_blend_keys_walk_the_menus_rows() {
+    use BlendShortcut as S;
     // The Brush: Clear is a menu row after Dissolve and Behind, and the steps walk the menu's rows.
     let mut a = app(Tool::Brush);
     key(&mut a, S::Clear);
@@ -121,7 +127,15 @@ fn blend_keys_reach_each_tools_target() {
     key(&mut a, BlendStep::Previous);
     assert_eq!(a.session.tools.brush.mode, BlendMode::LAYER_MODES[BlendMode::LAYER_MODES.len() - 1]);
     assert_eq!(layer_blend(&a), BlendMode::Normal);
+    // Other commands are not blend keys.
+    assert!(!key(&mut a, CommandRef::new("tools.smoothing.3")));
+}
 
+/// Tools without a Mode control take the key and leave the layer alone; tools without a mode of their own set the
+/// layer; an app without a document takes the key and does nothing.
+#[test]
+fn blend_keys_are_taken_by_tools_without_a_mode() {
+    use BlendShortcut as S;
     // Tools whose Mode has no control here, and Dodge, Burn and Sponge (whose ⇧⌥ letters are their own Range and
     // mode in Photoshop): the command is taken, nothing changes, the layer is never reached.
     for tool in [Tool::SpotHealing, Tool::Blur, Tool::Sharpen, Tool::Smudge, Tool::ArtHistoryBrush, Tool::Dodge, Tool::Burn, Tool::Sponge] {
@@ -150,9 +164,12 @@ fn blend_keys_reach_each_tools_target() {
     let mut none = Box::new(PhotocraftApp::new(photocraft_engine::Session::new(), Default::default()));
     none.ui.tool = Tool::Move;
     assert!(key(&mut none, BlendStep::Next));
-    // Other commands are not blend keys.
-    assert!(!key(&mut a, CommandRef::new("tools.smoothing.3")));
+}
 
+/// Color Replacement's letters set the active layer and leave the tool's Mode.
+#[test]
+fn color_replacement_blend_keys_set_the_layer() {
+    use BlendShortcut as S;
     // Color Replacement: four letters set the active layer and the tool's Mode stays (#11928).
     let mut a = app(Tool::ColorReplacement);
     let tool_mode_before = tool_mode(&mut a);

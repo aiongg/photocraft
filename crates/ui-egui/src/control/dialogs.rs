@@ -129,6 +129,9 @@ pub(crate) enum Which {
     Is(fn(&PhotocraftApp, DialogId) -> bool),
 }
 
+/// Builds the framework field pairs from the dialog's current `json_fields` and a production value.
+type FieldBuilder = fn(current: &Value, value: &Value) -> Vec<(String, Value)>;
+
 /// One production field name and how it reaches the framework's field.
 pub(crate) struct FieldKey {
     /// The dialog the row applies to.
@@ -141,7 +144,7 @@ pub(crate) struct FieldKey {
     pub values: &'static [(&'static str, &'static str)],
     /// Builds the pairs to set from the dialog's current `json_fields` and the value, for a field that is not a
     /// one-to-one rename.
-    pub with: Option<fn(current: &Value, value: &Value) -> Vec<(String, Value)>>,
+    pub with: Option<FieldBuilder>,
 }
 
 fn is_prompt<T: std::any::Any>(app: &PhotocraftApp, id: DialogId) -> bool {
@@ -429,10 +432,10 @@ fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value
     // The unsaved-changes prompt answers Save when no choice is named.
     let judged = choice.unwrap_or("save");
     // A Save writes the document back, so it is judged as `file.save` before the question closes.
-    if is_save_answer(app, id) {
-        if let Err(error) = crate::discard_ui::authorize_save(app, true) {
-            return err(error);
-        }
+    if is_save_answer(app, id)
+        && let Err(error) = crate::discard_ui::authorize_save(app, true)
+    {
+        return err(error);
     }
     if let Some((command, params)) = command_of(app, id, judged)
         && let Some(authorize) = app.services.automation_command.as_ref()
@@ -457,9 +460,12 @@ fn apply(app: &mut PhotocraftApp, id: DialogId) -> Reply {
 
 // ---- hosted workspaces ----
 
+/// A hosted workspace's `describe(app)`.
+type DescribeFn = fn(&PhotocraftApp) -> Option<Value>;
+
 /// The `describe(app)` of each hosted workspace, by its dialog key (L-21). Facts that live in app data stay in the
 /// module's adapter; this table only merges them into the workspace's `json_fields`.
-const DESCRIBE: &[(&str, fn(&PhotocraftApp) -> Option<Value>)] = &[
+const DESCRIBE: &[(&str, DescribeFn)] = &[
     ("select.selectAndMask", crate::select_mask_ui::describe),
     ("edit.contentAwareFill", crate::caf_ui::describe),
     ("filter.liquify", crate::liquify_ui::describe),

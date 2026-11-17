@@ -17,6 +17,7 @@ pub(crate) mod spelling;
 pub(crate) mod style_options;
 pub(crate) mod styles;
 
+#[cfg(test)]
 pub(crate) use spelling::close_spelling;
 pub use spelling::{SPELLING, SpellDialog, open_spelling};
 
@@ -36,7 +37,7 @@ pub struct TypePanelsUi {
     pub glyph_settings: craft::font_manager::glyphs::GlyphsPanelSettings,
     /// The text style colour picker's target while it is open.
     #[serde(skip)]
-    pub color_target: Option<color_picker::Target>,
+    pub(crate) color_target: Option<color_picker::Target>,
     /// Edit › Check Spelling dialog.
     pub spell: Option<spelling::SpellDialog>,
 }

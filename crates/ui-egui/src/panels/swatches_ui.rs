@@ -21,7 +21,7 @@ use craft::theme::variant::Tone;
 use craft::ui::bars::StatusMessage;
 use craft::ui::contract::{Bind, CommandSet};
 use craft::ui::menu::PanelRow;
-use craft::ui::patterns::presets::{PresetFileEvent, PresetFileRequest, PresetWords};
+use craft::ui::patterns::presets::{PresetFileRequest, PresetWords};
 use craft::ui::runtime::commands::{CommandRef, CommandState};
 
 use crate::PhotocraftApp;
@@ -230,27 +230,6 @@ fn answer_file(app: &mut PhotocraftApp, request: PresetFileRequest) {
     if let Err(e) = started {
         app.ui.status = e;
         app.ui.status_error = true;
-    }
-}
-
-/// A finished file pick: a read imports through the engine, a write or a failure says so in the status line.
-pub(crate) fn apply_file_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: &PresetFileEvent) {
-    if let PresetFileEvent::Loaded { file_name, bytes, replace, .. } = event {
-        if let Err(e) = import_bytes(app, file_name, bytes, *replace) {
-            app.ui.status = e;
-            app.ui.status_error = true;
-        }
-        return;
-    }
-    let (swatch_words, preset_words) = words(ctx);
-    let env = craft::ui::runtime::env::Env::of_root(ctx);
-    let out = SwatchesPanel::apply_file(&mut app.ui.swatches, event, &swatch_words, &preset_words, env.format());
-    match &out.status {
-        Some(status) => show_status(app, status),
-        None => {
-            app.ui.status = event.status(&preset_words);
-            app.ui.status_error = matches!(event, PresetFileEvent::Failed { .. });
-        }
     }
 }
 

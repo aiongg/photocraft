@@ -25,6 +25,9 @@ pub(crate) enum Admit {
     Busy,
 }
 
+/// A finished trace: its points, the straight-segment indices, the pen owner and the vector owner.
+type FinishedTrace = (Vec<[f64; 3]>, Vec<usize>, PenOwner, Option<super::VectorOwner>);
+
 /// The Freeform Pen's trace between presses and its finished trace until the host drains it.
 pub(crate) struct FreeformPenTool {
     /// This pass's admission rule for a press that begins a trace.
@@ -89,7 +92,7 @@ impl FreeformPenTool {
     }
 
     /// The finished trace as the points `freeform_finish_owned` takes, with its straight-segment indices and owner.
-    pub(super) fn take_finished(&mut self) -> Option<(Vec<[f64; 3]>, Vec<usize>, PenOwner, Option<super::VectorOwner>)> {
+    pub(super) fn take_finished(&mut self) -> Option<FinishedTrace> {
         let (points, straight) = self.closed.take()?;
         let owner = self.owner.take()?;
         Some((points.iter().map(|p| [p.x, p.y, 1.0]).collect(), straight, owner, self.target.take()))

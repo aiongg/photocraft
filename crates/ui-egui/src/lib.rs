@@ -113,7 +113,6 @@ pub use canvas::sampling;
 pub use canvas::scroll_all_windows;
 pub use canvas::select_mask_view;
 pub use canvas::snap_ui;
-use canvas::tile_overlay;
 pub use canvas::tool_feedback;
 pub use dialogs::adjust_dialog;
 pub use dialogs::adjust_editors;
@@ -330,10 +329,6 @@ pub struct PhotocraftApp {
     /// The canvas tools' own state: every tool family's gesture, hover and option state
     /// (`canvas::tools`).
     pub(crate) canvas_tools: canvas::tools::CanvasTools,
-    /// The Info, Notes, Log and ruler-tool state of the analysis tools (`tools::analysis`).
-    pub(crate) analysis_tools: tools::analysis::canvas::AnalysisTools,
-    /// The Slice and Slice Select tools' session (`slice_ui`).
-    pub(crate) slice_tool: craft::draw::ui::slice::SliceTool,
     /// Brush/Eraser stroke being drawn, rendered by the engine (see `canvas::LiveStroke`).
     live_stroke: Option<canvas::LiveStroke>,
     /// A live stroke just committed with its own pixels: the canvas caches that showed it
@@ -428,9 +423,6 @@ pub struct PhotocraftApp {
     path_document: Option<(DocId, u64, std::sync::Weak<Document>)>,
     pub fps: f32,
     pub(crate) last_frame_time: f64,
-    thumbs: HashMap<(photocraft_doc::LayerId, u8), (u64, egui::TextureHandle)>,
-    /// Snapshots whose live layer/mask keys were last used to prune thumbnail handles.
-    thumb_documents: Vec<(DocId, std::sync::Weak<Document>)>,
     /// Content bounds cached per (key, revision): scanning a 36 MP layer every frame cost ~77 ms.
     bounds_cache: HashMap<u64, (u64, photocraft_geom::Rect)>,
     /// Downsampled proxy of the active document for live previews: (doc, revision, k, proxy).

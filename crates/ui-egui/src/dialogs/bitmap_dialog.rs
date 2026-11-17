@@ -52,7 +52,6 @@ pub(crate) fn defaults(app: &PhotocraftApp, f: &mut DialogFields) {
 }
 
 /// The dialog's rows. The filter dialog's opener gives the dialog the Custom Pattern rows.
-
 pub(crate) fn params(app: &PhotocraftApp) -> Vec<Param> {
     let input = input_resolution(app);
     let choice = |list: &[(&'static str, &'static str)]| -> Vec<(String, craft::ui::runtime::env::Label)> {

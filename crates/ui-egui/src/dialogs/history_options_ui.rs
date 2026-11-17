@@ -92,7 +92,7 @@ mod tests {
         }
         crate::dialogs::confirm(&mut app, &ctx, id).unwrap();
         let o = &app.session.prefs().history_options;
-        assert!(!o.allow_non_linear_history && o.make_layer_visibility_changes_undoable == false);
+        assert!(!o.allow_non_linear_history && !o.make_layer_visibility_changes_undoable);
         assert!(!o.automatically_create_first_snapshot && o.automatically_create_new_snapshot_when_saving && o.show_new_snapshot_dialog_by_default);
         assert!(app.framework.dialogs.is_empty());
     }

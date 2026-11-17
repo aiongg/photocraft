@@ -92,7 +92,7 @@ fn picture(app: &PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Option<Opt
     let filtered = filtered_preview(app, id, doc_id, &subject.previewed, dialog.is_previewing());
     let base_k = picture_factor(app, id, dialog, &st.doc, &subject);
 
-    let cache_id = egui::Id::new(("filter-preview-ui", id.value()));
+    let cache_id = egui::Id::unique(("filter-preview-ui", id.value()));
     let mut cache: Cache = ctx.data_mut(|d| std::mem::take(d.get_temp_mut_or_default::<Cache>(cache_id)));
     // Channel visibility and the active mask can change without a document revision. Both the
     // original (press-and-hold) and filtered textures must follow the canvas's current view.
@@ -338,7 +338,7 @@ mod tests {
         crate::filter_dialog::open(&mut app, "filter.blur.gaussianBlur").unwrap();
         let id = top_dialog(&app);
         let ctx = app.ctx().clone();
-        let cache_id = egui::Id::new(("filter-preview-ui", id.value()));
+        let cache_id = egui::Id::unique(("filter-preview-ui", id.value()));
         let original = |ctx: &egui::Context| ctx.data(|d| d.get_temp::<Cache>(cache_id).unwrap().original.unwrap().tex.id());
         ctx.run_ui(Default::default(), |ui| feed(&mut app, ui.ctx())).textures_delta.clear();
         let before = original(&ctx);

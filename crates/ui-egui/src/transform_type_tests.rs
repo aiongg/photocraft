@@ -91,7 +91,7 @@ fn distort_and_perspective_corner_drags_scale_editable_type() {
     let cmd = egui::Modifiers::COMMAND;
     for mods in [cmd, cmd | egui::Modifiers::ALT | egui::Modifiers::SHIFT] {
         let mut app = app();
-        let ctx = crate::canvas::testing::ctx(&mut app);
+        let ctx = crate::canvas::testing::ctx(&app);
         crate::menus::invoke(&mut app, &ctx, "edit.freeTransform", json!({})).unwrap();
         let q0 = quad(&app);
         let [x, y] = q0[1];

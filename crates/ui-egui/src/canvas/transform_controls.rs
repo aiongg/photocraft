@@ -37,6 +37,7 @@ pub(crate) fn layer_edges(app: &PhotocraftApp, idx: usize) -> Option<BezPath> {
     Some(path)
 }
 
+#[cfg(test)]
 /// The layers Move › Show Transform Controls frames: every selected layer, the Background too when
 /// it is among several (a handle drag then refuses, [`begin_controls`]), but not the Background
 /// alone (#11101).

@@ -5,10 +5,9 @@ use craft::behavior::IconId;
 use craft::ui::buttons::Button;
 use craft::ui::choice::Switch;
 use craft::ui::contract::{Bind, Props as _, Show as _, Sizing, clicked};
-use craft::ui::menu::PanelRow;
 use craft::ui::patterns::panels::Inspector;
 use craft::ui::primitives::IconSpec;
-use craft::ui::runtime::commands::{CommandRef, CommandState};
+
 use photocraft_doc::{Layer, LayerContent, LayerId};
 use serde_json::json;
 
@@ -149,22 +148,6 @@ fn adjustment_controls(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, 
         let _ = app.run("layer.setAdjustment", params);
         app.live_adjust = None;
     }
-}
-
-/// Properties has no panel-menu rows of its own; the dock adds its group rows.
-pub(crate) fn panel_rows(_app: &PhotocraftApp) -> Vec<PanelRow> {
-    Vec::new()
-}
-
-/// Properties has no command set of its own, so it publishes no command states.
-// PLAN: the sheet lists `panel_rows` and `run_fired` only; pn.PC12 names `command_states` as well, so it is here, empty.
-pub(crate) fn command_states(_app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
-    Vec::new()
-}
-
-/// Properties has no panel-menu commands to run.
-pub(crate) fn run_fired(_app: &mut PhotocraftApp, _ctx: &egui::Context, _command: &CommandRef) -> bool {
-    false
 }
 
 #[cfg(test)]

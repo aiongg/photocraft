@@ -7,7 +7,7 @@ use craft::behavior::{Axis, EditEvent};
 use craft::theme::Rgba;
 use craft::ui::canvas::{Guide, GuideKey, GuideLine, Rulers};
 use craft::ui::canvas_controls::{CanvasGrid, GridLine, Guides, GuidesOutput};
-use craft::ui::contract::{Bind, Props as _, Show as _};
+use craft::ui::contract::{Bind, Show as _};
 use craft::ui::runtime::env::UnitKind;
 use craft::ui::style::DataColor;
 use egui::Color32;
@@ -21,55 +21,12 @@ use crate::guide_select;
 use crate::prefs::unit_kind;
 use crate::state::Tool;
 
-/// English display name for a length unit, as shown in Preferences › Units & Rulers.
-fn unit_label(u: Unit) -> &'static str {
-    match u {
-        Unit::Pixels => "Pixels",
-        Unit::Inches => "Inches",
-        Unit::Centimeters => "Centimeters",
-        Unit::Millimeters => "Millimeters",
-        Unit::Points => "Points",
-        Unit::Picas => "Picas",
-        Unit::Percent => "Percent",
-    }
-}
-
 /// Every length unit, in the Preferences › Units & Rulers order.
 const UNITS: [Unit; 7] = [Unit::Pixels, Unit::Inches, Unit::Centimeters, Unit::Millimeters, Unit::Points, Unit::Picas, Unit::Percent];
-
-/// The units Photoshop's Create Rectangle (and the other shape dialogs) offer on a right-click of
-/// Width or Height: the lengths, without Percent.
-pub(crate) const LENGTH_UNITS: [Unit; 6] = [Unit::Pixels, Unit::Inches, Unit::Centimeters, Unit::Millimeters, Unit::Points, Unit::Picas];
 
 /// [`UNITS`] as the rulers' own units menu lists them.
 static UNIT_KINDS: [UnitKind; 7] =
     [UnitKind::Pixels, UnitKind::Inches, UnitKind::Centimetres, UnitKind::Millimetres, UnitKind::Points, UnitKind::Picas, UnitKind::Percent];
-
-/// The ruler right-click menu: every unit of `units` with its (translated) label and whether it's
-/// the one in effect. Picking one changes the ruler unit exactly as the preference pane does.
-fn unit_menu_items(current: Unit, units: &[Unit]) -> Vec<(String, &'static str, bool)> {
-    units.iter().map(|&u| (tl!(unit_label(u)).to_string(), u.name(), u == current)).collect()
-}
-
-/// The length units menu that Free Transform's W and H fields and the shape dialogs open; the
-/// chosen unit's name is returned (`None` if the menu is dismissed without a pick).
-pub(crate) fn unit_menu(ui: &mut egui::Ui, current: Unit) -> Option<&'static str> {
-    unit_menu_of(ui, current, &UNITS)
-}
-
-/// [`unit_menu`] with only `units` in it.
-pub(crate) fn unit_menu_of(ui: &mut egui::Ui, current: Unit, units: &[Unit]) -> Option<&'static str> {
-    ui.set_min_width(150.0);
-    let mut chosen = None;
-    for (label, name, checked) in unit_menu_items(current, units) {
-        let label = if checked { format!("✓ {label}") } else { label };
-        if ui.button(label).clicked() {
-            ui.close();
-            chosen = Some(name);
-        }
-    }
-    chosen
-}
 
 /// Grid spacing in document pixels. Percentages use each axis's own extent.
 pub(crate) fn grid_major_px(g: &GuidesGridAndSlices, dpi: f64, size: [f64; 2], ppi: f64) -> [f64; 2] {
@@ -273,7 +230,7 @@ fn run_guides(app: &mut PhotocraftApp, ctx: &egui::Context, shown: &[Guide], out
             }
         }
         let mut gone: Vec<(bool, usize)> = shown.iter().filter(|g| !after.iter().any(|a| a.key == g.key)).map(|g| guide_select::unkey(g.key)).collect();
-        gone.sort_by(|a, b| b.1.cmp(&a.1));
+        gone.sort_by_key(|a| std::cmp::Reverse(a.1));
         for (vertical, index) in gone {
             status = status.and(app.run("view.deleteGuide", guide_select::delete_params(vertical, index)).map(drop));
         }

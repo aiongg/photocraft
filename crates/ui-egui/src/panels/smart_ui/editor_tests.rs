@@ -74,13 +74,19 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, field: &str, value: serde_j
 /// OK on the newest open dialog.
 fn confirm(app: &mut PhotocraftApp) {
     let id = app.framework.dialogs.open_dialogs().pop().expect("an open dialog").id;
-    crate::dialogs::testing::confirm(app, id);
+    crate::dialogs::testing::confirm(app, id).unwrap();
+}
+
+/// OK on the newest open dialog, which refuses it; the refusal is the error text.
+fn confirm_refused(app: &mut PhotocraftApp) -> String {
+    let id = app.framework.dialogs.open_dialogs().pop().expect("an open dialog").id;
+    crate::dialogs::testing::confirm(app, id).expect_err("the dialog refuses OK")
 }
 
 /// Cancel on the newest open dialog.
 fn cancel(app: &mut PhotocraftApp) {
     let id = app.framework.dialogs.open_dialogs().pop().expect("an open dialog").id;
-    crate::dialogs::testing::cancel(app, id);
+    crate::dialogs::testing::cancel(app, id).unwrap();
 }
 
 /// An adjustment on a Smart Object reopens its editor with the stored values and OK updates it in one step; Invert has no editor.
@@ -454,7 +460,7 @@ fn rabbit_stale_tone_filter_dialog_hides_controls_until_the_original_document_re
         assert!(h.query_all_by_role(egui::accesskit::Role::ComboBox).any(|n| n.value().as_deref() == Some("RGB")));
         let (req, _rx) = crate::control::ControlRequest::new("ui.window.open", json!({"document":1}));
         crate::control::handle(h.state_mut(), &ctx, &req);
-        confirm(h.state_mut());
+        confirm_refused(h.state_mut());
         assert!(std::sync::Arc::ptr_eq(&other, &h.state().session.active().unwrap().doc), "OK on a stale dialog changes nothing");
     }
 }
@@ -467,13 +473,13 @@ fn rabbit_invalid_whole_curves_alias_does_not_turn_neutral() {
             let (mut app, layer) = app(8, mode);
             app.run("image.adjustments.curves", json!({"points":[[0,255],[255,0]]})).unwrap();
             let before = app.session.active().unwrap().doc.clone();
-            let target = crate::smart_filter_dialog::target(&mut app, layer, 2).unwrap();
+            let target = crate::smart_filter_dialog::target(&app, layer, 2).unwrap();
             assert!(crate::adjust_dialog::open_smart_filter(&mut app, "image.adjustments.curves", &bad, target).is_some());
             assert!(fields(&app).get("points").is_none(), "invalid aliases cannot be hidden by defaults");
             let idx = app.session.active_index().unwrap();
             assert!(crate::canvas::ensure_filter_preview(&mut app, idx, &egui::Context::default()).is_none());
             assert!(app.filter_preview.as_ref().is_none_or(|preview| preview.result.is_none()));
-            confirm(&mut app);
+            confirm_refused(&mut app);
             assert!(std::sync::Arc::ptr_eq(&before, &app.session.active().unwrap().doc), "OK on an invalid alias changes nothing");
         }
     }

@@ -70,12 +70,15 @@ pub(crate) fn install(ctx: &egui::Context, fonts: &UiFonts<'_>, frame: Option<De
     }
 }
 
+#[cfg(test)]
+type TestBody = Box<dyn FnMut(&mut egui::Ui, &mut PhotocraftApp)>;
+
 /// What PhotoCraft keeps for the framework: the `Host` its components read services from, and
 /// the host of the framework dialogs it opens.
 pub struct Framework {
     /// A test harness's own pass body, run in place of the app's frame (see [`BuildApp`]).
     #[cfg(test)]
-    pub(crate) test_body: Option<Box<dyn FnMut(&mut egui::Ui, &mut PhotocraftApp)>>,
+    pub(crate) test_body: Option<TestBody>,
     sections: Arc<PrefSections>,
     host: Arc<Host>,
     /// The UI language `host` speaks.
@@ -485,9 +488,9 @@ impl Framework {
     /// Shift+F6 (Window › Color, Select › Modify › Feather) until those are a framework
     /// `CommandSet`. The held `Arc` is replaced only when the bindings differ, so the runtime
     /// rebuilds its keymap only on a change.
-    fn set_overrides(&mut self, rev: u64, catalog: AppCatalog, mut overrides: Overrides) {
+    fn set_overrides(&mut self, rev: u64, catalog: Option<AppCatalog>, mut overrides: Overrides) {
         self.overrides_rev = Some(rev);
-        self.catalog = Some(catalog);
+        self.catalog = catalog;
         for command in [NavCommand::NextPane, NavCommand::PreviousPane] {
             overrides.insert(CommandRef::from(command).key(), Vec::new());
         }

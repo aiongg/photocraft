@@ -72,7 +72,7 @@ fn pen_custom_undo_binding_and_menu_retract_pending_points() {
     assert!(crate::menus::is_enabled(&app, "edit.undo"));
     let undo_label = |app: &PhotocraftApp| crate::menus::menu_rows(app).into_iter().find(|row| row.command.id == "edit.undo").unwrap().label;
     assert_ne!(undo_label(&app), "Undo Reset Actions");
-    let ctx = testing::ctx(&mut app);
+    let ctx = testing::ctx(&app);
     crate::menus::invoke(&mut app, &ctx, "edit.undo", json!({})).unwrap();
     assert_eq!(pen_knots(&app), 0);
     assert_eq!(undo_label(&app), "Undo Reset Actions");

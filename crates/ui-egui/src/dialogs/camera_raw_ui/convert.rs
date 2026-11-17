@@ -280,7 +280,15 @@ fn open_session(
         // OK is held: a failed filter command keeps the workspace open with its settings.
         app.framework.dialogs.open(HostedWorkspace::new(RawDevelopWorkspace::new(open), dyn_source).held_ok());
     }
-    app.raw = Some(RawSession { layer, target, raw_open, original, source, gpu });
+    app.raw = Some(RawSession {
+        layer,
+        target,
+        raw_open,
+        original,
+        source,
+        #[cfg(test)]
+        gpu,
+    });
     if target == Target::OpenRaw {
         super::filmstrip::sync_pictures(app, ctx);
     }

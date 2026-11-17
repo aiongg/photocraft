@@ -174,7 +174,8 @@ fn guide_edits_run_their_view_commands() {
         let (from, to) = (canvas_at(h, 150.0, 40.0), ruler_at(h, true, 150.0, 40.0));
         drag(h, from, &steps(from, to), Modifiers::NONE, true);
     };
-    let table: [(&str, Edit, (Vec<f64>, Vec<f64>)); 5] = [
+    type Guides = (Vec<f64>, Vec<f64>);
+    let table: [(&str, Edit, Guides); 5] = [
         ("view.newGuide horizontal", place_horizontal, (vec![20.0, 50.0], vec![10.0, 40.0, 45.0])),
         ("view.newGuide vertical", place_vertical, (vec![20.0, 50.0, 30.0], vec![10.0, 40.0])),
         ("view.moveGuide vertical 1", move_second_vertical, (vec![20.0, 70.0], vec![10.0, 40.0])),

@@ -137,7 +137,7 @@ fn indexed_matte_document_color(app: &PhotocraftApp, doc: &Document, color: [f32
     let options = TransformOptions { intent: app.session.color.settings.intent(), bpc: app.session.color.settings.bpc, ..Default::default() };
     let transform = craft::cms::transform::cached(&source, &destination, options).map_err(|e| e.to_string())?;
     let mut output = [0.0; 16];
-    transform.eval(&color[..3], &mut output);
+    transform.eval(&color[..3], &mut output).map_err(|e| e.to_string())?;
     let rgb = if destination.color_space == ColorSpace::Gray { [output[0]; 3] } else { [output[0], output[1], output[2]] };
     if rgb.iter().any(|v| !v.is_finite()) {
         return Err("cannot convert matte colour to finite document samples".into());
@@ -169,17 +169,6 @@ pub(crate) fn indexed_matte_seed(colors: &MatteColors, value: &str) -> Option<[f
         "none" | "white" => Some([1.0; 3]),
         _ => Srgba::from_hex(value).map(Srgba::to_rgb_array),
     }
-}
-
-/// The family's `check` for Indexed Color: refuses a Foreground or Background matte the document cannot hold.
-pub(crate) fn indexed_matte_check(app: &PhotocraftApp, fields: &DialogFields) -> Result<(), String> {
-    let Some(doc) = app.session.active().map(|state| state.doc.as_ref()) else { return Ok(()) };
-    let tool = match fields.text("matte") {
-        Some("foreground") => app.session.tools.foreground,
-        Some("background") => app.session.tools.background,
-        _ => return Ok(()),
-    };
-    indexed_matte_document_color(app, doc, tool).map(drop)
 }
 
 // --- Lens Blur -------------------------------------------------------------------------------------------------
@@ -299,7 +288,7 @@ fn lut_choice(fields: &DialogFields) -> LutChoice {
         return LutChoice::Folder(PathBuf::from(file));
     }
     let look = fields.text("lut").unwrap_or("none");
-    photocraft_engine::adjust_cmds::LOOKS.iter().find(|(known, _)| *known == look).map_or(LutChoice::None, |(known, _)| LutChoice::Builtin(*known))
+    photocraft_engine::adjust_cmds::LOOKS.iter().find(|(known, _)| *known == look).map_or(LutChoice::None, |(known, _)| LutChoice::Builtin(known))
 }
 
 /// Writes a picked choice as the command's `lut` / `file` parameters; the loaded LUT already held is no pick.

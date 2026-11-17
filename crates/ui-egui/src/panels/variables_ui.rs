@@ -481,7 +481,7 @@ fn finish(app: &mut PhotocraftApp, answer: VariablesAnswer) -> Result<(), String
     let selected = (apply_on_ok && !state.data_sets.is_empty()).then(|| state.cur.min(state.data_sets.len() - 1));
     if let Some(index) = selected
         && let Some(st) = app.session.active()
-        && applied_at == Some((st.doc.id.0 as u64, st.revision as u64))
+        && applied_at == Some((st.doc.id.0, st.revision))
         && st.doc.variables.active == Some(index)
         && state.same_as_doc(&st.doc.variables)
     {
@@ -497,8 +497,7 @@ pub(crate) fn take(app: &mut PhotocraftApp, _ctx: &egui::Context) {
     if let Some((index, state)) = pending {
         match save(app, &state, Some(index)) {
             Ok(()) => {
-                let applied =
-                    app.session.active().map(|st| (VariablesState::from_doc(&st.doc.variables, state.page), (st.doc.id.0 as u64, st.revision as u64)));
+                let applied = app.session.active().map(|st| (VariablesState::from_doc(&st.doc.variables, state.page), (st.doc.id.0, st.revision)));
                 if let (Some((mut fresh, at)), Some(dialog)) = (applied, app.framework.dialogs.get_mut::<VariablesDialog>()) {
                     fresh.cur = state.cur;
                     fresh.clamp();

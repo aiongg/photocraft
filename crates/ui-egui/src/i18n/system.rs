@@ -28,34 +28,15 @@ fn resolve(tags: &[String]) -> Lang {
 /// fields take only that one (a German system refuses a typed `.`). `None` where the system sets
 /// none or another symbol: the fields then take both.
 pub fn decimal_separator() -> Option<char> {
+    // Tests take both separators, whatever the developer's own number format is.
     #[cfg(test)]
     {
-        TEST_DECIMAL.get()
+        None
     }
     #[cfg(not(test))]
     {
         craft::i18n::Region::system().decimal.filter(|c| matches!(c, '.' | ','))
     }
-}
-
-#[cfg(test)]
-thread_local! {
-    // Tests take both separators unless they choose one (`with_decimal_separator`), whatever the
-    // developer's own number format is.
-    static TEST_DECIMAL: std::cell::Cell<Option<char>> = const { std::cell::Cell::new(None) };
-}
-
-/// Runs `run` as on a system whose decimal separator is `sep` (`None`: unknown, both taken).
-#[cfg(test)]
-pub(crate) fn with_decimal_separator<R>(sep: Option<char>, run: impl FnOnce() -> R) -> R {
-    struct Restore(Option<char>);
-    impl Drop for Restore {
-        fn drop(&mut self) {
-            TEST_DECIMAL.set(self.0);
-        }
-    }
-    let _restore = Restore(TEST_DECIMAL.replace(sep));
-    run()
 }
 
 #[cfg(test)]

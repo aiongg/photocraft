@@ -80,17 +80,6 @@ impl SelectionTools {
         }
     }
 
-    /// Drops every outline and drag without a command: the tool or the document changed.
-    pub(crate) fn reset(&mut self) {
-        self.marquee.reset();
-        self.lasso.reset();
-        self.polygon.reset();
-        self.magnetic.reset();
-        self.wand.drag.reset();
-        self.wand.clicks.clear();
-        self.lock_prompted = false;
-    }
-
     /// The whole-pixel offset of the selection drag in progress, from the tool that runs it.
     pub(crate) fn drag_offset(&self) -> Option<(i32, i32)> {
         [self.marquee.phase(), self.lasso.phase(), self.polygon.phase(), self.magnetic.phase(), self.wand.drag.phase()].into_iter().find_map(drag_delta)
@@ -137,13 +126,6 @@ impl InsideSelectionDrag {
     /// Where the drag is, for [`SelectionTools::drag_offset`] and the retouch family's offset.
     pub(crate) fn phase(&self) -> SelectPhase {
         self.marquee.phase()
-    }
-
-    /// Drops the drag without a command.
-    pub(crate) fn reset(&mut self) {
-        self.marquee.reset();
-        self.active = false;
-        self.lock_prompted = false;
     }
 
     pub(crate) fn each_pass(&mut self, probe: &dyn SelectionProbe, cx: &mut ToolContext<'_>) {
@@ -226,7 +208,7 @@ impl PcSelection {
         let st = app.session.active();
         let (document, size) = st.map_or((0, PixelSize::new(0, 0)), |st| {
             let b = st.doc.bounds();
-            (st.doc.id.0 ^ app.session.active_generation(), PixelSize::new(b.width().max(0) as u32, b.height().max(0) as u32))
+            (st.doc.id.0 ^ app.session.active_generation(), PixelSize::new(b.width(), b.height()))
         });
         let piece = st.and_then(photocraft_engine::float_cmds::floating).map(|f| Piece { offset: f.offset, outline: f.parts.outline().cloned() });
         Self { document, size, has_selection: crate::tool_feedback::has_selection(app), selection: st.and_then(|st| st.doc.selection.clone()), piece }
@@ -355,7 +337,7 @@ impl SelectionPass<'_> {
     /// Runs `f` on the chosen tool as a pass over this pass's probe.
     fn with<R>(&self, f: impl FnOnce(&mut dyn CanvasTool) -> R) -> R {
         let mut guard = self.state.borrow_mut();
-        let s: &mut SelectionTools = &mut **guard;
+        let s: &mut SelectionTools = &mut guard;
         match self.which {
             Which::Marquee => f(&mut s.marquee.pass(&self.probe)),
             Which::Lasso => f(&mut s.lasso.pass(&self.probe)),

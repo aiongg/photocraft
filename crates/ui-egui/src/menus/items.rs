@@ -77,11 +77,13 @@ impl MenuModel {
 /// after the first pass's commands ran.
 pub fn model<'a>(app: &'a mut PhotocraftApp, ctx: &egui::Context) -> &'a MenuModel {
     let state = crate::native_menu::state_hash(app, craft::menu::had_input(ctx).then_some(app.frame));
-    if app.menu_model.as_ref().is_none_or(|m| m.state != state) {
-        let built = build(app, state);
-        app.menu_model = Some(built);
+    match app.menu_model.take() {
+        Some(held) if held.state == state => app.menu_model.insert(held),
+        _ => {
+            let built = build(app, state);
+            app.menu_model.insert(built)
+        }
     }
-    app.menu_model.as_ref().expect("the model was just built")
 }
 
 /// The row that runs `id`.
@@ -91,16 +93,6 @@ pub fn row<'a>(rows: &'a [Row], id: &str) -> Option<&'a Row> {
 
 fn find<'a>(rows: &'a mut [Row], id: &str) -> Option<&'a mut Row> {
     rows.iter_mut().find(|r| r.command.id == id)
-}
-
-fn row_in(path: &[String], id: &str, label: &str) -> Row {
-    let path: Vec<&str> = path.iter().map(String::as_str).collect();
-    Row::new(&path, id, label)
-}
-
-fn separator_in(path: &[String]) -> Row {
-    let path: Vec<&str> = path.iter().map(String::as_str).collect();
-    Row::separator(&path)
 }
 
 /// A live row shows the chord the runtime's keymap runs its command for (`commands::chord`: overrides included, a
@@ -314,11 +306,11 @@ pub fn menu_rows(app: &PhotocraftApp) -> Vec<Row> {
     let mut rows = base_rows(app);
     let prefs = app.session.prefs();
     let hidden = prefs.menus.hidden.iter().filter(|id| photocraft_engine::prefs::MenuCustomization::hideable(id)).cloned();
-    let colors = prefs
-        .interface
-        .show_menu_colors
-        .then(|| prefs.menus.colors.iter().filter_map(|(id, name)| menu_tint(name).map(|c| (id.clone(), c.into()))).collect::<Vec<_>>())
-        .unwrap_or_default();
+    let colors = if prefs.interface.show_menu_colors {
+        prefs.menus.colors.iter().filter_map(|(id, name)| menu_tint(name).map(|c| (id.clone(), c.into()))).collect::<Vec<_>>()
+    } else {
+        Vec::new()
+    };
     Customization::new(hidden, colors).apply(&mut rows);
     rows
 }

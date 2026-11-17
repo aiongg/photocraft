@@ -896,7 +896,7 @@ fn rotate_view_params_set_add_reset_and_reject() {
     let (mut app, ctx) = app_with(1);
     // PLAN: assumed the document's view keeps its rotation in degrees as `views[0].rotation`
     let angle = |app: &PhotocraftApp| f64::from(app.ui.views[0].rotation);
-    let mut run = |app: &mut PhotocraftApp, p: Value| menu(app, &ctx, "view.rotateView", p);
+    let run = |app: &mut PhotocraftApp, p: Value| menu(app, &ctx, "view.rotateView", p);
     run(&mut app, json!({"angle": 30.0})).unwrap();
     assert_eq!(angle(&app), 30.0);
     run(&mut app, json!({"delta": 15.0})).unwrap();

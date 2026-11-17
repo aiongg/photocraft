@@ -15,7 +15,7 @@ use craft::behavior::Axis;
 use craft::behavior::kurbo::Rect;
 use craft::draw::ui::measure::box_distances;
 use craft::ui::canvas_controls::SmartGuides;
-use craft::ui::contract::{Show as _, ShowContainer as _};
+use craft::ui::contract::Show as _;
 use photocraft_doc::{DocId, LayerId};
 use photocraft_engine::snap::union;
 

@@ -42,7 +42,7 @@ pub(crate) fn open(app: &mut PhotocraftApp) -> DialogId {
     let units = app.session.prefs().units_and_rulers.clone();
     // A resolution that is not a positive finite number leaves the dialog's own default.
     let usable = |ppi: f64| Some(ppi).filter(|ppi| ppi.is_finite() && *ppi > 0.0);
-    let (print, screen) = (usable(units.print_resolution as f64), usable(units.screen_resolution as f64));
+    let (print, screen) = (usable(units.print_resolution), usable(units.screen_resolution));
     let profiles = profiles(app);
     let custom = custom_pixel_aspects(app);
     let dialog = HostedNewDocument::new(app.ctx(), options, move |options| {

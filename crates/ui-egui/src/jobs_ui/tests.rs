@@ -916,8 +916,8 @@ fn transform_and_commit(h: &mut Harness<'static, PhotocraftApp>, copy: bool) {
 /// Sets the open box's corners as one edit of the session.
 fn move_box(app: &mut PhotocraftApp, corners: [[f64; 2]; 4]) {
     let session = &mut app.ui.transform.as_mut().unwrap().session;
-    let before = session.state().clone();
-    let mut after = before.clone();
+    let before = *session.state();
+    let mut after = before;
     after.quad = corners.map(|[x, y]| Point::new(x, y));
     session.apply(TransformEdit::Box(EditEvent::set(Mixed::Same(before), after, "Free Transform".into(), None)), 0.0);
 }

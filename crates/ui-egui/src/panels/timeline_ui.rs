@@ -5,7 +5,9 @@ use craft::behavior::IconId;
 use craft::theme::variant::Tone;
 use craft::timeline::PlaybackClock;
 use craft::timeline::time::{FrameRate, Tick, TimeRange};
-use craft::timeline::ui::{TransportBar, TransportButton, TransportWords};
+#[cfg(test)]
+use craft::timeline::ui::TransportWords;
+use craft::timeline::ui::{TransportBar, TransportButton};
 use craft::ui::buttons::{Button, IconButton};
 use craft::ui::contract::{Bind, Props as _, Show as _, ShowContainer as _, clicked};
 use craft::ui::display::{Shade, Text};

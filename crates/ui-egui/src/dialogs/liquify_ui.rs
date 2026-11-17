@@ -911,11 +911,6 @@ pub(crate) fn record_stroke(app: &mut PhotocraftApp, points: &[[f64; 3]]) {
     take(app, &ctx);
 }
 
-/// The document the open workspace belongs to.
-pub(crate) fn document(app: &PhotocraftApp) -> Option<DocId> {
-    app.liquify.as_ref().map(|l| l.document)
-}
-
 /// The reply of `filter.liquify` while the workspace is open: the app's facts, with the steps
 /// so far and the redo depth from the workspace.
 pub(crate) fn describe(app: &PhotocraftApp) -> Option<Value> {

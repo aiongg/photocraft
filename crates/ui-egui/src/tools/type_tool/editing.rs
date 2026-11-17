@@ -7,14 +7,14 @@ use super::{LayerId, PhotocraftApp, TextEdit, TextLayer, active_doc_id, byte_ran
 /// Marks the session's editor to take the keyboard in the pass that first shows it: the framework knows an editor's
 /// doc key only once it has been shown, so a request made before that finds nothing.
 pub(super) fn focus_editor(ctx: &egui::Context) {
-    ctx.data_mut(|d| d.insert_temp(egui::Id::new(FOCUS_WANTED), true));
+    ctx.data_mut(|d| d.insert_temp(egui::Id::unique(FOCUS_WANTED), true));
 }
 
 const FOCUS_WANTED: &str = "photocraft.type-editor-focus-wanted";
 
 /// Moves the keyboard to the editor just shown when a session start asked for it ([`focus_editor`]).
 pub(super) fn take_editor_focus(ctx: &egui::Context) {
-    if ctx.data_mut(|d| d.remove_temp::<bool>(egui::Id::new(FOCUS_WANTED))).is_some() {
+    if ctx.data_mut(|d| d.remove_temp::<bool>(egui::Id::unique(FOCUS_WANTED))).is_some() {
         let _ = focus::request(ctx, FocusTarget::Doc(super::controls::TYPE_EDITOR));
     }
 }

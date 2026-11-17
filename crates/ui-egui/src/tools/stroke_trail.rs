@@ -9,7 +9,7 @@
 
 use craft::behavior::kurbo::{Point, Rect};
 use craft::ui::canvas_controls::brush::{CoverageMask, StrokeTrail, TrailTone};
-use craft::ui::contract::{Props as _, Show as _};
+use craft::ui::contract::Show as _;
 use photocraft_paint::{BrushSettings, StrokePoint, StrokeRenderer};
 use serde_json::json;
 
@@ -181,9 +181,10 @@ pub(crate) fn show(ui: &mut egui::Ui, app: &mut PhotocraftApp, rect: egui::Rect)
         let tone = trail.tone;
         trail.show_as(ui, rect, tl!("Stroke footprint"), tone);
     }
-    if app.remove_trail.is_some() && crate::retouch_ui::remove_pending_live(app) {
-        if let Some(trail) = app.remove_trail.as_mut() {
-            trail.show_as(ui, rect, tl!("Waiting removals"), TrailTone::Danger);
-        }
+    if app.remove_trail.is_some()
+        && crate::retouch_ui::remove_pending_live(app)
+        && let Some(trail) = app.remove_trail.as_mut()
+    {
+        trail.show_as(ui, rect, tl!("Waiting removals"), TrailTone::Danger);
     }
 }

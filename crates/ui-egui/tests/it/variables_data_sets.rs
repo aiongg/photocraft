@@ -67,7 +67,7 @@ fn read_pixel(h: &mut H) -> Value {
 }
 
 fn revision(h: &H) -> u64 {
-    h.state().session.active().unwrap().revision as u64
+    h.state().session.active().unwrap().revision
 }
 
 fn blue_row(dir: &tempfile::TempDir, name: &str) -> Value {

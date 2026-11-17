@@ -115,8 +115,8 @@ impl Default for CanvasTools {
     fn default() -> Self {
         let options = NavigationOptions::default();
         Self {
-            momentary: Momentary::new(options.clone()),
-            hand: HandTool::new(options.clone()),
+            momentary: Momentary::new(options),
+            hand: HandTool::new(options),
             zoom: ZoomTool::new(options),
             rotate: RotateViewTool::default(),
             selection: Default::default(),
@@ -242,31 +242,25 @@ pub(crate) fn takes_command_stand_in(tool: Tool) -> bool {
 /// canvas's `Ui` and the tool coexist.
 pub(crate) struct ToolScope<'a> {
     app: RefCell<&'a mut PhotocraftApp>,
-    host: CanvasHost,
     ctx: egui::Context,
 }
 
 impl<'a> ToolScope<'a> {
-    fn new(app: &'a mut PhotocraftApp, ctx: egui::Context, host: CanvasHost) -> Self {
-        Self { app: RefCell::new(app), host, ctx }
+    fn new(app: &'a mut PhotocraftApp, ctx: egui::Context) -> Self {
+        Self { app: RefCell::new(app), ctx }
     }
 
     /// A scope for a family tool's unit test, with no canvas pass.
     // PLAN: the contract takes `&PhotocraftApp`, but `with_app` hands out `&mut PhotocraftApp`; the constructor takes `&mut`.
     #[cfg(test)]
-    pub(crate) fn for_test(app: &'a mut PhotocraftApp, host: CanvasHost) -> Self {
+    pub(crate) fn for_test(app: &'a mut PhotocraftApp) -> Self {
         let ctx = super::testing::ctx(app);
-        Self::new(app, ctx, host)
+        Self::new(app, ctx)
     }
 
     /// Runs `f` on the app. A nested call panics: a tool method calls `with_app` once at a time.
     pub(crate) fn with_app<R>(&self, f: impl FnOnce(&mut PhotocraftApp) -> R) -> R {
         f(&mut self.app.borrow_mut())
-    }
-
-    /// The canvas this pass runs on.
-    pub(crate) fn host(&self) -> CanvasHost {
-        self.host
     }
 
     /// The egui context of the pass.
@@ -362,22 +356,23 @@ impl CanvasTool for Preflight<'_, '_> {
     fn press(&mut self, pointer: &ToolPointer, cx: &mut ToolContext<'_>) -> ToolAction {
         let tool = self.tool;
         let doc = cx.space().map(|space| space.view.to_doc(pointer.pos));
-        if pointer.button == PointerButton::Primary && !self.dialog {
-            if let Some(doc) = doc {
-                if self.scope.with_app(|app| super::quick_pick::press(app, pointer, doc)) {
-                    return ToolAction::Done;
-                }
-                let at = [doc.x, doc.y];
-                // The Triangle's ⌥ press that samples is the Eyedropper stand-in's, not a shape (#13364).
-                if self.alt_stand_in && self.scope.with_app(|app| super::cursor_policy::shape_alt_samples(app, pointer.mods, at[0], at[1])) {
-                    return ToolAction::Ignored;
-                }
-                // The Control+Alt resize drag changes the brush, not the layer: it runs where a stroke would be refused
-                // (a hidden layer, a Clone Stamp without a source), as quick pick does before it.
-                let resizes = crate::brush_resize::PaintResize::chord(tool, pointer.button, pointer.mods);
-                if !resizes && self.refused(pointer, at) {
-                    return ToolAction::Done;
-                }
+        if pointer.button == PointerButton::Primary
+            && !self.dialog
+            && let Some(doc) = doc
+        {
+            if self.scope.with_app(|app| super::quick_pick::press(app, pointer, doc)) {
+                return ToolAction::Done;
+            }
+            let at = [doc.x, doc.y];
+            // The Triangle's ⌥ press that samples is the Eyedropper stand-in's, not a shape (#13364).
+            if self.alt_stand_in && self.scope.with_app(|app| super::cursor_policy::shape_alt_samples(app, pointer.mods, at[0], at[1])) {
+                return ToolAction::Ignored;
+            }
+            // The Control+Alt resize drag changes the brush, not the layer: it runs where a stroke would be refused
+            // (a hidden layer, a Clone Stamp without a source), as quick pick does before it.
+            let resizes = crate::brush_resize::PaintResize::chord(tool, pointer.button, pointer.mods);
+            if !resizes && self.refused(pointer, at) {
+                return ToolAction::Done;
             }
         }
         self.inner.press(pointer, cx)
@@ -555,7 +550,7 @@ fn with_rig<R>(
     } = tools;
     let outline_open = selection.outline_open();
     let result = {
-        let scope = ToolScope::new(app, ctx.clone(), host);
+        let scope = ToolScope::new(app, ctx.clone());
         let mut boxed: Option<FamilyTool<'_>> = None;
         let mut command_t: Option<FamilyTool<'_>> = None;
         let mut alt_t: Option<FamilyTool<'_>> = None;
@@ -582,8 +577,8 @@ fn with_rig<R>(
             };
         }
         let selected: DynTool<'_> = 'select: {
-            if dialog_picked {
-                break 'select dynamic(boxed.as_mut().expect("the dialog's tool was just stored"));
+            if dialog_picked && let Some(picked) = boxed.as_mut() {
+                break 'select dynamic(picked);
             }
             if transform_picked && let Some(t) = transform.as_mut() {
                 break 'select t as &mut dyn CanvasTool;
@@ -600,11 +595,15 @@ fn with_rig<R>(
                     None => dynamic(boxed.insert(Box::new(NoTool))),
                 },
                 Family::Selection => dynamic(boxed.insert(selection::tool(&scope, selection, host))),
-                Family::Move => dynamic(boxed.insert(move_tool::tool(&scope, mover.take().expect("the Move state is free"), host))),
+                Family::Move => match mover.take() {
+                    Some(state) => dynamic(boxed.insert(move_tool::tool(&scope, state, host))),
+                    None => dynamic(boxed.insert(Box::new(NoTool))),
+                },
                 Family::Paint => dynamic(boxed.insert(super::paint_tool::tool(&scope, paint, host))),
-                Family::Eyedropper => {
-                    dynamic(boxed.insert(super::eyedropper_tool::tool(&scope, eyedropper.take().expect("the Eyedropper state is free"), host)))
-                }
+                Family::Eyedropper => match eyedropper.take() {
+                    Some(state) => dynamic(boxed.insert(super::eyedropper_tool::tool(&scope, state, host))),
+                    None => dynamic(boxed.insert(Box::new(NoTool))),
+                },
                 Family::Vector => dynamic(boxed.insert(crate::vector_ui::host::tool(&scope, vector, host))),
                 Family::Type => dynamic(boxed.insert(crate::type_tool::tool(&scope, type_tool, host))),
                 Family::Gradient => dynamic(boxed.insert(crate::gradient_ui::tool::tool(&scope, gradient, host))),
@@ -612,7 +611,10 @@ fn with_rig<R>(
                 Family::Artboard => dynamic(boxed.insert(crate::artboard_tool::tool(&scope, artboard, host))),
                 Family::Frame => dynamic(boxed.insert(crate::frame_tool::tool(&scope, frame, host))),
                 Family::Slice => dynamic(boxed.insert(crate::slice_ui::tool(&scope, slice, host))),
-                Family::Retouch => dynamic(boxed.insert(retouch::tool(&scope, retouch.take().expect("the Retouch state is free"), host))),
+                Family::Retouch => match retouch.take() {
+                    Some(state) => dynamic(boxed.insert(retouch::tool(&scope, state, host))),
+                    None => dynamic(boxed.insert(Box::new(NoTool))),
+                },
                 Family::PerspectiveCrop => dynamic(boxed.insert(crate::perspective_crop_ui::tool(&scope, perspective, host))),
             }
         };
@@ -688,8 +690,8 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     // A pick a dialog arms on the canvas stands in for the selected tool, so the Hand's Cmd and Alt zoom is not in effect.
     let dialog_picks = app.session.active_index() == Some(host.idx) && crate::dialogs::canvas_input::armed(app).is_some();
     tools.momentary.hand_selected(tool == Tool::Hand && app.ui.transform.is_none() && !dialog_picks);
-    tools.momentary.set_options(navigation.clone());
-    tools.hand.options = navigation.clone();
+    tools.momentary.set_options(navigation);
+    tools.hand.options = navigation;
     // Zoom In or Out and Scrubby Zoom are the selected Zoom tool's own options, never the momentary Zoom's.
     tools.zoom.out = !app.ui.tool_options.zoom_in && !crate::spring_tools::holds(app, Tool::Zoom);
     tools.zoom.options = navigation;
@@ -700,7 +702,7 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
     if let (Some(scroll), Some(space)) = (response.scroll, out.space.as_ref()) {
         let size = app.session.documents().get(host.idx).map(|state| Size::new(f64::from(state.doc.size.width), f64::from(state.doc.size.height)));
         if let Some(size) = size {
-            let mut view = response.view.clone().unwrap_or(space.view);
+            let mut view = response.view.unwrap_or(space.view);
             if Autoscroll::scroll(&mut view, scroll, size).is_some() {
                 response.view = Some(view);
             }

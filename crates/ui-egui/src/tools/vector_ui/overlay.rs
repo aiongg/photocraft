@@ -27,6 +27,7 @@ pub(crate) fn shows_anchors(tool: Tool) -> bool {
     matches!(tool, Tool::PathSelection | Tool::Pen | Tool::FreeformPen | Tool::CurvaturePen)
 }
 
+#[cfg(test)]
 /// The saved path selected in the Paths panel: Photoshop's target path, drawn on the canvas with
 /// any tool (#6550). `None` when the panel selects the work path, a layer's path or nothing.
 pub(crate) fn selected_saved_path(app: &PhotocraftApp) -> Option<&Path> {

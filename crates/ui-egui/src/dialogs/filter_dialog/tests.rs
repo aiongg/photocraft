@@ -1,7 +1,7 @@
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::{DialogFields, HostedParamDialog, Param, ParamKind};
 use egui_kittest::Harness;
-use egui_kittest::kittest::{NodeT, Queryable};
+use egui_kittest::kittest::Queryable;
 
 use super::*;
 
@@ -125,7 +125,7 @@ fn indexed_matte_tool_seeds_use_document_encoded_rgb() {
     let transform = Transform::new(&source, &destination, app.session.color.settings.intent(), app.session.color.settings.bpc).unwrap();
     for (value, input) in [("foreground", [0.2, 0.4, 0.8]), ("background", [0.8, 0.4, 0.2])] {
         let mut output = [0.0; 16];
-        transform.eval(&input, &mut output);
+        transform.eval(&input, &mut output).unwrap();
         let got = rows::indexed_matte_seed(&colors, value).unwrap_or_else(|| panic!("{value}: no seed"));
         for c in 0..3 {
             assert!((got[c] - output[c]).abs() < 1e-4, "{value}: channel {c} is {} want {}", got[c], output[c]);
@@ -1211,9 +1211,9 @@ fn proxy_previews_never_clamp_pixel_sized_params() {
             if min <= 0.0 || !is_pixel_param_of(c.id, &p.key) {
                 continue;
             }
-            for v in [f64::from(min), f64::from(default), f64::from(min) * 2.5] {
+            for v in [min, default, min * 2.5] {
                 let k = preview_factor(c.id, &json!({ p.key.clone(): v }), 4);
-                assert!(v / f64::from(k) >= f64::from(min) - 1e-9, "{} {}={v}: k={k} clamps to {min}", c.id, p.key);
+                assert!(v / f64::from(k) >= min - 1e-9, "{} {}={v}: k={k} clamps to {min}", c.id, p.key);
             }
         }
     }

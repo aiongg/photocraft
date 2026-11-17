@@ -216,7 +216,7 @@ fn main() {
         }
         app.session.open_document(doc, Some("layout.psd".into()));
         app.sync_views();
-        photocraft_ui_egui::panels::panel_docking::show_panel(&mut app, "navigator", Some(navigator)).expect("the navigator shows");
+        photocraft_ui_egui::menus::invoke(&mut app, &cc.egui_ctx, "window.panel.navigator", json!({"show": navigator})).expect("the navigator shows");
         app
     });
     settle(&mut h, 4);

@@ -44,7 +44,7 @@ pub fn title_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     // The bar never closes the window: File › Exit asks about unsaved work first.
     if out.close_requested {
         let mut guard = app.borrow_mut();
-        let _ = crate::menus::invoke(&mut **guard, ui.ctx(), "file.exit", serde_json::json!({}));
+        let _ = crate::menus::invoke(&mut guard, ui.ctx(), "file.exit", serde_json::json!({}));
     }
 }
 

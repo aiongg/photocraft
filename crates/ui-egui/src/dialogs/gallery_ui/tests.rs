@@ -379,14 +379,14 @@ fn glow_color_keeps_exact_floats_until_a_new_pick_and_stores_linear() {
     assert_eq!(h.state().framework.dialogs.stack().ids().count(), 2, "the swatch opens the colour picker as a child");
     let picker = |app: &PhotocraftApp| app.framework.dialogs.stack().top().expect("the colour picker is on top");
     let id = picker(h.state());
-    crate::dialogs::testing::confirm(h.state_mut(), id);
+    crate::dialogs::testing::confirm(h.state_mut(), id).unwrap();
     h.run_steps(3);
     assert!(near(&glow(h.state()), &exact, 1e-6), "{:?}", glow(h.state()));
     // Cancel keeps them too.
     h.get_by_role_and_label(egui::accesskit::Role::ColorWell, "Glow Color").click();
     h.run_steps(3);
     let id = picker(h.state());
-    crate::dialogs::testing::cancel(h.state_mut(), id);
+    crate::dialogs::testing::cancel(h.state_mut(), id).unwrap();
     h.run_steps(3);
     assert!(near(&glow(h.state()), &exact, 1e-6), "{:?}", glow(h.state()));
     // A new pick stores the linear colour.
@@ -394,7 +394,7 @@ fn glow_color_keeps_exact_floats_until_a_new_pick_and_stores_linear() {
     h.run_steps(3);
     let id = picker(h.state());
     crate::color_picker_ui::testing::set_color(h.state_mut(), id, "#8040ff");
-    crate::dialogs::testing::confirm(h.state_mut(), id);
+    crate::dialogs::testing::confirm(h.state_mut(), id).unwrap();
     h.run_steps(3);
     let recorded = |app: &PhotocraftApp| -> Vec<f64> {
         let g = app.gallery.as_ref().expect("the gallery is open");

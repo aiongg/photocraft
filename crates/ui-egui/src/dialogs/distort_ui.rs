@@ -360,12 +360,6 @@ pub fn drop_foreign(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
-/// Screen distance (document px) that counts as "on" a handle at the current zoom.
-pub(crate) fn tolerance(app: &PhotocraftApp) -> f64 {
-    let z = app.point_zoom().max(0.01);
-    8.0 / f64::from(z)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -29,9 +29,11 @@ pub(crate) mod playback;
 pub(crate) mod record_again;
 pub(crate) mod runner;
 
+#[cfg(test)]
+pub(crate) use runner::play_targets;
 pub(crate) use runner::{
-    Gate, PausedPlayback, PausedPlaybacks, abandoned, authorize_owned, authorize_panel_preview, check_editor, is_editor, journal_view, open_recorded_editor,
-    play, play_targets, report_play, resume, resume_spelling, run_step_dialog, spelling_change, stopped, suspended_guard, token_of,
+    Gate, PausedPlaybacks, abandoned, authorize_owned, authorize_panel_preview, check_editor, is_editor, journal_view, open_recorded_editor, play, report_play,
+    resume, resume_spelling, run_step_dialog, spelling_change, stopped, suspended_guard, token_of,
 };
 
 #[cfg(test)]
@@ -159,6 +161,7 @@ fn selected_set_actions(app: &PhotocraftApp) -> Vec<usize> {
     selected_set(app).map(|set| set_actions(app, set)).unwrap_or_default()
 }
 
+#[cfg(test)]
 /// What Play plays: the selected action; with a set folder selected, every action of that set in
 /// order, as Photoshop plays a selected set (nothing for an empty set); else the first action.
 pub(crate) fn playback_targets(app: &PhotocraftApp) -> Vec<usize> {
@@ -168,6 +171,7 @@ pub(crate) fn playback_targets(app: &PhotocraftApp) -> Vec<usize> {
     playback_selection(app).into_iter().collect()
 }
 
+#[cfg(test)]
 /// Index of the playback target. Photoshop's Play button uses the first action when
 /// the panel has actions but none of its rows is selected.
 fn playback_selection(app: &PhotocraftApp) -> Option<usize> {
@@ -206,7 +210,7 @@ pub(crate) fn assign_shortcut(app: &mut PhotocraftApp, name: &str, shortcut: &st
         }
         for (other, assigned) in &prefs.alternate_shortcuts {
             if other.starts_with(SHORTCUT_PREFIX) && other != &id && assigned.iter().any(same) {
-                alternates.insert(other.clone(), json!(assigned.iter().filter(|a| !same(*a)).collect::<Vec<_>>()));
+                alternates.insert(other.clone(), json!(assigned.iter().filter(|a| !same(a)).collect::<Vec<_>>()));
             }
         }
     }

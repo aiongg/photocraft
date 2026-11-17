@@ -7,7 +7,7 @@ use std::hash::Hash;
 use craft::behavior::{EditEvent, GesturePhase};
 use craft::draw::ui::brush_presets::{BrushCardParts, BrushPick, BrushRowPaint, BrushesPanel, brush_row};
 use craft::keymap::Mods;
-use craft::ui::contract::{Bind, ReorderMove, Show as _};
+use craft::ui::contract::{Bind, ReorderMove};
 use craft::ui::patterns::presets::{PresetEvent, PresetRow, PresetView};
 use craft::ui::primitives::ContentPainterCx;
 use craft::ui::primitives::textures::TextureCache;

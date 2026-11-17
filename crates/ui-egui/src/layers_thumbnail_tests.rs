@@ -8,7 +8,7 @@ use photocraft_engine::Session;
 use serde_json::json;
 
 use crate::PhotocraftApp;
-use crate::layers_panel_nodes::{click, layer_id, row, thumb};
+use crate::layers_panel_nodes::{click, layer_id, thumb};
 
 type H = Harness<'static, PhotocraftApp>;
 
@@ -137,49 +137,8 @@ fn modifier_clicks_on_a_layer_thumbnail() {
     }
 }
 
-/// `name` over the Background, with "Other" above it, active.
-fn under_other(make: fn(&mut Session) -> u64) -> Session {
-    let mut s = Session::new();
-    s.execute("file.new", json!({"width": 640, "height": 480})).unwrap();
-    let id = make(&mut s);
-    s.execute("layer.setProps", json!({"layer": id, "name": "T"})).unwrap();
-    s.execute("layer.new.layer", json!({"name": "Other"})).unwrap();
-    s
-}
-
 fn made(v: serde_json::Value) -> u64 {
     v["layer"].as_u64().unwrap()
-}
-
-fn dialog_open(h: &H) -> bool {
-    h.state().dialog_open()
-}
-
-/// Where a double-click lands on the row of "T".
-#[derive(Clone, Copy)]
-enum At {
-    Thumb(LayerPart),
-    /// The middle of the row, on the name.
-    Name,
-    /// The row's end, past the name.
-    End,
-}
-
-fn solid() -> Session {
-    under_other(|s| {
-        let id = made(s.execute("layer.newFillLayer.solidColor", json!({"color": "#33669980"})).unwrap());
-        s.execute("layer.layerMask.revealAll", json!({})).unwrap();
-        id
-    })
-}
-
-/// "T", a frame holding a Smart Object.
-fn framed() -> Session {
-    under_other(|s| {
-        let photo = made(s.execute("layer.new.layer", json!({"name": "Photo"})).unwrap());
-        s.execute("edit.fill", json!({"contents": "black"})).unwrap();
-        made(s.execute("layer.new.frame", json!({"x": 10, "y": 10, "width": 100, "height": 80, "layer": photo})).unwrap())
-    })
 }
 
 /// Edit Text (the type thumbnail's double-click) on no document or a non-type layer changes nothing.

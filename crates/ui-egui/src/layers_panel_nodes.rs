@@ -27,12 +27,6 @@ pub(crate) fn row_drawn<S>(h: &Harness<'_, S>, name: &str) -> bool {
     h.query_all_by_label(name).any(|n| n.accesskit_node().role() == Role::TreeItem)
 }
 
-/// The rect of the panel part named `label` (an eye, a lock, a footer button): several nodes may
-/// carry the name (an eye is a button and a switch over one rect), so the first one.
-pub(crate) fn part<S>(h: &Harness<'_, S>, label: &str) -> Rect {
-    h.query_all_by_label(label).next().unwrap_or_else(|| panic!("no Layers panel part named {label:?}")).rect()
-}
-
 /// The active document's layer named `name`.
 pub(crate) fn layer_id(app: &PhotocraftApp, name: &str) -> LayerId {
     let st = app.session.active().expect("a document");
@@ -65,12 +59,6 @@ pub(crate) fn name_point(h: &Harness<'_, PhotocraftApp>, name: &str) -> Pos2 {
     Pos2::new(past + 16.0, at.center().y)
 }
 
-/// The rect of the fx badge on the row of the layer named `name`.
-pub(crate) fn fx_badge(h: &Harness<'_, PhotocraftApp>, name: &str) -> Rect {
-    let node = h.get_by_role_and_label(Role::TreeItem, name).accesskit_node().locate().0;
-    craft::layers::testing::fx_badge_rect(&h.ctx, node).unwrap_or_else(|| panic!("{name:?} shows no fx badge"))
-}
-
 /// A click at `at` with `mods` held: hover, press, release, as a hand does over separate passes.
 pub(crate) fn click<S>(h: &mut Harness<'_, S>, at: Pos2, mods: Modifiers) {
     h.event(Event::ModifiersChanged(mods));
@@ -81,20 +69,6 @@ pub(crate) fn click<S>(h: &mut Harness<'_, S>, at: Pos2, mods: Modifiers) {
         h.step();
     }
     h.event(Event::ModifiersChanged(Modifiers::NONE));
-    h.run_steps(3);
-}
-
-/// Two clicks at `at`, inside egui's double-click interval when the harness steps at 60 fps.
-pub(crate) fn double_click<S>(h: &mut Harness<'_, S>, at: Pos2) {
-    h.event(Event::PointerMoved(at));
-    h.step();
-    for _ in 0..2 {
-        for pressed in [true, false] {
-            h.event(Event::PointerButton { pos: at, button: PointerButton::Primary, pressed, modifiers: Modifiers::NONE });
-            h.step();
-        }
-        h.run_steps(2);
-    }
     h.run_steps(3);
 }
 

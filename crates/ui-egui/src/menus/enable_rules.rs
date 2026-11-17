@@ -278,7 +278,8 @@ mod tests {
     /// Document state → command → greyed, through the menu's own `disabled`.
     #[test]
     fn enable_rules_follow_the_document() {
-        let cases: &[(&str, Setup, &[(&str, bool)])] = &[
+        type Case<'a> = (&'a str, Setup, &'a [(&'a str, bool)]);
+        let cases: &[Case<'_>] = &[
             (
                 "a lone Background greys styles, masks, arranging, merges and transforms",
                 lone_background,

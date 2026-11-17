@@ -2,9 +2,9 @@
 //! Direct Selection (A) lives in `direct_select`.
 //! All edits go through the engine's `shape.*` / `path.*` commands.
 
+use egui::Color32;
 #[cfg(test)]
-use egui::Pos2;
-use egui::{Color32, Rect, Sense, Stroke, pos2, vec2};
+use egui::vec2;
 use photocraft_doc::vector::Path;
 use photocraft_doc::{Document, LayerContent};
 use photocraft_geom::Affine;
@@ -13,10 +13,8 @@ use serde_json::{Value, json};
 use craft::draw::ui::{EditSubpath, VectorMode};
 
 use crate::PhotocraftApp;
-use crate::shape_gradient_ui::ShapeGradients;
-use crate::shape_paint_ui::{PaintChange, paint_param};
+use crate::shape_paint_ui::paint_param;
 use crate::state::{Tool, ToolOptions};
-use crate::theme::Tokens;
 
 mod freeform;
 pub(crate) mod host;
@@ -29,31 +27,37 @@ mod pen;
 mod pen_resume;
 pub(crate) mod shapes;
 
+pub(crate) use options::enabled_stroke_width;
 #[cfg(test)]
 use options::{corner_radii_patch, solid_paint};
-pub(crate) use options::{draws_path, enabled_stroke_width};
 pub use options::{options_bar, shape_properties};
-pub(crate) use overlay::selected_saved_path_index;
-pub(crate) use overlay::{BezierShown, show_paths};
 #[cfg(test)]
-pub(crate) use overlay::{selected_saved_path, shows_anchors};
+pub(crate) use overlay::selected_saved_path;
+pub(crate) use overlay::selected_saved_path_index;
 pub use path_ops::{
     active_path_name, make_shape, path_selection_finish, path_to_selection, pick_shape_at, selected_document_path, takes_path_mask, with_active_path,
 };
 pub(crate) use path_ops::{
-    active_shape_path, active_type_path, delete_key_deletes_work_path, delete_key_edits_path, deselect_loaded_path, doc_path, edit_path, free_transform_path,
-    saved_path_components_selected, targeted_vector_mask, work_path_shown,
+    active_shape_path, active_type_path, delete_key_edits_path, deselect_loaded_path, edit_path, free_transform_path, saved_path_components_selected,
+    targeted_vector_mask, work_path_shown,
 };
-pub(crate) use paths_panel::command_params;
 pub use paths_panel::{PathEntry, PathRow, path_rows, paths_panel};
 #[cfg(test)]
 use pen::pen_path_op;
-pub(crate) use pen::{PATH_OPS, freeform_finish_owned, path_op_field, pen_path, pen_replace};
+pub(crate) use pen::{PATH_OPS, path_op_field, pen_path};
 pub use pen::{cancel_stale, pen_commit};
 pub use shapes::is_shape_tool;
 pub(crate) use shapes::{create_geometry, kind_of, tool_history_name};
 
-pub(crate) use host::{VectorTools, remove_last, replace_draft};
+#[cfg(test)]
+use crate::shape_paint_ui::PaintChange;
+#[cfg(test)]
+pub(crate) use host::remove_last;
+pub(crate) use host::{VectorTools, replace_draft};
+#[cfg(test)]
+pub(crate) use path_ops::delete_key_deletes_work_path;
+#[cfg(test)]
+pub(crate) use pen::freeform_finish_owned;
 
 /// Copy only the selected arrow's live parameters into new-arrow defaults.
 /// Existing shapes and geometry are not modified.
@@ -221,7 +225,7 @@ mod rectangle_click_in_shape_tests;
 
 #[cfg(test)]
 use pen_resume::pen_finish_on_redo;
-pub(crate) use pen_resume::{FinishedPen, box_steps, pen_history_enabled, pen_history_step};
+pub(crate) use pen_resume::{FinishedPen, pen_history_enabled, pen_history_step};
 
 /// Where a Pen draft goes, captured at its first anchor.
 #[derive(Clone, Debug)]

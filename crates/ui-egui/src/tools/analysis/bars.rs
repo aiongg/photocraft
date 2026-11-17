@@ -182,8 +182,10 @@ fn count(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Docum
 fn note(app: &mut PhotocraftApp, ui: &mut egui::Ui, doc: &photocraft_doc::Document) {
     TextField::new(Label::from(tl!("Author")), Bind::bound(&mut app.ui.analysis.note_author)).show(ui);
     let rgb = app.ui.analysis.note_color;
-    if Swatch::new(Label::from(tl!("Color")), Srgba::from_rgb_array(rgb)).show(ui).clicked {
-        crate::color_picker_ui::open_for_target(app, "noteColor", &crate::color_picker_ui::title_for(tl!("Color")), rgb);
+    if Swatch::new(Label::from(tl!("Color")), Srgba::from_rgb_array(rgb)).show(ui).clicked
+        && let Err(message) = crate::color_picker_ui::open_for_target(app, "noteColor", &crate::color_picker_ui::title_for(tl!("Color")), rgb)
+    {
+        crate::notices::error(app, message);
     }
     // Clear All asks first (#11791); `notes.delete {"all": true}` itself never does.
     if Button::new(Label::from(tl!("Clear All"))).enabled(!doc.notes.is_empty()).show(ui).clicked() {

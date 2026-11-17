@@ -4,7 +4,9 @@
 
 use craft::behavior::{EditEvent, Mixed, SelectionChange};
 use craft::keymap::Mods;
-use craft::layers::ui::panel::{ActivateOn, LayerColumn, LayerDrop, LayerMove, LayerPosition, LayersEvent, LayersFooterAction, LayersFooterButton};
+use craft::layers::ui::panel::{
+    ActivateOn, LayerColumn, LayerDrop, LayerMove, LayerPosition, LayerToggle, LayersEvent, LayersFooterAction, LayersFooterButton,
+};
 use craft::layers::ui::rows::LayerPropertyEdit;
 use craft::layers::ui::tree::{LayerPart, LayerRowKey, LockKind, SubRowGroup};
 use photocraft_doc::{Layer, LayerContent, LayerId};
@@ -74,6 +76,93 @@ pub(crate) fn apply_layers_events(app: &mut PhotocraftApp, ctx: &egui::Context, 
     run_actions(app, ctx, actions);
 }
 
+/// The panel's lock indicator reports only an unlock: the Background becomes a normal layer, any other layer loses
+/// every lock.
+fn unlock_action(doc: &photocraft_doc::Document, id: LayerId) -> Action {
+    if doc.is_background(id) {
+        ("layer.new.layerFromBackground".into(), json!({}))
+    } else {
+        ("layer.setProps".into(), json!({"layer": id.0, "locks": {"transparency": false, "pixels": false, "position": false, "artboard": false, "all": false}}))
+    }
+}
+
+/// The commands a click or sweep down a column of the panel makes.
+fn toggle_actions(doc: &photocraft_doc::Document, toggle: LayerToggle<LayerId>, actions: &mut Vec<Action>) {
+    let layer = |id: &LayerId| doc.layer(*id);
+    let filter_index = |id: &LayerId, row: usize| layers_tree::filter_index(doc, id, row);
+    // One sweep down the eye column is one gesture, so its steps share a key and are one undo step.
+    let coalesce = crate::history_keys::coalesce("layer-eye-sweep", &toggle.edit);
+    let value = match toggle.edit {
+        EditEvent::Set { after, .. } | EditEvent::Update { value: after, .. } | EditEvent::Commit { after, .. } => Some(after),
+        EditEvent::Cancel { before: Some(Mixed::Same(v)), .. } => Some(v),
+        _ => None,
+    };
+    let Some(on) = value else { return };
+    for row in &toggle.rows {
+        match (toggle.column, row) {
+            (LayerColumn::Visibility, LayerRowKey::Layer(id)) => {
+                if layer(id).is_some_and(|l| l.visible != on) {
+                    let mut p = json!({"layer": id.0, "visible": on});
+                    if let Some(key) = &coalesce {
+                        p["coalesce"] = json!(key);
+                    }
+                    actions.push(("layer.setProps".into(), p));
+                }
+            }
+            (LayerColumn::Visibility, LayerRowKey::Effects(id, index)) => {
+                let mut p = json!({"layer": id.0, "visible": on});
+                if let Some(i) = index {
+                    p["index"] = json!(i);
+                }
+                actions.push(("layer.setEffectsVisible".into(), p));
+            }
+            (LayerColumn::Visibility, LayerRowKey::Filters(id, row)) => {
+                let Some(LayerContent::Smart(sm)) = layer(id).map(|l| &l.content) else { continue };
+                match row.and_then(|r| filter_index(id, r)) {
+                    None if row.is_none() && sm.filters_enabled != on => actions.push(("layer.smartFilter.disableSmartFilters".into(), json!({"layer": id.0}))),
+                    Some(i) if sm.smart_filters.get(i).is_some_and(|f| f.visible != on) => {
+                        actions.push(("layer.smartFilter.setVisible".into(), json!({"layer": id.0, "index": i})))
+                    }
+                    _ => {}
+                }
+            }
+            (LayerColumn::Lock, LayerRowKey::Layer(id)) if layer(id).is_some() => actions.push(unlock_action(doc, *id)),
+            _ => {}
+        }
+    }
+}
+
+/// The commands a click on a layer's thumbnail makes.
+fn thumb_click_actions(doc: &photocraft_doc::Document, id: LayerId, part: LayerPart, mods: Mods, actions: &mut Vec<Action>) {
+    let Some(l) = doc.layer(id) else { return };
+    let m = egui_mods(mods);
+    if mods.cmd || mods.ctrl {
+        let params = match part {
+            LayerPart::LayerMask | LayerPart::VectorMask => mask_kind(part).map(|k| crate::mask_thumbs_ui::load_params(l, k, mods)),
+            LayerPart::FrameShape if l.frame.is_some() => Some(crate::mask_thumbs_ui::load_params(l, MaskKind::Vector, mods)),
+            LayerPart::Pixels | LayerPart::FrameShape if !doc.is_background(id) => {
+                Some(json!({"channel": "transparency", "layer": id.0, "operation": craft::behavior::geometry::SelectionOperation::from_mods(mods).name()}))
+            }
+            _ => None,
+        };
+        if let Some(p) = params {
+            actions.push(("select.loadSelection".into(), p));
+        }
+        return;
+    }
+    if part == LayerPart::FilterMask {
+        actions.extend(crate::smart_ui::filter_mask_click(l, m));
+        return;
+    }
+    if let Some(cmd) = mask_kind(part).and_then(|k| crate::mask_thumbs_ui::click_command(l, k, m)) {
+        actions.push(cmd);
+    } else if part == LayerPart::Pixels && m.alt && !m.shift {
+        // Alt-click the layer thumbnail: fit the layer on screen, as Photoshop does.
+        actions.push(("layer.select".into(), json!({"layer": id.0, "mode": "replace"})));
+        actions.push(("view.fitLayersOnScreen".into(), Value::Null));
+    }
+}
+
 fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<LayerId>, actions: &mut Vec<Action>) {
     let Some(st) = app.session.active() else { return };
     let doc = st.doc.clone();
@@ -104,63 +193,7 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
             let Some(l) = layer(&id) else { return };
             target_on_click(app, l, active == Some(id), select.part, actions);
         }
-        LayersEvent::Toggle(toggle) => {
-            // One sweep down the eye column is one gesture, so its steps share a key and are one undo step.
-            let coalesce = crate::history_keys::coalesce("layer-eye-sweep", &toggle.edit);
-            let value = match toggle.edit {
-                EditEvent::Set { after, .. } | EditEvent::Update { value: after, .. } | EditEvent::Commit { after, .. } => Some(after),
-                EditEvent::Cancel { before: Some(Mixed::Same(v)), .. } => Some(v),
-                _ => None,
-            };
-            let Some(on) = value else { return };
-            for row in &toggle.rows {
-                match (toggle.column, row) {
-                    (LayerColumn::Visibility, LayerRowKey::Layer(id)) => {
-                        if layer(id).is_some_and(|l| l.visible != on) {
-                            let mut p = json!({"layer": id.0, "visible": on});
-                            if let Some(key) = &coalesce {
-                                p["coalesce"] = json!(key);
-                            }
-                            actions.push(("layer.setProps".into(), p));
-                        }
-                    }
-                    (LayerColumn::Visibility, LayerRowKey::Effects(id, index)) => {
-                        let mut p = json!({"layer": id.0, "visible": on});
-                        if let Some(i) = index {
-                            p["index"] = json!(i);
-                        }
-                        actions.push(("layer.setEffectsVisible".into(), p));
-                    }
-                    (LayerColumn::Visibility, LayerRowKey::Filters(id, row)) => {
-                        let Some(LayerContent::Smart(sm)) = layer(id).map(|l| &l.content) else { continue };
-                        match row.and_then(|r| filter_index(id, r)) {
-                            None if row.is_none() && sm.filters_enabled != on => {
-                                actions.push(("layer.smartFilter.disableSmartFilters".into(), json!({"layer": id.0})))
-                            }
-                            Some(i) if sm.smart_filters.get(i).is_some_and(|f| f.visible != on) => {
-                                actions.push(("layer.smartFilter.setVisible".into(), json!({"layer": id.0, "index": i})))
-                            }
-                            _ => {}
-                        }
-                    }
-                    (LayerColumn::Lock, LayerRowKey::Layer(id)) => {
-                        // The panel's lock indicator reports only an unlock: the Background becomes a normal
-                        // layer, any other layer loses every lock.
-                        if layer(id).is_some() {
-                            actions.push(if doc.is_background(*id) {
-                                ("layer.new.layerFromBackground".into(), json!({}))
-                            } else {
-                                (
-                                    "layer.setProps".into(),
-                                    json!({"layer": id.0, "locks": {"transparency": false, "pixels": false, "position": false, "artboard": false, "all": false}}),
-                                )
-                            });
-                        }
-                    }
-                    _ => {}
-                }
-            }
-        }
+        LayersEvent::Toggle(toggle) => toggle_actions(&doc, toggle, actions),
         LayersEvent::ShowOnly(row) | LayersEvent::UndoShowOnly(row) => {
             actions.push(("layer.showOnly".into(), json!({"layer": row.layer().0})));
         }
@@ -182,35 +215,7 @@ fn map_event(app: &mut PhotocraftApp, ctx: &egui::Context, event: LayersEvent<La
             actions.push(("layer.renameLayer".into(), json!({"layer": layer.0, "name": text})));
         }
         LayersEvent::Activate { row, on, .. } => activate(app, ctx, &doc, row, on, actions),
-        LayersEvent::ThumbClick { layer: id, part, mods, .. } => {
-            let Some(l) = layer(&id) else { return };
-            let m = egui_mods(mods);
-            if mods.cmd || mods.ctrl {
-                let params = match part {
-                    LayerPart::LayerMask | LayerPart::VectorMask => mask_kind(part).map(|k| crate::mask_thumbs_ui::load_params(l, k, mods)),
-                    LayerPart::FrameShape if l.frame.is_some() => Some(crate::mask_thumbs_ui::load_params(l, MaskKind::Vector, mods)),
-                    LayerPart::Pixels | LayerPart::FrameShape if !doc.is_background(id) => Some(
-                        json!({"channel": "transparency", "layer": id.0, "operation": craft::behavior::geometry::SelectionOperation::from_mods(mods).name()}),
-                    ),
-                    _ => None,
-                };
-                if let Some(p) = params {
-                    actions.push(("select.loadSelection".into(), p));
-                }
-                return;
-            }
-            if part == LayerPart::FilterMask {
-                actions.extend(crate::smart_ui::filter_mask_click(l, m));
-                return;
-            }
-            if let Some(cmd) = mask_kind(part).and_then(|k| crate::mask_thumbs_ui::click_command(l, k, m)) {
-                actions.push(cmd);
-            } else if part == LayerPart::Pixels && m.alt && !m.shift {
-                // Alt-click the layer thumbnail: fit the layer on screen, as Photoshop does.
-                actions.push(("layer.select".into(), json!({"layer": id.0, "mode": "replace"})));
-                actions.push(("view.fitLayersOnScreen".into(), Value::Null));
-            }
-        }
+        LayersEvent::ThumbClick { layer: id, part, mods, .. } => thumb_click_actions(&doc, id, part, mods, actions),
         LayersEvent::MaskLink { layer: id, part, linked, .. } => {
             let prefix = if part == LayerPart::VectorMask { "layer.vectorMask" } else { "layer.layerMask" };
             actions.push((format!("{prefix}.linked"), json!({"layer": id.0, "linked": linked})));
@@ -582,10 +587,8 @@ pub(crate) fn selection_actions(change: SelectionChange<LayerId>, selected: &[La
         }
         SelectionChange::Set(ids) => actions.push(("layer.select".into(), json!({"layers": ids.iter().map(|id| id.0).collect::<Vec<_>>()}))),
         SelectionChange::Toggle(id) => actions.push(("layer.select".into(), json!({"layer": id.0, "mode": "toggle"}))),
-        SelectionChange::Clear => {
-            if !selected.is_empty() {
-                actions.push(("select.deselectLayers".into(), json!({})));
-            }
+        SelectionChange::Clear if !selected.is_empty() => {
+            actions.push(("select.deselectLayers".into(), json!({})));
         }
         _ => {}
     }

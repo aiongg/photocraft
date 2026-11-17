@@ -5,32 +5,11 @@ use super::filter_preview::filter_channel_preview;
 use super::navigator::navigator_waits_for_drag;
 use super::strokes::live_stroke;
 use super::{Document, PhotocraftApp};
-use egui::TextureOptions;
 use photocraft_doc::LayerContent;
 use photocraft_geom::Rect as DRect;
 
 /// Largest texture side we upload; bigger pictures are uploaded downsampled.
 pub const MAX_TEXTURE: u32 = 4096;
-
-/// The largest texture side to upload on this device: [`MAX_TEXTURE`], or less where the GPU
-/// allows less (2048 on some older or low-end GPUs and WebGL contexts). Past the device's limit
-/// egui asserts and the backend fails to create the texture.
-pub(super) fn texture_side(ctx: &egui::Context) -> u32 {
-    clamp_texture_side(ctx.input(|i| i.max_texture_side))
-}
-
-/// [`texture_side`] for a device whose largest texture side is `max_texture_side`.
-pub(super) fn clamp_texture_side(max_texture_side: usize) -> u32 {
-    u32::try_from(max_texture_side).unwrap_or(MAX_TEXTURE).clamp(1, MAX_TEXTURE)
-}
-
-/// The CPU canvas texture's sampling (#4810). Zoomed in, a full-resolution texture shows each
-/// document pixel as a crisp square, as the GPU canvas's sharp nearest filter and Photoshop do;
-/// zoomed out it is still filtered. A reduced texture (`factor` > 1) stays bilinear: its texels
-/// are averages of several pixels, and squares of them would be blocks the image doesn't have.
-pub(super) fn canvas_texture_options(factor: u32) -> TextureOptions {
-    if factor > 1 { TextureOptions::LINEAR } else { TextureOptions { magnification: egui::TextureFilter::Nearest, ..TextureOptions::LINEAR } }
-}
 
 /// The document area a filter preview of `preview` size covers, for a `doc` sized document
 /// previewed at proxy factor `k`: the document's bounds when it is the document's size (reduced by

@@ -16,7 +16,7 @@
 
 use craft::ui::contract::CommandSet;
 use craft::ui::menu::PanelRow;
-use craft::ui::runtime::commands::{CommandRef, CommandSet as _, CommandState};
+use craft::ui::runtime::commands::{CommandRef, CommandState};
 use photocraft_engine::BrushSettings;
 use photocraft_engine::paint;
 use serde_json::{Map, Value, json};
@@ -26,7 +26,6 @@ use crate::PhotocraftApp;
 pub(crate) mod brushes;
 
 pub use crate::brush_preview::{preview_pixels, preview_sig};
-pub(crate) use crate::brush_sections::section_body;
 pub use photocraft_engine::brush_cmds::brush_patch;
 
 /// Sections in Photoshop's order. The bool says whether the section has an enable box.
@@ -48,9 +47,6 @@ pub const SECTIONS: [(&str, bool); 13] = [
 
 /// The final five entries are switches, not sections with a properties pane.
 pub(super) const CHECKBOX_ONLY_START: usize = 8;
-
-/// Panel width.
-pub(crate) const WIDTH: f32 = 540.0;
 
 /// The enable flag behind section `i` (None for Brush Tip Shape).
 pub fn section_flag(b: &mut BrushSettings, i: usize) -> Option<&mut bool> {

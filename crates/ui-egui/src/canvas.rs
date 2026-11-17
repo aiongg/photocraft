@@ -12,7 +12,7 @@ use crate::PhotocraftApp;
 use crate::state::View;
 
 #[cfg(test)]
-use egui::{Color32, Mesh, PointerButton, Pos2, Sense, Stroke, TextureOptions, Vec2, pos2, vec2};
+use egui::{Color32, Pos2, Stroke, TextureOptions, Vec2, pos2, vec2};
 #[cfg(test)]
 use photocraft_doc::LayerContent;
 #[cfg(test)]
@@ -71,9 +71,11 @@ pub(crate) mod viewport_pages;
 pub(crate) use cursor_policy::alt_samples;
 pub(crate) use display::GPU_OUTPUT;
 #[cfg(test)]
+pub(crate) use display::cache_key;
+#[cfg(test)]
 use display::sync_display_lut;
 use display::texture_key;
-pub(crate) use display::{cache_key, canvas_display, display_doc, display_image};
+pub(crate) use display::{canvas_display, display_doc, display_image};
 pub(crate) use document_area::arranged_cells;
 pub use document_area::document_area;
 pub(crate) use document_display::view_target;
@@ -89,8 +91,6 @@ use filter_preview::filter_channel_preview;
 use filter_preview::filter_preview_display_doc;
 pub(crate) use filter_preview::filter_preview_factor;
 pub(crate) use navigator::NavigatorCache;
-#[cfg(test)]
-use navigator::navigator_waits_for_drag;
 pub use navigator::{NAVIGATOR_SIDE, navigator_gpu_view, navigator_texture, navigator_waits_for_gpu};
 #[cfg(test)]
 pub(crate) use raster_source::CompositePrep;
@@ -100,18 +100,21 @@ pub(crate) use sampling::composite_color;
 pub(crate) use strokes::live_retouch_points;
 pub(crate) use strokes::multiple_color_target;
 pub use strokes::paint_target;
-pub(crate) use strokes::{CommittedStroke, LiveStroke, strokes_live, unsmoothed_line};
-pub(crate) use tabs::tab_title_at;
 #[cfg(test)]
-use tabs::{main_canvas_document, move_target_after_filter, tab_context_items};
+pub(crate) use strokes::strokes_live;
+pub(crate) use strokes::{CommittedStroke, LiveStroke, unsmoothed_line};
 #[cfg(test)]
-pub(crate) use testing::{ToolEvent, tool_event};
+use tabs::{main_canvas_document, move_target_after_filter};
+#[cfg(test)]
+pub(crate) use testing::{ToolEvent, tool_event, tool_event_response};
 pub use textures::MAX_TEXTURE;
 pub(crate) use textures::visible_doc_rect;
 pub(crate) use textures::{damage_since, effect_reach, retain_gpu_documents, shown_as_document};
 #[cfg(test)]
 use textures::{ensure_gpu, redraw_focus};
+#[cfg(test)]
 pub(crate) use tools::selection::floating_outline;
+#[cfg(test)]
 pub(crate) use transform_controls::layer_edges;
 
 /// One document view's cached display state.

@@ -26,7 +26,7 @@ use craft::ui::canvas::RasterSource;
 use craft::ui::dialog::{DialogId, HostedWorkspace};
 use craft::ui::runtime::memory::SaveKey;
 use craft::ui::runtime::pending::Job as PendingJob;
-use photocraft_doc::{DocId, Document, LayerId};
+use photocraft_doc::{Document, LayerId};
 use photocraft_engine::jobs::JobCtx;
 use photocraft_engine::select_mask_edits::{self, MAX_EDIT_POINTS, MAX_EDITS};
 use photocraft_engine::smartselect_cmds::{MAX_STROKE_POINTS, MAX_STROKES};
@@ -68,11 +68,15 @@ struct Cache {
     proxy: Arc<Document>,
 }
 
+/// The ants surface, its own revision and the size of the reduced copy it covers, behind the lock the preview job and
+/// the overlay share.
+type AntsCell = Mutex<Option<(Arc<Surface>, u64, [u32; 2])>>;
+
 /// The refined selection the Marching Ants view outlines, owned so the framework's overlay can read it through
 /// [`MaskSource`] while the preview job replaces it.
 pub(crate) struct SharedMask {
     /// The ants surface, its own revision and the size of the reduced copy it covers.
-    cell: Mutex<Option<(Arc<Surface>, u64, [u32; 2])>>,
+    cell: AntsCell,
     /// Document pixels per mask pixel.
     k: AtomicU32,
     next_revision: AtomicU64,
@@ -206,26 +210,6 @@ impl PcSelectMaskSource {
             cache: lock(&self.shared.cache).clone(),
         }
     }
-
-    #[cfg(test)]
-    pub(crate) fn cached_edits(&self) -> Option<usize> {
-        lock(&self.shared.cache).as_ref().map(|c| c.base.edits.len())
-    }
-
-    #[cfg(test)]
-    pub(crate) fn cached_revision(&self) -> Option<u64> {
-        lock(&self.shared.cache).as_ref().map(|c| c.base.revision)
-    }
-
-    #[cfg(test)]
-    pub(crate) fn ants_reduction(&self) -> Option<u32> {
-        self.shared.ants.holds_mask().then(|| self.shared.ants.reduction())
-    }
-
-    #[cfg(test)]
-    pub(crate) fn last_request(&self) -> Option<SelectMaskPreviewRequest> {
-        lock(&self.shared.last_request).clone()
-    }
 }
 
 impl SelectMaskSource for PcSelectMaskSource {
@@ -304,13 +288,6 @@ fn command_params(cmd: &SelectMaskCommand, target_mask: bool) -> Value {
         o.insert("target".into(), json!("mask"));
     }
     params
-}
-
-/// The params OK runs `select.refineEdge` with, over the open workspace.
-pub(crate) fn commit_params(app: &PhotocraftApp) -> Option<Value> {
-    let (id, _, _, source) = app.select_mask_target.as_ref()?;
-    let hosted = app.framework.dialogs.get_by_id::<Hosted>(*id)?;
-    Some(command_params(&hosted.workspace().command(), source.target_mask))
 }
 
 /// The facts of the open workspace for the control surface (merged with the workspace's own fields; a refused OK's

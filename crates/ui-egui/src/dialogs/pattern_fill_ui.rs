@@ -47,6 +47,7 @@ pub(crate) struct Session {
 }
 
 impl Session {
+    #[cfg(test)]
     /// The layer an edit changes; `None` for a new fill.
     pub(crate) fn layer(&self) -> Option<LayerId> {
         match self.target {

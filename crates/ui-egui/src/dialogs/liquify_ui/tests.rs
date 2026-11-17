@@ -507,7 +507,7 @@ fn workspaces_open_on_the_layer_with_a_mask_channel_or_quick_mask_targeted() {
         let ctx = app.ctx().clone();
         assert!(crate::canvas::paint_target(&app).get("colors").is_none(), "{case}");
         opens_and_cancels(&mut app, "filter.adaptiveWideAngle", &format!("{case}: Adaptive Wide Angle"), |app| crate::wide_angle_ui::open(app, &ctx));
-        opens_and_cancels(&mut app, "filter.filterGallery", &format!("{case}: Filter Gallery"), |app| crate::gallery_ui::open(app));
+        opens_and_cancels(&mut app, "filter.filterGallery", &format!("{case}: Filter Gallery"), crate::gallery_ui::open);
         open_ws(&mut app).unwrap_or_else(|e| panic!("{case}: Liquify: {e}"));
         assert_eq!(crate::distort_ui::modal_workspace(&app), Some(KEY), "{case}: Liquify");
         let stroke = stroke_with(StepTool::ForwardWarp, 30.0, &[[20.0, 24.0], [36.0, 24.0]]);
@@ -538,7 +538,7 @@ fn workspaces_open_on_a_smart_object_with_its_filter_mask_targeted() {
     assert!(app.filter_mask_targeted());
     let ctx = app.ctx().clone();
     opens_and_cancels(&mut app, "filter.adaptiveWideAngle", "Adaptive Wide Angle", |app| crate::wide_angle_ui::open(app, &ctx));
-    opens_and_cancels(&mut app, "filter.filterGallery", "Filter Gallery", |app| crate::gallery_ui::open(app));
+    opens_and_cancels(&mut app, "filter.filterGallery", "Filter Gallery", crate::gallery_ui::open);
     open_ws(&mut app).unwrap();
     perform(&mut app, stroke_with(StepTool::ForwardWarp, 30.0, &[[20.0, 24.0], [36.0, 24.0]]));
     ctl(&mut app, json!({"commit": true})).unwrap();
@@ -673,7 +673,6 @@ fn assert_view_masked(after: &[Color32], before: &[Color32]) {
 #[test]
 fn a_targeted_channels_preview_shows_liquify_only_inside_the_selection() {
     let mut app = app_with_layer();
-    let ctx = app.ctx().clone();
     app.session.execute("select.rect", json!({"x": 0, "y": 0, "width": 60, "height": 80})).unwrap();
     app.run("channel.target", json!({"channel": {"color": 0}})).unwrap();
     open_ws(&mut app).unwrap();
@@ -696,7 +695,6 @@ fn a_targeted_channels_preview_shows_liquify_only_inside_the_selection() {
 #[test]
 fn the_preview_shows_liquify_only_inside_the_selection() {
     let mut app = app_with_layer();
-    let ctx = app.ctx().clone();
     app.session.execute("select.rect", json!({"x": 0, "y": 0, "width": 60, "height": 80})).unwrap();
     open_ws(&mut app).unwrap();
     let view_before = read_view(&app);

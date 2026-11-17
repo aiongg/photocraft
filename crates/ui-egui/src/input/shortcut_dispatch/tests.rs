@@ -136,7 +136,7 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
         Place::LayersRow => {
             h.get_by_role_and_label(Role::TreeItem, "paint").scroll_to_me();
             h.run_steps(4);
-            let row = crate::layers_panel_nodes::row(&h, "paint");
+            let row = crate::layers_panel_nodes::row(h, "paint");
             click(h, row.center() + vec2(row.width() / 4.0, 0.0));
             assert_eq!(active_name(h), "paint");
         }
@@ -210,7 +210,7 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
             let chord = Chord::parse(&sc).unwrap_or_else(|_| panic!("{id}: unparsable {sc}"));
             // A press the focused component holds (the Layers rows' stacking and visibility keys)
             // is the component's and reaches no app command.
-            let held = focus_holds(&h.ctx, chord.clone());
+            let held = focus_holds(&h.ctx, chord);
             press(&mut h, &sc);
             let log = take_log(&h.ctx);
             if typing && !chord.has_command() && !chord.is_function_key() {
@@ -408,8 +408,11 @@ fn delete_key_targets() {
         assert!(h.state().session.active().unwrap().doc.layer(layer).is_some(), "{key}: the layer stays");
         assert_eq!(layer_pixels(&h), before, "{key}: the layer's pixels are untouched");
     }
+}
 
-    // A smart object's filter mask targeted: the selection fills it; with no selection the layer goes.
+/// With a smart object's filter mask targeted, Delete fills it from a selection; with no selection the layer goes.
+#[test]
+fn delete_key_targets_a_smart_objects_filter_mask() {
     let mut h = harness();
     put_focus(&mut h, Place::Canvas);
     let s = &mut h.state_mut().session;
@@ -437,7 +440,11 @@ fn delete_key_targets() {
     press(&mut h, "Delete");
     assert_eq!(logged(&h), ["layer.delete"]);
     assert!(smart(&h).is_none(), "no selection deletes the layer, as in Photoshop");
+}
 
+/// Delete with several layers selected removes every one of them, or edits the targeted mask when a selection exists.
+#[test]
+fn delete_key_with_several_layers_selected() {
     // Every selected layer goes, pixel layers too.
     let mut h = harness();
     put_focus(&mut h, Place::Canvas);

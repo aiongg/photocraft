@@ -123,7 +123,7 @@ mod tests {
             doc: photocraft_doc::DocId(1),
             revision,
             sources: Vec::new(),
-            dialog: craft::ui::dialog::DialogId::new(dialog),
+            dialog: craft::ui::dialog::DialogId::unique(dialog),
             open: 0,
             active: None,
             target: Default::default(),

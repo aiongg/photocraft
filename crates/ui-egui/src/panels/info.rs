@@ -97,7 +97,7 @@ pub(crate) fn readings<'a>(app: &mut PhotocraftApp, samplers: &'a [(SamplerReado
     // With a drawn ruler and the Ruler tool, X/Y are its point and W/H its size (#11991).
     let ruler = ruler_rows(app);
     let wh = ruler.as_ref().and_then(|r| r.size).or(crate::crop_ui::info_size(app)).or(selection);
-    let guide = idx.and_then(|idx| craft::ui::canvas_controls::reading::running(&app.ctx(), CanvasHost::primary(app, idx).canvas_id()));
+    let guide = idx.and_then(|idx| craft::ui::canvas_controls::reading::running(app.ctx(), CanvasHost::primary(app, idx).canvas_id()));
     let pointer = hover_pixel(app);
     let rgba = pointer.and_then(|p| pointer_sample(app, p));
     let color = rgba.map(|c| {

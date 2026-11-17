@@ -4,7 +4,7 @@
 //! the `path.deleteAnchor` the click would have run; No changes nothing.
 
 use craft::ui::dialog::{PromptAnswer, PromptChoice, StandardPrompt};
-use serde_json::{Value, json};
+use serde_json::Value;
 
 use super::alerts;
 use crate::PhotocraftApp;

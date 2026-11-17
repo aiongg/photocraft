@@ -1,4 +1,6 @@
-use super::{PhotocraftApp, Reply, Value, json};
+#[cfg(test)]
+use super::PhotocraftApp;
+use super::{Reply, Value, json};
 
 /// The fields `ui.set` reads. Anything else is rejected before a field is applied, and every
 /// field's value is validated before the first one is applied, so a typo, an unknown field, a

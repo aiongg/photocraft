@@ -1,14 +1,17 @@
 //! Chrome around the canvas: title bar, options bar, toolbar, status bar, dock cards, Properties.
 
 use craft::ui::patterns::blend_keys::{BlendKeyEntry, BlendShortcut};
-use egui::{Align2, Color32, CornerRadius, Pos2, Rect, RichText, Sense, Stroke, StrokeKind, pos2, vec2};
+#[cfg(test)]
+use egui::Rect;
+use egui::vec2;
 use photocraft_color::BlendMode;
-use photocraft_doc::{Layer, LayerContent, LayerId};
+use photocraft_doc::LayerId;
 use photocraft_engine::history_source_cmds::HistorySource;
 use serde_json::{Value, json};
 
 use crate::state::Tool;
-use crate::theme::{self, Tokens};
+#[cfg(test)]
+use crate::theme;
 use crate::{PhotocraftApp, icons};
 
 pub mod actions;
@@ -69,15 +72,15 @@ pub(super) mod variables_ui;
 pub(crate) use history::select_snapshot;
 pub(crate) use history::selected_snapshot;
 pub(crate) use info::{SamplerReadouts, sampler_readouts};
-pub(crate) use layers::{blend_options, fx_button};
+pub(crate) use layers::blend_options;
 pub(crate) use layers_tree::listed_filter;
 pub use options_bar::options_bar;
 pub use status_bar::status_bar;
 pub use title_bar::{title_bar, window_title};
 pub(crate) use toolbar::QUICK_MASK;
-pub use toolbar::toolbar;
 #[cfg(test)]
-use toolbar::{TOOL_SECTIONS, color_chips};
+use toolbar::color_chips;
+pub use toolbar::toolbar;
 
 /// Photoshop's Shift+Alt letter position of blend mode `m`; `None` for the modes without a letter (Darker Color,
 /// Lighter Color, Subtract, Divide) and for PhotoCraft's own extra modes.

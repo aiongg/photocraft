@@ -51,9 +51,15 @@ pub(crate) enum ToolEvent {
 }
 
 /// Delivers `ev` with `mods` held: `Down` is `press`, `Move` is `move_to` and `Up` is `release`, with the pressure
-/// of `Down` and `Move` fed through the stylus feed first. Returns what the tool host reported in the main canvas's
-/// pass of the last frame the delivery ran (the default when that frame ran no main canvas pass).
-pub(crate) fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> ToolHostResponse {
+/// of `Down` and `Move` fed through the stylus feed first.
+pub(crate) fn tool_event(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) {
+    // The tests that read the response call `tool_event_response`.
+    let _ = tool_event_response(app, ev, mods);
+}
+
+/// `tool_event`, returning what the tool host reported in the main canvas's pass of the last frame the delivery ran
+/// (the default when that frame ran no main canvas pass).
+pub(crate) fn tool_event_response(app: &mut PhotocraftApp, ev: ToolEvent, mods: Modifiers) -> ToolHostResponse {
     match ev {
         ToolEvent::Down { x, y, pressure } => {
             pen(app, pressure);
@@ -111,7 +117,7 @@ fn run_frame(app: &mut PhotocraftApp) {
     app.framework_before_input(&ctx);
     // The platform completes an IME reset the framework asked for in the pass before; without it the engine drops
     // every composition event after an interrupted composition.
-    let os_input = ctx.data_mut(|d| d.remove_temp::<Vec<egui::Event>>(egui::Id::new(OS_IME_RESETS))).unwrap_or_default();
+    let os_input = ctx.data_mut(|d| d.remove_temp::<Vec<egui::Event>>(egui::Id::unique(OS_IME_RESETS))).unwrap_or_default();
     frames.frame_without_input(os_input, |ui| {
         crate::shortcut_dispatch::record_view_commands(app);
         crate::shortcuts::handle(app, &ui.ctx().clone());
@@ -120,7 +126,7 @@ fn run_frame(app: &mut PhotocraftApp) {
         crate::shortcuts::escape_keys(app, &ui.ctx().clone());
     });
     if let Some(request_id) = frames.ime().and_then(|ime| ime.reset) {
-        ctx.data_mut(|d| d.insert_temp(egui::Id::new(OS_IME_RESETS), vec![egui::Event::ImeResetCompleted { request_id }]));
+        ctx.data_mut(|d| d.insert_temp(egui::Id::unique(OS_IME_RESETS), vec![egui::Event::ImeResetCompleted { request_id }]));
     }
     app.canvas_tools.frames = Some(frames);
 }
@@ -131,7 +137,7 @@ const OS_IME_RESETS: &str = "photocraft.test-os-ime-resets";
 /// of the interrupted composition that are still on their way reach the framework before the answer, as they do on
 /// a platform. The request stays pending, so the answer follows that frame.
 pub(crate) fn hold_ime_reset_answer(app: &PhotocraftApp) {
-    let _ = ctx(app).data_mut(|d| d.remove_temp::<Vec<egui::Event>>(egui::Id::new(OS_IME_RESETS)));
+    let _ = ctx(app).data_mut(|d| d.remove_temp::<Vec<egui::Event>>(egui::Id::unique(OS_IME_RESETS)));
 }
 
 /// Runs frames until the window host has delivered everything queued.

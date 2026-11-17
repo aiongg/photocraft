@@ -16,7 +16,7 @@ use super::pen::{PATH_OPS, merge_target, tool_in_shape_mode, tool_path_op};
 
 /// Path alignment's Align entries: label and icon.
 pub(crate) const PATH_ALIGN_ENTRIES: [(&str, &str); 6] = [
-    ("Align Left Edges", "align-edge-left"),
+    ("Align Left Edges", "align_edge_left"),
     ("Align Horizontal Centers", "align-edge-hcenter"),
     ("Align Right Edges", "align-edge-right"),
     ("Align Top Edges", "align-edge-top"),
@@ -105,7 +105,7 @@ pub(super) fn path_alignment_menu(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let choice = &mut app.ui.path_align_to;
     Row::new().show(ui, |ui, cx| {
         let open = &mut cx.memory.shown::<AlignOpen>(cx.id).0;
-        let button = IconButton::new(IconId::new("align-edge-left"))
+        let button = IconButton::new(IconId::new("align_edge_left"))
             .label(label(tl!("Path alignment")))
             .popup(PopupKind::Dialog)
             .popup_mark(PopupMark::Menu)

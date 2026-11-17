@@ -3,7 +3,7 @@
 
 use craft::behavior::PixelSize;
 use craft::ui::bars::{StatusItem, StatusValues};
-use craft::ui::dialog::{Alert, HostedAlert, StackDialog as _};
+use craft::ui::dialog::{Alert, HostedAlert};
 use craft::ui::runtime::env::Env;
 use craft::ui::shell::{RecentSort, RecentView};
 use craft::ui::text::InvalidZoom;
@@ -88,7 +88,7 @@ pub(crate) fn status_values(app: &PhotocraftApp) -> StatusValues {
     let doc: &Document = &st.doc;
     values.document_sizes = Some(document_sizes(doc));
     values.document_profile = Some(format!("{} ({}bpc)", profile_name(doc), doc.depth.bits()));
-    values.document_dimensions = Some(PixelSize::new(doc.size.width as u32, doc.size.height as u32));
+    values.document_dimensions = Some(PixelSize::new(doc.size.width, doc.size.height));
     values.document_resolution = Some(f64::from(doc.resolution_dpi));
     values.layer_count = Some(doc.layer_count());
     values.current_tool = Some(super::tool_commands::command_of(app.ui.tool).into());

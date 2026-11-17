@@ -11,7 +11,7 @@ use std::sync::mpsc::{Receiver, TryRecvError};
 
 use craft::imaging::ui::transform_preview::{PreviewPixels, PreviewTextures};
 use craft::ui::choice::Checkbox;
-use craft::ui::contract::{Bind, Entry, FieldLayout, Outcome as _, Props as _, Show as _, ShowContainer as _, Sizing};
+use craft::ui::contract::{Bind, Entry, FieldLayout, Props as _, Show as _, ShowContainer as _, Sizing};
 use craft::ui::display::Divider;
 use craft::ui::form::Field;
 use craft::ui::pickers::Select;

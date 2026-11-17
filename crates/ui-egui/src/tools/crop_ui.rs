@@ -65,11 +65,6 @@ pub(crate) fn document(app: &PhotocraftApp) -> Option<CropDocument> {
     Some(CropDocument::new(CropDocKey::new(st.doc.id.0), size, f64::from(st.doc.resolution_dpi)).selection(bounds))
 }
 
-/// Whether the New Crop Preset… row can save the current options.
-pub(crate) fn can_save_preset(app: &PhotocraftApp) -> bool {
-    app.ui.tool_options.crop.preset_name(&words(app), &units(app)).is_some()
-}
-
 /// Maps what a pass of the tool reported to the app.
 pub(crate) fn finish(app: &mut PhotocraftApp, output: CropOutput) {
     for event in output.events {
@@ -199,16 +194,19 @@ pub fn pending(app: &PhotocraftApp) -> bool {
     app.ui.tool == Tool::Crop && app.canvas_tools.crop.tool.session().pending()
 }
 
+#[cfg(test)]
 /// The frame is the untouched default one, not a drawn, moved, resized or turned box.
 pub(crate) fn is_default_frame(app: &PhotocraftApp) -> bool {
     app.canvas_tools.crop.tool.session().is_default()
 }
 
+#[cfg(test)]
 /// A drag of the frame or a Straighten line runs.
 pub(crate) fn dragging(app: &PhotocraftApp) -> bool {
     app.ui.tool == Tool::Crop && (app.canvas_tools.crop.tool.dragging() || app.canvas_tools.crop.tool.session().straighten().on())
 }
 
+#[cfg(test)]
 /// The Straighten line is armed or held.
 pub(crate) fn straightening(app: &PhotocraftApp) -> bool {
     app.canvas_tools.crop.tool.straighten_armed() || app.canvas_tools.crop.tool.session().straighten().on()

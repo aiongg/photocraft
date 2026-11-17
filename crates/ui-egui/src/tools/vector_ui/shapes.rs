@@ -418,6 +418,7 @@ fn preview_layer(app: &PhotocraftApp, kind: ShapeKind, geometry: &ShapeGeometry,
     })
 }
 
+#[cfg(test)]
 /// The shape layer the drag of `geometry` would make, for the drag's preview and its tests.
 pub(super) fn shape_preview(app: &PhotocraftApp, kind: ShapeKind, geometry: &ShapeGeometry) -> Option<photocraft_doc::ShapeLayer> {
     preview_layer(app, kind, geometry, false)

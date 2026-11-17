@@ -1256,7 +1256,7 @@ fn choose_guide(app: &mut PhotocraftApp, ctx: &Context, command: &str) -> Result
 fn choose_pasteboard(app: &mut PhotocraftApp, menu: &CanvasToolMenu, command: &str) -> Result<(), String> {
     if command == PASTEBOARD_PICK {
         let rgb = prefs::parse_hex(&app.session.prefs().interface.canvas_custom_color).map_or([0.5; 3], |c| c.map(|v| f32::from(v) / 255.0));
-        crate::color_picker_ui::open_for_target(app, "pasteboard", "Color Picker (Custom Canvas Color)", rgb);
+        crate::color_picker_ui::open_for_target(app, "pasteboard", "Color Picker (Custom Canvas Color)", rgb)?;
         return Ok(());
     }
     let (command, params) = engine_call(app, menu, command);

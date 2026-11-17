@@ -23,12 +23,6 @@ fn zoom(h: &Harness<'static, PhotocraftApp>) -> f32 {
     h.state().current_zoom()
 }
 
-/// The open document's size, as the zoom ladder takes it.
-fn doc_size(h: &Harness<'static, PhotocraftApp>) -> craft::behavior::kurbo::Size {
-    let [w, hgt] = h.state().ui.views[0].doc_size;
-    craft::behavior::kurbo::Size::new(f64::from(w), f64::from(hgt))
-}
-
 /// The highest zoom the ladder allows.
 fn max_zoom() -> f32 {
     craft::behavior::canvas::ZoomLadder::MAX as f32

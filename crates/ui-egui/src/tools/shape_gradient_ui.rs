@@ -45,11 +45,6 @@ impl ShapeGradients<'_> {
         let base = Fill::gradient(Vec::new(), 90.0, 1.0, GradientStyle::Linear, false);
         stops::apply_value(&base, &GradientFill::new(stops::of_preset(self.current, self.fg, self.bg)))
     }
-
-    /// Puts `gradient`'s stops at the front of the Recent row; a gradient already there moves up.
-    pub(crate) fn remember(&mut self, gradient: &Fill) {
-        remember_recent(self.recent, gradient);
-    }
 }
 
 /// [`ShapeGradients::remember`] on the row itself, for a caller that no longer holds the choices.

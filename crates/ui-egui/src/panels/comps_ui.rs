@@ -8,7 +8,7 @@ use craft::behavior::{EditEvent, Mixed};
 use craft::layers::ui::comps::{CompOption, LayerCompRow, LayerCompsEvent, LayerCompsPanel};
 use craft::ui::contract::Bind;
 use craft::ui::menu::PanelRow;
-use craft::ui::runtime::commands::{CommandRef, CommandState};
+use craft::ui::runtime::commands::CommandRef;
 use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
@@ -29,11 +29,6 @@ fn run(app: &mut PhotocraftApp, id: &str, p: Value) {
 
 /// The panel menu has no rows: Move Up and Move Down belong to the row menu.
 pub(crate) fn panel_rows(_app: &PhotocraftApp) -> Vec<PanelRow> {
-    Vec::new()
-}
-
-/// The panel has no command set of its own.
-pub(crate) fn command_states(_app: &PhotocraftApp) -> Vec<(CommandRef, CommandState)> {
     Vec::new()
 }
 

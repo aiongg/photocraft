@@ -92,7 +92,7 @@ fn shift_right_brush_does_not_open_presets_or_paint() {
     );
     let ctx = app.ctx().clone();
     assert!(inspect(&app, &ctx)["brushPicker"].is_null(), "Shift+right opens Mode, not Brush Presets");
-    assert!(!crate::canvas::testing::in_gesture(&mut app));
+    assert!(!crate::canvas::testing::in_gesture(&app));
     assert!(app.session.journal.iter().skip(before).all(|(id, _)| id != "paint.stroke"), "no stroke is painted");
     assert_eq!(app.session.journal.len(), before, "opening a menu does not paint or journal");
 }
@@ -351,7 +351,7 @@ fn inspect_lists_hosted_dialogs_in_stack_order() {
     assert_eq!(listed(&mut app), [lower_id.clone(), upper_id.clone()]);
     assert!(app.framework.dialogs.stack().is_top(upper));
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": upper_id}))["ok"], true);
-    assert_eq!(listed(&mut app), [lower_id.clone()]);
+    assert_eq!(listed(&mut app), std::slice::from_ref(&lower_id));
     assert!(app.framework.dialogs.stack().is_top(lower), "the dialog below takes the input again");
     assert_eq!(call(&mut app, &ctx, "ui.dialog.cancel", json!({"dialog": lower_id}))["ok"], true);
     assert!(listed(&mut app).is_empty());
@@ -699,7 +699,7 @@ fn ui_set_drives_the_crop_fill() {
     let ctx = app.ctx().clone();
     assert_eq!(call(&mut app, &ctx, "ui.set", json!({"tool": "crop", "cropFill": "contentAware"}))["ok"], true);
     // The fill's serialized name is the protocol's value.
-    let fill = |app: &PhotocraftApp| serde_json::to_value(&app.ui.tool_options.crop.fill).unwrap();
+    let fill = |app: &PhotocraftApp| serde_json::to_value(app.ui.tool_options.crop.fill).unwrap();
     assert_eq!(fill(&app), json!("contentAware"));
     assert_eq!(call(&mut app, &ctx, "ui.inspect", json!({}))["result"]["toolOptions"]["crop"]["fill"], json!("contentAware"));
     for bad in [json!("generativeExpand"), json!(true), json!(1)] {
@@ -718,9 +718,9 @@ fn ui_set_drives_the_crop_overlay_options() {
     let good = call(&mut app, &ctx, "ui.set", json!({"tool": "crop", "cropOverlay": "goldenSpiral", "cropOverlayShow": "always", "cropOverlayOrientation": 2}));
     assert_eq!(good["ok"], true, "{good}");
     // The serialized names are the protocol's values.
-    let guide = |app: &PhotocraftApp| serde_json::to_value(&app.ui.tool_options.crop.guide).unwrap();
+    let guide = |app: &PhotocraftApp| serde_json::to_value(app.ui.tool_options.crop.guide).unwrap();
     let o = &app.ui.tool_options.crop;
-    assert_eq!((guide(&app), serde_json::to_value(&o.guide_show).unwrap(), o.guide_orientation), (json!("goldenSpiral"), json!("always"), 2));
+    assert_eq!((guide(&app), serde_json::to_value(o.guide_show).unwrap(), o.guide_orientation), (json!("goldenSpiral"), json!("always"), 2));
     let seen = call(&mut app, &ctx, "ui.inspect", json!({}));
     let t = &seen["result"]["toolOptions"]["crop"];
     assert_eq!((t["guide"].as_str(), t["guideShow"].as_str(), t["guideOrientation"].as_u64()), (Some("goldenSpiral"), Some("always"), Some(2)));

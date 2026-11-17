@@ -43,10 +43,7 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
         return None;
     }
     Some(match id {
-        "file.export.saveForWebLegacy" => {
-            app.session.active()?;
-            Ok(opened(open_web(app)))
-        }
+        "file.export.saveForWebLegacy" => Ok(opened(open_web(app)?)),
         "file.print" => {
             app.session.active()?;
             Ok(opened(open_print(app)))
@@ -160,7 +157,7 @@ mod web_playback_tests {
     #[test]
     fn four_up_caches_follow_the_local_frame() {
         let mut app = animated_app(8);
-        let id = open_web(&mut app);
+        let id = open_web(&mut app).expect("an open document");
         set_option(&mut app, id, "format", json!(WebFormat::Gif));
         set_option(&mut app, id, "view", json!(WebView::FourUp));
         let colors = [[255, 0, 0, 255], [0, 255, 0, 255], [0, 0, 255, 255]];
@@ -176,7 +173,7 @@ mod web_playback_tests {
     #[test]
     fn playback_refreshes_indexed_frames_without_resetting_palette_edits() {
         let mut app = animated_app(8);
-        let id = open_web(&mut app);
+        let id = open_web(&mut app).expect("an open document");
         set_option(&mut app, id, "format", json!(WebFormat::Gif));
         set_option(&mut app, id, "view", json!(WebView::Optimized));
         pass(&mut app);
@@ -233,7 +230,7 @@ mod web_playback_tests {
     #[test]
     fn a_still_document_opens_without_an_animation() {
         let mut app = app();
-        let id = open_web(&mut app);
+        let id = open_web(&mut app).expect("an open document");
         assert!(app.framework.dialogs.get_by_id::<craft::ui::patterns::form_dialogs::HostedSaveForWeb>(id).is_some());
     }
 }

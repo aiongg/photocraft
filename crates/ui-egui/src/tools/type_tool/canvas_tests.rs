@@ -18,7 +18,7 @@ use serde_json::json;
 
 use super::{PathClick, layout, path_target, text_layer};
 use crate::PhotocraftApp;
-use crate::canvas::testing::{ToolEvent, tool_event};
+use crate::canvas::testing::{ToolEvent, tool_event, tool_event_response};
 
 const ANTI_ALIAS_METHODS: [TextAntiAlias; 5] = [TextAntiAlias::None, TextAntiAlias::Sharp, TextAntiAlias::Crisp, TextAntiAlias::Strong, TextAntiAlias::Smooth];
 
@@ -234,7 +234,6 @@ mod panel_defaults {
     use super::*;
     use crate::state::{Tool, ToolOptions};
     use egui::accesskit::Role;
-    use egui_kittest::kittest::NodeT;
     use photocraft_doc::text::{Caps, Kerning, Orientation, TextAlign, TextShape};
 
     /// Without a type target the preset chevrons set the next layer's defaults, with no
@@ -2293,14 +2292,14 @@ fn clicking_on_a_path_outline_starts_type_on_the_path_where_clicked() {
 fn the_path_pointer_is_off_while_dragging_a_text_box_or_editing() {
     let mut app = new_app();
     ellipse_layer(&mut app);
-    let hover = |app: &mut PhotocraftApp, x: f64, y: f64| tool_event(app, ToolEvent::Move { x, y, pressure: 1.0 }, Modifiers::NONE).cursor;
+    let hover = |app: &mut PhotocraftApp, x: f64, y: f64| tool_event_response(app, ToolEvent::Move { x, y, pressure: 1.0 }, Modifiers::NONE).cursor;
     let path_pointer = hover(&mut app, 400.0, 350.0);
     assert!(path_pointer.is_some(), "a hover inside the shape shows a pointer");
     // Press and hold on the shape, then a flat drag: still a click on release.
-    let pressed = tool_event(&mut app, ToolEvent::Down { x: 400.0, y: 350.0, pressure: 1.0 }, Modifiers::NONE);
+    let pressed = tool_event_response(&mut app, ToolEvent::Down { x: 400.0, y: 350.0, pressure: 1.0 }, Modifiers::NONE);
     assert!(crate::canvas::testing::in_gesture(&app), "the press starts a drag");
     assert_eq!(pressed.cursor, path_pointer, "press and hold");
-    let flat = tool_event(&mut app, ToolEvent::Move { x: 1200.0, y: 351.0, pressure: 1.0 }, Modifiers::NONE);
+    let flat = tool_event_response(&mut app, ToolEvent::Move { x: 1200.0, y: 351.0, pressure: 1.0 }, Modifiers::NONE);
     assert_eq!(flat.cursor, path_pointer, "a flat drag");
     tool_event(&mut app, ToolEvent::Up { x: 1200.0, y: 351.0 }, Modifiers::NONE);
     let id = LayerId(app.ui.text_edit.as_ref().expect("editing").layer);
@@ -2311,7 +2310,7 @@ fn the_path_pointer_is_off_while_dragging_a_text_box_or_editing() {
     let mut app = new_app();
     ellipse_layer(&mut app);
     tool_event(&mut app, ToolEvent::Down { x: 300.0, y: 300.0, pressure: 1.0 }, Modifiers::NONE);
-    let dragged = tool_event(&mut app, ToolEvent::Move { x: 400.0, y: 350.0, pressure: 1.0 }, Modifiers::NONE);
+    let dragged = tool_event_response(&mut app, ToolEvent::Move { x: 400.0, y: 350.0, pressure: 1.0 }, Modifiers::NONE);
     assert!(crate::canvas::testing::in_gesture(&app), "dragging out a box from inside the shape");
     assert_ne!(dragged.cursor, path_pointer, "the drag makes a box, not area type");
     tool_event(&mut app, ToolEvent::Up { x: 400.0, y: 350.0 }, Modifiers::NONE);

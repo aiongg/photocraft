@@ -27,8 +27,15 @@ pub(crate) mod params {
     use photocraft_doc::DocId;
     use serde_json::Value;
 
-    use super::*;
+    use super::{
+        PhotocraftApp, alerts, brush_preset_dialog, canvas_input, channel_options_ui, color_picker_ui, color_table_ui, count_group_name_ui, duplicate_layer_ui,
+        equalize_ui, file_forms, fill_ui, filter_dialog, history_options_ui, image_processor_ui, merge_channels_ui, new_group_ui, new_layer_ui,
+        smart_filter_dialog, snapshot_dialog, stack_dialog, stroke_ui,
+    };
     use crate::canvas::document_display::CanvasHost;
+
+    /// Judges a held OK: a refusal's label, or `Ok`.
+    type OkCheck = fn(&mut PhotocraftApp, &ParamResult) -> Result<(), Label>;
 
     /// One family of parameter dialogs: the dialogs whose key it owns, and what it does with their answers.
     #[derive(Clone, Copy)]
@@ -39,7 +46,7 @@ pub(crate) mod params {
         /// [`captured`].
         pub run: fn(&mut PhotocraftApp, &egui::Context, ParamResult),
         /// Judges a held OK before the dialog closes; a refusal shows under the rows and keeps the dialog open.
-        pub check: Option<fn(&mut PhotocraftApp, &ParamResult) -> Result<(), Label>>,
+        pub check: Option<OkCheck>,
         /// The files of a folder, for a files row of the family's dialogs.
         pub listing: Option<fn(&PhotocraftApp, &Path) -> Vec<PathBuf>>,
         /// A footer button the dialog reported (the button's id comes last).
@@ -246,7 +253,7 @@ pub(crate) mod params {
     struct Picks(Vec<(PickId, DialogId, String)>);
 
     fn picks_id() -> egui::Id {
-        egui::Id::new("pc-param-picks")
+        egui::Id::unique("pc-param-picks")
     }
 
     /// Answers the dialogs' requests of this pass: colours through a Color Picker child, paths through the host's file
@@ -435,6 +442,7 @@ pub(crate) const TAKERS: &[fn(&mut PhotocraftApp, &egui::Context)] = &[
     layer_style::take,
     color_picker_ui::take,
     crate::type_panels_ui::color_picker::take,
+    crate::type_panels_ui::spelling::take,
     color_range_ui::take,
     select_mask_ui::take,
     caf_ui::take,
@@ -493,7 +501,7 @@ pub fn run(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// Answers dialog `id` with OK, as its default button would, and runs what OK does. A held OK is answered at once by the
 /// family that holds it: an accepted one closes the dialog in this call, a refusal comes back as the error text, and one
 /// that waits on a pick (Export's save dialog) is answered by the pick.
-pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
+pub fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
     if app.framework.dialogs.get_dyn(id).is_none() {
         return Err(format!("no dialog {}", id.value()));
     }
@@ -529,7 +537,7 @@ pub(crate) fn confirm(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId
 }
 
 /// Cancels dialog `id`, as Cancel or Escape would, and runs what a cancel leaves to do.
-pub(crate) fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
+pub fn cancel(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId) -> Result<(), String> {
     // A prompt answers Escape with its escape button, as an answer its family takes; the host's own cancel is a result
     // that reaches no family (it stands for a replaced prompt).
     let escape = app.framework.dialogs.get_dyn_mut(id).and_then(|dialog| dialog.downcast_mut::<StandardPrompt>()).and_then(|prompt| {

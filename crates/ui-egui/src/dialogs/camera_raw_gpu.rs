@@ -100,6 +100,16 @@ type PointsKey = (u64, [u32; 5]);
 /// The last [`PointsKey`] and its points.
 type Points = Option<(PointsKey, Option<(f32, f32)>)>;
 
+/// The pixels of one develop: the proxy (`w` × `h`) and, when they are the dialog's unchanged proxy, the [`source_key`]
+/// that lets them upload once.
+#[derive(Clone, Copy)]
+pub(crate) struct ProxyPixels<'a> {
+    pub(crate) px: &'a [[f32; 4]],
+    pub(crate) key: Option<u64>,
+    pub(crate) w: usize,
+    pub(crate) h: usize,
+}
+
 /// One dialog's handle on the pass (cheap to clone into each proxy job).
 #[derive(Clone)]
 #[cfg_attr(target_arch = "wasm32", allow(dead_code))]
@@ -124,16 +134,8 @@ impl CameraRawGpu {
     /// `key` names the pixels when they are the dialog's unchanged proxy ([`source_key`]), so they
     /// upload once. Neutral settings are `None` too: the CPU develop returns them at once, a GPU
     /// round trip would only cost. `inputs` are the develop's seed, pixel scale and encoding gamma.
-    pub(crate) fn develop(
-        &self,
-        px: &[[f32; 4]],
-        key: Option<u64>,
-        w: usize,
-        h: usize,
-        p: &CameraRaw,
-        inputs: &DevelopInputs,
-        float: bool,
-    ) -> Option<Vec<[f32; 4]>> {
+    pub(crate) fn develop(&self, pixels: ProxyPixels<'_>, p: &CameraRaw, inputs: &DevelopInputs, float: bool) -> Option<Vec<[f32; 4]>> {
+        let ProxyPixels { px, key, w, h } = pixels;
         if p.is_identity() || self.failed.load(Ordering::Relaxed) || !self.health.is_ok() {
             return None;
         }
@@ -357,9 +359,9 @@ mod tests {
         // A layer about 450 times wider than tall has a 2 px tall proxy: its pyramid has one level.
         let thin = vec![[0.4, 0.3, 0.2, 1.0]; 40 * 2];
         let inputs = DevelopInputs::default();
-        assert!(gpu.develop(&thin, None, 40, 2, &cr!(shadows: 50.0), &inputs, false).is_none());
+        assert!(gpu.develop(ProxyPixels { px: &thin, key: None, w: 40, h: 2 }, &cr!(shadows: 50.0), &inputs, false).is_none());
         let px = vec![[0.4, 0.3, 0.2, 1.0]; 64 * 48];
-        assert!(gpu.develop(&px, None, 64, 48, &cr!(exposure: 0.5), &inputs, false).is_some(), "the GPU develop stays on");
+        assert!(gpu.develop(ProxyPixels { px: &px, key: None, w: 64, h: 48 }, &cr!(exposure: 0.5), &inputs, false).is_some(), "the GPU develop stays on");
     }
 
     #[test]

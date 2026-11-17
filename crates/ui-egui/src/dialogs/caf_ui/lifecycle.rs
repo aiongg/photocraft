@@ -28,12 +28,12 @@ pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
     let (pw, ph) = ((canvas.width() as usize).div_ceil(k), (canvas.height() as usize).div_ceil(k));
 
     // The workspace reads its remembered settings itself; the plan is made for what it opens with.
-    let open = FillOpen::new([canvas.width() as u32, canvas.height() as u32], name, FillLimits::new(MAX_CAF_EDITS, MAX_CAF_POINTS));
+    let open = FillOpen::new([canvas.width(), canvas.height()], name, FillLimits::new(MAX_CAF_EDITS, MAX_CAF_POINTS));
     let mut workspace = craft::imaging::ui::fill::ContentAwareFillWorkspace::new(open).remember(REMEMBERED);
     let base = compute_base(&doc, layer, &workspace.command())?;
     workspace.set_brush(photocraft_algo::content_aware::default_brush_size(bounds(&base)));
 
-    let picture_size = PixelSize::new(canvas.width() as u32, canvas.height() as u32);
+    let picture_size = PixelSize::new(canvas.width(), canvas.height());
     let mut caf = CafApp {
         id: dialog_id(CMD),
         document,
@@ -86,11 +86,6 @@ pub(super) fn bounds(b: &Base) -> Rect {
         let (x, y) = (b.rect.x0 + (i % w) as i32, b.rect.y0 + (i / w) as i32);
         r.union(&Rect::new(x, y, x + 1, y + 1))
     })
-}
-
-/// The document the open workspace belongs to.
-pub(crate) fn document(app: &PhotocraftApp) -> Option<photocraft_doc::DocId> {
-    app.caf.as_ref().map(|c| c.document)
 }
 
 /// The workspace's facts for the automation surface: the app's (the plan's window and areas, the preview, the last

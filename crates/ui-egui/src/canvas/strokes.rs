@@ -41,13 +41,6 @@ pub(crate) struct CloneSource {
     revision: Revision,
 }
 
-impl CloneSource {
-    /// The overlay's pixels, premultiplied sRGBA, row by row.
-    pub(crate) fn image(&self) -> &ColorImage {
-        &self.pixels
-    }
-}
-
 impl RasterSource for CloneSource {
     fn size(&self) -> PixelSize {
         let [w, h] = self.pixels.size;

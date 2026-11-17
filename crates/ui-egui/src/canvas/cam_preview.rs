@@ -22,8 +22,6 @@ use crate::state::Tool;
 
 /// How long (s) the move must stay unchanged before a preview is computed.
 const SETTLE_S: f64 = 0.15;
-/// How often a running job is polled for its result.
-const POLL_MS: u64 = 40;
 
 struct Running {
     key: PreviewKey,
@@ -112,7 +110,7 @@ fn step(app: &mut PhotocraftApp, now: f64) -> Option<(Arc<Document>, u64)> {
         return None;
     };
     let st = app.session.active()?;
-    let session = PreviewSession::new(st.doc.id.0, st.revision, st.active_layer.map_or(0, |l| u64::from(l.0) + 1));
+    let session = PreviewSession::new(st.doc.id.0, st.revision, st.active_layer.map_or(0, |l| l.0 + 1));
     let b = st.doc.bounds();
     if app.cam_preview.as_ref().is_some_and(|p| p.live.session() != Some(session)) {
         app.cam_preview = None;
@@ -208,19 +206,6 @@ fn spawn(job: ContentAwarePreview, key: PreviewKey, refining: bool) -> Option<Ru
         refine,
         refining,
     })
-}
-
-/// Keep frames coming while a preview waits out its debounce or computes.
-pub(crate) fn wake(app: &PhotocraftApp, ctx: &egui::Context) {
-    let Some(p) = &app.cam_preview else { return };
-    if p.running.is_some() {
-        ctx.request_repaint_after(std::time::Duration::from_millis(POLL_MS));
-    } else if !p.shows(p.key)
-        && p.failed != Some(p.key)
-        && let Some(left) = p.live.settles_in(ctx.input(|i| i.time), SETTLE_S)
-    {
-        ctx.request_repaint_after(std::time::Duration::from_secs_f64(left));
-    }
 }
 
 /// Whether the canvas shows a preview.

@@ -174,10 +174,10 @@ pub(crate) fn fill_params(stops: &GradientStops) -> Value {
 /// stops (and a CMYK document's stop colours) alone. An empty object when nothing differs.
 pub(crate) fn value_params(before: &GradientFill, after: &GradientFill) -> Value {
     let mut p = serde_json::Map::new();
-    if before.stops != after.stops {
-        if let Value::Object(stops) = fill_params(&after.stops) {
-            p.extend(stops);
-        }
+    if before.stops != after.stops
+        && let Value::Object(stops) = fill_params(&after.stops)
+    {
+        p.extend(stops);
     }
     if before.style != after.style {
         p.insert("style".into(), json!(style_name(after.style)));

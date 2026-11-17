@@ -1,5 +1,5 @@
 use super::*;
-use crate::canvas::{ToolEvent, tool_event};
+use crate::canvas::{ToolEvent, tool_event, tool_event_response};
 use craft::behavior::geometry::SnapLine;
 use serde_json::json;
 
@@ -37,7 +37,7 @@ fn has_line(lines: &[SnapLine], position: f64) -> bool {
 /// Drags the Move tool from the mover's body to `to` and returns the snap lines of the last move.
 fn move_drag(app: &mut PhotocraftApp, to: [f64; 2], m: egui::Modifiers) -> Vec<SnapLine> {
     tool_event(app, ToolEvent::Down { x: 60.0, y: 60.0, pressure: 1.0 }, m);
-    let lines = tool_event(app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 }, m).snapped;
+    let lines = tool_event_response(app, ToolEvent::Move { x: to[0], y: to[1], pressure: 1.0 }, m).snapped;
     tool_event(app, ToolEvent::Up { x: to[0], y: to[1] }, m);
     lines
 }

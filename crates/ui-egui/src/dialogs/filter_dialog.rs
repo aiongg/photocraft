@@ -26,6 +26,7 @@ mod rows;
 pub(crate) use rows::{REPLACE_COLOR, replace_color_sample};
 
 const MATCH_COLOR: &str = "image.adjustments.matchColor";
+#[cfg(test)]
 pub(crate) const MATCH_COLOR_DESTINATION: &str = "__matchColorDestination";
 
 /// The decimals of the Rotate Canvas angle: it keeps hundredths of a degree, so the ruler's
@@ -845,9 +846,6 @@ fn proof_setup_defaults(app: &PhotocraftApp, fields: &mut Map<String, Value>) {
     fields.insert("bpc".into(), json!(pv.setup.bpc));
     fields.insert("simulatePaper".into(), json!(pv.setup.simulate_paper));
 }
-
-/// Schema dialogs whose `profile` menu lists the installed profiles after the built-ins.
-const PROFILE_DIALOGS: &[&str] = &["edit.assignProfile", "edit.convertToProfile", "view.proofSetup"];
 
 /// Commands whose `angle` is a direction in document angles (counter-clockwise from three
 /// o'clock): a light or a blur direction, edited on a dial as in Photoshop's Motion Blur, Emboss

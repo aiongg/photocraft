@@ -225,10 +225,7 @@ pub(crate) fn release(app: &mut PhotocraftApp, pick: DialogPick) {
 /// The modifiers the pass holds that change what a Color Range press does.
 fn held(app: &PhotocraftApp) -> Mods {
     let held = app.ctx().input(|i| i.modifiers);
-    let mut mods = Mods::default();
-    mods.shift = held.shift;
-    mods.alt = held.alt;
-    mods
+    Mods { shift: held.shift, alt: held.alt, ..Mods::default() }
 }
 
 /// The cursor over the image while `pick` is armed: the pipette for the samplers (Color Range's with the badge of the

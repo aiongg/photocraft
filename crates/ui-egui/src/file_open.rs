@@ -377,7 +377,7 @@ impl PhotocraftApp {
     /// Files dropped onto the window, routed by `to` ([`DropTo`]). Preset files (brushes,
     /// gradients) always go to their libraries. A native drop carries an absolute path, read in
     /// bounded reads (#375); a drop without a path carries its bytes.
-    pub fn open_dropped(&mut self, ctx: &egui::Context, files: Vec<OsFile>, to: DropTo) {
+    pub(crate) fn open_dropped(&mut self, ctx: &egui::Context, files: Vec<OsFile>, to: DropTo) {
         // Files dragged in from another app's window bring PhotoCraft to the front and give it the keyboard, as
         // Photoshop does, instead of leaving it behind the source (#5687). A drop on a floating panel's window
         // brings the main window.

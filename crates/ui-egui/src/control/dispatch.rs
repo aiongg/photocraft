@@ -98,7 +98,7 @@ fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Re
     let Some(id) = str_param(p, "id") else { return err("missing `id`") };
     let Some(menu) = app.ui.canvas_tool_menu.as_ref() else { return err("no canvas context menu is open") };
     if matches!(menu.kind, MenuKind::BrushMode { .. }) {
-        return mode_menu_choose(app, ctx, id);
+        return mode_menu_choose(app, id);
     }
     if !crate::canvas_tool_menu::available(app, menu, id) {
         return err("context action is unavailable");
@@ -115,7 +115,7 @@ fn context_choose(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Re
 }
 
 /// A row of the painting tools' Shift+right-click menu, by its English label (`brushModeMenu.choices`).
-fn mode_menu_choose(app: &mut PhotocraftApp, ctx: &egui::Context, label: &str) -> Reply {
+fn mode_menu_choose(app: &mut PhotocraftApp, label: &str) -> Reply {
     let item = match crate::brush_mode_menu::find(app, label) {
         Ok(item) => item,
         Err(e) => return err(e),
@@ -276,7 +276,7 @@ fn screenshot(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply 
     let host = WindowHost::of(ctx);
     let viewport = match window.as_deref() {
         None | Some("main") => egui::ViewportId::ROOT,
-        Some(id) => match host.viewport_of(egui::Id::new(id)) {
+        Some(id) => match host.viewport_of(egui::Id::unique(id)) {
             Some(viewport) => viewport,
             None => return err(format!("no open window `{id}`")),
         },
@@ -755,8 +755,8 @@ fn panels_patch(app: &PhotocraftApp, patch: Option<&Value>) -> std::result::Resu
         let merged = merged_object(&app.ui.panels.task_bar, Some(bar), "panels.task_bar")?;
         own_patch.insert("task_bar".into(), serde_json::to_value(merged).map_err(|e| e.to_string())?);
     }
-    let own_patch = (!own_patch.is_empty()).then(|| Value::Object(own_patch));
-    let legacy = (!legacy.is_empty()).then(|| Value::Object(legacy));
+    let own_patch = (!own_patch.is_empty()).then_some(Value::Object(own_patch));
+    let legacy = (!legacy.is_empty()).then_some(Value::Object(legacy));
     Ok((own_patch, legacy))
 }
 

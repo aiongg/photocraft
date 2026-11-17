@@ -16,7 +16,7 @@
 use craft::behavior::IconId;
 use craft::ui::buttons::{Button, ToggleButton};
 use craft::ui::canvas_controls::TaskBar;
-use craft::ui::contract::{Bind, Props as _, Show as _};
+use craft::ui::contract::{Bind, Show as _};
 use craft::ui::runtime::env::Label;
 
 use crate::PhotocraftApp;

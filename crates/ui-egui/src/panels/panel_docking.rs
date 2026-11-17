@@ -32,7 +32,7 @@ const FLOAT_AT: [f32; 2] = [400.0, 140.0];
 const FLOAT_SIZE: [f32; 2] = [300.0, 400.0];
 
 /// What the workspace allows `panel`, as the dock and every command apply it.
-fn permissions(panel: &String) -> Permissions {
+fn permissions(panel: &str) -> Permissions {
     registry::permissions(panel)
 }
 
@@ -118,7 +118,7 @@ fn apply_during(app: &mut PhotocraftApp, actions: Vec<Action<String>>, dragging:
 /// Whether a workspace gesture of the pass (a divider drag, a window move) is still running after it: its last
 /// event is its begin or a step, not its commit or cancel. The area's own one-step edits belong to no gesture.
 fn dragging(edit: &EditEvents<Workspace>) -> bool {
-    edit.iter().filter(|event| event.id().is_some()).last().is_some_and(|event| matches!(event, EditEvent::Begin { .. } | EditEvent::Update { .. }))
+    edit.iter().rfind(|event| event.id().is_some()).is_some_and(|event| matches!(event, EditEvent::Begin { .. } | EditEvent::Update { .. }))
 }
 
 /// Whether [`apply`] would take `actions`: the same refusals, on a copy of the workspace. Changes nothing.
@@ -129,7 +129,7 @@ pub(crate) fn check(app: &PhotocraftApp, actions: &[Action<String>]) -> Result<(
 /// The workspace `actions` make of the live one, and the panels they close; the refusals of [`apply`] and [`check`].
 fn planned(app: &PhotocraftApp, actions: &[Action<String>]) -> Result<(Workspace, Vec<String>), String> {
     let mut next = app.ui.docking.clone();
-    let closed = next.apply_all(actions.iter().cloned(), app.workspaces.set.locked, permissions).map_err(|error| error.to_string())?;
+    let closed = next.apply_all(actions.iter().cloned(), app.workspaces.set.locked, |panel: &String| permissions(panel)).map_err(|error| error.to_string())?;
     // The model leaves the panel registry to the application: an action may not bring in an unknown panel.
     if let Some(unknown) = next.layout.panels().into_iter().find(|panel| !registry::registered(panel)) {
         return Err(format!("`{unknown}` is not a registered panel"));
@@ -145,7 +145,7 @@ fn stop_closed_timeline(app: &mut PhotocraftApp, closed: &[String]) {
 }
 
 /// What the dock reads of `panel`: its name, icon, least size, group heights, float size and, for the toolbar, the grid
-/// its column is whole steps of.
+/// its column is whole steps of and its float in the main window.
 fn spec(app: &PhotocraftApp, panel: &str) -> PanelSpec {
     if panel == CANVAS {
         let least = SizeLimits::at_least(egui::vec2(CANVAS_MIN[0], CANVAS_MIN[1]));
@@ -161,7 +161,9 @@ fn spec(app: &PhotocraftApp, panel: &str) -> PanelSpec {
         spec = spec.float_size(egui::vec2(width, height));
     }
     if panel == TOOLBAR {
-        spec = spec.grid(ToolRail::<crate::state::Tool>::dock_grid(app.ctx(), super::toolbar::cells(app)));
+        // The toolbar floats in the main window, as production's: its tooltips, tool flyouts and Edit Toolbar drawer
+        // open beside the one-button-wide rail, which its own OS window would clip.
+        spec = spec.grid(ToolRail::<crate::state::Tool>::dock_grid(app.ctx(), super::toolbar::cells(app))).allow_native(false);
     }
     spec
 }
@@ -685,7 +687,7 @@ fn group_command(app: &mut PhotocraftApp, params: &Value) -> Result<Value, Strin
         }
         "up" | "down" => {
             let up = operation == "up";
-            if !layout.can_step_group(&panel, up, permissions) {
+            if !layout.can_step_group(&panel, up, |panel: &String| permissions(panel)) {
                 return Err("group is already at the edge".into());
             }
             vec![Action::step_group(panel.clone(), up), Action::activate(panel.clone())]
@@ -720,7 +722,7 @@ pub(crate) fn load_at_launch(app: &mut PhotocraftApp, saved: &Value) {
     let mut workspace = loaded(saved);
     let transient = "brushSettings".to_owned();
     if workspace.layout.contains(&transient)
-        && let Err(error) = workspace.apply(Action::close(transient), false, permissions)
+        && let Err(error) = workspace.apply(Action::close(transient), false, |panel: &String| permissions(panel))
     {
         app.ui.status = error.to_string();
     }
@@ -746,7 +748,7 @@ fn loaded(saved: &Value) -> Workspace {
             migrated(saved, &default)
         }
     };
-    workspace.reconcile(|panel: &String| registry::registered(panel), permissions, &default);
+    workspace.reconcile(|panel: &String| registry::registered(panel), |panel: &String| permissions(panel), &default);
     if predates_toolbar {
         migrate_toolbar(&mut workspace, saved.get("panels"));
     }
@@ -799,7 +801,7 @@ fn migrate_toolbar(workspace: &mut Workspace, panels: Option<&Value>) {
     }
     for action in actions {
         // A step the workspace refuses leaves the toolbar where the default put it.
-        let _ = workspace.apply(action, false, permissions);
+        let _ = workspace.apply(action, false, |panel: &String| permissions(panel));
     }
 }
 
@@ -824,7 +826,7 @@ fn migrated(saved: &Value, default: &Workspace) -> Workspace {
         actions.push(Action::open("timeline".to_owned(), None));
     }
     let mut workspace = default.clone();
-    match workspace.apply_all(actions, false, permissions) {
+    match workspace.apply_all(actions, false, |panel: &String| permissions(panel)) {
         Ok(_) => workspace,
         Err(_) => default.clone(),
     }
@@ -992,7 +994,7 @@ pub(crate) mod probe {
 
     /// The id of the OS windows the last pass showed floating windows in, by each panel they hold.
     fn windows_id() -> egui::Id {
-        egui::Id::new("photocraft dock windows")
+        egui::Id::unique("photocraft dock windows")
     }
 
     type Windows = Vec<(String, egui::ViewportId)>;

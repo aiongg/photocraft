@@ -34,29 +34,30 @@ impl From<&ShapeStroke> for StrokeOptions {
 /// along the path, as the document stores them. The width is the caller's.
 impl From<&StrokeOptions> for StrokeStyle {
     fn from(o: &StrokeOptions) -> Self {
-        let mut style = StrokeStyle::default();
-        style.align = match o.align {
-            StrokeAlign::Inside => FwAlign::Inside,
-            StrokeAlign::Center => FwAlign::Center,
-            StrokeAlign::Outside => FwAlign::Outside,
-        };
-        style.cap = match o.cap {
-            LineCap::Butt => FwCap::Butt,
-            LineCap::Round => FwCap::Round,
-            LineCap::Square => FwCap::Square,
-        };
-        style.join = match o.join {
-            LineJoin::Miter => FwJoin::Miter,
-            LineJoin::Round => FwJoin::Round,
-            LineJoin::Bevel => FwJoin::Bevel,
-        };
-        style.miter_limit = o.miter_limit;
-        style.dashes = o.dashes.clone();
-        style.dash_offset = o.dash_offset;
-        style.dash_unit = DashUnit::Widths;
-        style.dash_align = DashAlign::Exact;
-        style.opacity = o.opacity;
-        style
+        StrokeStyle {
+            align: match o.align {
+                StrokeAlign::Inside => FwAlign::Inside,
+                StrokeAlign::Center => FwAlign::Center,
+                StrokeAlign::Outside => FwAlign::Outside,
+            },
+            cap: match o.cap {
+                LineCap::Butt => FwCap::Butt,
+                LineCap::Round => FwCap::Round,
+                LineCap::Square => FwCap::Square,
+            },
+            join: match o.join {
+                LineJoin::Miter => FwJoin::Miter,
+                LineJoin::Round => FwJoin::Round,
+                LineJoin::Bevel => FwJoin::Bevel,
+            },
+            miter_limit: o.miter_limit,
+            dashes: o.dashes.clone(),
+            dash_offset: o.dash_offset,
+            dash_unit: DashUnit::Widths,
+            dash_align: DashAlign::Exact,
+            opacity: o.opacity,
+            ..StrokeStyle::default()
+        }
     }
 }
 

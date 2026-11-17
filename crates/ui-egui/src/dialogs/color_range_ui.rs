@@ -113,7 +113,6 @@ pub struct SelectionPreview {
 
 /// Open the dialog with Photoshop's defaults (the value's `Default`). `Err` without a document: the
 /// dialog's sample points are clamped to the document's size.
-
 pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
     let label = crate::dialogs::filter_dialog::title_of(photocraft_engine::commands::find(COMMAND).map_or(tl!("Color Range…"), |c| c.label));
     let idx = app.session.active_index().ok_or("no document")?;

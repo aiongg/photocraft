@@ -4,10 +4,8 @@
 //! typing session is one "Edit Type" history step and automation sees exactly what the user does.
 //! Offsets in [`TextEdit`] are character indices (the engine's unit); the layout works in bytes.
 
-use std::collections::HashMap;
 use std::sync::{Arc, PoisonError};
 
-use egui::{Color32, Stroke};
 use photocraft_doc::{Document, LayerContent, LayerId, TextLayer};
 use photocraft_geom::{Affine, Point};
 use photocraft_text::TextLayout;
@@ -31,32 +29,30 @@ mod values;
 pub(crate) use controls::canvas_controls;
 #[cfg(test)]
 pub(crate) use craft::text::ui::editor::CharToggle;
+#[cfg(test)]
 use defaults::apply;
 #[cfg(test)]
 use defaults::{default_style_params, default_styles, shown_scale};
 pub use defaults::{foreground_changed, open_color_picker};
 pub(crate) use defaults::{formatting_params, target, target_text};
-use editing::selected_styles;
 pub use editing::{cancel, commit, commit_with, edit_active, edit_at, end_if_left};
 #[cfg(test)]
 pub(crate) use editing::{step_char_metric, toggle_char_style, toggle_hyphenate};
 #[cfg(test)]
 use fonts::preview_text;
-pub(crate) use fonts::{FontSourceState, finish_font_state, font_field, font_state, selected_style};
 pub use fonts::{families, style_label, styles, warm_fonts};
+pub(crate) use fonts::{finish_font_state, font_state, selected_style};
 pub(crate) use host::LayerHost;
-#[cfg(test)]
-pub(crate) use host::type_text;
 pub use layout::layout;
 pub(crate) use layout::{hit_layer, offset_at, shows_own_layout};
 pub use options_bar::options_bar;
 pub(crate) use options_bar::styles_at;
 #[cfg(test)]
-pub(crate) use panel::{OPENTYPE_BUTTONS, toggle_opentype};
+pub(crate) use panel::toggle_opentype;
 pub use panel::{character_panel, type_properties};
 #[cfg(test)]
-pub(crate) use pointer::path_target;
-pub(crate) use pointer::{PathClick, TypeState, TypeTool, box_shape, drain, hover_path_target, tool};
+pub(crate) use pointer::{PathClick, path_target};
+pub(crate) use pointer::{TypeState, box_shape, drain, tool};
 pub(crate) use values::doc_unit;
 
 pub const PLACEHOLDER: &str = "Lorem Ipsum";

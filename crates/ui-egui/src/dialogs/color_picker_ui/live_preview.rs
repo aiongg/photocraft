@@ -43,6 +43,7 @@ pub(super) fn begin(app: &mut PhotocraftApp, picker: DialogId, target: &PickTarg
     app.color_picker_live.push(Live { picker, before, shown: None });
 }
 
+#[cfg(test)]
 /// The dialogs an open picker is previewing in: they record no ⌘Z step meanwhile, so a Cancel leaves
 /// no trace and an OK is one step.
 pub(crate) fn previewed_dialogs(app: &PhotocraftApp) -> Vec<DialogId> {

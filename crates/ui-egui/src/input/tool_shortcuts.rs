@@ -25,6 +25,7 @@ pub(crate) fn default(tool: Tool) -> Option<String> {
     (tool.key() != '\0').then(|| tool.key().to_string())
 }
 
+#[cfg(test)]
 pub(crate) fn shortcut(app: &PhotocraftApp, tool: Tool) -> Option<String> {
     crate::shortcuts::effective_shortcut(app, &id(tool), default(tool).as_deref())
 }
