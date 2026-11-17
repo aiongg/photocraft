@@ -1485,10 +1485,11 @@ fn a_thin_layer_scaled_then_warped_commits_the_curve() {
         p[3]
     };
     // The middle sags below the band's old bottom edge (y 60). The pulled edge is a cubic with its inner points 40 px
-    // down: it hangs 30 px in the middle and about 8 px at x 80, a tenth of the band's 90 px from its right end, so
-    // y 70 is below it there.
-    assert!(alpha(41, 70) > 0.99, "middle {}", alpha(41, 70));
-    assert!(alpha(80, 70) < 0.01 && alpha(80, 40) > 0.99, "end {} {}", alpha(80, 70), alpha(80, 40));
+    // down: across the band (x -3.5 to 86.5) it hangs 120 t (1 - t) px, 30 in the middle and about 20 at x 15, so y 82
+    // is inside the band in the middle and below it at x 15. The band is opaque only between its outer source pixels'
+    // centres (x 11.5 to 71.5): the 30× stretch spreads each edge pixel over 30 px.
+    assert!(alpha(41, 70) > 0.99 && alpha(41, 82) > 0.99, "middle {} {}", alpha(41, 70), alpha(41, 82));
+    assert!(alpha(15, 82) < 0.01 && alpha(15, 40) > 0.99, "side {} {}", alpha(15, 82), alpha(15, 40));
 }
 
 /// #7885: a surface drag (a press inside a cell, on no anchor or handle) commits exactly as
