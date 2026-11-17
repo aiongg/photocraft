@@ -223,9 +223,6 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     // A discrete zoom eases from the view it was asked for in. A measuring run starts no ease, so the request waits for
     // the pass that shows the canvas.
     let measuring = craft::ui::runtime::measure::active(ctx);
-    if view.zoom_animating {
-        eprintln!("DIAG navigator_viewport_follows_the_canvas_zoom_ease: ease request measuring={measuring} zoom={} from={:?}", view.zoom, view.zoom_from);
-    }
     let from = view.zoom_from.map_or(given, |(zoom, center)| View { zoom, center, ..view.clone() }.canvas_view(rect, ppp, pass.flip, pass.aspect));
     let ease = (view.zoom_animating && !measuring)
         .then(|| (from, view.zoom_anchor.map(|(doc, screen)| (Point::new(doc[0], doc[1]), Pos2::new(screen[0], screen[1])))));

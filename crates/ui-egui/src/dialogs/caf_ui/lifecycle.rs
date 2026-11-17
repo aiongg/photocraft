@@ -287,25 +287,12 @@ fn reconcile(app: &mut PhotocraftApp, id: DialogId, replan: bool, rebased: bool,
         if !committed {
             c.restate_all(&session.strokes);
         }
-        eprintln!(
-            "DIAG the_lasso_edits_the_fill_area_and_the_window_follows: strokes branch err={:?} strokes {} vs {} fill {} vs {}",
-            c.error,
-            session.strokes.len(),
-            c.known.strokes.len(),
-            session.fill_edits.len(),
-            c.known.fill_edits.len()
-        );
         c.error = None;
         c.known = session;
         return;
     }
     match compute_base(&c.doc, c.layer, &command) {
         Ok(base) => {
-            eprintln!(
-                "DIAG the_lasso_edits_the_fill_area_and_the_window_follows: plan ok replan={replan} rebased={rebased} same_session={} err={:?}",
-                session == c.known,
-                c.error
-            );
             c.set_base(base, &session.strokes);
             if rebased || session != c.known {
                 c.error = None;

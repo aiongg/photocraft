@@ -55,6 +55,15 @@ fn navigator_viewport_follows_the_canvas_zoom_ease() {
     let midway = (0..30).any(|_| {
         h.run_steps(1);
         let row = percents(&h);
+        let space = craft::ui::canvas::ToolHost::shown_space(&h.ctx, crate::canvas::CanvasHost::main(0).canvas_id());
+        eprintln!(
+            "DIAG navigator_viewport_follows_the_canvas_zoom_ease: row={row:?} space={:?} time={} animation_time={} view_zoom={} request={}",
+            space.map(|s| (s.view.zoom, s.target().zoom, s.easing())),
+            h.ctx.input(|i| i.time),
+            h.ctx.global_style().animation_time,
+            h.state().ui.views[0].zoom,
+            h.state().ui.views[0].zoom_animating
+        );
         let between = row.iter().any(|p| *p > 100.5 && *p < 199.5);
         seen.push(row);
         between
