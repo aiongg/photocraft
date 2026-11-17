@@ -430,6 +430,7 @@ fn drag_content(app: &mut PhotocraftApp, c: &mut ContentPress, to: KPoint, mods:
     }
     c.last = next;
     let _ = t.session.apply(TransformEdit::Box(EditEvent::update(c.id, next)), time);
+    eprintln!("DIAG {}: frame content drag part {:?} origin {:?} next {:?} session {:?}", crate::diag_test(), c.part, c.origin, next, t.session.state());
 }
 
 /// The release of a content press: the box's Commit (when it moved) and the automatic commit of the session.
@@ -445,7 +446,16 @@ fn release_content(app: &mut PhotocraftApp, c: &ContentPress, to: KPoint, mods: 
     }
     let after = box_drag(&c.origin, &c.last, c.part, c.start, to, mods, &BoxRules::default());
     let edits = [TransformEdit::Box(EditEvent::commit(c.id, Mixed::Same(c.origin), after))];
+    eprintln!(
+        "DIAG {}: frame content release auto {} session {:?} target {:?} layer {:?}",
+        crate::diag_test(),
+        app.ui.frame_tool.auto_transform,
+        app.ui.transform.as_ref().map(|t| *t.session.state()),
+        app.ui.transform.as_ref().map(|t| t.target.clone()),
+        app.ui.transform.as_ref().map(|t| t.layer)
+    );
     crate::transform_tool::auto_commit(app, &edits);
+    eprintln!("DIAG {}: frame content after commit status {:?} transform open {}", crate::diag_test(), app.ui.status, app.ui.transform.is_some());
 }
 
 fn cancel_content(app: &mut PhotocraftApp, c: &ContentPress, reason: CancelReason, time: f64) {
