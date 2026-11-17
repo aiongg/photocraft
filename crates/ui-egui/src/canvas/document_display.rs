@@ -287,12 +287,15 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
     // Where the tool takes a press over the canvas controls this pass, asked before the canvas shows.
     let regions = tools::claimed_regions(app, ctx, host);
 
+    // The view commands asked of this view (a menu row, an action step, a new document's fit) run in the canvas's pass.
+    let queued = view.pending.clone();
     let mut bound = given;
     let mut canvas = Canvas::new(label.clone())
         .id(id)
         .view(Bind::bound(&mut bound))
         .document(target)
         .layer_bounds(&fit_layers)
+        .queued(&queued)
         .snap(snap)
         .pasteboard(pasteboard)
         .navigation(navigation)
@@ -427,6 +430,10 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         let px = u64::from(read.width().unsigned_abs()) * u64::from(read.height().unsigned_abs());
         let whole = u64::from(doc.size.width) * u64::from(doc.size.height);
         app.perf.record(if px >= whole { "full" } else { "rect" }, px, ms, 0.0);
+    }
+    // A measuring run ran none of them; the real run did, and commands asked while it ran wait for the next pass.
+    if !measuring {
+        view.pending.drain(..queued.len().min(view.pending.len()));
     }
     let canvas_output = shown.output;
     if let Some(next) = canvas_output.view.as_ref() {

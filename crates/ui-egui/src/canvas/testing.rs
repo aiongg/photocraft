@@ -161,8 +161,7 @@ pub(crate) fn clear_of_dialogs(app: &mut PhotocraftApp, at: [f64; 2]) {
     if let Some(i) = app.session.active_index().filter(|i| *i < app.ui.views.len()) {
         let v = &mut app.ui.views[i];
         v.center = [v.center[0] - moved.x as f32, v.center[1] - moved.y as f32];
-        v.fit_pending = false;
-        v.fill_pending = false;
+        v.clear_pending();
     }
     shown(app);
 }

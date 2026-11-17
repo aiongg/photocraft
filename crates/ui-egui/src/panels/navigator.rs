@@ -41,7 +41,7 @@ pub(super) fn navigator(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
                 target.request_zoom_animation(animated_zoom);
             }
             target.set_from(&view, ppp);
-            target.fit_pending = false;
+            target.clear_pending();
         }
     }
     crate::chrome_ui::zoom_alert(app, out.invalid_zoom);

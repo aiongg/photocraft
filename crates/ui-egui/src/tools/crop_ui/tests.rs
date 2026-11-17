@@ -386,7 +386,7 @@ fn board() -> PhotocraftApp {
     app.run("file.new", json!({"width": 400, "height": 300})).unwrap();
     app.sync_views();
     app.ui.views[0].zoom = 1.0;
-    app.ui.views[0].fit_pending = false;
+    app.ui.views[0].clear_pending();
     app.run("layer.new.layer", json!({"name": "target"})).unwrap();
     app.run("select.rect", json!({"x": 300, "y": 200, "width": 50, "height": 60})).unwrap();
     app.run("edit.fill", json!({"color": "#ff0000"})).unwrap();

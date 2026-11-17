@@ -25,7 +25,7 @@ fn whole_app(animated_zoom: bool) -> Harness<'static, PhotocraftApp> {
     h.ctx.all_styles_mut(|style| style.animation_time = egui::Style::default().animation_time);
     h.run_steps(6);
     let view = &mut h.state_mut().ui.views[0];
-    view.fit_pending = false;
+    view.clear_pending();
     view.zoom = 1.0;
     view.center = [100.0, 50.0];
     h.run_steps(4);

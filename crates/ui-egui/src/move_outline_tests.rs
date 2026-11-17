@@ -41,8 +41,7 @@ fn app() -> (PhotocraftApp, LayerId, LayerId) {
     app.ui.views = vec![View {
         zoom: 4.0,
         center: [32.0, 32.0],
-        fit_pending: false,
-        fill_pending: false,
+        pending: Vec::new(),
         doc_size: [64, 64],
         rotation: 0.0,
         zoom_animating: false,

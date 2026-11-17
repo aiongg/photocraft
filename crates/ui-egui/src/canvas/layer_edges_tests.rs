@@ -26,7 +26,7 @@ fn app(depth: u32) -> PhotocraftApp {
 fn assert_edges(app: &mut PhotocraftApp, ctx: &egui::Context, idx: usize, primary: bool, expected: DRect) {
     use craft::behavior::kurbo::Shape as _;
     let rect = Rect::from_min_size(Pos2::ZERO, vec2(600.0, 400.0));
-    let view = View { zoom: 0.75, center: [300.0, 200.0], doc_size: [600, 400], fit_pending: false, ..Default::default() };
+    let view = View { zoom: 0.75, center: [300.0, 200.0], doc_size: [600, 400], pending: Vec::new(), ..Default::default() };
     let mut output = ctx.run_ui(egui::RawInput { screen_rect: Some(rect), ..Default::default() }, |ui| {
         canvas_view(app, ui, super::document_display::CanvasHost::main(idx), rect, view.clone(), primary);
     });

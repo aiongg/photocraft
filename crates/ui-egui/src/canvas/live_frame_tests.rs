@@ -72,7 +72,7 @@ fn live_tools_paint_the_interpolated_camera_during_zoom_animation() {
         app.sync_views();
         app.ui.tool = tool;
         let v = &mut app.ui.views[0];
-        v.fit_pending = false;
+        v.clear_pending();
         v.zoom = 1.0;
         v.center = [32.0, 32.0];
         v.doc_size = [64, 64];

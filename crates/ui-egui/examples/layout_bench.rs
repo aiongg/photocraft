@@ -393,9 +393,9 @@ fn shots(h: &mut H, dir: &str, ppp: f32, [group, headline]: [LayerId; 2]) {
                 if view == "100" {
                     v.zoom = 1.0;
                     v.center = [(b.x0 + b.x1) as f32 / 2.0, (b.y0 + b.y1) as f32 / 2.0];
-                    v.fit_pending = false;
+                    v.clear_pending();
                 } else {
-                    v.fit_pending = true;
+                    v.place(craft::ui::canvas::ViewCommands::FitOnScreen);
                 }
             }
             settle(h, 6);

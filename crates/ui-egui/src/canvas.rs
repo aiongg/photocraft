@@ -5,7 +5,6 @@
 //! with direct GPU rendering behind the same `CanvasCache` interface.
 
 use craft::behavior::PressPhase;
-use craft::behavior::kurbo::Size;
 use egui::Rect;
 use photocraft_doc::Document;
 
@@ -143,9 +142,9 @@ pub fn mode_label(doc: &Document) -> &'static str {
     }
 }
 
-/// Per-frame reconciliation of the camera with its document: resize re-centre and pending fit/fill. Returns the pixel
-/// aspect the view is drawn with.
-fn sync_view_to_document(app: &PhotocraftApp, view: &mut View, doc: &Document, rect: Rect, ppp: f32) -> f32 {
+/// Per-frame reconciliation of the camera with its document: a resize re-centres it. Returns the pixel aspect the view
+/// is drawn with.
+fn sync_view_to_document(app: &PhotocraftApp, view: &mut View, doc: &Document) -> f32 {
     let size = [doc.size.width, doc.size.height];
     if view.doc_size != size {
         // Like Photoshop: keep the zoom level, re-centre the resized document.
@@ -155,24 +154,7 @@ fn sync_view_to_document(app: &PhotocraftApp, view: &mut View, doc: &Document, r
         view.doc_size = size;
     }
     // View › Pixel Aspect Ratio Correction: document pixels are shown this much wider.
-    let aspect = app.ui.view.display_aspect();
-    if (view.fit_pending || view.fill_pending) && rect.width() > 50.0 {
-        // The view lies inside the rulers' strips while they show (`Canvas::show_rulers`).
-        let rect =
-            if app.ui.extras.rulers { craft::ui::style::StyleCx::with_root(app.ctx(), |cx| craft::ui::canvas::Rulers::content_rect(cx, rect)) } else { rect };
-        let mut camera = view.canvas_view(rect, ppp, app.ui.view.flip_horizontal, aspect);
-        let document = Size::new(f64::from(size[0]), f64::from(size[1]));
-        // Fit wins over fill, as the fit cleared both flags.
-        if view.fit_pending {
-            craft::behavior::canvas::zoom::fit(&mut camera, document, ppp, 20.0);
-        } else {
-            craft::behavior::canvas::zoom::fill(&mut camera, document, ppp);
-        }
-        view.set_from(&camera, ppp);
-        view.fit_pending = false;
-        view.fill_pending = false;
-    }
-    aspect
+    app.ui.view.display_aspect()
 }
 
 /// Draws one document's canvas into `rect` and runs its tools. `host` names the canvas (document, viewport and document
@@ -189,8 +171,8 @@ pub fn canvas_view(
     let ctx = ui.ctx().clone();
     let idx = host.idx;
     // The primary canvas keeps its view in `app.ui.views`: the pass starts from the stored view and stores the one it
-    // ends with, unless something stored another view while the pass ran (a tool's commit asking for a fit), which then
-    // stands.
+    // ends with, unless something stored another view while the pass ran (a tool's commit that moved it), which then
+    // stands; view commands asked of it meanwhile are kept for the next pass.
     // A New Window for Document keeps a view of its own (`window_views`), which is not the document's.
     let own_window = host.window.is_some_and(|window| app.ui.window_views.contains_key(&window));
     let stored = (primary && !own_window).then(|| app.ui.views.get(idx).cloned()).flatten();
@@ -210,7 +192,7 @@ pub fn canvas_view(
         crate::monitor_status::check_window(app, &ctx);
     }
     let doc = app.session.documents()[idx].doc.clone();
-    let aspect = sync_view_to_document(app, &mut view, &doc, rect, ppp);
+    let aspect = sync_view_to_document(app, &mut view, &doc);
     let active = primary && app.session.active_index() == Some(idx);
     if active {
         // A document switched while a button is down ends the gesture of the document it began on.
@@ -233,9 +215,14 @@ pub fn canvas_view(
         crate::spring_tools::note_canvas_press(app);
     }
     if let Some(stored) = stored
-        && app.ui.views.get(idx) == Some(&stored)
+        && let Some(current) = app.ui.views.get(idx)
+        && let Some(asked) = current.pending.strip_prefix(&stored.pending[..])
+        && (View { pending: stored.pending.clone(), ..current.clone() }) == stored
     {
-        app.ui.views[idx] = view.clone();
+        // View commands asked while the pass ran (a canvas menu row) wait for the next pass.
+        let mut next = view.clone();
+        next.pending.extend_from_slice(asked);
+        app.ui.views[idx] = next;
     }
     (view, shown.output)
 }

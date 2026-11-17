@@ -254,7 +254,7 @@ mod tests {
             let v = &mut h.state_mut().ui.views[0];
             v.zoom = 1.0;
             v.center = [120.0, 40.0];
-            v.fit_pending = false;
+            v.clear_pending();
         }
         h.run_steps(2);
         // The document point (x, y) on screen, with the view at 100 % centred on (120, 40).

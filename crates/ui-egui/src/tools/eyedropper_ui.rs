@@ -86,7 +86,7 @@ mod tests {
         for v in &mut app.ui.views {
             v.zoom = 2.0;
             // The first pass would otherwise fit the document to the window.
-            v.fit_pending = false;
+            v.clear_pending();
         }
     }
 
@@ -97,7 +97,7 @@ mod tests {
         app.sync_views();
         for v in &mut app.ui.views {
             v.zoom = 1.0;
-            v.fit_pending = false;
+            v.clear_pending();
         }
         app.ui.tool_options.eyedropper.size = size(3);
         click(&mut app, 3.5, 3.5, egui::Modifiers::NONE);

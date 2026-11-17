@@ -41,8 +41,7 @@ fn cpu_canvas_background_benchmark() {
         let v = &mut h.state_mut().ui.views[0];
         v.zoom = 1.0;
         v.center = [3000.0, 2000.0];
-        v.fit_pending = false;
-        v.fill_pending = false;
+        v.clear_pending();
         for _ in 0..3 {
             h.step();
             h.render().unwrap();

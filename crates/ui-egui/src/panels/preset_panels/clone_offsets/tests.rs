@@ -150,8 +150,7 @@ fn clone_offset_readout_is_in_document_pixels_at_different_canvas_zooms() {
         let view = app.ui.views.first_mut().unwrap();
         view.zoom = zoom;
         view.center = [32.0, 32.0];
-        view.fit_pending = false;
-        view.fill_pending = false;
+        view.clear_pending();
         testing::frame(&mut app);
         let screen = testing::to_screen(&app, [40.0, 30.0]);
         let at = crate::canvas::document_display::doc_point_at(&app, screen).unwrap();

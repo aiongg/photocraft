@@ -48,7 +48,8 @@ fn gpu_zoom_animation_reuses_the_document_composite() {
         std::fs::create_dir_all(directory).unwrap();
     }
     h.state_mut().run("view.zoomIn", json!({})).unwrap();
-    let target = h.state().current_zoom();
+    // The canvas runs the command in its next pass: the zoom it asks for is the rung after 100 %.
+    let target = craft::behavior::canvas::ZoomLadder::step(1.0, 1, craft::behavior::kurbo::Size::new(400.0, 300.0)) as f32;
     // The ease's length belongs to the framework's motion settings, so the steps are short and the test looks for a
     // frame between the start and the target zoom rather than naming a time for it.
     let mut midway = false;

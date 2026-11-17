@@ -295,7 +295,7 @@ fn a_huge_display_grows_the_blocks() {
 /// The main canvas's view of the 16×8 document at 10 device pixels per pixel.
 fn main_view(app: &mut PhotocraftApp) -> crate::state::View {
     app.sync_views();
-    crate::state::View { zoom: 10.0, center: [8.0, 4.0], fit_pending: false, fill_pending: false, ..app.ui.views[0].clone() }
+    crate::state::View { zoom: 10.0, center: [8.0, 4.0], pending: Vec::new(), ..app.ui.views[0].clone() }
 }
 
 /// The shapes of one 160×80 canvas frame of document 0 in `view`.

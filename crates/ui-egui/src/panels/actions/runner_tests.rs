@@ -3,6 +3,7 @@ use super::*;
 use craft::automation::actions::{ActionList, ActionStep};
 use craft::automation::ui::actions::{ActionSelection, ActionsEvent, ActionsHost};
 use craft::text::ui::spelling::CheckSpellingDialog;
+use craft::ui::canvas::{ViewCommands, ViewRequest};
 use craft::ui::dialog::DialogId;
 
 use super::host::PhotoActions;
@@ -414,7 +415,7 @@ fn nested_shell_actions_include_view_steps_and_propagate_failures() {
     app.run("view.actualPixels", json!({})).unwrap();
     let r = app.run("actions.play", json!({"action":"Parent"})).unwrap();
     assert!(r.get("failed").is_none(), "{r}");
-    assert!(app.ui.views[0].fit_pending);
+    assert_eq!(app.ui.views[0].pending.last(), Some(&ViewRequest::Command(ViewCommands::FitOnScreen)), "the nested Fit on Screen is asked of the canvas");
     app.session.authorize =
         Some(|id, _| if id == "view.fitOnScreen" { Err(photocraft_engine::EngineError::Other("denied nested view".into())) } else { Ok(()) });
     let r = app.run("actions.play", json!({"action":"Parent"})).unwrap();
@@ -459,6 +460,28 @@ fn nested_shell_actions_include_view_steps_and_propagate_failures() {
     }
 }
 
+/// A played action's view steps are asked of the active document's canvas when they play, in order: after a step that
+/// opens a document they act on that document, and an action recorded around the playback records only the call.
+#[test]
+fn played_view_steps_act_on_the_document_the_steps_before_them_opened() {
+    let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
+    app.run("file.new", json!({"width": 40, "height": 40})).unwrap();
+    app.sync_views();
+    app.ui.views[0].clear_pending();
+    let steps = [("file.new", json!({"width": 80, "height": 60})), ("view.zoomIn", json!({})), ("view.zoomIn", json!({})), ("view.fitOnScreen", json!({}))];
+    add_action(&mut app, new_action("Open and fit", steps.iter().map(|(id, p)| (id.to_string(), p.clone())).collect()));
+    app.run("actions.record", json!({"name": "Around"})).unwrap();
+    let r = app.run("actions.play", json!({"action": "Open and fit"})).unwrap();
+    assert!(r.get("failed").is_none(), "{r}");
+    app.run("actions.stop", json!({})).unwrap();
+    let opened = app.session.active_index().unwrap();
+    assert_ne!(opened, 0);
+    assert!(app.ui.views[opened].pending.ends_with(&[ViewCommands::ZoomIn, ViewCommands::ZoomIn, ViewCommands::FitOnScreen].map(ViewRequest::Command)));
+    assert!(app.ui.views[0].pending.is_empty(), "the document open before is left alone");
+    let around = app.session.actions.list.actions().iter().position(|a| a.name == "Around").unwrap();
+    assert_eq!(commands(&app, around), ["actions.play"], "the view steps are not recorded a second time");
+}
+
 #[test]
 fn view_menu_commands_record_append_and_replay_after_resize() {
     let mut app = PhotocraftApp::new(photocraft_engine::Session::new(), crate::Services::default());
@@ -483,18 +506,18 @@ fn view_menu_commands_record_append_and_replay_after_resize() {
     assert_eq!(result["ran"], 2);
     assert!(result.get("failed").is_none(), "{result}");
     let idx = app.session.active_index().unwrap();
-    assert!(app.ui.views[idx].fit_pending);
-    // The canvas's own per-frame fit: a 100 x 100 canvas with a 20 point margin.
-    let doc = &app.session.active().unwrap().doc;
-    let size = craft::behavior::kurbo::Size::new(f64::from(doc.size.width), f64::from(doc.size.height));
+    assert_eq!(app.ui.views[idx].pending.last(), Some(&ViewRequest::Command(ViewCommands::FitOnScreen)));
+    // The commands asked, as the canvas runs them on a 100 x 100 canvas: the fit leaves its margin around the resized
+    // document.
+    let target = crate::canvas::view_target(&app, idx);
     let rect = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(100.0, 100.0));
     let mut camera = app.ui.views[idx].canvas_view(rect, 1.0, false, 1.0);
-    craft::behavior::canvas::zoom::fit(&mut camera, size, 1.0, 20.0);
+    for request in &app.ui.views[idx].pending {
+        request.command().apply(&mut camera, &target, None, 1.0);
+    }
     app.ui.views[idx].set_from(&camera, 1.0);
-    app.ui.views[idx].fit_pending = false;
     assert_eq!(app.ui.views[idx].zoom, 0.75);
     assert_eq!(app.ui.views[idx].center, [40.0, 30.0]);
-    assert!(!app.ui.views[idx].fit_pending);
 }
 
 #[test]
@@ -517,7 +540,7 @@ fn view_action_failure_resume_and_authorization() {
     assert!(result["failed"]["error"].as_str().unwrap().contains("denied view"));
     let result = app.run("actions.play", json!({"action": 0, "from": 1})).unwrap();
     assert_eq!(result["ran"], 1);
-    assert!(!app.ui.views[0].fit_pending);
+    assert_eq!(app.ui.views[0].pending.last(), Some(&ViewRequest::Command(ViewCommands::ActualPixels)), "played from step 1: no fit after 100%");
     assert!(app.run("actions.play", json!({"action": 0, "from": -1})).is_err());
     app.session.actions.playing = 1;
     assert!(app.run("actions.play", json!({"action": 0})).is_err());

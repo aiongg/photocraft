@@ -118,7 +118,8 @@ fn color_picker_samples_the_image_under_its_pipette() {
     h.state_mut().run("shape.create", json!({"kind": "rect", "rect": [200, 0, 200, 300], "fill": "#00ff00"})).unwrap();
     // 400 %: the image covers the whole canvas, red on the left of the dialog, green on its right.
     let v = &mut h.state_mut().ui.views[0];
-    (v.zoom, v.center, v.fit_pending) = (4.0, [200.0, 150.0], false);
+    (v.zoom, v.center) = (4.0, [200.0, 150.0]);
+    v.clear_pending();
     crate::color_picker_ui::open(h.state_mut(), "foreground");
     h.run_steps(3);
     let r = h.state().last_canvas_rect;
@@ -183,7 +184,8 @@ fn curves_picker_samples_document_coordinates_through_the_view_transform() {
     let committed = h.state().session.active().unwrap().doc.clone();
     let history = h.state().session.active().unwrap().history.past_len();
     let view = &mut h.state_mut().ui.views[0];
-    (view.zoom, view.center, view.fit_pending) = (4.0, [200.0, 150.0], false);
+    (view.zoom, view.center) = (4.0, [200.0, 150.0]);
+    view.clear_pending();
     h.state_mut().ui.view.flip_horizontal = true;
     let dialog = crate::adjust_dialog::open(h.state_mut(), "image.adjustments.curves").unwrap();
     // Arms the black-point eyedropper, as its button in the dialog does.
@@ -250,7 +252,8 @@ fn the_wheel_reaches_12800_percent_and_stops_dead_there() {
     let mut h = app_window();
     {
         let v = &mut h.state_mut().ui.views[0];
-        (v.zoom, v.center, v.fit_pending) = (40.0, [200.0, 150.0], false);
+        (v.zoom, v.center) = (40.0, [200.0, 150.0]);
+        v.clear_pending();
     }
     h.run_steps(4);
     assert_eq!(zoom(&h), 40.0, "4000 % holds: no zoom control clamps it back");
@@ -293,7 +296,8 @@ fn the_first_animated_notch_back_from_the_limit_zooms_out() {
     let mut h = harness();
     {
         let v = &mut h.state_mut().ui.views[0];
-        (v.zoom, v.fit_pending) = (max_zoom() / 1.05, false);
+        v.zoom = max_zoom() / 1.05;
+        v.clear_pending();
     }
     let r = h.state().last_canvas_rect;
     h.hover_at(r.center());

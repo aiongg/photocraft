@@ -267,7 +267,11 @@ fn done_fits_the_cropped_document() {
     assert!((zoom(&h) - 1.0).abs() < 1e-4, "Done fits the cropped document: zoom {}", zoom(&h));
     let app = h.state();
     let v = app.session.active_index().and_then(|i| app.ui.views.get(i)).expect("a view");
-    assert!(!v.fit_pending && (v.center[0] - 110.0).abs() < 0.5 && (v.center[1] - 85.0).abs() < 0.5, "fitted and centred: {:?}", v.center);
+    assert!(
+        !v.asks(craft::ui::canvas::ViewCommands::FitOnScreen) && (v.center[0] - 110.0).abs() < 0.5 && (v.center[1] - 85.0).abs() < 0.5,
+        "fitted and centred: {:?}",
+        v.center
+    );
 }
 
 #[test]

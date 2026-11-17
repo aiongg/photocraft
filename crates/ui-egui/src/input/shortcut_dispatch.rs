@@ -97,9 +97,10 @@ impl Bridged {
 }
 
 /// PhotoCraft's commands the craft runtime carries out, with the framework command each one is. Their
-/// keys reach the runtime as keymap overrides ([`overrides`]), the menus fire them through
-/// [`fire_bridged`], and the action recorder records what a canvas ran, whoever fired it
-/// ([`record_view_commands`]). Actions and automation run PhotoCraft's own (`run_view`). They are not rows of
+/// keys reach the runtime as keymap overrides ([`overrides`]) and the menu bar's rows fire them. App code (the menus
+/// PhotoCraft runs, action steps, automation) asks the active document's canvas for a view row's command
+/// (`actions::runner::run_view`), which journals it; the other rows it fires through [`fire_bridged`]. The action
+/// recorder records the view commands a canvas ran from the runtime ([`record_view_commands`]). They are not rows of
 /// [`catalog`]: the runtime defines them.
 pub(crate) const RUNTIME_COMMANDS: &[(&str, Bridged)] = &[
     ("window.togglePanels", Bridged::Chrome(ChromeCommand::TogglePanels)),
@@ -157,7 +158,15 @@ pub(crate) fn is_bridged(id: &str) -> bool {
 
 /// Whether `id` is a view row of [`RUNTIME_COMMANDS`]: a command the document canvas runs on its view.
 pub(crate) fn is_view_command(id: &str) -> bool {
-    RUNTIME_COMMANDS.iter().any(|(row, bridged)| *row == id && matches!(bridged, Bridged::View(_)))
+    view_command(id).is_some()
+}
+
+/// The canvas's view command a view row `id` of [`RUNTIME_COMMANDS`] is.
+pub(crate) fn view_command(id: &str) -> Option<ViewCommands> {
+    RUNTIME_COMMANDS.iter().find_map(|(row, bridged)| match bridged {
+        Bridged::View(command) if *row == id => Some(*command),
+        _ => None,
+    })
 }
 
 /// Whether `id` is a screen-mode row of [`RUNTIME_COMMANDS`]: a command the window's shell runs.
@@ -502,8 +511,9 @@ pub(crate) fn fire_bridged(ctx: &egui::Context, id: &str) -> Option<bool> {
     Some(craft::ui::runtime::commands::fire(ctx, bridged.command(), FireSource::Menu))
 }
 
-/// Records each view row of [`RUNTIME_COMMANDS`] a canvas ran since the last frame, by its chord or its menu row, as
-/// PhotoCraft's view command: an action being recorded gets `view.fitOnScreen` for ⌘0 and for the menu item alike.
+/// Records each view row of [`RUNTIME_COMMANDS`] a canvas ran from the runtime since the last frame, by its chord or its
+/// menu-bar row, as PhotoCraft's view command: an action being recorded gets `view.fitOnScreen` for ⌘0 and for the menu
+/// item alike. The ones app code asked for (`run_view`) never reach the runtime and are journaled when asked.
 /// The screen-mode rows the shell ran go to the shortcut log only.
 pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
     for fired in std::mem::take(&mut app.framework.delivered) {

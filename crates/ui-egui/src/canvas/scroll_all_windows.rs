@@ -48,8 +48,7 @@ pub fn follow(app: &mut PhotocraftApp, source: Source, pan: ViewPan) {
         if c[0].is_finite() && c[1].is_finite() {
             v.zoom_animating = false;
             v.zoom_anchor = None;
-            v.fit_pending = false;
-            v.fill_pending = false;
+            v.clear_pending();
             v.center = c;
         }
     };
@@ -108,7 +107,7 @@ mod tests {
     use super::*;
 
     fn view(zoom: f32, center: [f32; 2], rotation: f32) -> View {
-        View { zoom, center, rotation, fit_pending: false, fill_pending: false, ..View::default() }
+        View { zoom, center, rotation, pending: Vec::new(), ..View::default() }
     }
 
     /// Where a view is stored: a document's view, or a New Window's own.
