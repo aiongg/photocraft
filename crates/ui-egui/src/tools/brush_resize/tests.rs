@@ -77,6 +77,7 @@ fn drive(app: &mut PhotocraftApp, button: PointerButton, from: [f64; 2], to: [f6
         testing::release(app, to, m);
         return;
     }
+    testing::shown(app);
     let host = WindowHost::of(&testing::ctx(app));
     let pos = testing::to_screen(app, from);
     host.inject_click(egui::ViewportId::ROOT, pos, button, 1, mods_of(m), true);

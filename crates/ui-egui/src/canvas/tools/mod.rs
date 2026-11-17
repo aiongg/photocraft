@@ -183,7 +183,8 @@ pub(crate) enum Family {
     Retouch,
 }
 
-/// The family `tool` belongs to. Clone Stamp and Healing are painting tools whose Alt press is the retouch source pick.
+/// The family `tool` belongs to. Clone Stamp and Healing are painting tools whose Alt press is the retouch source pick;
+/// Quick Selection paints its selection with a brush stroke, as they paint pixels.
 pub(crate) fn family(tool: Tool) -> Family {
     match tool {
         Tool::RectMarquee
@@ -193,8 +194,7 @@ pub(crate) fn family(tool: Tool) -> Family {
         | Tool::Lasso
         | Tool::PolygonLasso
         | Tool::MagneticLasso
-        | Tool::MagicWand
-        | Tool::QuickSelection => Family::Selection,
+        | Tool::MagicWand => Family::Selection,
         Tool::Move => Family::Move,
         Tool::Hand => Family::Hand,
         Tool::Zoom => Family::Zoom,

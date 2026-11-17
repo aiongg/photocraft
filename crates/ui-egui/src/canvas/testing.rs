@@ -174,7 +174,7 @@ pub(crate) fn to_screen(app: &PhotocraftApp, at: [f64; 2]) -> Pos2 {
 /// Runs frames until the canvas's view holds still, so an input maps through the layout the next pass shows: the first
 /// passes lay the window out (the document area is resized once the chrome has its room), and an input mapped through
 /// an earlier pass's view would land on the later layout.
-fn shown(app: &mut PhotocraftApp) {
+pub(crate) fn shown(app: &mut PhotocraftApp) {
     let mut last = view(app).map(|v| v.rect);
     for _ in 0..MAX_FRAMES {
         run_frame(app);
