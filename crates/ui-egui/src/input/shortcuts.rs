@@ -354,12 +354,9 @@ fn handle_escape_and_view_keys(app: &mut PhotocraftApp, ctx: &egui::Context) {
         return;
     }
     // Both full screen modes (with and without the menu bar) return to Standard, as in Photoshop
-    // (#4116), through the menu command so the window and the Screen Mode check follow.
+    // (#4116). The shell brings the window to the mode it binds, and the Screen Mode check follows it.
     if !esc_taken && app.ui.view.screen_mode != craft::ui::shell::ScreenMode::Standard && crate::window_keys::take_escape(ctx) {
-        if let Err(e) = crate::menus::invoke(app, ctx, "view.screenMode.standard", json!({})) {
-            app.ui.status = e;
-            app.ui.status_error = true;
-        }
+        app.ui.view.screen_mode = craft::ui::shell::ScreenMode::Standard;
         return;
     }
     if !esc_taken && app.session.active().is_some_and(|st| st.doc.selection.is_some()) && crate::window_keys::take_escape(ctx) {

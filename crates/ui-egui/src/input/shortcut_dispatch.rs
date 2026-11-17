@@ -20,6 +20,7 @@ use craft::ui::docking::WorkspaceCommands;
 use craft::ui::rails::{LastUsed, RailTool};
 use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, CommandSet, EditCommands, FirePhase, FireSource, Fired};
 use craft::ui::runtime::frame::ChromeToggle;
+use craft::ui::shell::ScreenModeCommands;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -75,6 +76,8 @@ pub(crate) enum Bridged {
     Swatches(SwatchesCommand),
     /// A Window › Workspace command under its framework id; the shell runs it ([`crate::workspace_ui::run_fired`]).
     Workspace(WorkspaceCommands),
+    /// A View › Screen Mode command: the window's shell takes it and writes `ui.view.screen_mode`, which it binds.
+    ScreenMode(ScreenModeCommands),
 }
 
 impl Bridged {
@@ -88,6 +91,7 @@ impl Bridged {
             Bridged::Stack(command) => CommandRef::from(command),
             Bridged::Swatches(command) => CommandRef::from(command),
             Bridged::Workspace(command) => CommandRef::from(command),
+            Bridged::ScreenMode(command) => CommandRef::from(command),
         }
     }
 }
@@ -134,6 +138,11 @@ pub(crate) const RUNTIME_COMMANDS: &[(&str, Bridged)] = &[
     ("layer.arrange.sendBackward", Bridged::Stack(LayersPanelCommands::MoveDown)),
     ("layer.arrange.bringToFront", Bridged::Stack(LayersPanelCommands::MoveToTop)),
     ("layer.arrange.sendToBack", Bridged::Stack(LayersPanelCommands::MoveToBottom)),
+    ("view.screenMode.standard", Bridged::ScreenMode(ScreenModeCommands::Standard)),
+    ("view.screenMode.fullScreenWithMenuBar", Bridged::ScreenMode(ScreenModeCommands::FullScreenWithMenuBar)),
+    ("view.screenMode.fullScreen", Bridged::ScreenMode(ScreenModeCommands::FullScreen)),
+    ("view.screenMode.cycle", Bridged::ScreenMode(ScreenModeCommands::Cycle)),
+    ("view.screenMode.cycleBack", Bridged::ScreenMode(ScreenModeCommands::CycleBack)),
 ];
 
 /// The PhotoCraft id and bridge row of a framework command, if a row bridges it.
@@ -149,6 +158,17 @@ pub(crate) fn is_bridged(id: &str) -> bool {
 /// Whether `id` is a view row of [`RUNTIME_COMMANDS`]: a command the document canvas runs on its view.
 pub(crate) fn is_view_command(id: &str) -> bool {
     RUNTIME_COMMANDS.iter().any(|(row, bridged)| *row == id && matches!(bridged, Bridged::View(_)))
+}
+
+/// Whether `id` is a screen-mode row of [`RUNTIME_COMMANDS`]: a command the window's shell runs.
+pub(crate) fn is_screen_mode(id: &str) -> bool {
+    RUNTIME_COMMANDS.iter().any(|(row, bridged)| *row == id && matches!(bridged, Bridged::ScreenMode(_)))
+}
+
+/// The PhotoCraft row of a screen-mode command of the shell: the command gate judges the framework command as the
+/// menus judge that row.
+pub(crate) fn screen_mode_row(command: &CommandRef) -> Option<&'static str> {
+    bridge_of(command).filter(|(_, bridged)| matches!(bridged, Bridged::ScreenMode(_))).map(|(id, _)| id)
 }
 
 /// The id of the command that steps a tool group to its next tool: the group is named by its key.
@@ -484,11 +504,16 @@ pub(crate) fn fire_bridged(ctx: &egui::Context, id: &str) -> Option<bool> {
 
 /// Records each view row of [`RUNTIME_COMMANDS`] a canvas ran since the last frame, by its chord or its menu row, as
 /// PhotoCraft's view command: an action being recorded gets `view.fitOnScreen` for ⌘0 and for the menu item alike.
+/// The screen-mode rows the shell ran go to the shortcut log only.
 pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
     for fired in std::mem::take(&mut app.framework.delivered) {
-        if let Some((id, Bridged::View(_))) = bridge_of(&fired.command) {
-            crate::panels::actions::journal_view(app, id, json!({}));
-            record(&app.ctx(), id, Outcome::Ran);
+        match bridge_of(&fired.command) {
+            Some((id, Bridged::View(_))) => {
+                crate::panels::actions::journal_view(app, id, json!({}));
+                record(&app.ctx(), id, Outcome::Ran);
+            }
+            Some((id, Bridged::ScreenMode(_))) if fired.phase == FirePhase::Press => record(&app.ctx(), id, Outcome::Ran),
+            _ => {}
         }
     }
 }
@@ -612,15 +637,6 @@ fn pick_tool(app: &mut PhotocraftApp, letter: char, step: PickStep, plain: bool,
 /// through [`dispatch_as`].
 fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
     let id = f.command.id.as_str();
-    // Space+F (⇧Space+F backwards) cycles the pasteboard colour, as in Photoshop: F while the Hand key is held,
-    // in place of F's own Cycle Screen Mode.
-    // PLAN: `hold_keys::reposition_held(app)` without the context is top-w26's, assumed.
-    if matches!(id, "view.screenMode.cycle" | "view.screenMode.cycleBack") && crate::hold_keys::reposition_held(app) && app.ui.text_edit.is_none() {
-        if let Err(e) = crate::canvas_tool_menu::cycle_canvas_color(app, id == "view.screenMode.cycleBack") {
-            app.ui.status = e;
-        }
-        return;
-    }
     // The Magnetic Lasso's bracket keys step its detection width, not the brush (#11688), until an outline is open.
     if app.ui.tool == Tool::MagneticLasso && !app.canvas_tools.selection.outline_open() {
         let step = match id {

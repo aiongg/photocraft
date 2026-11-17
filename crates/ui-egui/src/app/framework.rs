@@ -515,6 +515,8 @@ pub(crate) const COMMAND_SOURCES: &[CommandSource] = &[
     CommandSource { states: crate::slice_ui::command_states, run: crate::slice_ui::run_fired },
     CommandSource { states: crate::align_bar::command_states, run: crate::align_bar::run_fired },
     CommandSource { states: crate::artboard_tool::command_states, run: crate::artboard_tool::run_fired },
+    // Space+F: the pasteboard colour keys of the held Hand.
+    CommandSource { states: |_| Vec::new(), run: crate::canvas_tool_menu::run_canvas_color },
     // The options bar's engine-command buttons: their commands run through `shortcuts::handle`.
     CommandSource { states: crate::panels::options_bar::selection::command_states, run: |_, _, _| false },
 ];

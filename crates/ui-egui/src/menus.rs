@@ -45,16 +45,40 @@ pub(crate) fn menu_gate(app: &PhotocraftApp) -> (Gate, ModalRules) {
 }
 
 /// The runtime's gate over commands. Only PhotoCraft's catalogue commands are gated here: framework
-/// command sets and dialog-scoped commands pass, and the runtime's own modal rule decides them.
+/// command sets and dialog-scoped commands pass, and the runtime's own modal rule decides them. The shell's
+/// screen-mode commands are judged as their View › Screen Mode rows, and the rows' own rules
+/// ([`refused`]) apply to them: their keys and menu items are one command.
 pub(crate) fn command_gate(app: &PhotocraftApp) -> CommandGate {
     let (gate, rules) = menu_gate(app);
-    CommandGate::new(move |c| !is_live(&c.id) || gate.allows_under(&rules, c))
+    let refused = refused(app);
+    CommandGate::new(move |c| gated(&gate, &rules, &refused, c))
 }
 
 /// [`command_gate`]'s test for one command, for callers that hold no gate.
 pub(crate) fn allows(app: &PhotocraftApp, command: &CommandRef) -> bool {
     let (gate, rules) = menu_gate(app);
-    !is_live(&command.id) || gate.allows_under(&rules, command)
+    gated(&gate, &rules, &refused(app), command)
+}
+
+fn gated(gate: &Gate, rules: &ModalRules, refused: &[CommandRef], command: &CommandRef) -> bool {
+    if refused.contains(command) {
+        return false;
+    }
+    let row = crate::shortcut_dispatch::screen_mode_row(command).map(CommandRef::new);
+    let command = row.as_ref().unwrap_or(command);
+    !is_live(&command.id) || gate.allows_under(rules, command)
+}
+
+/// The framework commands PhotoCraft's state turns off now: the shell's screen modes its View › Screen Mode rows
+/// grey (no full screen without a document, #9349; none while type is edited), and the canvas colour keys of the
+/// held Hand while type is edited.
+fn refused(app: &PhotocraftApp) -> Vec<CommandRef> {
+    let screen_modes = crate::shortcut_dispatch::RUNTIME_COMMANDS
+        .iter()
+        .filter(|(id, _)| crate::shortcut_dispatch::is_screen_mode(id) && crate::view_cmds::is_enabled(app, id) == Some(false))
+        .map(|(_, bridged)| bridged.command());
+    let colors = crate::canvas_tool_menu::CanvasColorCommands::ALL.into_iter().filter(|_| app.ui.text_edit.is_some()).map(CommandRef::from);
+    screen_modes.chain(colors).collect()
 }
 
 /// Top-level menus in Photoshop order.
