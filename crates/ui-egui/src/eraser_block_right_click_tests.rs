@@ -45,7 +45,7 @@ fn right_click(mode: &str, shift: bool, erase_preference: bool) -> Outcome {
     } else {
         // An erase is a `paint.stroke` command whose parameters carry `erase: true`.
         let erased = app.session.journal[journal..].iter().any(|(id, p)| id == "paint.stroke" && p["erase"] == json!(true));
-        assert!(erased, "a right-click that opened nothing erases");
+        assert!(erased, "a right-click that opened nothing erases: {mode}, shift {shift}, erase preference {erase_preference}");
         Outcome::Erase
     }
 }
