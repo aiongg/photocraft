@@ -156,8 +156,16 @@ fn put_focus(h: &mut Harness<'_, PhotocraftApp>, place: Place) {
         Place::FocusedWidget => {
             h.get_by_role_and_label(Role::TreeItem, "paint").scroll_to_me();
             h.run_steps(4);
+            eprintln!("DIAG every_displayed_shortcut_dispatches_from_where_focus_usually_is: row before focus {:?}", h.get_by_role_and_label(Role::TreeItem, "paint"));
             h.get_by_role_and_label(Role::TreeItem, "paint").focus();
             h.run_steps(2);
+            eprintln!(
+                "DIAG every_displayed_shortcut_dispatches_from_where_focus_usually_is: focused {:?} typing {} egui focus {:?} row after {:?}",
+                focus::focused_rec(&h.ctx).map(|rec| format!("{rec:?}")),
+                WindowHost::of(&h.ctx).typing(),
+                h.ctx.memory(|m| m.focused()),
+                h.get_by_role_and_label(Role::TreeItem, "paint")
+            );
             assert!(focus::focused_rec(&h.ctx).is_some() && !WindowHost::of(&h.ctx).typing(), "a widget is focused");
         }
     }
