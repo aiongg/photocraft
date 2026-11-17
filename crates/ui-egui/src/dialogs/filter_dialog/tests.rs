@@ -1,7 +1,7 @@
 use craft::ui::dialog::DialogId;
 use craft::ui::patterns::form_dialogs::{DialogFields, HostedParamDialog, Param, ParamKind};
 use egui_kittest::Harness;
-use egui_kittest::kittest::{NodeT, Queryable};
+use egui_kittest::kittest::Queryable;
 
 use super::*;
 
@@ -1211,9 +1211,9 @@ fn proxy_previews_never_clamp_pixel_sized_params() {
             if min <= 0.0 || !is_pixel_param_of(c.id, &p.key) {
                 continue;
             }
-            for v in [f64::from(min), f64::from(default), f64::from(min) * 2.5] {
+            for v in [min, default, min * 2.5] {
                 let k = preview_factor(c.id, &json!({ p.key.clone(): v }), 4);
-                assert!(v / f64::from(k) >= f64::from(min) - 1e-9, "{} {}={v}: k={k} clamps to {min}", c.id, p.key);
+                assert!(v / f64::from(k) >= min - 1e-9, "{} {}={v}: k={k} clamps to {min}", c.id, p.key);
             }
         }
     }

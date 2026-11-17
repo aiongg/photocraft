@@ -187,7 +187,7 @@ fn mixer_drag_shows_actual_mixed_paint_before_release_and_alt_never_paints() {
     tool_event(&mut app, ToolEvent::Down { x: 30.0, y: 30.0, pressure: 1.0 }, alt);
     tool_event(&mut app, ToolEvent::Move { x: 35.0, y: 30.0, pressure: 1.0 }, M);
     tool_event(&mut app, ToolEvent::Up { x: 35.0, y: 30.0 }, M);
-    assert!(!testing::in_gesture(&mut app));
+    assert!(!testing::in_gesture(&app));
     assert!(app.session.tools.mixer.spatial.is_some());
     assert!(std::sync::Arc::ptr_eq(&before, &app.session.active().unwrap().doc));
     app.run("brush.mixer.load", json!({})).unwrap();
@@ -274,7 +274,7 @@ fn mixer_cancel_without_an_edit() {
             testing::frame(&mut app);
         }
         tool_event(&mut app, ToolEvent::Up { x: 30.0, y: 30.0 }, M);
-        assert!(!testing::in_gesture(&mut app) && app.live_stroke.is_none(), "mode {mode}");
+        assert!(!testing::in_gesture(&app) && app.live_stroke.is_none(), "mode {mode}");
         assert!(std::sync::Arc::ptr_eq(&before, &app.session.active().unwrap().doc), "mode {mode}");
         assert_eq!(app.session.active().unwrap().history.past_len(), steps, "mode {mode}");
         assert!(!app.session.journal.iter().any(|(id, _)| id == "paint.mixerBrush"), "mode {mode}");
@@ -326,7 +326,7 @@ fn mixer_drag_above_the_preview_size_paints_on_release() {
         let steps = app.session.active().unwrap().history.past_len();
         tool_event(&mut app, ToolEvent::Down { x: 20.0, y: 30.0, pressure: 1.0 }, M);
         assert!(app.live_stroke.is_none(), "no live preview above 1024 px");
-        assert_eq!(testing::in_gesture(&mut app), !locked, "a valid 2000 px stroke is kept for release");
+        assert_eq!(testing::in_gesture(&app), !locked, "a valid 2000 px stroke is kept for release");
         assert_eq!(app.ui.status_error, locked, "{}", app.ui.status);
         tool_event(&mut app, ToolEvent::Move { x: 50.0, y: 30.0, pressure: 1.0 }, M);
         tool_event(&mut app, ToolEvent::Up { x: 50.0, y: 30.0 }, M);
@@ -495,7 +495,7 @@ fn painting_a_group_is_refused_at_the_press_with_a_message() {
             _ => format!("Could not use the {} because the target layer is a group.", tool.label()),
         };
         assert_eq!(errors(&app)[seen..], [want], "{tool:?}");
-        assert!(!testing::in_gesture(&mut app) && app.live_stroke.is_none(), "{tool:?} starts no stroke");
+        assert!(!testing::in_gesture(&app) && app.live_stroke.is_none(), "{tool:?} starts no stroke");
         // The alert is modal: the next tool's press reaches the canvas once it is answered.
         let ctx = testing::ctx(&app);
         for id in app.framework.dialogs.open_dialogs().into_iter().map(|d| d.id).collect::<Vec<_>>() {
@@ -531,7 +531,7 @@ fn painting_a_group_is_refused_at_the_press_with_a_message() {
     let seen = errors(&app).len();
     tool_event(&mut app, ToolEvent::Down { x: 10.0, y: 10.0, pressure: 1.0 }, M);
     assert_eq!(errors(&app).len(), seen, "the mask is paintable");
-    assert!(testing::in_gesture(&mut app), "the stroke starts on the mask");
+    assert!(testing::in_gesture(&app), "the stroke starts on the mask");
     tool_event(&mut app, ToolEvent::Move { x: 20.0, y: 10.0, pressure: 1.0 }, M);
     tool_event(&mut app, ToolEvent::Up { x: 20.0, y: 10.0 }, M);
     assert_ne!(mask_at(&app, 15), before, "the stroke painted the group's mask");

@@ -408,8 +408,7 @@ mod tests {
         app.framework.dialogs.set_json_field(&ctx, dialog, "radius", json!(6.0)).unwrap();
 
         crate::canvas::ensure_filter_preview(&mut app, 0, &ctx).expect("a preview");
-        // The target builder takes the app mutably, so it runs before the preview is borrowed.
-        let captured = crate::smart_filter_dialog::target(&mut app, LayerId(id), 0).unwrap();
+        let captured = crate::smart_filter_dialog::target(&app, LayerId(id), 0).unwrap();
         let preview = app.filter_preview.as_ref().unwrap();
         assert_eq!(preview.key.command, "layer.smartFilter.setParams");
         // The dialog's own preview window matches it to the dialog by that command.

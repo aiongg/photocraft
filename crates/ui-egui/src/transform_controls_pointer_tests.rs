@@ -36,7 +36,7 @@ fn fixture() -> (PhotocraftApp, egui::Context, [LayerId; 2]) {
     app.ui.tool_options.move_auto_select = false;
     app.ui.extras.snap = false;
     app.ui.view.show.smart_guides = false;
-    let ctx = crate::canvas::testing::ctx(&mut app);
+    let ctx = crate::canvas::testing::ctx(&app);
     accepted(&mut app, "ui.set", json!({"tool": "Move", "moveShowTransform": true, "zoom": 1.0, "center": [500, 350]}));
     (app, ctx, [layers[0], layers[1]])
 }
@@ -347,7 +347,7 @@ fn move_pointer_still_reaches_the_liquify_workspace() {
     app.run("file.new", json!({"width": 120, "height": 80, "depth": 8})).unwrap();
     app.run("layer.new.layer", json!({})).unwrap();
     app.sync_views();
-    let ctx = crate::canvas::testing::ctx(&mut app);
+    let ctx = crate::canvas::testing::ctx(&app);
     accepted(&mut app, "ui.set", json!({"tool": "Move", "moveShowTransform": true}));
     crate::menus::invoke(&mut app, &ctx, "filter.liquify", json!({})).unwrap();
     let before = app.session.active().unwrap().doc.clone();

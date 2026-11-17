@@ -92,7 +92,7 @@ fn shift_right_brush_does_not_open_presets_or_paint() {
     );
     let ctx = app.ctx().clone();
     assert!(inspect(&app, &ctx)["brushPicker"].is_null(), "Shift+right opens Mode, not Brush Presets");
-    assert!(!crate::canvas::testing::in_gesture(&mut app));
+    assert!(!crate::canvas::testing::in_gesture(&app));
     assert!(app.session.journal.iter().skip(before).all(|(id, _)| id != "paint.stroke"), "no stroke is painted");
     assert_eq!(app.session.journal.len(), before, "opening a menu does not paint or journal");
 }

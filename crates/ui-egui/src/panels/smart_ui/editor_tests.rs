@@ -467,7 +467,7 @@ fn rabbit_invalid_whole_curves_alias_does_not_turn_neutral() {
             let (mut app, layer) = app(8, mode);
             app.run("image.adjustments.curves", json!({"points":[[0,255],[255,0]]})).unwrap();
             let before = app.session.active().unwrap().doc.clone();
-            let target = crate::smart_filter_dialog::target(&mut app, layer, 2).unwrap();
+            let target = crate::smart_filter_dialog::target(&app, layer, 2).unwrap();
             assert!(crate::adjust_dialog::open_smart_filter(&mut app, "image.adjustments.curves", &bad, target).is_some());
             assert!(fields(&app).get("points").is_none(), "invalid aliases cannot be hidden by defaults");
             let idx = app.session.active_index().unwrap();
