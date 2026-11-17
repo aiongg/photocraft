@@ -1514,7 +1514,9 @@ fn export_as_is_recorded_and_replayed() {
     assert_eq!(*exported.borrow(), [("/pics/out.jpg".to_string(), 20, 10, Some(70))]);
     let craft::automation::actions::ActionStep { command: step_id, params: step } = app.session.actions.list.actions()[0].steps.last().cloned().unwrap();
     assert_eq!(step_id, "file.export.exportAs");
-    assert_eq!((&step["path"], &step["format"], &step["quality"], &step["scale"]), (&json!("/pics/out.jpg"), &json!("jpg"), &json!(70), &json!(50)));
+    // The scale is the dialog's percentage, a number whatever its JSON form (`50` or `50.0`).
+    assert_eq!((&step["path"], &step["format"], &step["quality"]), (&json!("/pics/out.jpg"), &json!("jpg"), &json!(70)));
+    assert_eq!(step["scale"].as_f64(), Some(50.0));
     assert!(step.as_object().unwrap().keys().all(|k| !k.starts_with("__")), "only the destination and the dialog's settings: {step}");
     assert_eq!(crate::actions::label_of("file.export.exportAs"), "Export As");
 
