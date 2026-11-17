@@ -163,7 +163,8 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let events = hosted.take_events();
     let ok = hosted.take_ok();
 
-    let (mut replan, mut committed) = (false, false);
+    // `rebased`: the plan's inputs outside the session changed (the document, Sample All Layers).
+    let (mut replan, mut rebased, mut committed) = (false, false, false);
     let (mut applies, mut picks) = (Vec::new(), Vec::new());
     if let Some(c) = app.caf.as_mut() {
         for event in events {
@@ -184,7 +185,7 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
                 FillEvent::SettingsChanged(settings) => {
                     if settings.sample_all_layers != c.sample_all {
                         c.sample_all = settings.sample_all_layers;
-                        replan = true;
+                        (replan, rebased) = (true, true);
                     }
                 }
                 FillEvent::Apply(command) => applies.push(command),
@@ -217,8 +218,10 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
         }
     }
 
-    sync_document(app, &mut replan);
-    reconcile(app, id, replan, committed);
+    if sync_document(app) {
+        (replan, rebased) = (true, true);
+    }
+    reconcile(app, id, replan, rebased, committed);
     if let (Some(e), Some(c)) = (refused, app.caf.as_mut()) {
         c.error = Some(e);
     }
@@ -245,30 +248,32 @@ pub(crate) fn take(app: &mut PhotocraftApp, ctx: &egui::Context) {
     }
 }
 
-/// The document changed under the open workspace (an Apply): a new composite and document, and a new plan.
-fn sync_document(app: &mut PhotocraftApp, replan: &mut bool) {
-    let Some(c) = app.caf.as_ref() else { return };
-    let Some(st) = app.session.active() else { return };
+/// The document changed under the open workspace (an Apply): a new composite and document. `true` when it did, for
+/// a new plan.
+fn sync_document(app: &mut PhotocraftApp) -> bool {
+    let Some(c) = app.caf.as_ref() else { return false };
+    let Some(st) = app.session.active() else { return false };
     if st.doc.id != c.document || st.revision == c.revision {
-        return;
+        return false;
     }
     let (revision, doc, k) = (st.revision, Arc::clone(&st.doc), c.k as u32);
     let image = composite(app, c.pw, c.ph);
-    let Some(c) = app.caf.as_mut() else { return };
+    let Some(c) = app.caf.as_mut() else { return false };
     c.revision = revision;
     c.doc = doc;
     if let Some(image) = image {
         c.image.replace(image, k);
     }
     c.dirty = true;
-    *replan = true;
+    true
 }
 
 /// Brings the planes to the workspace's session. Undo and redo change the session without an event, so it is
 /// compared with the one the planes were made for: strokes alone repaint, a changed sampling option or fill area
 /// (and `replan`) plan again. A plan that refuses a lasso edit (an empty fill area) is reported back to the
-/// workspace, which takes the edit out.
-fn reconcile(app: &mut PhotocraftApp, id: DialogId, replan: bool, committed: bool) {
+/// workspace, which takes the edit out; the refusal stays shown while a plan of the same session over the same inputs
+/// (`rebased` false) follows, as nothing it could answer changed.
+fn reconcile(app: &mut PhotocraftApp, id: DialogId, replan: bool, rebased: bool, committed: bool) {
     let Some((session, command)) = app.framework.dialogs.get_by_id::<Hosted>(id).map(|h| (h.workspace().session().clone(), h.workspace().command())) else {
         return;
     };
@@ -282,14 +287,29 @@ fn reconcile(app: &mut PhotocraftApp, id: DialogId, replan: bool, committed: boo
         if !committed {
             c.restate_all(&session.strokes);
         }
+        eprintln!(
+            "DIAG the_lasso_edits_the_fill_area_and_the_window_follows: strokes branch err={:?} strokes {} vs {} fill {} vs {}",
+            c.error,
+            session.strokes.len(),
+            c.known.strokes.len(),
+            session.fill_edits.len(),
+            c.known.fill_edits.len()
+        );
         c.error = None;
         c.known = session;
         return;
     }
     match compute_base(&c.doc, c.layer, &command) {
         Ok(base) => {
+            eprintln!(
+                "DIAG the_lasso_edits_the_fill_area_and_the_window_follows: plan ok replan={replan} rebased={rebased} same_session={} err={:?}",
+                session == c.known,
+                c.error
+            );
             c.set_base(base, &session.strokes);
-            c.error = None;
+            if rebased || session != c.known {
+                c.error = None;
+            }
             c.known = session;
         }
         Err(e) => {
