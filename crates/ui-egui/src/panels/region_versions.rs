@@ -7,6 +7,7 @@
 use std::hash::{Hash, Hasher};
 
 use super::{PhotocraftApp, chrome_ui};
+use crate::color_picker_ui::PickWindow;
 
 /// The version of the options bar: the Zoom tool's members show the active view.
 pub(crate) fn options_bar(app: &PhotocraftApp) -> u64 {
@@ -24,13 +25,15 @@ pub(crate) fn status_bar(app: &PhotocraftApp) -> u64 {
 
 /// The version of panel `id`'s body. The Navigator shows the active view, the Info panel the pointer's document pixel
 /// and the zoom it samples at, the Clone Source panel the pairing at the last hover point, the Modifier Keys panel the
-/// latched keys, which their use releases; every other panel shows only what every version holds.
+/// latched keys, which their use releases, the Properties panel the colour its well's open Color Picker previews and
+/// the answer that picker left; every other panel shows only what every version holds.
 pub(crate) fn panel(app: &PhotocraftApp, id: &str) -> u64 {
     match id {
         "navigator" => version(app, view(app)),
         "info" => version(app, (app.hover_doc.map(|at| at.map(f64::to_bits)), app.current_zoom().to_bits())),
         "cloneSource" => version(app, app.ui.presets_ui.clone_cursor.map(|(document, at)| (document, at.map(f64::to_bits)))),
         "modifierKeys" => version(app, app.ui.shell.latched),
+        "properties" => version(app, crate::color_picker_ui::window_picker_state(app, PickWindow::Properties)),
         _ => version(app, ()),
     }
 }

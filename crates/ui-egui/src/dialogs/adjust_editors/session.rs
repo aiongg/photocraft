@@ -280,6 +280,13 @@ fn commit(
 /// closed, OK's colour is one edit and Cancel (or OK without a colour) leaves the layer as it was.
 fn follow_color_pick(app: &mut PhotocraftApp, id: LayerId, record: &mut PropertiesAdjust, committed: &AdjustValue, vcx: &ValueCx) {
     let Some(pick) = record.pick.take() else { return };
+    if std::thread::current().name().is_some_and(|name| name.ends_with("photo_filter_colour_picker_previews_live_cancel_restores_and_ok_is_one_step")) {
+        eprintln!(
+            "DIAG photo_filter_colour_picker_previews_live_cancel_restores_and_ok_is_one_step: Properties follows its picker: shows {:?} state {:?}",
+            app.framework.dialogs.get_by_id::<ColorPickerDialog>(pick.dialog).map(ColorPickerDialog::current),
+            crate::color_picker_ui::window_picker_state(app, PickWindow::Properties)
+        );
+    }
     match app.framework.dialogs.get_by_id::<ColorPickerDialog>(pick.dialog).map(ColorPickerDialog::current) {
         Some(current) => {
             if let Some(picked) = current {
