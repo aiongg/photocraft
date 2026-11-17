@@ -57,7 +57,7 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 /// on a shape.
 pub(crate) fn editing(app: &PhotocraftApp) -> bool {
     let Some(idx) = app.session.active_index() else { return false };
-    ToolHost::controls_pressing(app.ctx(), CanvasHost::main(idx).canvas_id())
+    ToolHost::controls_pressing(app.ctx(), CanvasHost::primary(app, idx).canvas_id())
 }
 
 /// The salt that ends a control's press when the document, an edit under it or the tool changes.

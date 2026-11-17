@@ -11,6 +11,7 @@
 
 use craft::behavior::{Cursor, CursorIcon, IconId, PaintedCursor};
 use craft::color::ui::ColorPickerDialog;
+use craft::draw::ui::pattern::PatternFillDialog;
 use craft::imaging::layer_style::EffectSpec;
 use craft::imaging::ui::adjust::TonePicker;
 use craft::imaging::ui::color_range::HostedColorRange;
@@ -83,7 +84,8 @@ pub(crate) fn armed(app: &PhotocraftApp) -> Option<DialogPick> {
         }
     }
     // PLAN: `pattern_fill_ui::drag_target(app)` takes the hosted dialog (dialogs-w60), not the base's field map.
-    if super::pattern_fill_ui::drag_target(app).is_some() {
+    // The phase drag belongs to the Pattern Fill dialog while it is the top: a dialog opened above it takes the canvas.
+    if dialogs.get_by_id::<PatternFillDialog>(top).is_some() && super::pattern_fill_ui::drag_target(app).is_some() {
         return Some(DialogPick::PatternPhase);
     }
     super::filter_preview_ui::locator(app).is_some().then_some(DialogPick::Locator)

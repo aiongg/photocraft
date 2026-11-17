@@ -119,7 +119,7 @@ pub fn open(app: &mut PhotocraftApp) -> Result<DialogId, String> {
     let idx = app.session.active_index().ok_or("no document")?;
     let size = app.session.active().map(|st| [st.doc.size.width, st.doc.size.height]).ok_or("no document")?;
     app.color_range = None;
-    let dialog = HostedColorRange::new(label, ColorRangeValue::default(), size).canvas(CanvasHost::main(idx).canvas_id());
+    let dialog = HostedColorRange::new(label, ColorRangeValue::default(), size).canvas(CanvasHost::primary(app, idx).canvas_id());
     Ok(app.framework.dialogs.open(dialog))
 }
 

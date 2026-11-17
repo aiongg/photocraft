@@ -106,7 +106,7 @@ pub(crate) struct CanvasTools {
     /// The app context's frame loop for the canvas test driver (`canvas::testing`).
     #[cfg(test)]
     pub(crate) frames: Option<craft::ui::testing::Frames>,
-    /// What the host reported in the main window's primary canvas pass, for the test driver's `tool_event`.
+    /// What the host reported in the document's own canvas pass, for the test driver's `tool_event`.
     #[cfg(test)]
     pub(crate) last_response: Option<ToolHostResponse>,
 }
@@ -674,10 +674,10 @@ fn with_rig<R>(
 /// Runs the tool host for the canvas `host` on the canvas's tool input `out`, in the canvas's body after its controls
 /// (`shown` is what they reported) and before its picture, and applies what it reports: the view a tool or the
 /// autoscroll moved (in the response's `view`), the Scroll All Windows follow, and each family's drain, which feeds
-/// the picture of the same pass. Tools are active in the main window only.
+/// the picture of the same pass. Tools are active only on the document's own canvas (`CanvasHost::primary`).
 pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out: &ToolPass, shown: BodyShown) -> ToolHostResponse {
     let ctx = ui.ctx().clone();
-    let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
+    let primary = host.is_primary(app);
     let mut tools = std::mem::take(&mut app.canvas_tools);
     let tool = app.ui.tool;
     // A tool switch ends the other lassos' outlines between presses; a gesture keeps its tool (`ToolHost`).
@@ -723,9 +723,9 @@ pub(crate) fn run(app: &mut PhotocraftApp, ui: &egui::Ui, host: CanvasHost, out:
 
 /// The regions the tool of the canvas `host`'s next pass claims over the canvas controls (`CanvasTool::regions`), for
 /// `Canvas::tool_regions`: asked before the canvas shows, from the same pick as the pass (`with_rig`). Tools run in the
-/// main window only, so the other canvases claim nothing.
+/// document's own canvas only (`CanvasHost::primary`), so the other canvases claim nothing.
 pub(crate) fn claimed_regions(app: &mut PhotocraftApp, ctx: &egui::Context, host: CanvasHost) -> Vec<ToolRegion> {
-    let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
+    let primary = host.is_primary(app);
     if !primary {
         return Vec::new();
     }
@@ -779,15 +779,15 @@ pub(crate) fn after_run(app: &mut PhotocraftApp, tools: &mut CanvasTools, respon
 pub(crate) fn tool_changed(app: &mut PhotocraftApp, ctx: &egui::Context, host: CanvasHost) {
     let mut tools = std::mem::take(&mut app.canvas_tools);
     let id = host.canvas_id();
-    let primary = host.window.is_none() && host.viewport == egui::ViewportId::ROOT;
+    let primary = host.is_primary(app);
     with_rig(app, ctx, host, &mut tools, primary, BodyShown::default(), |selected, tool_host| {
         tool_host.cancel(ctx, id, selected, CancelReason::HostChanged);
     });
     app.canvas_tools = tools;
 }
 
-/// Whether the active document's main canvas has a gesture running, for the readers with no `Context` at hand.
+/// Whether the active document's own canvas has a gesture running, for the readers with no `Context` at hand.
 pub(crate) fn in_gesture(app: &PhotocraftApp) -> bool {
     let Some(idx) = app.session.active_index() else { return false };
-    ToolHost::in_gesture(app.ctx(), CanvasHost::main(idx).canvas_id())
+    ToolHost::in_gesture(app.ctx(), CanvasHost::primary(app, idx).canvas_id())
 }

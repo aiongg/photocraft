@@ -618,7 +618,7 @@ fn open_hosted(app: &mut PhotocraftApp, command: &str, recorded: Value, smart: O
     .json_form(json_form)
     .held_ok();
     if let Some(idx) = app.session.active_index() {
-        dialog = dialog.canvas(crate::canvas::document_display::CanvasHost::main(idx).canvas_id());
+        dialog = dialog.canvas(crate::canvas::document_display::CanvasHost::primary(app, idx).canvas_id());
     }
     if kind == "curves" {
         dialog = dialog.resizable(true).remember(SaveKey::new("photocraft.adjust.curves"));

@@ -58,14 +58,13 @@ fn tab_reveals_and_activates_the_last_tool() {
     assert!(entered, "Tab must reach the rail's buttons");
     // The node's rect is its visible part, so a button the rail clipped is shorter than a whole one.
     let full_height = button_rect(&harness, "Move Tool").height();
-    // The grid wraps, so Up from the first slot goes backwards from the end of the rail.
+    // Right walks the grid in reading order and goes on to the next row at a row's end; Up and Down stop at the first
+    // and last rows.
     let mut reached = false;
-    for _ in 0..10 {
-        harness.key_press(egui::Key::ArrowUp);
+    for _ in 0..60 {
+        harness.key_press(egui::Key::ArrowRight);
         harness.run_steps(3);
         reached = focused(&harness, "Zoom Tool");
-        let f: Vec<String> = harness.query_all(egui_kittest::kittest::By::new()).filter(|n| n.is_focused()).map(|n| format!("{n:?}").chars().take(160).collect()).collect();
-        eprintln!("DIAG tab_reveals_and_activates_the_last_tool: focus after ArrowUp: {f:?}");
         if reached {
             break;
         }
