@@ -279,6 +279,8 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
         .snap(snap)
         .pasteboard(pasteboard)
         .navigation(navigation)
+        // The view lies inside the rulers' strips, which `rulers::show` draws along the body's top and left edges.
+        .show_rulers(app.ui.extras.rulers)
         .view_follows_pointer(follows_pointer)
         .precise_cursors(app.session.prefs().cursors.other == photocraft_engine::prefs::OtherCursor::Precise)
         .tool_regions(regions);
