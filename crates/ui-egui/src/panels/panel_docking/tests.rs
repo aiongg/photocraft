@@ -323,8 +323,8 @@ fn a_saved_workspace_keeps_the_timeline_and_leaves_out_host_chrome() {
     assert!(!is_shown(&restored, "timeline"));
 }
 
-/// A craft-ui v2 save written by main must keep loading: every panel is shown or closed with a place,
-/// and a change writes the versioned workspace.
+/// A craft-ui v2 save written by main must keep loading: every panel is shown or closed with a place, the toolbar it
+/// predates docks at the start, and a change writes the versioned workspace.
 #[test]
 fn main_workspace_file_loads_as_the_default_and_saves_as_a_workspace() {
     let saved: Value = serde_json::from_str(include_str!("../../../tests/fixtures/main-docking-workspace.json")).unwrap();
@@ -335,6 +335,8 @@ fn main_workspace_file_loads_as_the_default_and_saves_as_a_workspace() {
         assert!(is_shown(&app, entry.id) || app.ui.docking.hidden.iter().any(|(panel, _)| panel == entry.id), "{} is shown or can be reopened", entry.id);
     }
     assert!(is_shown(&app, "layers"));
+    // The save predates the toolbar panel and has no start dock: the toolbar comes back docked at the start.
+    assert_eq!(toolbar_edge(&app), Some(DockEdge::Start), "the toolbar is docked at the start: {:?}", app.ui.docking.layout);
 
     invoke(&mut app, "window.panel.float", json!({"panel": "properties"})).unwrap();
     let written = crate::dock::snapshot(&app);
