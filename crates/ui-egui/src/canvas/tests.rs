@@ -1023,7 +1023,16 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
     h.run_steps(6);
     // The panel is shown, not toggled: the menu entry closes a Navigator the workspace already shows.
     crate::panel_docking::show_panel(h.state_mut(), "navigator", Some(true)).unwrap();
+    // A Navigator in a column of icons shows in a flyout, which the click into the status bar closes: expand its column
+    // so the panel stays while both fields are typed into.
+    let navigator = "navigator".to_owned();
+    if h.state().ui.docking.layout.opens_in_flyout(&navigator) {
+        crate::panel_docking::apply(h.state_mut(), vec![craft::behavior::dock::Action::set_iconic(navigator.clone(), false)]).unwrap();
+        h.state_mut().ui.flyout = None;
+        crate::panel_docking::show_panel(h.state_mut(), "navigator", Some(true)).unwrap();
+    }
     h.run_steps(6);
+    assert!(crate::panel_docking::is_front(h.state(), "navigator"), "the Navigator shows as a panel");
     assert_eq!(h.state().session.active_index(), Some(0), "the floating document is active");
     eprintln!(
         "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: floating windows {:?} content rect {:?}",
@@ -1047,6 +1056,15 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
     };
     assert_eq!(fields(&h).len(), 2, "the status bar's and the Navigator's zoom fields");
     for (field, typed, want) in [(0, "200", 2.0), (1, "50", 0.5), (0, "300", 3.0), (1, "100", 1.0)] {
+        if fields(&h).len() != 2 {
+            eprintln!(
+                "DIAG a_floating_document_follows_navigator_and_status_bar_zoom: before field {field}: fields {:?} flyout {:?} navigator in front {} in a flyout {}",
+                fields(&h),
+                h.state().ui.flyout,
+                crate::panel_docking::is_front(h.state(), "navigator"),
+                h.state().ui.docking.layout.opens_in_flyout(&"navigator".to_owned())
+            );
+        }
         let at = fields(&h)[field].center();
         h.event(egui::Event::PointerMoved(at));
         h.event(egui::Event::PointerButton { pos: at, button: egui::PointerButton::Primary, pressed: true, modifiers: egui::Modifiers::NONE });
