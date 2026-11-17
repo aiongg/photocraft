@@ -52,13 +52,13 @@ mod sidecar;
 
 pub use filmstrip::HeldRaw;
 pub use menu::menu;
-#[cfg(test)]
-use open::{open_raw, replace_raw_document};
 pub use open::{
     REDEVELOP_JOB, RawOpen, Redevelop, on_redevelop_event, open, open_smart_filter, opened_without_dialog, queue_open_dialog, wants_open_dialog,
     without_develop_note,
 };
 use open::{Target, non_defaults};
+#[cfg(test)]
+use open::{open_raw, replace_raw_document};
 use proxy::{ProxyBase, ProxyJob};
 pub use sidecar::sidecar_path;
 

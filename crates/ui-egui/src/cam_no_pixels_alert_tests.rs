@@ -3,7 +3,6 @@
 //! selects nothing. A drag that encloses an area still makes the selection; a drag with a
 //! selection keeps its behaviour.
 
-
 use egui::Modifiers;
 use serde_json::json;
 

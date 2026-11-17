@@ -481,7 +481,6 @@ fn footer_and_drop_events_follow_the_targets() {
     send(&mut app, vec![LayersEvent::activate(LayerRowKey::Filters(LayerId(b), Some(0)), ActivateOn::Row)]);
     assert!(app.dialog_open(), "Camera Raw opened");
     assert_eq!(active(&app), Some(LayerId(b)), "on the copy's smart object");
-
 }
 
 /// Layer masks moved or copied onto a group (#10485) and refused onto a masked row, and a layer dropped into a frame.

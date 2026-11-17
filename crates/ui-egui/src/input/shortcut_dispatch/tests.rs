@@ -408,7 +408,6 @@ fn delete_key_targets() {
         assert!(h.state().session.active().unwrap().doc.layer(layer).is_some(), "{key}: the layer stays");
         assert_eq!(layer_pixels(&h), before, "{key}: the layer's pixels are untouched");
     }
-
 }
 
 /// With a smart object's filter mask targeted, Delete fills it from a selection; with no selection the layer goes.
@@ -441,7 +440,6 @@ fn delete_key_targets_a_smart_objects_filter_mask() {
     press(&mut h, "Delete");
     assert_eq!(logged(&h), ["layer.delete"]);
     assert!(smart(&h).is_none(), "no selection deletes the layer, as in Photoshop");
-
 }
 
 /// Delete with several layers selected removes every one of them, or edits the targeted mask when a selection exists.

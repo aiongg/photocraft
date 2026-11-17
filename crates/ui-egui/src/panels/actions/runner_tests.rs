@@ -63,7 +63,7 @@ fn settle(app: &mut PhotocraftApp, ctx: &egui::Context) {
     let mut frame = eframe::Frame::_new_kittest();
     let screen = egui::Rect::from_min_size(egui::Pos2::ZERO, egui::vec2(1200.0, 800.0));
     let input = egui::RawInput { screen_rect: Some(screen), focused: true, ..Default::default() };
-    ctx.run_logic(&input, |ctx| app.logic(ctx, &mut frame));
+    let _ = ctx.run_logic(&input, |ctx| app.logic(ctx, &mut frame));
 }
 
 /// Done on Check Spelling: the app's own close, on the app's context.

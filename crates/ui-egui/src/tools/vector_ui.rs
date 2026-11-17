@@ -31,10 +31,10 @@ pub(crate) mod shapes;
 use options::{corner_radii_patch, solid_paint};
 pub(crate) use options::{draws_path, enabled_stroke_width};
 pub use options::{options_bar, shape_properties};
-pub(crate) use overlay::selected_saved_path_index;
-pub(crate) use overlay::{BezierShown, show_paths};
 #[cfg(test)]
 pub(crate) use overlay::selected_saved_path;
+pub(crate) use overlay::selected_saved_path_index;
+pub(crate) use overlay::{BezierShown, show_paths};
 pub use path_ops::{
     active_path_name, make_shape, path_selection_finish, path_to_selection, pick_shape_at, selected_document_path, takes_path_mask, with_active_path,
 };
