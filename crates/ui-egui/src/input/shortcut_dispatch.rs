@@ -19,6 +19,8 @@ use craft::ui::canvas::{MomentaryCommands, PickStep, ViewCommands, tool_pick};
 use craft::ui::docking::WorkspaceCommands;
 use craft::ui::rails::{LastUsed, RailTool};
 use craft::ui::runtime::commands::{AppCatalog, ChromeCommand, CommandRef, CommandSet, EditCommands, FirePhase, FireSource, Fired};
+use craft::ui::runtime::frame::ChromeToggle;
+use craft::ui::shell::ScreenModeCommands;
 use serde_json::json;
 
 use crate::PhotocraftApp;
@@ -74,6 +76,8 @@ pub(crate) enum Bridged {
     Swatches(SwatchesCommand),
     /// A Window › Workspace command under its framework id; the shell runs it ([`crate::workspace_ui::run_fired`]).
     Workspace(WorkspaceCommands),
+    /// A View › Screen Mode command: the window's shell takes it and writes `ui.view.screen_mode`, which it binds.
+    ScreenMode(ScreenModeCommands),
 }
 
 impl Bridged {
@@ -87,6 +91,7 @@ impl Bridged {
             Bridged::Stack(command) => CommandRef::from(command),
             Bridged::Swatches(command) => CommandRef::from(command),
             Bridged::Workspace(command) => CommandRef::from(command),
+            Bridged::ScreenMode(command) => CommandRef::from(command),
         }
     }
 }
@@ -133,6 +138,11 @@ pub(crate) const RUNTIME_COMMANDS: &[(&str, Bridged)] = &[
     ("layer.arrange.sendBackward", Bridged::Stack(LayersPanelCommands::MoveDown)),
     ("layer.arrange.bringToFront", Bridged::Stack(LayersPanelCommands::MoveToTop)),
     ("layer.arrange.sendToBack", Bridged::Stack(LayersPanelCommands::MoveToBottom)),
+    ("view.screenMode.standard", Bridged::ScreenMode(ScreenModeCommands::Standard)),
+    ("view.screenMode.fullScreenWithMenuBar", Bridged::ScreenMode(ScreenModeCommands::FullScreenWithMenuBar)),
+    ("view.screenMode.fullScreen", Bridged::ScreenMode(ScreenModeCommands::FullScreen)),
+    ("view.screenMode.cycle", Bridged::ScreenMode(ScreenModeCommands::Cycle)),
+    ("view.screenMode.cycleBack", Bridged::ScreenMode(ScreenModeCommands::CycleBack)),
 ];
 
 /// The PhotoCraft id and bridge row of a framework command, if a row bridges it.
@@ -143,6 +153,22 @@ fn bridge_of(command: &CommandRef) -> Option<(&'static str, Bridged)> {
 /// Whether the runtime defines command `id` (a row of [`RUNTIME_COMMANDS`]).
 pub(crate) fn is_bridged(id: &str) -> bool {
     RUNTIME_COMMANDS.iter().any(|(bridged, _)| *bridged == id)
+}
+
+/// Whether `id` is a view row of [`RUNTIME_COMMANDS`]: a command the document canvas runs on its view.
+pub(crate) fn is_view_command(id: &str) -> bool {
+    RUNTIME_COMMANDS.iter().any(|(row, bridged)| *row == id && matches!(bridged, Bridged::View(_)))
+}
+
+/// Whether `id` is a screen-mode row of [`RUNTIME_COMMANDS`]: a command the window's shell runs.
+pub(crate) fn is_screen_mode(id: &str) -> bool {
+    RUNTIME_COMMANDS.iter().any(|(row, bridged)| *row == id && matches!(bridged, Bridged::ScreenMode(_)))
+}
+
+/// The PhotoCraft row of a screen-mode command of the shell: the command gate judges the framework command as the
+/// menus judge that row.
+pub(crate) fn screen_mode_row(command: &CommandRef) -> Option<&'static str> {
+    bridge_of(command).filter(|(_, bridged)| matches!(bridged, Bridged::ScreenMode(_))).map(|(id, _)| id)
 }
 
 /// The id of the command that steps a tool group to its next tool: the group is named by its key.
@@ -478,11 +504,27 @@ pub(crate) fn fire_bridged(ctx: &egui::Context, id: &str) -> Option<bool> {
 
 /// Records each view row of [`RUNTIME_COMMANDS`] a canvas ran since the last frame, by its chord or its menu row, as
 /// PhotoCraft's view command: an action being recorded gets `view.fitOnScreen` for ⌘0 and for the menu item alike.
+/// The screen-mode rows the shell ran go to the shortcut log only.
 pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
     for fired in std::mem::take(&mut app.framework.delivered) {
-        if let Some((id, Bridged::View(_))) = bridge_of(&fired.command) {
-            crate::panels::actions::journal_view(app, id, json!({}));
-            record(&app.ctx(), id, Outcome::Ran);
+        match bridge_of(&fired.command) {
+            Some((id, Bridged::View(_))) => {
+                crate::panels::actions::journal_view(app, id, json!({}));
+                record(&app.ctx(), id, Outcome::Ran);
+            }
+            Some((id, Bridged::ScreenMode(_))) if fired.phase == FirePhase::Press => record(&app.ctx(), id, Outcome::Ran),
+            _ => {}
+        }
+    }
+}
+
+/// Records each chrome toggle a key ran since the last frame as its row of [`RUNTIME_COMMANDS`]: the runtime runs a key's
+/// toggle in its key stage and fires no command for it, and the window's shell hides its panels.
+pub(crate) fn record_chrome_toggles(ctx: &egui::Context, toggles: &[(egui::ViewportId, ChromeToggle)]) {
+    for (_, toggle) in toggles {
+        let row = RUNTIME_COMMANDS.iter().find(|(_, bridged)| matches!(bridged, Bridged::Chrome(command) if command.toggle() == *toggle));
+        if let Some((id, _)) = row {
+            record(ctx, id, Outcome::Ran);
         }
     }
 }
@@ -495,7 +537,6 @@ pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
 /// group's tool on the press and releases the spring on the key-up; every other command runs on its press only.
 /// A framework command goes to [`crate::app::framework::run_command`], a PhotoCraft id to [`dispatch_as`].
 pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[Fired]) {
-    let now = ctx.input(|i| i.time);
     for f in fired {
         if f.target.is_some() {
             continue;
@@ -515,7 +556,7 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[F
             continue;
         }
         // PLAN: `opacity_keys::fired` and `blend_keys::fired` are top-w25's tp.PT14 rows, assumed.
-        if crate::opacity_keys::fired(app, f, now) || crate::blend_keys::fired(app, f) {
+        if crate::opacity_keys::fired(app, f) || crate::blend_keys::fired(app, f) {
             continue;
         }
         // A tool command a key fired: its letter picks within the group; a click or a menu row selects the tool itself.
@@ -526,16 +567,16 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[F
                 FirePhase::Press if !crate::tool_shortcuts::uses_default(app, tool) => crate::tool_memory::select(app, tool),
                 FirePhase::Press => {
                     let step = tool_step(app, f);
-                    pick_tool(app, ctx, tool.key(), step, true);
+                    pick_tool(app, tool.key(), step, true, f.time);
                 }
-                FirePhase::Release => crate::spring_tools::released(app, tool.key()),
+                FirePhase::Release => crate::spring_tools::released(app, tool.key(), f.time),
                 FirePhase::Repeat => {}
             }
             continue;
         }
         if let Some(letter) = next_in_group_letter(id) {
             if f.phase == FirePhase::Press {
-                pick_tool(app, ctx, letter, PickStep::Next, false);
+                pick_tool(app, letter, PickStep::Next, false, f.time);
             }
             continue;
         }
@@ -555,8 +596,8 @@ fn tool_step(app: &PhotocraftApp, fired: &Fired) -> PickStep {
 
 /// Selects the tool the key `letter` picks. The group is the tools of that letter the user has not remapped, in the
 /// toolbar layout's order across slots (Edit › Toolbar); the rail's last-used memory is `app.ui.group_tools`, with the group's index among the letters as
-/// the slot. `plain` is a letter press with no Shift step: only those spring (#2672).
-fn pick_tool(app: &mut PhotocraftApp, ctx: &egui::Context, letter: char, step: PickStep, plain: bool) {
+/// the slot. `plain` is a letter press with no Shift step: only those spring (#2672). `at` is the press's input time.
+fn pick_tool(app: &mut PhotocraftApp, letter: char, step: PickStep, plain: bool, at: f64) {
     let mut group: Vec<Tool> = Tool::ALL.iter().copied().filter(|t| t.key() == letter && crate::tool_shortcuts::uses_default(app, *t)).collect();
     let order = crate::panels::toolbar::layout_order(&app.session.prefs().toolbar);
     group.sort_by_key(|t| order.iter().position(|x| x == t).unwrap_or(usize::MAX));
@@ -571,8 +612,7 @@ fn pick_tool(app: &mut PhotocraftApp, ctx: &egui::Context, letter: char, step: P
     let Some(picked) = tool_pick(&refs, slot, &before, &last, step, |_| true).map(|t| t.id) else { return };
     app.ui.tool = picked;
     crate::tool_memory::ended_by_tool(app);
-    let now = ctx.input(|i| i.time);
-    crate::spring_tools::pressed(app, letter, before, plain, now);
+    crate::spring_tools::pressed(app, letter, before, plain, at);
     if app.ui.spring.is_none() {
         // Permanent key choices own the tool; held-key switches keep the pen marker.
         app.stylus.tool_before_eraser = None;
@@ -583,15 +623,6 @@ fn pick_tool(app: &mut PhotocraftApp, ctx: &egui::Context, letter: char, step: P
 /// through [`dispatch_as`].
 fn run_pressed(app: &mut PhotocraftApp, ctx: &egui::Context, f: &Fired) {
     let id = f.command.id.as_str();
-    // Space+F (⇧Space+F backwards) cycles the pasteboard colour, as in Photoshop: F while the Hand key is held,
-    // in place of F's own Cycle Screen Mode.
-    // PLAN: `hold_keys::reposition_held(app)` without the context is top-w26's, assumed.
-    if matches!(id, "view.screenMode.cycle" | "view.screenMode.cycleBack") && crate::hold_keys::reposition_held(app) && app.ui.text_edit.is_none() {
-        if let Err(e) = crate::canvas_tool_menu::cycle_canvas_color(app, id == "view.screenMode.cycleBack") {
-            app.ui.status = e;
-        }
-        return;
-    }
     // The Magnetic Lasso's bracket keys step its detection width, not the brush (#11688), until an outline is open.
     if app.ui.tool == Tool::MagneticLasso && !app.canvas_tools.selection.outline_open() {
         let step = match id {

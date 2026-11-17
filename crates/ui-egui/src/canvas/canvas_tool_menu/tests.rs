@@ -364,12 +364,8 @@ fn kind_name(kind: &MenuKind) -> &'static str {
 fn row_app(row: &Case) -> PhotocraftApp {
     let mut app = if matches!(row.setup, Setup::UntouchedCrop | Setup::PendingCrop) { crop_app() } else { self::app() };
     match row.setup {
-        Setup::Plain | Setup::UntouchedCrop => {}
-        Setup::Zoomed => {
-            // A view a pan would move: zoomed in through the view command, as a user does.
-            let ctx = app.ctx().clone();
-            crate::menus::invoke(&mut app, &ctx, "view.twoHundredPercent", json!({})).unwrap();
-        }
+        // Zoomed needs a canvas to run its view command: `context_popup_table` zooms once the canvas shows.
+        Setup::Plain | Setup::UntouchedCrop | Setup::Zoomed => {}
         Setup::Selection => {
             app.run("select.rect", json!({"x": 1, "y": 1, "width": 8, "height": 8})).unwrap();
         }
@@ -400,6 +396,13 @@ fn row_app(row: &Case) -> PhotocraftApp {
 fn context_popup_table() {
     for row in ROWS {
         let mut h = harness(row_app(row));
+        if matches!(row.setup, Setup::Zoomed) {
+            // A view a pan would move: zoomed in through View › 200%, as a user does; the canvas runs it in its next pass.
+            let ctx = h.ctx.clone();
+            crate::menus::invoke(h.state_mut(), &ctx, "view.twoHundredPercent", json!({})).unwrap();
+            // The pass that applies it, then the zoom's ease to its end.
+            h.run_steps(3);
+        }
         if row.held != Held::Nothing {
             h.event(egui::Event::ModifiersChanged(row.mods));
             h.event(egui::Event::Key { key: egui::Key::Space, physical_key: None, pressed: true, repeat: false, modifiers: row.mods });

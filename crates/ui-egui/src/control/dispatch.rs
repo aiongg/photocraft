@@ -1204,7 +1204,8 @@ struct ParsedPointer {
     events: Vec<PointerStep>,
 }
 
-/// Validate every event, then queue them for the active canvas's tool host in order; the canvas takes them on
+/// Validate every event, then queue them in order for the tool host of the canvas they drive (an open full-window
+/// workspace's, else the active document's main canvas); the canvas takes them on
 /// its next pass and the reply does not wait for that. The tool host families own every interception (dialog
 /// pickers, Color Range, the preview locator, context menus, Move transform controls). The host takes the
 /// whole queue on its next pass; a held Space is queued with the events (`hold`, then `let_go`), so it is down for
@@ -1216,7 +1217,16 @@ fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
         Ok(parsed) => parsed,
         Err(e) => return err(e),
     };
-    let (Some(idx), Some(view)) = (app.session.active_index(), crate::canvas::document_display::active_view(app)) else { return err("no canvas to drive") };
+    // An open full-window workspace (Liquify, Filter Gallery, Vanishing Point) takes the events on its own canvas, in
+    // that canvas's view, as the editor that is open; else the active document's main canvas takes them.
+    let canvas = app
+        .framework
+        .dialogs
+        .canvas()
+        .or_else(|| app.session.active_index().map(|idx| crate::canvas::document_display::CanvasHost::primary(app, idx).canvas_id()));
+    let Some((canvas, view)) = canvas.and_then(|canvas| ToolHost::shown_space(ctx, canvas).map(|space| (canvas, space.view))) else {
+        return err("no canvas to drive");
+    };
     if let Some(t) = parsed.tool {
         crate::tool_memory::select(app, t);
         // The tool's own brush now, not at the next frame, so a paint command right after uses
@@ -1241,7 +1251,6 @@ fn pointer(app: &mut PhotocraftApp, ctx: &egui::Context, p: &Value) -> Reply {
     // instead of growing. Like a modifier flag, it may be top-level or grouped under "modifiers"; it is a held key
     // for the length of the request, and the tool host's momentary tools read it from the held keys.
     let space = p.get("modifiers").unwrap_or(p).get("space").and_then(Value::as_bool).unwrap_or(false);
-    let canvas = crate::canvas::document_display::CanvasHost::primary(app, idx).canvas_id();
     if space {
         ToolHost::inject(ctx, canvas, ToolInput::hold(Key::Space));
     }

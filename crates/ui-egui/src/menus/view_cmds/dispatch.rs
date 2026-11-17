@@ -1,4 +1,4 @@
-use craft::ui::shell::{ScreenMode, ScreenModeCommands};
+use craft::ui::shell::ScreenMode;
 use photocraft_engine::prefs::FontPreview;
 
 use super::arrange::{arrange, command as arrange_command, layout_checked};
@@ -77,8 +77,9 @@ pub(super) fn is_enabled_with_engine(app: &PhotocraftApp, id: &str, engine_enabl
     let doc = app.session.active().is_some();
     Some(match id {
         // Full Screen Mode shows a document, so without one it is unavailable, as in Photoshop
-        // (#9349); with none open, Cycle can only bring a full screen mode back to Standard.
-        "view.screenMode.cycle" | "view.screenMode.cycleBack" => app.ui.text_edit.is_none() && (doc || app.ui.view.screen_mode != ScreenMode::Standard),
+        // (#9349), and so is the cycle through it: a full screen mode left without a document is
+        // Standard again before the next pass (`leave_full_screen_without_document`).
+        "view.screenMode.cycle" | "view.screenMode.cycleBack" => app.ui.text_edit.is_none() && doc,
         "view.screenMode.fullScreen" | "view.screenMode.fullScreenWithMenuBar" => doc,
         "view.rotateView" => doc,
         i if i.starts_with("window.arrange.") => arrange_command(&i["window.arrange.".len()..]).is_some_and(|command| {
@@ -99,10 +100,11 @@ pub(super) fn is_enabled_with_engine(app: &PhotocraftApp, id: &str, engine_enabl
 }
 
 /// A full screen mode with no document left (the last one closed) goes back to Standard Screen
-/// Mode, rather than showing the start screen on the full screen pasteboard (#9349).
-pub fn leave_full_screen_without_document(app: &mut PhotocraftApp, ctx: &egui::Context) {
+/// Mode, rather than showing the start screen on the full screen pasteboard (#9349). The shell
+/// brings the window to the mode it binds.
+pub fn leave_full_screen_without_document(app: &mut PhotocraftApp) {
     if app.ui.view.screen_mode != ScreenMode::Standard && app.session.documents().is_empty() {
-        let _ = crate::menus::invoke(app, ctx, "view.screenMode.standard", json!({}));
+        app.ui.view.screen_mode = ScreenMode::Standard;
     }
 }
 
@@ -261,7 +263,23 @@ pub fn invoke(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &V
     if !handles(id) {
         return None;
     }
+    if crate::shortcut_dispatch::is_screen_mode(id) {
+        return Some(screen_mode(app, ctx, id));
+    }
     Some(run(app, id, params))
+}
+
+/// A View › Screen Mode command from a menu, the toolbar's list or automation: fired to the window's shell, as its
+/// key fires it, which applies it in its next pass. Refused where the menu greys it: Full Screen Mode shows a
+/// document (#9349).
+fn screen_mode(app: &PhotocraftApp, ctx: &egui::Context, id: &str) -> Result<Value, String> {
+    if is_enabled(app, id) == Some(false) {
+        return Err(if app.session.documents().is_empty() { "Full Screen Mode needs an open document".into() } else { format!("{id} is not available now") });
+    }
+    match crate::shortcut_dispatch::fire_bridged(ctx, id) {
+        Some(true) => Ok(Value::Null),
+        _ => Err(format!("{id} is unavailable: no window shell runs it")),
+    }
 }
 
 fn flag_param(p: &Value, cur: bool) -> bool {
@@ -309,29 +327,6 @@ fn run(app: &mut PhotocraftApp, id: &str, p: &Value) -> Result<Value, String> {
         let slot = snap_slot(&mut o.snap_to, k).ok_or("unknown Snap To item")?;
         *slot = flag_param(p, *slot);
         return Ok(json!(*slot));
-    }
-    if let Some(k) = id.strip_prefix("view.screenMode.") {
-        // Full Screen Mode shows a document (#9349): refused without one, from any caller (the
-        // toolbar's list, automation). The shell applies the mode to the window.
-        let no_document = app.session.documents().is_empty();
-        if no_document && matches!(k, "fullScreen" | "fullScreenWithMenuBar") {
-            return Err("Full Screen Mode needs an open document".into());
-        }
-        let command = match k {
-            "standard" => ScreenModeCommands::Standard,
-            "fullScreenWithMenuBar" => ScreenModeCommands::FullScreenWithMenuBar,
-            "fullScreen" => ScreenModeCommands::FullScreen,
-            "cycle" => ScreenModeCommands::Cycle,
-            "cycleBack" => ScreenModeCommands::CycleBack,
-            _ => return Err(format!("unknown screen mode {k}")),
-        };
-        o.screen_mode = if no_document && matches!(command, ScreenModeCommands::Cycle | ScreenModeCommands::CycleBack) {
-            // Without a document a cycle can only leave a full screen mode (#9349): straight back to Standard.
-            ScreenMode::Standard
-        } else {
-            command.apply(o.screen_mode)
-        };
-        return Ok(json!({"screenMode": screen_mode_names::name(o.screen_mode)}));
     }
     if let Some(k) = id.strip_prefix("view.pixelAspectRatio.") {
         o.pixel_aspect = k.to_string();

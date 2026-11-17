@@ -15,6 +15,7 @@ use serde_json::{Value, json};
 use super::values::{self, ValueCx};
 use super::{AdjustAsk, AdjustValue, EditorSetup, answer_color, black_white_auto, editor, gradient_presets, is_gray, swatches};
 use crate::PhotocraftApp;
+use crate::color_picker_ui::PickWindow;
 use crate::theme::Tokens;
 use crate::tone::{self, HistSource};
 
@@ -239,10 +240,8 @@ pub fn layer_editor(app: &mut PhotocraftApp, ui: &mut egui::Ui, id: LayerId, adj
         Some(AdjustAsk::ImportGradients) => crate::preset_files_ui::import_gradients_dialog(app),
         Some(AdjustAsk::PickColor(request)) if record.pick.is_none() => {
             let (key, opened) = (request.key.clone(), request.color);
-            // PLAN: assumed `color_picker_ui::open_for_window(app, ColorRequest) -> DialogId` and
-            // `answer_for_window(app) -> Option<(String, Srgba)>` (dialogs-w37 writer note 12); Properties has no
-            // parent dialog for `open_for_request`.
-            let dialog = crate::color_picker_ui::open_for_window(app, request);
+            // Properties has no parent dialog for `open_for_request`: the panel holds its picker itself.
+            let dialog = crate::color_picker_ui::open_for_window(app, PickWindow::Properties, request);
             record.pick = Some(ColorPick { dialog, key, opened, before: value });
         }
         _ => {}
@@ -291,7 +290,7 @@ fn follow_color_pick(app: &mut PhotocraftApp, id: LayerId, record: &mut Properti
             }
             record.pick = Some(pick);
         }
-        None => match crate::color_picker_ui::answer_for_window(app) {
+        None => match crate::color_picker_ui::answer_for_window(app, PickWindow::Properties) {
             Some((key, color)) if key == pick.key && Some(color) != pick.opened => {
                 let mut answered = pick.before;
                 if answer_color(&mut answered, &key, color) {

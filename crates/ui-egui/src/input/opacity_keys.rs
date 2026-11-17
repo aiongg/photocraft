@@ -63,9 +63,9 @@ fn has_smoothing(tool: Tool) -> bool {
     matches!(tool, Tool::Brush | Tool::Pencil | Tool::Eraser)
 }
 
-/// Applies one fired command if it is a number key or a Smoothing key the current tool takes; `now` is the pass clock in
-/// seconds. Returns whether the command was taken.
-pub(crate) fn fired(app: &mut PhotocraftApp, f: &Fired, now: f64) -> bool {
+/// Applies one fired command if it is a number key or a Smoothing key the current tool takes; two digits pair by the
+/// keys' own times (`Fired::time`). Returns whether the command was taken.
+pub(crate) fn fired(app: &mut PhotocraftApp, f: &Fired) -> bool {
     if let Some(d) = smoothing_digit(&f.command) {
         if f.phase != FirePhase::Press || !has_smoothing(app.ui.tool) {
             return false;
@@ -80,7 +80,7 @@ pub(crate) fn fired(app: &mut PhotocraftApp, f: &Fired, now: f64) -> bool {
     if target(app.ui.tool) == Target::None {
         return false;
     }
-    let Some(entry) = OpacityDigit::entry(&mut app.opacity_keys, f, now) else { return false };
+    let Some(entry) = OpacityDigit::entry(&mut app.opacity_keys, f) else { return false };
     apply(app, entry.percent as f32, entry.second);
     true
 }
@@ -150,7 +150,9 @@ mod tests {
 
     /// Fires `command` at `now` seconds.
     fn fire(app: &mut PhotocraftApp, command: impl Into<CommandRef>, now: f64) -> bool {
-        fired(app, &test_fired(command.into()), now)
+        let mut f = test_fired(command.into());
+        f.time = now;
+        fired(app, &f)
     }
 
     /// Everything a number key can change: brush opacity, brush flow, layer opacity, layer fill, the Gradient and Paint
@@ -271,7 +273,8 @@ mod tests {
         // A release types no digit.
         let mut release = test_fired(D::OpacityThree.into());
         release.phase = FirePhase::Release;
-        assert!(!fired(&mut a, &release, 20.0));
+        release.time = 20.0;
+        assert!(!fired(&mut a, &release));
         assert!((snap(&a)[OPACITY] - 0.5).abs() < 1e-6);
     }
 

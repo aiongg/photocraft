@@ -206,8 +206,15 @@ fn mixer_raw_drag_commits_live_pixels_before_a_spring_tool_returns() {
         button(&mut h, start, true, Modifiers::NONE);
         if spring {
             // A temporary Mixer Brush's key was released while its mouse drag is held.
-            h.state_mut().ui.spring =
-                Some(crate::spring_tools::Spring { previous: Tool::Zoom, tool: Tool::MixerBrush, keys: vec![], since: 0.0, used: true, released: true });
+            h.state_mut().ui.spring = Some(crate::spring_tools::Spring {
+                previous: Tool::Zoom,
+                tool: Tool::MixerBrush,
+                keys: vec![],
+                since: 0.0,
+                up: None,
+                used: true,
+                released: true,
+            });
         }
         let end = screen(&h, 80.0, 50.0);
         h.event(egui::Event::PointerMoved(end));

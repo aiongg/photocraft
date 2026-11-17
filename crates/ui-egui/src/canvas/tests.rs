@@ -1013,14 +1013,26 @@ fn a_floating_document_follows_navigator_and_status_bar_zoom() {
         app.run("file.new", json!({"width": 400, "height": 300, "name": "floating"})).unwrap();
         app.run("file.new", json!({"width": 400, "height": 300, "name": "docked"})).unwrap();
         app.sync_views();
-        let app_ctx = app.ctx().clone();
-        float_doc(&mut app, &app_ctx, 0).unwrap();
         app
     });
     h.run_steps(6);
+    // Floated once the window has its size, as from the menu: the floating window takes its size from the window's
+    // content area, which egui doesn't know before the first frame.
+    let ctx = h.ctx.clone();
+    float_doc(h.state_mut(), &ctx, 0).unwrap();
+    h.run_steps(6);
     // The panel is shown, not toggled: the menu entry closes a Navigator the workspace already shows.
     crate::panel_docking::show_panel(h.state_mut(), "navigator", Some(true)).unwrap();
+    // A Navigator in a column of icons shows in a flyout, which the click into the status bar closes: expand its column
+    // so the panel stays while both fields are typed into.
+    let navigator = "navigator".to_owned();
+    if h.state().ui.docking.layout.opens_in_flyout(&navigator) {
+        crate::panel_docking::apply(h.state_mut(), vec![craft::behavior::dock::Action::set_iconic(navigator.clone(), false)]).unwrap();
+        h.state_mut().ui.flyout = None;
+        crate::panel_docking::show_panel(h.state_mut(), "navigator", Some(true)).unwrap();
+    }
     h.run_steps(6);
+    assert!(crate::panel_docking::is_front(h.state(), "navigator"), "the Navigator shows as a panel");
     assert_eq!(h.state().session.active_index(), Some(0), "the floating document is active");
     // The status bar's zoom field (bottom left) and the Navigator's.
     let fields = |h: &egui_kittest::Harness<'_, PhotocraftApp>| {

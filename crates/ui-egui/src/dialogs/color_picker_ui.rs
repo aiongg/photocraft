@@ -5,7 +5,8 @@
 //! serves the dialog's screen pick, Add to Swatches and canvas eyedropper, previews the picked
 //! colour in its parent ([`live_preview`]) and commits an OK to the target ([`commit`]). A hosted
 //! dialog's colour row opens a child with [`open_for_request`] and pulls the answer with
-//! [`answer_for`].
+//! [`answer_for`]; a window the app holds itself opens one with [`open_for_window`] and pulls the
+//! answer with [`answer_for_window`].
 
 use craft::cms::convert::CmykConverter;
 use craft::color::ui::{ColorPickerDialog, ColorPickerResult, PickedColor};
@@ -44,8 +45,25 @@ pub(crate) enum PickTarget {
     NoteColor,
     /// The pasteboard's custom colour.
     Pasteboard,
-    /// A colour row `key` of the app-held Preferences window; the answer waits in [`answer_for_window`].
-    Window { key: String },
+    /// A colour row `key` of `window`, which the app holds itself; the answer waits in [`answer_for_window`].
+    Window { window: PickWindow, key: String },
+}
+
+/// The windows the app holds itself (no parent dialog) that open a Color Picker for a colour of theirs. Each one's
+/// picker and answers are its own: one window closing never takes another's picker.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub(crate) enum PickWindow {
+    /// The Preferences window's colour rows.
+    Preferences,
+    /// The Properties panel's colour wells (an adjustment layer's colours).
+    Properties,
+}
+
+impl PickWindow {
+    /// The id under which this window's answers wait in `app.color_answers`.
+    fn answers(self) -> DialogId {
+        egui::Id::new(("pc-color-picker-window", self))
+    }
 }
 
 impl PickTarget {
@@ -58,7 +76,7 @@ impl PickTarget {
             PickTarget::Shape(_) => "shape".into(),
             PickTarget::SolidFill { .. } => "solidFill".into(),
             PickTarget::NewSolidFill { .. } => "newSolidFill".into(),
-            PickTarget::Request { key, .. } | PickTarget::Window { key } => key.clone(),
+            PickTarget::Request { key, .. } | PickTarget::Window { key, .. } => key.clone(),
             PickTarget::CropShield => "cropShield".into(),
             PickTarget::ArtboardBackground => "artboardBackground".into(),
             PickTarget::NoteColor => "noteColor".into(),
@@ -73,7 +91,7 @@ impl PickTarget {
 enum Identity<'a> {
     Plain(&'static str),
     Request(DialogId, &'a str),
-    Window(&'a str),
+    Window(PickWindow, &'a str),
     Command(&'a str, Option<u64>),
     Shape(bool, Option<u64>),
     SolidFill(u64, u64),
@@ -90,18 +108,13 @@ impl PickTarget {
             PickTarget::NoteColor => Identity::Plain("noteColor"),
             PickTarget::Pasteboard => Identity::Plain("pasteboard"),
             PickTarget::Request { parent, key } => Identity::Request(*parent, key),
-            PickTarget::Window { key } => Identity::Window(key),
+            PickTarget::Window { window, key } => Identity::Window(*window, key),
             PickTarget::Command { command, document, .. } => Identity::Command(command, document.map(|d| d.0)),
             PickTarget::Shape(t) => Identity::Shape(t.which == crate::shape_fill_ui::Paint::Stroke, t.layer.map(|l| l.0)),
             PickTarget::SolidFill { document, layer } => Identity::SolidFill(document.0, layer.0),
             PickTarget::NewSolidFill { document } => Identity::NewSolidFill(document.0),
         }
     }
-}
-
-/// The parent id under which the Preferences window's answers wait in `app.color_answers`.
-fn window_parent() -> DialogId {
-    egui::Id::new("pc-color-picker-window")
 }
 
 /// `"#rrggbb"` of channels in 0..1.
@@ -237,27 +250,29 @@ pub(crate) fn answer_for(app: &mut PhotocraftApp, parent: DialogId) -> Option<(S
     Some((key, color))
 }
 
-/// Opens the picker for a colour row of the app-held Preferences window (no parent dialog).
-pub(crate) fn open_for_window(app: &mut PhotocraftApp, request: ColorRequest) -> DialogId {
-    let target = PickTarget::Window { key: request.key.clone() };
+/// Opens the picker for a colour row of `window`, which the app holds itself (no parent dialog).
+pub(crate) fn open_for_window(app: &mut PhotocraftApp, window: PickWindow, request: ColorRequest) -> DialogId {
+    let target = PickTarget::Window { window, key: request.key.clone() };
     launch(app, ColorPickerDialog::from_request(titled(request)), None, target)
 }
 
-/// The oldest confirmed colour of the Preferences window's picker, once.
-pub(crate) fn answer_for_window(app: &mut PhotocraftApp) -> Option<(String, Srgba)> {
-    answer_for(app, window_parent())
+/// The oldest confirmed colour of `window`'s picker, once.
+pub(crate) fn answer_for_window(app: &mut PhotocraftApp, window: PickWindow) -> Option<(String, Srgba)> {
+    answer_for(app, window.answers())
 }
 
-/// Cancels the picker the Preferences window opened, when it is still open (the window closed over it).
-pub(crate) fn cancel_window_picker(app: &mut PhotocraftApp, ctx: &egui::Context) {
-    if let Some((id, _)) = find(app, |t| matches!(t, PickTarget::Window { .. })) {
+/// Cancels the picker `window` opened, when it is still open (the window closed over it).
+pub(crate) fn cancel_window_picker(app: &mut PhotocraftApp, ctx: &egui::Context, window: PickWindow) {
+    if let Some((id, _)) = find(app, |t| matches!(t, PickTarget::Window { window: w, .. } if *w == window)) {
         app.framework.dialogs.cancel_by_id(ctx, id);
     }
 }
 
-/// Whether the Preferences window's picker is open, as the dialog host knows it.
-pub(crate) fn window_picker_open(app: &PhotocraftApp) -> bool {
-    app.color_targets.iter().any(|(id, t)| matches!(t, PickTarget::Window { .. }) && app.framework.dialogs.get_by_id::<ColorPickerDialog>(*id).is_some())
+/// Whether `window`'s picker is open, as the dialog host knows it.
+pub(crate) fn window_picker_open(app: &PhotocraftApp, window: PickWindow) -> bool {
+    app.color_targets
+        .iter()
+        .any(|(id, t)| matches!(t, PickTarget::Window { window: w, .. } if *w == window) && app.framework.dialogs.get_by_id::<ColorPickerDialog>(*id).is_some())
 }
 
 /// The Color Picker, when it is the top dialog (another dialog opened over it takes the input).
@@ -383,8 +398,8 @@ fn commit(app: &mut PhotocraftApp, _id: DialogId, target: PickTarget, picked: &P
             app.color_answers.push((*parent, key.clone(), picked.color));
             Ok(json!({ "color": color }))
         }
-        PickTarget::Window { key } => {
-            app.color_answers.push((window_parent(), key.clone(), picked.color));
+        PickTarget::Window { window, key } => {
+            app.color_answers.push((window.answers(), key.clone(), picked.color));
             Ok(json!({ "color": color }))
         }
         PickTarget::CropShield => {

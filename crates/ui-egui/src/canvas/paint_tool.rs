@@ -371,7 +371,11 @@ impl CanvasTool for PaintTool<'_> {
             if moved || hold_due(app, now_ms) {
                 push_point(app, stroke, [x, y]);
             }
-            crate::stroke_trail::feed(app, stroke.tool, &stroke.points);
+            // The canvas shows a live stroke itself; a stroke without one (a retouch tool that
+            // paints on release, a live stroke that could not start) shows its footprint trail.
+            if !(strokes_live(stroke.tool) && app.live_stroke.is_some()) {
+                crate::stroke_trail::feed(app, stroke.tool, &stroke.points);
+            }
         });
     }
 

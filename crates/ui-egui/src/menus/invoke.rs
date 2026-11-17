@@ -62,7 +62,6 @@ fn keeps_box_drag(id: &str) -> bool {
         "view.actualPixels",
         "view.rotateView",
         "view.resetView",
-        "view.screenMode.cycle",
         "view.darkenInterface",
         "view.lightenInterface",
     ];
@@ -707,6 +706,12 @@ fn type_command_target(app: &PhotocraftApp) -> Option<Value> {
 fn invoke_view_command(app: &mut PhotocraftApp, ctx: &egui::Context, id: &str, params: &Value) -> Option<Result<Value, String>> {
     match id {
         "view.zoomIn" | "view.zoomOut" | "view.fitOnScreen" | "view.actualPixels" => Some(app.run(id, params.clone())),
+        // The canvas's other view commands (200%, Print Size, Fill Screen, the fits, the rotate rows) run as the menu
+        // bar's pick runs them: fired to the canvas, which applies and records them in its next pass.
+        v if crate::shortcut_dispatch::is_view_command(v) => Some(match crate::shortcut_dispatch::fire_bridged(ctx, v) {
+            Some(true) => Ok(Value::Null),
+            _ => Err(format!("{v} is unavailable: no canvas can run it")),
+        }),
         // A menu row's Alternate: the adjustment's dialog with its last settings. `invoke` notes the palette recent.
         a if params.get("lastSettings").and_then(Value::as_bool) == Some(true) && crate::adjust_dialog::has_dialog(a) => {
             Some(crate::adjust_dialog::open_last(app, a).map(dialog_reply))
