@@ -44,6 +44,15 @@ pub(crate) fn dialog_tool<'a>(scope: &'a ToolScope<'a>, state: &'a mut DialogToo
     Some(Box::new(DialogTool { scope, state, pick }))
 }
 
+/// Ends the gesture of a dialog's pick when a pass of its press runs without the pick: a dialog opened above the one
+/// that armed it, or the pick disarmed. Nothing of the gesture resumes when the pick comes back; what it applied
+/// stays (production stops the Pattern Fill drag on a nested dialog).
+pub(crate) fn end_if_disarmed(app: &crate::PhotocraftApp, state: &mut DialogTools, host: CanvasHost) {
+    if app.session.active_index() != Some(host.idx) || canvas_input::armed(app).is_none() {
+        *state = DialogTools::default();
+    }
+}
+
 /// Whether the pick samples a colour from the image, so the precise cursor (Caps Lock) shows a crosshair.
 fn samples(pick: DialogPick) -> bool {
     matches!(pick, DialogPick::TonePicker(_) | DialogPick::Color | DialogPick::ParamDropper | DialogPick::ColorRange)

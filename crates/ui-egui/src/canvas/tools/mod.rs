@@ -508,6 +508,9 @@ fn with_rig<R>(
     let crop_run = (fam == Family::Crop).then(|| crate::crop_ui::CropRun::of(app)).flatten();
     let mut crop_tool = crop_run.as_ref().map(|_| std::mem::take(&mut tools.crop.tool));
     let in_gesture = ToolHost::in_gesture(ctx, host.canvas_id());
+    if in_gesture && tools.gesture_pick == GesturePick::Dialog {
+        dialog::end_if_disarmed(app, &mut tools.dialog, host);
+    }
     // The open Free Transform session moves into the pass and back after it, so its tool borrows the session, not the
     // app. Only the primary canvas draws and drives the box; a secondary window's tool is the selected tool's own. A
     // gesture another pick began leaves it in the app, where that tool edits it: the Frame tool's press on an image
