@@ -755,11 +755,12 @@ fn failed_stale_pen_commit_preserves_the_draft_until_retry() {
         draft.as_mut().unwrap().commit_failed = true;
         let owner = app.ui.pen_doc;
         app.session.execute("file.new", json!({"width": 200, "height": 200})).unwrap();
-        // The new document is the one the Paths panel selection belongs to once a pass has seen it.
+        app.session.authorize = Some(|_, _| Err(photocraft_engine::EngineError::Other("test rejection".into())));
+        // The new document is the one the Paths panel selection belongs to once a pass has seen it. The pass finds the
+        // old draft stale and its commit refused, which is the state the actions below meet.
         app.sync_views();
         app.ui.tool_options.vector_mode = VectorMode::Shape;
         app.ui.selected_path = Some("foreign named path".into());
-        app.session.authorize = Some(|_, _| Err(photocraft_engine::EngineError::Other("test rejection".into())));
         match action {
             "pen" => testing::press(&mut app, [150.0, 150.0], Modifiers::NONE),
             "curvature" => {

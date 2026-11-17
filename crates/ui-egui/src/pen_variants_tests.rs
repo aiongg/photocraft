@@ -21,6 +21,14 @@ fn work_path(app: &PhotocraftApp) -> Path {
     app.session.active().unwrap().doc.work_path.clone().expect("a work path")
 }
 
+/// Lets the double-click time pass: a click on the spot of the last one would be a double click, which toggles an
+/// anchor between smooth and corner.
+fn pause(app: &mut PhotocraftApp) {
+    for _ in 0..60 {
+        testing::frame(app);
+    }
+}
+
 fn click(app: &mut PhotocraftApp, x: f64, y: f64) {
     tool_event(app, ToolEvent::Down { x, y, pressure: 1.0 }, Modifiers::NONE);
     tool_event(app, ToolEvent::Up { x, y }, Modifiers::NONE);
@@ -230,6 +238,7 @@ fn the_curvature_pen_carries_on_an_open_path() {
     let steps = |app: &PhotocraftApp| app.session.active().unwrap().history.past_len();
     let at = steps(&app);
     app.ui.tool = Tool::CurvaturePen;
+    pause(&mut app);
     click(&mut app, 80.0, 80.0);
     assert!(app.ui.pen.is_none(), "the click selects the endpoint, it draws nothing");
     click(&mut app, 140.0, 120.0);
@@ -252,6 +261,7 @@ fn the_curvature_pen_carries_on_an_open_path() {
     assert!((mid.in_ctrl.x - mid.anchor.x) * (mid.out_ctrl.x - mid.anchor.x) < 0.0, "handles on either side: {mid:?}");
     // While it draws on, the Curvature Pen moves only the new anchors: a press on an old corner
     // adds an anchor there.
+    pause(&mut app);
     click(&mut app, 200.0, 80.0);
     click(&mut app, 260.0, 40.0);
     click(&mut app, 80.0, 20.0);
@@ -311,6 +321,7 @@ fn a_carried_on_endpoint_starts_a_new_curvature_run() {
     let fresh = work_path(&draw(&[(400.0, 300.0), (550.0, 150.0), (700.0, 300.0)])).subpaths[0].knots.clone();
     let mut app = draw(&[(100.0, 300.0), (250.0, 150.0), (400.0, 300.0)]);
     let before = work_path(&app).subpaths[0].knots.clone();
+    pause(&mut app);
     click(&mut app, 400.0, 300.0);
     assert!(app.ui.pen.is_none(), "the click selects the endpoint, it draws nothing");
     click(&mut app, 550.0, 150.0);
