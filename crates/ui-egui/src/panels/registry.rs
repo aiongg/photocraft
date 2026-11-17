@@ -113,7 +113,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         rows: super::swatches_ui::panel_rows,
         states: super::swatches_ui::command_states,
         run: super::swatches_ui::run_fired,
-        ..panel("swatches", || tl!("Swatches").to_string(), "swatch-book", LEAST, super::swatches_ui::panel)
+        ..panel("swatches", || tl!("Swatches").to_string(), "swatch_book", LEAST, super::swatches_ui::panel)
     },
     panel("gradients", || tl!("Gradients").to_string(), "blend", LEAST, super::preset_panels::gradients_panel),
     panel("patterns", || tl!("Patterns").to_string(), "grid", LEAST, super::preset_panels::patterns_panel),
@@ -142,7 +142,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         rows: super::histogram_panel::panel_rows,
         states: super::histogram_panel::command_states,
         run: super::histogram_panel::run_fired,
-        ..panel("histogram", || tl!("Histogram").to_string(), "chart-line", LEAST, |app, ui| scrolled(app, ui, super::histogram_panel::show))
+        ..panel("histogram", || tl!("Histogram").to_string(), "chart_line", LEAST, |app, ui| scrolled(app, ui, super::histogram_panel::show))
     },
     panel("info", || tl!("Info").to_string(), "info", LEAST, |app, ui| scrolled(app, ui, super::info::info_panel)),
     PanelEntry {
@@ -174,7 +174,7 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         rows: super::channels_panel::panel_rows,
         states: super::channels_panel::command_states,
         run: super::channels_panel::run_fired,
-        ..panel("channels", || tl!("Channels").to_string(), "squares-intersect", 110.0, super::channels_panel::show)
+        ..panel("channels", || tl!("Channels").to_string(), "squares_subtract", 110.0, super::channels_panel::show)
     },
     panel("paths", || tl!("Paths").to_string(), "pen_tool", 110.0, crate::vector_ui::paths_panel),
     PanelEntry { heights: Some(BRUSHES_HEIGHTS), ..panel("brushes", || tl!("Brushes").to_string(), "brush", 70.0, super::brush_panel::brushes::panel) },
@@ -210,19 +210,19 @@ pub(crate) static PANELS: &[PanelEntry] = &[
         )
     },
     // Glyphs and Measurement Log hold collections that scroll themselves.
-    floating("glyphs", || tl!("Glyphs").to_string(), "text-cursor", [360.0, 320.0], super::type_panels_ui::glyphs::body),
+    floating("glyphs", || tl!("Glyphs").to_string(), "text_cursor", [360.0, 320.0], super::type_panels_ui::glyphs::body),
     // The Timeline docks below the canvas; it lays out its own tracks.
-    panel("timeline", || tl!("Timeline").to_string(), "square-split-vertical", LEAST, super::timeline_ui::body),
+    panel("timeline", || tl!("Timeline").to_string(), "split_horizontal", LEAST, super::timeline_ui::body),
     PanelEntry {
         rows: super::brush_panel::panel_rows,
         states: super::brush_panel::command_states,
         run: super::brush_panel::run_fired,
-        ..floating("brushSettings", || tl!("Brush Settings").to_string(), "brush-cleaning", [520.0, 460.0], super::brush_settings::brush_settings)
+        ..floating("brushSettings", || tl!("Brush Settings").to_string(), "brush_cleaning", [520.0, 460.0], super::brush_settings::brush_settings)
     },
     floating("modifierKeys", || tl!("Modifier Keys").to_string(), "keyboard", [240.0, 140.0], |app, ui| scrolled(app, ui, crate::modifier_keys::panel)),
     floating("gradientEditor", || tl!("Gradient Editor").to_string(), "blend", [520.0, 440.0], |app, ui| scrolled(app, ui, crate::gradient_ui::editor::show)),
     floating("measurementLog", || tl!("Measurement Log").to_string(), "ruler", [620.0, 320.0], crate::tools::analysis::log_panel::body),
-    floating("notes", || tl!("Notes").to_string(), "square-plus", [260.0, 300.0], |app, ui| scrolled(app, ui, crate::tools::analysis::notes_panel::body)),
+    floating("notes", || tl!("Notes").to_string(), "square_plus", [260.0, 300.0], |app, ui| scrolled(app, ui, crate::tools::analysis::notes_panel::body)),
 ];
 
 /// The Color panel menu's states, from the panel's own state.

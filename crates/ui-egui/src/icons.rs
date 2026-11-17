@@ -65,4 +65,50 @@ mod tests {
             assert!(has_icon(&IconId::new(name)), "{name}");
         }
     }
+
+    /// Every panel's iconic form draws the registry's icon, so each registry name resolves.
+    #[test]
+    fn every_panel_icon_resolves() {
+        register();
+        for panel in crate::panels::registry::PANELS {
+            assert!(has_icon(&IconId::new(panel.icon)), "panel {}: icon {:?} is not in the catalog", panel.id, panel.icon);
+        }
+    }
+
+    fn sources(dir: &std::path::Path, out: &mut Vec<std::path::PathBuf>) {
+        for entry in std::fs::read_dir(dir).expect("source dir reads").flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                sources(&path, out);
+            } else if path.extension().is_some_and(|ext| ext == "rs") {
+                out.push(path);
+            }
+        }
+    }
+
+    /// An unknown id paints nothing and only logs, so every id written as a string literal in the sources must resolve.
+    /// Ids built in match arms are not scanned.
+    #[test]
+    fn every_icon_id_literal_in_the_sources_resolves() {
+        register();
+        let form = concat!("IconId", "::new(\"");
+        let mut files = Vec::new();
+        sources(&std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("src"), &mut files);
+        let (mut seen, mut unknown) = (0, Vec::new());
+        for file in files.iter().filter(|file| !file.ends_with("icons.rs")) {
+            let text = std::fs::read_to_string(file).expect("source reads");
+            for (number, line) in text.lines().enumerate().filter(|(_, line)| !line.trim_start().starts_with("//")) {
+                for (at, _) in line.match_indices(form) {
+                    let rest = &line[at + form.len()..];
+                    let Some(end) = rest.find('"') else { continue };
+                    seen += 1;
+                    if !has_icon(&IconId::new(&rest[..end])) {
+                        unknown.push(format!("{}:{}: {:?}", file.display(), number + 1, &rest[..end]));
+                    }
+                }
+            }
+        }
+        assert!(seen > 20, "the scan found {seen} icon ids: its pattern no longer matches the sources");
+        assert!(unknown.is_empty(), "icon ids that are not in the catalog:\n{}", unknown.join("\n"));
+    }
 }

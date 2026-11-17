@@ -83,7 +83,7 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
 fn footer_menu_arrow(ui: &mut egui::Ui, rect: Rect) {
     let arrow = Rect::from_min_size(rect.right_bottom() - vec2(11.0, 10.0), vec2(9.0, 9.0));
     ui.scope_builder(egui::UiBuilder::new().max_rect(arrow), |ui| {
-        Icon::new(IconSpec::svg(IconId::new("chevron-down"))).show(ui);
+        Icon::new(IconSpec::svg(IconId::new("chevron_down"))).show(ui);
     });
 }
 
