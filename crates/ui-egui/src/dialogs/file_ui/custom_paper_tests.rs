@@ -197,7 +197,10 @@ fn custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened() {
             .query_all_by(|n| matches!(n.role(), egui::accesskit::Role::Dialog | egui::accesskit::Role::Window | egui::accesskit::Role::ComboBox))
             .map(|n| (n.accesskit_node().role(), n.accesskit_node().label(), n.accesskit_node().value(), n.rect()))
             .collect();
-        eprintln!("DIAG custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened: new {id:?} open {open:?} nodes {windows:?} letter {}", shown(&h, "Letter"));
+        eprintln!(
+            "DIAG custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened: new {id:?} open {open:?} nodes {windows:?} letter {}",
+            shown(&h, "Letter")
+        );
     }
     assert!(shown(&h, "Custom"), "reopening array-valued settings must show Custom");
     assert_eq!(fields(&h, id)["paper"], json!([522.0, 666.0]));

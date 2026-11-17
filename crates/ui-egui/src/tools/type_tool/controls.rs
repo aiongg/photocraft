@@ -306,6 +306,22 @@ fn frame_box(app: &mut PhotocraftApp, ui: &mut egui::Ui, canvas: egui::Rect, id:
     let out = TransformBox::text_frame(Label::from(&*tl!("Text frame")), Bind::given(BoxState::new(quad, quad[0].midpoint(quad[2]))), start)
         .overflow(overflow)
         .show_at(ui, canvas);
+    // DIAG: the frame's events of the paragraph-handle test, with the box each carries and what the preview holds.
+    if std::thread::current().name().is_some_and(|name| name.ends_with("every_paragraph_box_handle_resizes_the_box_with_snapping_on")) {
+        for event in out.edit.events.iter() {
+            eprintln!(
+                "DIAG every_paragraph_box_handle_resizes_the_box_with_snapping_on: frame event {:?} cancel {:?} value {:?} proposed {:?} landed {:?} holds {} wanted {:?} given {:?}",
+                event.phase(),
+                out.edit.events.cancel_reason(),
+                event.value().and_then(|state| box_of(state, &aff)),
+                event.value().map(|state| state.quad),
+                event.landed().and_then(|state| box_of(state, &aff)),
+                crate::type_box_preview::holds_drag(app),
+                dragged,
+                quad
+            );
+        }
+    }
     for event in out.edit.events.iter() {
         match event.phase() {
             Some(GesturePhase::Begin) => {

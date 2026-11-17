@@ -158,11 +158,8 @@ fn sync_view_to_document(app: &PhotocraftApp, view: &mut View, doc: &Document, r
     let aspect = app.ui.view.display_aspect();
     if (view.fit_pending || view.fill_pending) && rect.width() > 50.0 {
         // The view lies inside the rulers' strips while they show (`Canvas::show_rulers`).
-        let rect = if app.ui.extras.rulers {
-            craft::ui::style::StyleCx::with_root(app.ctx(), |cx| craft::ui::canvas::Rulers::content_rect(cx, rect))
-        } else {
-            rect
-        };
+        let rect =
+            if app.ui.extras.rulers { craft::ui::style::StyleCx::with_root(app.ctx(), |cx| craft::ui::canvas::Rulers::content_rect(cx, rect)) } else { rect };
         let mut camera = view.canvas_view(rect, ppp, app.ui.view.flip_horizontal, aspect);
         let document = Size::new(f64::from(size[0]), f64::from(size[1]));
         // Fit wins over fill, as the fit cleared both flags.
