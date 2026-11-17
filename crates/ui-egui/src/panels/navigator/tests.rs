@@ -21,6 +21,8 @@ fn whole_app(animated_zoom: bool) -> Harness<'static, PhotocraftApp> {
         app.sync_views();
         app
     });
+    // The harness sets egui's animation time to zero, which turns the framework's motion off; the ease needs it on.
+    h.ctx.all_styles_mut(|style| style.animation_time = egui::Style::default().animation_time);
     h.run_steps(6);
     let view = &mut h.state_mut().ui.views[0];
     view.fit_pending = false;
@@ -55,6 +57,15 @@ fn navigator_viewport_follows_the_canvas_zoom_ease() {
     let midway = (0..30).any(|_| {
         h.run_steps(1);
         let row = percents(&h);
+        let space = craft::ui::canvas::ToolHost::shown_space(&h.ctx, crate::canvas::CanvasHost::main(0).canvas_id());
+        eprintln!(
+            "DIAG navigator_viewport_follows_the_canvas_zoom_ease: row={row:?} space={:?} time={} animation_time={} view_zoom={} request={}",
+            space.map(|s| (s.view.zoom, s.target().zoom, s.easing())),
+            h.ctx.input(|i| i.time),
+            h.ctx.global_style().animation_time,
+            h.state().ui.views[0].zoom,
+            h.state().ui.views[0].zoom_animating
+        );
         let between = row.iter().any(|p| *p > 100.5 && *p < 199.5);
         seen.push(row);
         between

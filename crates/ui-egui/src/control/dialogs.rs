@@ -394,6 +394,20 @@ fn set(app: &mut PhotocraftApp, ctx: &egui::Context, id: DialogId, p: &Value) ->
             err(format!("the dialog refused `{field}`"))
         };
     }
+    // An adjustment dialog lists the command's parameters beside the host's own fields (Preview, the picker, the shown
+    // channel, the clipping display): a set of a parameter is an edit of the parameters, read into the dialog's value
+    // as the engine reads them.
+    if !matches!(field, "preview" | "picker" | "channel" | "clipping")
+        && let Some(mut params) = app.adjust_open.as_ref().filter(|open| open.id == id).and_then(|_| crate::adjust_dialog::open_params(app))
+        && params.get(field).is_some()
+    {
+        params[field] = value;
+        if !crate::adjust_dialog::apply_params(app, id, &params) {
+            return err(format!("the dialog refused `{field}`"));
+        }
+        crate::dialogs::take_results(app, ctx);
+        return ok(Value::Null);
+    }
     for (field, value) in map_request(app, id, field, value) {
         if let Err(e) = app.framework.dialogs.set_json_field(ctx, id, &field, value) {
             return err(e);

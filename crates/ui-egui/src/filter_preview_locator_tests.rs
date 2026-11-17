@@ -52,10 +52,15 @@ fn control(h: &mut Harness<'static, PhotocraftApp>, method: &str, params: Value)
     h.run_steps(2);
 }
 
-/// The screen point of document point `p` in the shown view.
-fn screen(h: &Harness<'static, PhotocraftApp>, p: [f64; 2]) -> Pos2 {
-    // PLAN: assumed `canvas::testing::to_screen(&PhotocraftApp, [f64; 2]) -> Pos2` (cw.P2b).
-    crate::canvas::testing::to_screen(h.state(), p)
+/// The shown view's canvas rect.
+fn canvas_rect(h: &Harness<'static, PhotocraftApp>) -> egui::Rect {
+    crate::canvas::testing::view(h.state()).expect("the canvas shows a view").rect
+}
+
+/// The document point under screen point `p` in the shown view.
+fn doc(h: &Harness<'static, PhotocraftApp>, p: Pos2) -> [f64; 2] {
+    let at = crate::canvas::testing::view(h.state()).expect("the canvas shows a view").to_doc(p);
+    [at.x, at.y]
 }
 
 fn dialog_id(h: &Harness<'static, PhotocraftApp>) -> DialogId {
@@ -118,21 +123,25 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
     let before = edits(&h);
 
     // Over the image (left of the dialog) the pointer is the locator square; over the dialog it is
-    // the normal pointer.
-    let a_doc = [70.0, 230.0];
-    let a = screen(&h, a_doc);
+    // the normal pointer. The points are on the canvas in the strip at its left edge, clear of the dialog
+    // that opens centred over it.
+    let r = canvas_rect(&h);
+    let a = pos2(r.left() + 40.0, r.bottom() - 80.0);
+    let a_doc = doc(&h, a);
+    assert!(!near(a_doc, [200.0, 150.0]), "the point is off the default centre: {a_doc:?}");
     // The cursor a pass shows follows the hover the pass before registered: one more pass after the move.
     move_to(&mut h, a);
     h.run_steps(2);
     let locator = Some(Cursor::Painted(PaintedCursor::Locator));
     eprintln!(
-        "DIAG a_click_on_the_image_centres_the_smart_sharpen_preview: at {a:?} armed={:?} cursor={:?} canvas_rect={:?}",
+        "DIAG a_click_on_the_image_centres_the_smart_sharpen_preview: at {a:?} doc {a_doc:?} armed={:?} cursor={:?} canvas_rect={r:?} document_area={:?} screen={:?}",
         crate::dialogs::canvas_input::armed(h.state()),
         craft::ui::runtime::cursor::current(&h.ctx),
-        crate::canvas::testing::view(h.state()).map(|v| v.rect)
+        h.state().last_canvas_rect,
+        h.ctx.content_rect()
     );
     assert_eq!(craft::ui::runtime::cursor::current(&h.ctx), locator, "the locator replaces the pointer");
-    move_to(&mut h, pos2(600.0, 400.0));
+    move_to(&mut h, r.center());
     h.run_steps(2);
     assert_ne!(craft::ui::runtime::cursor::current(&h.ctx), locator, "over the dialog it is the normal pointer");
 
@@ -141,8 +150,8 @@ fn a_click_on_the_image_centres_the_smart_sharpen_preview() {
     assert!(near(centre(&h), a_doc), "{:?} vs {a_doc:?}", centre(&h));
 
     // A drag centres it where it was pressed: neither its moves nor its release move it on.
-    let b_doc = [85.0, 75.0];
-    let b = screen(&h, b_doc);
+    let b = pos2(r.left() + 40.0, r.top() + 100.0);
+    let b_doc = doc(&h, b);
     move_to(&mut h, b);
     button(&mut h, b, true);
     assert!(near(centre(&h), b_doc), "the press centres it: {:?} vs {b_doc:?}", centre(&h));
