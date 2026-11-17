@@ -9,7 +9,7 @@ use serde_json::{Value, json};
 const PANELS: [&str; 6] = ["color", "properties", "navigator", "history", "character", "layers"];
 
 const PRESETS: [(&str, &str, &[&str], bool); 6] = [
-    ("essentials", "Essentials", &["color", "properties", "layers"], false),
+    ("essentials", "Essentials", &["color", "properties", "navigator", "history", "layers"], false),
     ("photography", "Photography", &["properties", "navigator", "history", "layers"], false),
     ("painting", "Painting", &["color", "layers"], false),
     ("graphicAndWeb", "Graphic and Web", &["properties", "character", "layers"], false),
@@ -30,10 +30,9 @@ fn select(app: &mut PhotocraftApp, suffix: &str) {
     invoke(app, &format!("window.workspace.{suffix}"), json!({}));
 }
 
-/// Whether the Window menu shows `panel` as open.
+/// Whether the workspace holds `panel`, in a column of icons or not.
 fn is_open(app: &PhotocraftApp, panel: &str) -> bool {
-    let id = format!("window.panel.{panel}");
-    menus::menu_rows(app).iter().find(|row| row.command.id == id).and_then(|row| row.kind.checked()) == Some(true)
+    app.ui.docking.layout.contains(&panel.to_owned())
 }
 
 fn shown(app: &PhotocraftApp) -> Vec<&'static str> {
@@ -167,18 +166,17 @@ fn legacy_workspace_without_timeline_visibility_still_loads() {
     assert!(!is_open(&app, "timeline"));
 }
 
+/// A preset replaces the arrangement: the shell preferences and the lock stay, and the toolbar, a panel of the
+/// arrangement, is in every preset.
 #[test]
 fn presets_preserve_shell_preferences_and_workspace_lock() {
     let mut app = app();
-    app.ui.panels.toolbar = false;
-    app.ui.panels.toolbar_double = true;
     app.ui.panels.options_bar = false;
     app.ui.panels.status_bar = false;
     app.workspaces.set.locked = true;
     for (suffix, _, _, _) in PRESETS {
         select(&mut app, suffix);
-        assert!(!app.ui.panels.toolbar);
-        assert!(app.ui.panels.toolbar_double);
+        assert!(is_open(&app, "toolbar"), "{suffix} has the toolbar");
         assert!(!app.ui.panels.options_bar);
         assert!(!app.ui.panels.status_bar);
         assert!(app.workspaces.set.locked);

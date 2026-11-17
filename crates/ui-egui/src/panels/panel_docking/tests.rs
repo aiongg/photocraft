@@ -5,6 +5,7 @@
 
 use super::*;
 use craft::behavior::dock::{Action, Column, DockEdge, DockPlacement, Layout, Node, PanelPlace};
+use craft::ui::docking::DockSizes;
 use serde_json::{Value, json};
 
 use crate::panels::registry;
@@ -28,14 +29,23 @@ fn floating(app: &PhotocraftApp, panel: &str) -> bool {
     app.ui.docking.layout.floating.iter().any(|window| window.contains(panel))
 }
 
-/// The panel's dock group or floating window is minimized.
+/// The panel's group is minimized.
 fn minimized(app: &PhotocraftApp, panel: &str) -> bool {
     let layout = &app.ui.docking.layout;
-    match layout.place(&panel.to_owned()) {
-        Some(PanelPlace::Floating { window, .. }) => layout.floating[window].minimized,
-        Some(place) => layout.group(&place).is_some_and(|group| group.minimized),
-        None => false,
-    }
+    layout.place(&panel.to_owned()).is_some_and(|place| layout.group(&place).is_some_and(|group| group.minimized))
+}
+
+/// The panel's column is collapsed to icons.
+fn iconic(app: &PhotocraftApp, panel: &str) -> bool {
+    let layout = &app.ui.docking.layout;
+    layout.place(&panel.to_owned()).and_then(|place| layout.column(&place)).is_some_and(|column| column.iconic)
+}
+
+/// The selected tab of the group holding `panel`.
+fn active_tab(app: &PhotocraftApp, panel: &str) -> Option<String> {
+    let layout = &app.ui.docking.layout;
+    let place = layout.place(&panel.to_owned())?;
+    layout.group(&place)?.active_panel().cloned()
 }
 
 fn control_set(app: &mut PhotocraftApp, ctx: &egui::Context, params: Value) -> Value {
@@ -66,21 +76,26 @@ type Check = fn(&PhotocraftApp) -> bool;
 #[test]
 fn window_panel_ids_drive_the_workspace() {
     let mut app = app();
-    assert!(!is_shown(&app, "navigator"), "Navigator starts closed in the default workspace");
+    assert!(!is_shown(&app, "character"), "Character starts closed in the default workspace");
+    assert!(is_shown(&app, "navigator") && iconic(&app, "navigator") && !is_front(&app, "navigator"), "Navigator starts as an icon");
 
     // One row per request: id, params, and what holds afterwards. `row` makes each closure a `Check`.
     let row = |id: &'static str, params: Value, holds: Check| (id, params, holds);
     let rows = vec![
         // Without `show`: a hidden panel comes to the front, a front one closes (both id families).
-        row("window.panel.navigator", json!({}), |a| is_front(a, "navigator")),
-        row("window.panel.navigator", json!({}), |a| !is_shown(a, "navigator")),
-        row("window.toggle.navigator", json!({}), |a| is_front(a, "navigator")),
-        row("window.toggle.navigator", json!({}), |a| !is_shown(a, "navigator")),
+        row("window.panel.character", json!({}), |a| is_front(a, "character")),
+        row("window.panel.character", json!({}), |a| !is_shown(a, "character")),
+        row("window.toggle.character", json!({}), |a| is_front(a, "character")),
+        row("window.toggle.character", json!({}), |a| !is_shown(a, "character")),
         // With `show`: true never hides, even on the second call.
-        row("window.toggle.navigator", json!({"show": true}), |a| is_front(a, "navigator")),
-        row("window.toggle.navigator", json!({"show": true}), |a| is_front(a, "navigator")),
-        row("window.toggle.navigator", json!({"show": false}), |a| !is_shown(a, "navigator")),
+        row("window.toggle.character", json!({"show": true}), |a| is_front(a, "character")),
+        row("window.toggle.character", json!({"show": true}), |a| is_front(a, "character")),
+        row("window.toggle.character", json!({"show": false}), |a| !is_shown(a, "character")),
+        // A panel in a column of icons opens its flyout and, toggled again, closes it; it stays in the layout.
+        row("window.panel.navigator", json!({}), |a| is_front(a, "navigator") && iconic(a, "navigator")),
+        row("window.panel.navigator", json!({}), |a| is_shown(a, "navigator") && !is_front(a, "navigator")),
         row("window.panel.brushes", json!({}), |a| is_front(a, "brushes")),
+        row("window.panel.brushes", json!({"show": false}), |a| is_shown(a, "brushes") && !is_front(a, "brushes")),
         // A tab behind another one comes to the front.
         row("window.panel.channels", json!({}), |a| is_front(a, "channels") && !is_front(a, "layers")),
         row("window.toggle.layers", json!({"show": true}), |a| is_front(a, "layers")),
@@ -104,6 +119,9 @@ fn window_panel_ids_drive_the_workspace() {
         row("window.panel.float", json!({"panel": "properties", "x": 50, "y": 70, "width": 330, "height": 410}), |a| floating(a, "properties")),
         row("window.panel.minimize", json!({"panel": "properties", "minimized": true}), |a| minimized(a, "properties")),
         row("window.panel.minimize", json!({"panel": "properties", "minimized": false}), |a| !minimized(a, "properties")),
+        // A column collapses to icons and expands again; a floating column does too, and keeps its icons floating.
+        row("window.panel.iconic", json!({"panel": "properties"}), |a| iconic(a, "properties") && floating(a, "properties")),
+        row("window.panel.iconic", json!({"panel": "properties", "iconic": false}), |a| !iconic(a, "properties")),
         row("window.panel.history", json!({"show": true}), |a| is_front(a, "history")),
         row("window.panel.layout", json!({"action": {"Float": {"panel": "history", "rect": [40, 60, 300, 300]}}}), |a| floating(a, "history")),
         row("ui.dock", json!({"action": {"Close": {"panel": "history"}}}), |a| !is_shown(a, "history")),
@@ -125,6 +143,7 @@ fn window_panel_ids_drive_the_workspace() {
     assert!(members.iter().all(|panel| !is_shown(&app, panel)), "{members:?}");
     invoke(&mut app, "window.panel.layers", json!({"show": true})).unwrap();
     assert!(is_front(&app, "layers"));
+    assert!(invoke(&mut app, "window.panel.iconic", json!({"panel": "toolbar"})).is_err(), "the toolbar never collapses to icons");
 
     // A floated panel docks back to where it floated from; a floating group docks all of its panels.
     let mut app = self::app();
@@ -136,8 +155,6 @@ fn window_panel_ids_drive_the_workspace() {
     assert_eq!(app.ui.docking.layout, before, "the panel is back where it was");
 
     invoke(&mut app, "window.panel.float", json!({"panel": "paths"})).unwrap();
-    // History is closed in the default workspace: a closed panel is not in the layout, so it opens first.
-    invoke(&mut app, "window.panel.history", json!({"show": true})).unwrap();
     invoke(&mut app, "window.panel.move", json!({"panel": "history", "anchor": "paths"})).unwrap();
     assert!(app.ui.docking.layout.floating.iter().any(|w| w.contains("paths") && w.contains("history")));
     invoke(&mut app, "window.panel.dock", json!({"panel": "paths", "group": true})).unwrap();
@@ -232,7 +249,7 @@ fn a_pre_docking_save_migrates_once() {
     let mut app = app();
     crate::dock::apply(&mut app, &old);
     assert!(!is_shown(&app, "swatches") && !is_shown(&app, "paths") && !is_shown(&app, "layerComps"), "hidden tabs are closed");
-    assert!(is_shown(&app, "history") && is_front(&app, "actions"), "the history group opens on its picked tab");
+    assert!(is_shown(&app, "history") && active_tab(&app, "history").as_deref() == Some("actions"), "the history group opens on its picked tab");
     assert!(is_front(&app, "gradients"), "the color group's picked tab is in front");
     assert!(minimized(&app, "properties"), "the collapsed group is minimized");
 
@@ -266,7 +283,9 @@ fn ui_set_dock_fields_map_onto_the_workspace_atomically() {
 
     // The end dock's total after a `dockWidth` request.
     assert!(ok(&mut app, json!({"dockWidth": 400.0})));
-    let total: f32 = end_columns(&app.ui.docking.layout).expect("the end dock").iter().filter_map(|column| column.width).sum();
+    let sizes = DockSizes::of(&ctx);
+    let total: f32 =
+        end_columns(&app.ui.docking.layout).expect("the end dock").iter().map(|column| sizes.width(column, &|panel: &String| spec(&app, panel))).sum();
     assert!((total - 400.0).abs() < 1.0, "{total}");
 
     // One bad field applies nothing, whatever the good fields say.
@@ -282,23 +301,22 @@ fn ui_set_dock_fields_map_onto_the_workspace_atomically() {
     }
 }
 
-/// A save carries the Timeline as a panel of the layout and leaves the host's chrome flags to the host.
+/// A save carries the Timeline as a panel of the layout and leaves the host's chrome flag to the host.
 #[test]
 fn a_saved_workspace_keeps_the_timeline_and_leaves_out_host_chrome() {
     let mut app = app();
     show_panel(&mut app, "timeline", Some(true)).unwrap();
-    app.ui.panels.rail = false;
     app.ui.panels.menu_bar = false;
     apply(&mut app, vec![Action::set_minimized("layers".to_owned(), true)]).unwrap();
     let written = crate::dock::snapshot(&app);
 
     let mut restored = self::app();
-    assert!(restored.ui.panels.rail && restored.ui.panels.menu_bar);
+    assert!(restored.ui.panels.menu_bar);
     crate::dock::apply(&mut restored, &written);
     assert!(is_shown(&restored, "timeline"), "the Timeline's open state is in the layout");
     assert!(!restored.ui.timeline.playing());
     assert!(minimized(&restored, "layers"));
-    assert!(restored.ui.panels.rail && restored.ui.panels.menu_bar, "the host keeps its own chrome flags");
+    assert!(restored.ui.panels.menu_bar, "the host keeps its own chrome flag");
 
     // A layout without the Timeline closes it.
     crate::dock::apply(&mut restored, &crate::dock::snapshot(&self::app()));
@@ -325,4 +343,87 @@ fn main_workspace_file_loads_as_the_default_and_saves_as_a_workspace() {
     let mut reloaded = self::app();
     crate::dock::apply(&mut reloaded, &written);
     assert_eq!((&reloaded.ui.docking.layout, &reloaded.ui.docking.hidden), (&app.ui.docking.layout, &app.ui.docking.hidden));
+}
+
+/// The dock edge the toolbar's column is docked on.
+fn toolbar_edge(app: &PhotocraftApp) -> Option<DockEdge> {
+    let layout = &app.ui.docking.layout;
+    let Some(PanelPlace::Dock { path, .. }) = layout.place(&registry::TOOLBAR.to_owned()) else { return None };
+    [DockEdge::Start, DockEdge::End].into_iter().find(|edge| layout.dock_path(*edge).as_ref() == Some(&path))
+}
+
+/// Essentials shows Color, Properties and Layers in front, and Navigator, History and Brushes as the icons of a collapsed
+/// column beside the canvas.
+#[test]
+fn essentials_keeps_navigator_history_and_brushes_as_icons() {
+    let app = app();
+    for panel in ["color", "properties", "layers"] {
+        assert!(is_front(&app, panel) && !iconic(&app, panel), "{panel} shows in the expanded column");
+    }
+    for panel in ["navigator", "history", "brushes"] {
+        assert!(iconic(&app, panel), "{panel} is an icon");
+        assert_eq!(app.ui.docking.layout.panel_state(&panel.to_owned()), PanelState::Open, "{panel} is open but not showing");
+    }
+    assert_eq!(toolbar_edge(&app), Some(DockEdge::Start), "the toolbar has the start dock to itself");
+}
+
+/// The Window menu's row of a panel in a collapsed column opens its flyout and, picked again, closes it: the layout does
+/// not change either time, and the row is checked while the flyout is open.
+#[test]
+fn the_window_menu_opens_and_closes_the_flyout_of_an_icon_panel() {
+    let mut app = app();
+    let before = saved(&app);
+    let checked =
+        |app: &PhotocraftApp| crate::menus::menu_rows(app).iter().find(|row| row.command.id == "window.panel.navigator").and_then(|row| row.kind.checked());
+    assert_eq!(checked(&app), Some(false));
+    invoke(&mut app, "window.panel.navigator", json!({})).unwrap();
+    assert_eq!(checked(&app), Some(true), "the flyout is open");
+    assert_eq!(app.ui.flyout.as_deref(), Some("navigator"));
+    invoke(&mut app, "window.panel.navigator", json!({})).unwrap();
+    assert_eq!(checked(&app), Some(false), "the flyout is closed");
+    assert_eq!(saved(&app), before, "the layout never changed");
+}
+
+/// The toolbar takes no tab, group or column of icons, floats as its own column, and docks at either edge.
+#[test]
+fn the_toolbar_shares_nothing_floats_and_docks_at_either_edge() {
+    let mut app = app();
+    let before = saved(&app);
+    for (id, params) in [
+        ("window.panel.move", json!({"panel": "toolbar", "anchor": "layers"})),
+        ("window.panel.move", json!({"panel": "toolbar", "anchor": "layers", "zone": "top"})),
+        ("window.panel.move", json!({"panel": "layers", "anchor": "toolbar"})),
+        ("window.panel.move", json!({"panel": "layers", "anchor": "toolbar", "zone": "bottom"})),
+        ("window.panel.iconic", json!({"panel": "toolbar"})),
+    ] {
+        assert!(invoke(&mut app, id, params.clone()).is_err(), "{id} {params}");
+        assert_eq!(saved(&app), before, "{id} {params}");
+    }
+
+    invoke(&mut app, "window.panel.float", json!({"panel": "toolbar", "column": true, "x": 80, "y": 90})).unwrap();
+    assert!(floating(&app, "toolbar") && toolbar_edge(&app).is_none());
+    invoke(&mut app, "window.panel.dock", json!({"panel": "toolbar", "column": true, "side": "end"})).unwrap();
+    assert_eq!(toolbar_edge(&app), Some(DockEdge::End));
+    invoke(&mut app, "window.panel.dock", json!({"panel": "toolbar", "column": true, "side": "start"})).unwrap();
+    assert_eq!(toolbar_edge(&app), Some(DockEdge::Start));
+}
+
+/// `ui.set toolbarColumns` sets the toolbar column's width in tool columns, from one to the toolbar's cells.
+#[test]
+fn ui_set_toolbar_columns_sets_the_toolbar_columns_steps() {
+    let mut app = app();
+    let ctx = app.ctx().clone();
+    let steps = |app: &PhotocraftApp| {
+        let layout = &app.ui.docking.layout;
+        layout.place(&registry::TOOLBAR.to_owned()).and_then(|place| layout.column(&place)).and_then(|column| column.steps)
+    };
+    assert!(control_set(&mut app, &ctx, json!({"toolbarColumns": 3}))["ok"] == true);
+    assert_eq!(steps(&app), Some(3));
+    assert!(control_set(&mut app, &ctx, json!({"toolbarColumns": 1}))["ok"] == true);
+    assert_eq!(steps(&app), Some(1));
+    for bad in [json!(0), json!(10_000), json!("two")] {
+        let before = saved(&app);
+        assert!(control_set(&mut app, &ctx, json!({"toolbarColumns": bad.clone()}))["ok"] != true, "{bad}");
+        assert_eq!(saved(&app), before, "{bad}");
+    }
 }

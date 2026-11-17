@@ -1,17 +1,18 @@
 use super::{PhotocraftApp, Tool, json, vec2};
+use craft::behavior::overlay::Side;
 use craft::color::ui::{PairWell, SwatchPair, Well};
-use craft::ui::contract::{Bind, Gap, PaneEdge, Props as _, Show as _, ShowContainer as _, clicked};
+use craft::ui::contract::{Bind, Gap, Props as _, Show as _, ShowContainer as _, clicked};
 use craft::ui::layout::RowAlign;
 use craft::ui::layout_components::{Row, Stack};
-use craft::ui::rails::{DrawerGroup, FlyoutButton, LastUsed, RailTool, ToolRail, ToolSlot, ToolbarDrawer, ToolbarEdit, apply_toolbar_edit};
+use craft::ui::rails::{
+    DrawerGroup, FlyoutButton, LastUsed, RailFooter, RailTool, ToolRail, ToolSlot, ToolbarDrawer, ToolbarEdit, apply_toolbar_edit, visible_slots,
+};
 use craft::ui::runtime::commands::CommandRef;
 use craft::ui::runtime::env::Label;
 use craft::ui::shell::ScreenModeButton;
 use photocraft_engine::prefs::ToolbarCustomization;
-use std::num::NonZeroU8;
 
 use super::tool_commands;
-use crate::state::ToolbarSide;
 
 #[cfg(test)]
 #[path = "toolbar_tab_reveal_tests.rs"]
@@ -136,10 +137,10 @@ fn last_used(slots: &[ToolSlot<Tool>], group_tools: &[Tool]) -> LastUsed<Tool> {
     last
 }
 
-/// The tool rail's column count: two while the header's column toggle asks for them. The shell's tools slot and the
-/// rail both take it.
-pub(crate) fn columns(app: &PhotocraftApp) -> usize {
-    if app.ui.panels.toolbar_double { 2 } else { 1 }
+/// The cells of the toolbar's grid: its visible slots and the Edit Toolbar button. The dock column's width in steps goes
+/// up to this many content columns.
+pub(crate) fn cells(app: &PhotocraftApp) -> usize {
+    visible_slots(&tool_commands::slots(&app.session.prefs().toolbar), &[]).len() + 1
 }
 
 /// The Edit in Quick Mask Mode command, which the rail's footer shows as a rail button.
@@ -153,14 +154,43 @@ fn quick_mask_button(app: &PhotocraftApp, ui: &mut egui::Ui) {
     let _ = FlyoutButton::new(&tools, &0).id_salt("quick-mask").selected(on).show(ui);
 }
 
-/// The rail's edge for the physical side the toolbar sits on: the rail names its edge by the interface direction.
-fn rail_edge(side: ToolbarSide) -> PaneEdge {
-    if (side.resolve() == ToolbarSide::Right) != crate::direction::is_rtl() { PaneEdge::End } else { PaneEdge::Start }
+/// The rail over `slots`, its flyouts and drawer opening on `opens`, the side of the canvas.
+fn rail<'a>(slots: &'a [ToolSlot<Tool>], current: &'a Tool, remembered: &'a LastUsed<Tool>, opens: Side, editing: bool) -> ToolRail<'a, Tool> {
+    let rail = ToolRail::new(Label::Empty, slots, current, remembered).opens(opens).edit_toolbar(tl!("Edit Toolbar…").to_string());
+    // The drawer's open flag is the one source of "editing".
+    if editing { rail.editing() } else { rail }
+}
+
+/// The rail's footer: the colour chips, then the Quick Mask and Screen Mode buttons.
+fn footer(app: &mut PhotocraftApp, ui: &mut egui::Ui, rail: RailFooter) {
+    let column = ui.available_width();
+    color_chips(app, ui, column);
+    let modes = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
+        quick_mask_button(app, ui);
+        ScreenModeButton::new(app.ui.view.screen_mode).show(ui);
+    };
+    // The two buttons sit centred in the rail's columns, side by side in two columns.
+    Row::new().fill_width().align(RowAlign::Center).gap(Gap::Tight).show(ui, |ui, _| {
+        if rail.columns > 1 {
+            modes(ui, app);
+        } else {
+            Stack::new().gap(Gap::Tight).show(ui, |ui, _| modes(ui, app));
+        }
+    });
+}
+
+/// The height of the toolbar's rail laid out `width` wide: as many tool columns as `width` holds, with the footer.
+pub(crate) fn measure(app: &mut PhotocraftApp, ui: &egui::Ui, width: f32) -> f32 {
+    let slots = tool_commands::slots(&app.session.prefs().toolbar);
+    let remembered = last_used(&slots, &app.ui.group_tools);
+    let current = app.ui.tool;
+    let (opens, editing) = (crate::panel_docking::toolbar_opens(app), app.ui.toolbar_drawer);
+    rail(&slots, &current, &remembered, opens, editing).measure_rail(ui, width, |ui, at| footer(app, ui, at)).y
 }
 
 /// The tool palette: a `ToolRail` over the slots, with the colour chips and then the Quick Mask and Screen Mode buttons
-/// in its footer, and, while the Edit Toolbar drawer is open, the drawer beside it. The caller places it on the side
-/// `panels.toolbar_side` gives (AppShell's tools slot).
+/// in its footer, and, while the Edit Toolbar drawer is open, the drawer beside it. The Toolbar panel's group view
+/// shows it in the group's full rect; the rail takes as many tool columns as the rect's width holds.
 ///
 /// A frame can run this twice. Every outcome comes from the pass's own widgets (a click, a drop), and the slots and
 /// remembered tools are read again at the start of each pass, so a second pass applies only its own input.
@@ -169,38 +199,8 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let slots = tool_commands::slots(&app.session.prefs().toolbar);
     let remembered = last_used(&slots, &app.ui.group_tools);
     let current = app.ui.tool;
-    let columns = columns(app);
-    let side = app.ui.panels.toolbar_side.resolve();
-    let edge = rail_edge(side);
-    let other_side = side.other();
-    let move_label = if other_side == ToolbarSide::Right { tl!("Move Toolbar to the Right") } else { tl!("Move Toolbar to the Left") };
-
-    let mut rail = ToolRail::new(Label::Empty, &slots, &current, &remembered)
-        .columns(u8::try_from(columns).ok().and_then(NonZeroU8::new).unwrap_or(NonZeroU8::MIN))
-        .edge(edge)
-        .column_toggle(tl!("Toolbar").to_string())
-        .side_toggle(move_label.to_string())
-        .edit_toolbar(tl!("Edit Toolbar…").to_string());
-    // The drawer's open flag is the one source of "editing".
-    if app.ui.toolbar_drawer {
-        rail = rail.editing();
-    }
-    let out = rail.show_rail(ui, |ui, footer| {
-        let column = ui.available_width();
-        color_chips(app, ui, column);
-        let modes = |ui: &mut egui::Ui, app: &mut PhotocraftApp| {
-            quick_mask_button(app, ui);
-            ScreenModeButton::new(app.ui.view.screen_mode).show(ui);
-        };
-        // The two buttons sit centred in the rail's columns, side by side in two columns.
-        Row::new().fill_width().align(RowAlign::Center).gap(Gap::Tight).show(ui, |ui, _| {
-            if footer.columns > 1 {
-                modes(ui, app);
-            } else {
-                Stack::new().gap(Gap::Tight).show(ui, |ui, _| modes(ui, app));
-            }
-        });
-    });
+    let (opens, editing) = (crate::panel_docking::toolbar_opens(app), app.ui.toolbar_drawer);
+    let out = rail(&slots, &current, &remembered, opens, editing).show_rail(ui, |ui, at| footer(app, ui, at));
 
     if let Some(tool) = out.select {
         crate::tool_memory::select(app, tool);
@@ -216,14 +216,6 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         }
         _ => {}
     }
-    if out.toggle_columns {
-        app.ui.panels.toolbar_double = !app.ui.panels.toolbar_double;
-    }
-    if out.toggle_side {
-        app.ui.panels.toolbar_side = other_side;
-        // Persist the side as a discrete change; the dock may not be drawn this frame.
-        crate::dock::persist(app);
-    }
     if let Some(next) = &out.last_used {
         for slot in &slots {
             if let Some(tool) = next.get(slot.id)
@@ -237,7 +229,7 @@ pub fn toolbar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         open_drawer(app);
     }
     if app.ui.toolbar_drawer {
-        show_drawer(app, ui, &ctx, &slots, edge, &out);
+        show_drawer(app, ui, &ctx, &slots, opens, &out);
     }
 }
 
@@ -247,14 +239,14 @@ fn show_drawer(
     ui: &mut egui::Ui,
     ctx: &egui::Context,
     slots: &[ToolSlot<Tool>],
-    edge: PaneEdge,
+    opens: Side,
     rail: &craft::ui::rails::ToolRailOutput<Tool>,
 ) {
     // Every tool is listed in toolbar order; the drawer dims the ones the toolbar holds.
     let mut all: Vec<Tool> = Tool::ALL.to_vec();
     all.sort_by_key(|tool| toolbar_position(*tool));
     let groups = [DrawerGroup::new(tl!("All Tools").to_string(), all.into_iter().map(tool_commands::rail_tool).collect())];
-    let mut drawer = ToolbarDrawer::new(rail.response.rect, &groups, slots, rail.dropped).edge(edge);
+    let mut drawer = ToolbarDrawer::new(rail.response.rect, &groups, slots, rail.dropped).opens(opens);
     if let Some(opener) = &rail.edit_toolbar {
         drawer = drawer.opened_by(opener);
     }

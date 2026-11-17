@@ -32,60 +32,10 @@ pub use tool_options::{SampleAllLayers, ToolOptions};
 use tool_options::{default_brush_tool, yes};
 pub use transform::{CamTransform, ContentAwareOptions, Extras, FreeTransform, MadeLayer, SessionWarp};
 
-/// Which side of the canvas holds the tool palette. `Start` follows the UI direction; the
-/// physical sides pin it so the palette can sit beside the right-hand dock.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(rename_all = "camelCase")]
-pub enum ToolbarSide {
-    /// The leading edge of the interface direction: left in LTR, right in RTL.
-    #[default]
-    Start,
-    /// The window's left edge in every direction.
-    Left,
-    /// The window's right edge in every direction.
-    Right,
-}
-
-/// Reads a [`ToolbarSide`], falling back to the default for any value it does not name.
-fn toolbar_side_or_default<'de, D: serde::Deserializer<'de>>(d: D) -> Result<ToolbarSide, D::Error> {
-    let value = serde_json::Value::deserialize(d)?;
-    Ok(serde_json::from_value(value).unwrap_or_default())
-}
-
-impl ToolbarSide {
-    /// Resolves `Start` against the interface direction; physical sides are returned unchanged.
-    pub fn resolve(self) -> Self {
-        match self {
-            Self::Start if crate::direction::is_rtl() => Self::Right,
-            Self::Start => Self::Left,
-            side => side,
-        }
-    }
-
-    /// The opposite physical side.
-    pub fn other(self) -> Self {
-        match self.resolve() {
-            Self::Right => Self::Left,
-            _ => Self::Right,
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Serialize, Deserialize)]
 pub struct Panels {
-    pub toolbar: bool,
     pub options_bar: bool,
     pub status_bar: bool,
-    /// The toolbar's header chevron: two columns even when one fits (#1197).
-    #[serde(default)]
-    pub toolbar_double: bool,
-    /// Physical side of the tool palette. `Start` mirrors with the reading direction. An unknown
-    /// or malformed value reads as `Start`, so it never discards the other panel flags.
-    #[serde(default, deserialize_with = "toolbar_side_or_default")]
-    pub toolbar_side: ToolbarSide,
-    /// The right dock's icon rail. An app that embeds PhotoCraft's UI can hide it for a simpler view.
-    #[serde(default = "yes")]
-    pub rail: bool,
     /// The title bar with the in-window menus. An app that embeds PhotoCraft's UI and draws its own
     /// bar can hide it; the caption buttons of a custom title bar go with it.
     #[serde(default = "yes")]
@@ -103,17 +53,7 @@ pub use craft::ui::canvas_controls::TaskBarPlace;
 
 impl Default for Panels {
     fn default() -> Self {
-        Self {
-            toolbar: true,
-            options_bar: true,
-            status_bar: true,
-            toolbar_double: false,
-            toolbar_side: ToolbarSide::Start,
-            rail: true,
-            menu_bar: true,
-            context_task_bar: true,
-            task_bar: TaskBarPlace::default(),
-        }
+        Self { options_bar: true, status_bar: true, menu_bar: true, context_task_bar: true, task_bar: TaskBarPlace::default() }
     }
 }
 
@@ -407,6 +347,10 @@ pub struct UiState {
     /// docks back to.
     #[serde(default = "crate::panels::registry::default_workspace")]
     pub docking: craft::behavior::dock::Workspace<String>,
+    /// The panel open in the flyout of a column collapsed to icons (`Layout::opens_in_flyout`); the dock area shows it.
+    /// Not saved: a flyout is closed at launch.
+    #[serde(skip)]
+    pub flyout: Option<String>,
     /// Which chip the Color panel edits, and how it shows the colour.
     #[serde(default)]
     pub color_panel: ColorPanelState,
@@ -553,6 +497,7 @@ impl Default for UiState {
             theme: crate::theme::AppTheme::default(),
             palette: Default::default(),
             docking: crate::panels::registry::default_workspace(),
+            flyout: None,
             color_panel: Default::default(),
             color_panel_synced: None,
             swatches: SwatchesState::default(),
@@ -604,24 +549,6 @@ impl UiState {
 #[cfg(test)]
 mod tests {
     use super::*;
-
-    /// An unknown or malformed `toolbar_side` reads as `Start` and keeps every other panel flag.
-    #[test]
-    fn unknown_toolbar_side_falls_back_without_dropping_panels() {
-        let saved = Panels { status_bar: false, toolbar_double: true, toolbar_side: ToolbarSide::Left, ..Default::default() };
-        for bad in
-            [serde_json::json!("diagonal"), serde_json::json!(5), serde_json::json!(null), serde_json::json!("RIGHT"), serde_json::json!({"side": "left"})]
-        {
-            let mut value = serde_json::to_value(&saved).unwrap();
-            value["toolbar_side"] = bad.clone();
-            let read = serde_json::from_value::<Panels>(value).unwrap_or_else(|e| panic!("{bad} must not fail the panels: {e}"));
-            assert_eq!(read, Panels { toolbar_side: ToolbarSide::Start, ..saved.clone() }, "{bad}");
-        }
-        for side in [ToolbarSide::Start, ToolbarSide::Left, ToolbarSide::Right] {
-            let panels = Panels { toolbar_side: side, ..saved.clone() };
-            assert_eq!(serde_json::from_value::<Panels>(serde_json::to_value(&panels).unwrap()).unwrap(), panels);
-        }
-    }
 
     #[test]
     fn sample_all_layers_is_per_tool_and_old_prefs_load() {

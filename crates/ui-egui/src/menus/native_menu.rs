@@ -105,13 +105,14 @@ pub(crate) fn state_hash(app: &PhotocraftApp, input: Option<u64>) -> u64 {
     // Edit / Clear Selected Guides are enabled only while a guide is selected.
     crate::guide_select::selected(app).hash(&mut h);
     // The dock workspace's revision moves only on `replace`, so the arrangement is read as the panels in the layout and
-    // the keys of the hidden and floating ones; the shown flags cover panels opened or closed.
+    // the keys of the hidden and floating ones; the checked flags cover panels opened or closed and the flyout of a
+    // panel in a column of icons.
     let docking = &app.ui.docking;
     docking.layout.panels().hash(&mut h);
     docking.hidden.iter().map(|(panel, _)| panel).collect::<Vec<_>>().hash(&mut h);
     docking.floated.iter().map(|(panel, _)| panel).collect::<Vec<_>>().hash(&mut h);
     for panel in crate::panels::registry::PANELS {
-        crate::panel_docking::is_shown(app, panel.id).hash(&mut h);
+        crate::panel_docking::is_checked(app, panel.id).hash(&mut h);
     }
     serde_json::to_string(&(&ui.extras, &ui.view, ui.theme.id().as_str(), ui.theme.is_dark(), ui.tool)).unwrap_or_default().hash(&mut h);
     s.prefs().interface.language.hash(&mut h);

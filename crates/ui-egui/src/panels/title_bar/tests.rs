@@ -64,27 +64,21 @@ fn the_close_caption_asks_about_unsaved_work_unless_the_device_is_lost() {
     assert!(lost.state().framework.dialogs.is_empty(), "no prompt opened");
 }
 
-/// The whole app with the rail and the menu bar set as given.
-fn whole_app(rail: bool, menu_bar: bool) -> Harness<'static, PhotocraftApp> {
-    integrated_app(move |app| {
-        app.ui.panels.rail = rail;
-        app.ui.panels.menu_bar = menu_bar;
-    })
+/// The whole app with the menu bar set as given.
+fn whole_app(menu_bar: bool) -> Harness<'static, PhotocraftApp> {
+    integrated_app(move |app| app.ui.panels.menu_bar = menu_bar)
 }
 
-/// An app that embeds the UI can hide the icon rail and the menu bar; both are on by default, and the dock's panels
-/// stay either way.
+/// An app that embeds the UI can hide the menu bar; it is on by default. The dock's panels stay either way, and no
+/// separate rail of panel icons exists: the dock's own column of icons holds them.
 #[test]
-fn the_rail_and_the_menu_bar_follow_their_panel_flags() {
-    let panels = crate::state::Panels::default();
-    assert!(panels.rail && panels.menu_bar);
+fn the_menu_bar_follows_its_panel_flag() {
+    assert!(crate::state::Panels::default().menu_bar);
 
-    let h = whole_app(true, true);
-    assert!(h.query_by_label("Color & Swatches").is_some(), "the rail is drawn");
-    assert!(h.query_by_label("File").is_some(), "the title bar's menus are drawn");
-
-    let h = whole_app(false, false);
-    assert!(h.query_by_label("Color & Swatches").is_none(), "the icon rail is not drawn");
-    assert!(h.query_by_label("File").is_none(), "the title bar is not drawn");
-    assert!(h.query_all_by_label("Layers").next().is_some(), "the dock itself stays");
+    for menu_bar in [true, false] {
+        let h = whole_app(menu_bar);
+        assert_eq!(h.query_by_label("File").is_some(), menu_bar, "the title bar's menus are drawn with the flag");
+        assert!(h.query_by_label("Color & Swatches").is_none(), "no panel rail is drawn (menu bar {menu_bar})");
+        assert!(h.query_all_by_label("Layers").next().is_some(), "the dock itself stays (menu bar {menu_bar})");
+    }
 }

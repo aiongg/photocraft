@@ -510,7 +510,6 @@ pub(crate) struct CommandSource {
 /// no command state, and its picks run through `menus::invoke`.
 pub(crate) const COMMAND_SOURCES: &[CommandSource] = &[
     CommandSource { states: crate::panels::registry::states, run: crate::panels::registry::run_fired },
-    CommandSource { states: crate::panels::rail_commands::states, run: crate::panels::rail_commands::run_fired },
     CommandSource { states: tool_states, run: run_tool },
     CommandSource { states: crate::workspace_ui::states, run: crate::workspace_ui::run_fired },
     CommandSource { states: crate::slice_ui::command_states, run: crate::slice_ui::run_fired },

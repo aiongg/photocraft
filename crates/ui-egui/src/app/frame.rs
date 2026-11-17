@@ -2,15 +2,10 @@ use super::{
     PhotocraftApp, canvas, discard_ui, gpu_canvas, gpu_status, i18n, jobs_ui, last_brush, monitor_status, native_menu, notices, paint_mouse, panels, prefs_ui,
     screen_picker, shortcuts, smart_svg_ui, tool_memory, transform_tool, type_tool, updates_ui, view_cmds, work_area,
 };
-use craft::ui::contract::{Bind, BodyCx, PaneEdge};
+use craft::ui::contract::Bind;
 use craft::ui::runtime::env::WindowKey;
 use craft::ui::runtime::windows::WindowHost;
 use craft::ui::shell::{AppShell, slots};
-
-/// The tool rail's slot: the toolbar on the side `panels.toolbar_side` gives.
-fn tool_rail(ui: &mut egui::Ui, _cx: &mut BodyCx<'_>, app: &mut PhotocraftApp) {
-    panels::toolbar(app, ui);
-}
 
 impl PhotocraftApp {
     /// Close this frame's stage record (`frame_stages`): keep it if it was slow, and hand it to
@@ -227,13 +222,9 @@ impl PhotocraftApp {
         // Home is only the menu bar and the Home content; the saved panel prefs are untouched.
         let home = self.home_screen_up();
         let panels_on = &self.ui.panels;
-        let (menu_bar, options_bar, toolbar, status_bar) = (panels_on.menu_bar, panels_on.options_bar, panels_on.toolbar, panels_on.status_bar);
-        // The shell's start edge is the reading start; the toolbar's physical side is resolved
-        // against it, and the shell swaps its start and end slots in a right-to-left window.
-        let reading_start = if crate::direction::is_rtl() { crate::state::ToolbarSide::Right } else { crate::state::ToolbarSide::Left };
-        let toolbar_edge = if self.ui.panels.toolbar_side.resolve() == reading_start { PaneEdge::Start } else { PaneEdge::End };
+        let (menu_bar, options_bar, status_bar) = (panels_on.menu_bar, panels_on.options_bar, panels_on.status_bar);
         let window_title = panels::title_bar::window_title(self);
-        let versions = (panels::region_versions::options_bar(self), panels::region_versions::tool_rail(self), panels::region_versions::status_bar(self));
+        let versions = (panels::region_versions::options_bar(self), panels::region_versions::status_bar(self));
         // The shell binds a copy of the mode, since `show` takes the app too; the copy goes back
         // to the view after the pass.
         let mut mode = self.ui.view.screen_mode;
@@ -244,15 +235,15 @@ impl PhotocraftApp {
             .title_bar_if(menu_bar, |ui, _cx, app| panels::title_bar(app, ui))
             .options_bar(options_bar && !home, |ui, _cx, app| panels::options_bar(app, ui))
             .content(slots::OPTIONS, versions.0)
-            .tools(toolbar_edge, panels::toolbar::columns(self), toolbar && !home, tool_rail)
-            .content(slots::TOOLS, versions.1)
             .status(status_bar && !home, |ui, _cx, app| panels::status_bar(app, ui))
-            .content(slots::STATUS, versions.2)
-            .body(|ui, _cx, app| {
+            .content(slots::STATUS, versions.1)
+            .body(|ui, cx, app| {
                 if home {
                     canvas::document_area(app, ui);
                 } else {
-                    crate::panel_docking::show(app, ui);
+                    // Shift+Tab hides the panels and keeps the tools: the toolbar is a panel of the dock.
+                    let panels_hidden = cx.shell().is_some_and(|shell| shell.panels_hidden());
+                    crate::panel_docking::show(app, ui, panels_hidden);
                 }
                 notices::show(app, ui);
                 smart_svg_ui::host(app, &ui.ctx().clone());

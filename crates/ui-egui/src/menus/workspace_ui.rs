@@ -534,31 +534,29 @@ mod tests {
 
     #[test]
     fn saved_workspaces_preserve_host_chrome_on_select_and_reset() {
-        for (menu_bar, rail) in [(false, false), (false, true), (true, false), (true, true)] {
+        for menu_bar in [false, true] {
             let (mut app, ctx) = app();
-            panel_docking::show_panel(&mut app, "history", Some(true)).unwrap();
-            panel_docking::show_panel(&mut app, "navigator", Some(true)).unwrap();
+            panel_docking::show_panel(&mut app, "character", Some(true)).unwrap();
+            panel_docking::show_panel(&mut app, "paragraph", Some(true)).unwrap();
             let id = save(&mut app, "Host layout").unwrap();
             app.ui.panels.menu_bar = menu_bar;
-            app.ui.panels.rail = rail;
             select(&mut app, "painting").unwrap();
-            assert!(!shown(&app, "history"));
+            assert!(!shown(&app, "character"));
             select(&mut app, &id).unwrap();
-            assert_eq!((app.ui.panels.menu_bar, app.ui.panels.rail), (menu_bar, rail), "select");
-            assert!(shown(&app, "history") && shown(&app, "navigator"));
+            assert_eq!(app.ui.panels.menu_bar, menu_bar, "select");
+            assert!(shown(&app, "character") && shown(&app, "paragraph"));
             app.ui.panels.menu_bar = !menu_bar;
-            app.ui.panels.rail = !rail;
-            panel_docking::show_panel(&mut app, "history", Some(false)).unwrap();
+            panel_docking::show_panel(&mut app, "character", Some(false)).unwrap();
             run(&mut app, &ctx, WorkspaceCommands::Reset).unwrap();
-            assert_eq!((app.ui.panels.menu_bar, app.ui.panels.rail), (!menu_bar, !rail), "reset");
-            assert!(shown(&app, "history") && shown(&app, "navigator"), "reset restores the saved layout");
+            assert_eq!(app.ui.panels.menu_bar, !menu_bar, "reset");
+            assert!(shown(&app, "character") && shown(&app, "paragraph"), "reset restores the saved layout");
         }
     }
 
     #[test]
     fn new_select_delete_workspaces() {
         let (mut app, _ctx) = app();
-        panel_docking::show_panel(&mut app, "history", Some(true)).unwrap();
+        panel_docking::show_panel(&mut app, "character", Some(true)).unwrap();
         app.session.prefs.edit(|p| {
             p.shortcuts.insert("filter.blur.gaussian".into(), "Cmd+Alt+G".into());
         });
@@ -568,7 +566,7 @@ mod tests {
         select(&mut app, "painting").unwrap();
         app.session.prefs.edit(|p| p.shortcuts.clear());
         select(&mut app, &id).unwrap();
-        assert!(shown(&app, "history"));
+        assert!(shown(&app, "character"));
         assert_eq!(app.session.prefs().shortcuts.get("filter.blur.gaussian").map(String::as_str), Some("Cmd+Alt+G"));
         // The set persists in the preferences.
         let stored: WorkspaceSet<String> = serde_json::from_value(app.session.prefs().workspace_set.clone()).unwrap();
