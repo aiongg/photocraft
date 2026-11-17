@@ -164,6 +164,11 @@ fn moving_box(app: &PhotocraftApp, pixels: bool) -> Option<[f64; 4]> {
 fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Mods, style: ConstrainStyle) -> (ToolAction, Option<Run>) {
     // The Cmd stand-in for a painting tool, or the Move tool itself.
     let standing_in = app.ui.tool != Tool::Move;
+    // A ⌘ press with another tool is refused on a locked layer before any pick or marquee, as production checks the
+    // lock first for every tool but Move (tool_input.rs `tool_event_with_view`).
+    if standing_in && crate::move_lock::blocked(app, true) {
+        return (ToolAction::Claimed, Some(Run::plain(Kind::Refused, p)));
+    }
     let marquee = |app: &mut PhotocraftApp, add: bool, auto: bool, clear: bool| {
         // PLAN: assumed `move_box::begin(app, p, add, move_auto_select, clear_on_empty)` as today.
         crate::move_box::begin(app, p, add, auto, clear);
