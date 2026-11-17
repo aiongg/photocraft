@@ -164,9 +164,10 @@ fn moving_box(app: &PhotocraftApp, pixels: bool) -> Option<[f64; 4]> {
 fn press_at(app: &mut PhotocraftApp, p: [f64; 2], mods: Mods, style: ConstrainStyle) -> (ToolAction, Option<Run>) {
     // The Cmd stand-in for a painting tool, or the Move tool itself.
     let standing_in = app.ui.tool != Tool::Move;
-    // A ⌘ press with another tool is refused on a locked layer before any pick or marquee, as production checks the
-    // lock first for every tool but Move (tool_input.rs `tool_event_with_view`).
-    if standing_in && crate::move_lock::blocked(app, true) {
+    // A selection tool's ⌘ press that moves the layer is refused on a locked layer before any pick or marquee
+    // (production's `command_moves_layer` check in tool_input.rs `tool_event_with_view`). With the tools on which ⌘ is
+    // the Move tool, the press picks the layer under the pointer first and the lock check below refuses only a move.
+    if standing_in && super::family(app.ui.tool) == super::Family::Selection && crate::move_lock::blocked(app, true) {
         return (ToolAction::Claimed, Some(Run::plain(Kind::Refused, p)));
     }
     let marquee = |app: &mut PhotocraftApp, add: bool, auto: bool, clear: bool| {
