@@ -495,15 +495,16 @@ pub(crate) fn record_view_commands(app: &mut PhotocraftApp) {
 /// group's tool on the press and releases the spring on the key-up; every other command runs on its press only.
 /// A framework command goes to [`crate::app::framework::run_command`], a PhotoCraft id to [`dispatch_as`].
 pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[Fired]) {
-    let now = ctx.input(|i| i.time);
     if std::thread::current().name().is_some_and(|name| name.ends_with("save_in_background_off_blocks_the_app_until_the_file_is_written")) {
         for f in fired {
             eprintln!(
-                "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: fired {} {:?} {:?} target {} time {now} tool {:?}",
+                "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: fired {} {:?} {:?} target {} key time {} run at {} tool {:?}",
                 f.command.id,
                 f.phase,
                 f.source,
                 f.target.is_some(),
+                f.time,
+                ctx.input(|i| i.time),
                 app.ui.tool
             );
         }
@@ -527,7 +528,7 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[F
             continue;
         }
         // PLAN: `opacity_keys::fired` and `blend_keys::fired` are top-w25's tp.PT14 rows, assumed.
-        if crate::opacity_keys::fired(app, f, now) || crate::blend_keys::fired(app, f) {
+        if crate::opacity_keys::fired(app, f) || crate::blend_keys::fired(app, f) {
             continue;
         }
         // A tool command a key fired: its letter picks within the group; a click or a menu row selects the tool itself.
@@ -538,16 +539,16 @@ pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[F
                 FirePhase::Press if !crate::tool_shortcuts::uses_default(app, tool) => crate::tool_memory::select(app, tool),
                 FirePhase::Press => {
                     let step = tool_step(app, f);
-                    pick_tool(app, ctx, tool.key(), step, true);
+                    pick_tool(app, tool.key(), step, true, f.time);
                 }
-                FirePhase::Release => crate::spring_tools::released(app, tool.key()),
+                FirePhase::Release => crate::spring_tools::released(app, tool.key(), f.time),
                 FirePhase::Repeat => {}
             }
             continue;
         }
         if let Some(letter) = next_in_group_letter(id) {
             if f.phase == FirePhase::Press {
-                pick_tool(app, ctx, letter, PickStep::Next, false);
+                pick_tool(app, letter, PickStep::Next, false, f.time);
             }
             continue;
         }
@@ -567,8 +568,8 @@ fn tool_step(app: &PhotocraftApp, fired: &Fired) -> PickStep {
 
 /// Selects the tool the key `letter` picks. The group is the tools of that letter the user has not remapped, in the
 /// toolbar layout's order across slots (Edit › Toolbar); the rail's last-used memory is `app.ui.group_tools`, with the group's index among the letters as
-/// the slot. `plain` is a letter press with no Shift step: only those spring (#2672).
-fn pick_tool(app: &mut PhotocraftApp, ctx: &egui::Context, letter: char, step: PickStep, plain: bool) {
+/// the slot. `plain` is a letter press with no Shift step: only those spring (#2672). `at` is the press's input time.
+fn pick_tool(app: &mut PhotocraftApp, letter: char, step: PickStep, plain: bool, at: f64) {
     let mut group: Vec<Tool> = Tool::ALL.iter().copied().filter(|t| t.key() == letter && crate::tool_shortcuts::uses_default(app, *t)).collect();
     let order = crate::panels::toolbar::layout_order(&app.session.prefs().toolbar);
     group.sort_by_key(|t| order.iter().position(|x| x == t).unwrap_or(usize::MAX));
@@ -583,8 +584,7 @@ fn pick_tool(app: &mut PhotocraftApp, ctx: &egui::Context, letter: char, step: P
     let Some(picked) = tool_pick(&refs, slot, &before, &last, step, |_| true).map(|t| t.id) else { return };
     app.ui.tool = picked;
     crate::tool_memory::ended_by_tool(app);
-    let now = ctx.input(|i| i.time);
-    crate::spring_tools::pressed(app, letter, before, plain, now);
+    crate::spring_tools::pressed(app, letter, before, plain, at);
     if app.ui.spring.is_none() {
         // Permanent key choices own the tool; held-key switches keep the pen marker.
         app.stylus.tool_before_eraser = None;
