@@ -73,7 +73,7 @@ pub(crate) use display::GPU_OUTPUT;
 #[cfg(test)]
 use display::sync_display_lut;
 use display::texture_key;
-pub(crate) use display::{cache_key, canvas_display, display_doc, display_image};
+pub(crate) use display::{canvas_display, display_doc, display_image};
 pub(crate) use document_area::arranged_cells;
 pub use document_area::document_area;
 pub(crate) use document_display::view_target;
@@ -100,8 +100,7 @@ pub(crate) use sampling::composite_color;
 pub(crate) use strokes::live_retouch_points;
 pub(crate) use strokes::multiple_color_target;
 pub use strokes::paint_target;
-pub(crate) use strokes::{CommittedStroke, LiveStroke, strokes_live, unsmoothed_line};
-pub(crate) use tabs::tab_title_at;
+pub(crate) use strokes::{CommittedStroke, LiveStroke, unsmoothed_line};
 #[cfg(test)]
 use tabs::{main_canvas_document, move_target_after_filter, tab_context_items};
 #[cfg(test)]
@@ -111,8 +110,6 @@ pub(crate) use textures::visible_doc_rect;
 pub(crate) use textures::{damage_since, effect_reach, retain_gpu_documents, shown_as_document};
 #[cfg(test)]
 use textures::{ensure_gpu, redraw_focus};
-pub(crate) use tools::selection::floating_outline;
-pub(crate) use transform_controls::layer_edges;
 
 /// One document view's cached display state.
 #[derive(Default)]

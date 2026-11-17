@@ -9,7 +9,7 @@
 
 use craft::behavior::kurbo::{Point, Rect};
 use craft::ui::canvas_controls::brush::{CoverageMask, StrokeTrail, TrailTone};
-use craft::ui::contract::{Props as _, Show as _};
+use craft::ui::contract::Show as _;
 use photocraft_paint::{BrushSettings, StrokePoint, StrokeRenderer};
 use serde_json::json;
 

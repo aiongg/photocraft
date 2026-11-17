@@ -535,7 +535,7 @@ fn fit_with_straight_segments(trace: &[[f64; 2]], straight: &[usize], fit: f64, 
     (PenPath { draft: EditSubpath::new(knots, closed), ..Default::default() }, closed)
 }
 
-use super::{PenOwner, cancel_stale_pen, capture_pen_owner};
+use super::{PenOwner, cancel_stale_pen};
 
 /// Commits a draft with the normal history labels used by Pen and Curvature Pen.
 fn commit_path(app: &mut PhotocraftApp, pen: &PenPath, closed: bool) -> Result<(), String> {

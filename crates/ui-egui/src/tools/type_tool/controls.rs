@@ -27,7 +27,6 @@ use serde_json::json;
 use super::editing::{cancel, commit_with, edit_home, end_if_left};
 use super::host::LayerHost;
 use super::layout::{doc_point, layout, path_warp};
-use super::pointer::box_shape;
 use super::{Affine, LayerId, PhotocraftApp, text_layer};
 
 /// The document key of the text editor. One editing session is open at a time, so one key is enough; the session

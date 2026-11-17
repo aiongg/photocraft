@@ -7,7 +7,7 @@
 
 use craft::behavior::kurbo;
 use craft::ui::canvas_controls::{HoverOutline, HoverShape};
-use craft::ui::contract::{Show as _, ShowContainer as _};
+use craft::ui::contract::Show as _;
 use photocraft_doc::{DocId, Document, Layer, LayerContent, LayerId};
 use photocraft_geom::Rect;
 

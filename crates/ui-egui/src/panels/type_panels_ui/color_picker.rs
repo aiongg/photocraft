@@ -6,7 +6,7 @@ use craft::theme::Srgba;
 use craft::ui::dialog::{DialogId, DialogResult};
 use photocraft_doc::{Color, DocId, Document};
 use serde::{Deserialize, Serialize};
-use serde_json::{Value, json};
+use serde_json::json;
 
 use crate::{PhotocraftApp, color_picker_ui, panel_docking};
 

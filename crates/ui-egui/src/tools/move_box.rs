@@ -8,7 +8,7 @@ use serde_json::json;
 
 use craft::behavior::kurbo::{Point, Rect};
 use craft::ui::canvas_controls::Marquee;
-use craft::ui::contract::{Show as _, ShowContainer as _};
+use craft::ui::contract::Show as _;
 
 use crate::PhotocraftApp;
 

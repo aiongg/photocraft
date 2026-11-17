@@ -4,7 +4,7 @@
 
 use std::ops::RangeInclusive;
 
-use craft::behavior::{EditEvents, IconId, NumberCodec};
+use craft::behavior::{EditEvents, NumberCodec};
 use craft::ui::bars::{Bar, BarHome, BarKind, BarOutput, BarTool};
 use craft::ui::choice::Checkbox;
 use craft::ui::contract::{Bind, Entry, Props as _, Show as _, ShowContainer as _};

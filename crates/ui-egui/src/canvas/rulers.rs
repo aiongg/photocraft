@@ -7,7 +7,7 @@ use craft::behavior::{Axis, EditEvent};
 use craft::theme::Rgba;
 use craft::ui::canvas::{Guide, GuideKey, GuideLine, Rulers};
 use craft::ui::canvas_controls::{CanvasGrid, GridLine, Guides, GuidesOutput};
-use craft::ui::contract::{Bind, Props as _, Show as _};
+use craft::ui::contract::{Bind, Show as _};
 use craft::ui::runtime::env::UnitKind;
 use craft::ui::style::DataColor;
 use egui::Color32;

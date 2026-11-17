@@ -3,7 +3,7 @@
 
 use craft::behavior::PixelSize;
 use craft::ui::bars::{StatusItem, StatusValues};
-use craft::ui::dialog::{Alert, HostedAlert, StackDialog as _};
+use craft::ui::dialog::{Alert, HostedAlert};
 use craft::ui::runtime::env::Env;
 use craft::ui::shell::{RecentSort, RecentView};
 use craft::ui::text::InvalidZoom;

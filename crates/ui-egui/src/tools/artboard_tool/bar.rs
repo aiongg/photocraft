@@ -12,7 +12,7 @@ use craft::ui::buttons::Button;
 use craft::ui::contract::{Entry, Show as _, Trigger};
 use craft::ui::menu::Menu;
 use craft::ui::runtime::requests::ColorRequest;
-use photocraft_doc::{ArtboardBackground, Layer, LayerId};
+use photocraft_doc::{ArtboardBackground, LayerId};
 use photocraft_engine::artboard_cmds::PRESETS;
 use serde_json::{Value, json};
 

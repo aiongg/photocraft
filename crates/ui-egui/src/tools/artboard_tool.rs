@@ -19,7 +19,7 @@ use craft::draw::ui::artboard::{ArtboardBackground as Shown, ArtboardCommand, Ar
 use craft::keymap::CommandRef;
 use craft::theme::Srgba;
 use craft::ui::canvas::ToolHostResponse;
-use craft::ui::contract::{Props as _, Show as _};
+use craft::ui::contract::Show as _;
 
 use craft::ui::runtime::commands::CommandState;
 use photocraft_doc::{ArtboardBackground, Layer, LayerId};

@@ -26,7 +26,7 @@ use craft::ui::canvas::RasterSource;
 use craft::ui::dialog::{DialogId, HostedWorkspace};
 use craft::ui::runtime::memory::SaveKey;
 use craft::ui::runtime::pending::Job as PendingJob;
-use photocraft_doc::{DocId, Document, LayerId};
+use photocraft_doc::{Document, LayerId};
 use photocraft_engine::jobs::JobCtx;
 use photocraft_engine::select_mask_edits::{self, MAX_EDIT_POINTS, MAX_EDITS};
 use photocraft_engine::smartselect_cmds::{MAX_STROKE_POINTS, MAX_STROKES};

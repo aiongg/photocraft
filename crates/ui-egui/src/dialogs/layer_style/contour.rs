@@ -6,7 +6,7 @@ use craft::imaging::ui::layer_style::{ContourAction, ContourEditorDialog, Contou
 use craft::ui::dialog::{DialogId, DialogResult};
 use photocraft_doc::Contour as DocContour;
 use photocraft_doc::adjust::CurvePoint;
-use photocraft_engine::layer_style::{contour_from_param, contour_param, contour_to_shc, contours_from_shc};
+use photocraft_engine::layer_style::{contour_from_param, contour_param, contour_to_shc};
 use serde_json::{Value, json};
 
 use super::{Child, child_of, take_child};

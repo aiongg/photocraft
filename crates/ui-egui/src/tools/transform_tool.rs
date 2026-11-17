@@ -12,7 +12,7 @@ use craft::behavior::geometry::{SnapLine, TransformMode};
 use craft::draw::ui::transform::{Interpolation, TransformPreset, TransformSettings, TransformTool};
 use craft::imaging::ui::transform_preview::{PreviewPixels, PreviewTextures, StyledPreview};
 use craft::imaging::ui::warp::WarpSplit;
-use egui::{Color32, CursorIcon, Pos2, Stroke, pos2, vec2};
+use egui::Color32;
 use photocraft_algo::transform::Homography;
 use photocraft_doc::{DocId, Document, LayerContent, LayerId};
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome};
@@ -41,14 +41,13 @@ pub use commit::{apply_click, auto_commit, cancel, commit, end_if_left, follow_e
 #[cfg(test)]
 pub(crate) use draw::styled_composite;
 pub use draw::{SessionShown, show_in_canvas};
-pub(crate) use draw::{carries_selection_of, moves_selection, selection_map};
+pub(crate) use draw::{moves_selection, selection_map};
 pub use options_bar::{options_bar, reset_warp};
 pub(crate) use preview::read_surface;
 pub(crate) use preview::solo_layer;
 use preview::{Above, composite_image, show_only};
 #[cfg(test)]
 use preview::{covering, preview_image};
-pub(crate) use warp::{cylinder_edit, grid_edit};
 pub use warp::{edit_session_warp, split};
 
 /// Opens a prepared box once its job has landed (see [`Preparing`]).

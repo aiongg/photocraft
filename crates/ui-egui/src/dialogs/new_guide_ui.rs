@@ -24,7 +24,7 @@ use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
 use crate::guide_edit::Target;
-use crate::guide_layout_ui::{document_guides as _, guide_units, preference_rgba};
+use crate::guide_layout_ui::{guide_units, preference_rgba};
 
 const COMMAND: &str = "view.newGuide";
 const EDIT_COMMAND: &str = "view.editGuide";

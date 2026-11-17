@@ -113,7 +113,6 @@ pub use canvas::sampling;
 pub use canvas::scroll_all_windows;
 pub use canvas::select_mask_view;
 pub use canvas::snap_ui;
-use canvas::tile_overlay;
 pub use canvas::tool_feedback;
 pub use dialogs::adjust_dialog;
 pub use dialogs::adjust_editors;

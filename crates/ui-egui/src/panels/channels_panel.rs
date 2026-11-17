@@ -16,9 +16,9 @@ use craft::ui::menu::PanelRow;
 use craft::ui::primitives::textures::{ThumbnailOptions, Thumbnails};
 use craft::ui::runtime::commands::{CommandRef, CommandState};
 
+use crate::PhotocraftApp;
 use crate::app::thumbs::ChannelThumbs;
 use crate::theme::Tokens;
-use crate::{PhotocraftApp, panel_docking};
 
 /// One row of the panel: its key, its thumbnail's key and the key of its events.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

@@ -15,7 +15,7 @@
 
 use craft::behavior::{DisplayOrder, ItemSource, Selection};
 use craft::draw::ui::crop::{CropSettings, CropUserPreset};
-use craft::ui::contract::{Bind, Props as _, Show as _, ShowCollection as _};
+use craft::ui::contract::{Bind, Show as _, ShowCollection as _};
 use craft::ui::dialog::{DialogId, DialogResult, DialogStack, StackDialog, dialog_id};
 use craft::ui::display::Text;
 use craft::ui::list::{List, ListRow};

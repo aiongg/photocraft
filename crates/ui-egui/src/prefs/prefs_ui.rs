@@ -7,16 +7,15 @@
 //! change them with `prefs.get` / `prefs.set`); this module only edits a working copy in a dialog
 //! and commits it with those commands on Apply or OK.
 
-use std::collections::{BTreeMap, HashMap, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
-use egui::{Color32, RichText, Sense, vec2};
+use egui::Color32;
 use photocraft_doc::DocId;
 use photocraft_engine::jobs::{JobEvent, JobId, JobOutcome, Started};
-use photocraft_engine::prefs::{self, AppearanceMode, SECTIONS};
-use serde_json::{Map, Value, json};
+use photocraft_engine::prefs::{self, AppearanceMode};
+use serde_json::{Value, json};
 
 use crate::PhotocraftApp;
-use crate::theme::Tokens;
 
 /// Shell runtime state for preferences, autosave and snapping (not serialised).
 #[derive(Default)]
@@ -73,7 +72,7 @@ use appearance::{display_scale, selected_theme};
 pub(crate) use dialogs::set_draft;
 pub use dialogs::{apply_window, invoke, open_preferences, window_open};
 pub(crate) use dialogs::{feed, take as take_window};
-pub(crate) use presets::{PRESETS_FAMILY, open_io, open_manager, take as take_presets};
+pub(crate) use presets::{PRESETS_FAMILY, take as take_presets};
 pub(crate) use save::save_preferences;
 pub use save::{autosave_now, tick};
 pub use shortcuts::{open as open_shortcuts, recording, shortcuts_open, show as show_shortcuts};
