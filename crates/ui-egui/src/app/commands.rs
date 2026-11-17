@@ -104,15 +104,10 @@ impl PhotocraftApp {
         }
         // Document exports read committed pixels, not the pending Free Transform preview.
         // Check on execution (also dialog OK and automation), leaving Folder processing usable.
-        if id == "file.scripts.imageProcessor"
-            && self.ui.transform.is_some()
-            && match params.get("source").and_then(Value::as_str) {
-                Some("open") => true,
-                Some("current") => self.transform_preview.as_ref().is_none_or(|preview| self.session.active().is_some_and(|st| st.doc.id == preview.doc.id)),
-                _ => false,
-            }
+        if id == crate::dialogs::image_processor_ui::COMMAND
+            && crate::dialogs::image_processor_ui::waits_for_transform(self, params.get("source").and_then(Value::as_str))
         {
-            return Err("Commit or cancel the transform first".into());
+            return Err(tl!("Commit or cancel the transform first").into());
         }
         if let Some(r) = transform_tool::intercept(self, id) {
             return r;
