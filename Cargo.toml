@@ -110,6 +110,42 @@ wildcard_imports = "deny"
 dbg_macro = "warn"
 todo = "warn"
 
+# The settings of craft-libs' `tools/cl` for this workspace (craft-libs docs/development.md, "App workspaces").
+[workspace.metadata.cl]
+# Every cl command selects these packages: each brings features the others lack, so a command that drops one
+# builds a second copy of egui, photocraft-io or craft-affinity and of everything above them.
+selection = [
+    "photocraft-ui-egui", "photocraft-engine", "photocraft", "photocraft-algo", "photocraft-automation",
+    "photocraft-text", "photocraft-tablet", "photocraft-cli", "photocraft-paint", "photocraft-io", "photocraft-gpu",
+]
+# Crates whose new builds cl names after a command, besides the framework's.
+tracked = ["egui", "eframe", "photocraft-ui-egui", "photocraft-io", "craft-affinity"]
+# Each changes a build input (the text crate's build script tracks CRAFT_FONTS_DIR), so a command run with a
+# different value rebuilds.
+unset_env = ["RUST_MIN_STACK", "CARGO_INCREMENTAL", "CRAFT_FONTS_DIR"]
+# The tests keep a 5% scratch reserve, which a TMPDIR on a nearly full disk trips.
+set_env = { TMPDIR = "/tmp" }
+run_slots = 3
+test_threads = 4
+
+# The one build of each crate a target dir holds after the selection's test build (`cl doctor` compares).
+[workspace.metadata.cl.expected_features]
+egui = ["bytemuck", "default_fonts", "monochrome_emoji_fonts", "persistence", "ron", "serde"]
+photocraft-io = ["pdf-editable", "testgen"]
+craft-affinity = ["synth"]
+craft-ui-contract = ["default", "snapshot", "testing"]
+craft-imaging = ["default", "screen-testing", "ui"]
+
+# The ui-egui lib binary holds most of the unit tests; split, it no longer sets the run's wall time.
+[workspace.metadata.cl.shard]
+"photocraft-ui-egui/photocraft_ui_egui" = 3
+
+# Seconds per test binary, ordering the first run longest first (later runs use the recorded times).
+[workspace.metadata.cl.default_seconds]
+"photocraft-ui-egui/photocraft_ui_egui" = 389.0
+"photocraft-ui-egui/it" = 221.0
+"photocraft-engine/photocraft_engine" = 97.0
+
 # Dependencies carry no debug info: their frames in a backtrace lose file:line, and the target dir
 # and link times shrink. The test profile inherits both settings.
 [profile.dev.package."*"]
