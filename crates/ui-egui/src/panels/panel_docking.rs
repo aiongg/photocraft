@@ -118,7 +118,7 @@ fn apply_during(app: &mut PhotocraftApp, actions: Vec<Action<String>>, dragging:
 /// Whether a workspace gesture of the pass (a divider drag, a window move) is still running after it: its last
 /// event is its begin or a step, not its commit or cancel. The area's own one-step edits belong to no gesture.
 fn dragging(edit: &EditEvents<Workspace>) -> bool {
-    edit.iter().filter(|event| event.id().is_some()).next_back().is_some_and(|event| matches!(event, EditEvent::Begin { .. } | EditEvent::Update { .. }))
+    edit.iter().rfind(|event| event.id().is_some()).is_some_and(|event| matches!(event, EditEvent::Begin { .. } | EditEvent::Update { .. }))
 }
 
 /// Whether [`apply`] would take `actions`: the same refusals, on a copy of the workspace. Changes nothing.

@@ -156,6 +156,16 @@ fn tool_settings(o: &crate::state::ToolOptions, live: Option<&photocraft_doc::Li
     settings
 }
 
+/// The title of the alert for a number typed outside its range.
+fn range_title(kind: ShapeKind) -> String {
+    match kind {
+        ShapeKind::Polygon | ShapeKind::Star => tl!("Sides"),
+        ShapeKind::Line => tl!("Weight"),
+        _ => tl!("Radius"),
+    }
+    .to_owned()
+}
+
 /// The paint a chip's Color Picker request edits, with the colour it starts from when the layer has none.
 fn paint_dialog_target<C>(which: ShapePaint, fg: C, bg: C) -> Option<(crate::shape_fill_ui::Paint, C)> {
     match which {
@@ -332,12 +342,7 @@ pub(crate) fn options_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui, tool: Tool
         crate::screen_picker::hold(app, ui.ctx(), ("shape-bar", which), gesture);
     }
     if let Some(range) = out.out_of_range {
-        let title = match kind {
-            ShapeKind::Polygon | ShapeKind::Star => tl!("Sides"),
-            ShapeKind::Line => tl!("Weight"),
-            _ => tl!("Radius"),
-        };
-        let alert = Alert::range(title.to_owned(), &range, &Env::of(ui));
+        let alert = Alert::range(range_title(kind), &range, &Env::of(ui));
         // An `Err` is the alert that was not opened because one is already up.
         let _ = app.framework.dialogs.open_unless_open(HostedAlert::new(alert));
     }
