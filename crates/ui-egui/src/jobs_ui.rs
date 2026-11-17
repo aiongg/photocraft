@@ -505,14 +505,6 @@ pub fn tick(app: &mut PhotocraftApp, ctx: &egui::Context) {
     if !keep_polling(app, ctx) {
         return;
     }
-    if ctx.input(|i| i.raw.events.iter().any(|e| matches!(e, egui::Event::Key { key: egui::Key::Escape, pressed: true, .. }))) {
-        eprintln!(
-            "DIAG interactive_batch_shows_its_read_only_input_and_asks_after_escape: tick job={:?} focused={:?} escape_pressed={}",
-            job_in_view(app).map(|j| (j.id, j.command)),
-            craft::ui::runtime::focus::focused_rec(ctx),
-            crate::window_keys::escape_pressed(ctx)
-        );
-    }
     // Once per frame: Escape is taken from the frame's input, so a second pass finds none. While the Batch question is
     // open Escape is its prompt's (it answers Stop), so it is left in the input.
     if let Some(job) = job_in_view(app)
@@ -897,7 +889,6 @@ pub(crate) fn batch_preview(app: &mut PhotocraftApp, ui: &mut egui::Ui) -> bool 
 /// background save shows its progress in the tab and the status bar instead.
 pub fn dialog(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     if let Some(job) = app.session.jobs().into_iter().find(|job| job.command == "file.automate.batch" && app.session.batch_interrupt_waiting(job.id)) {
-        eprintln!("DIAG interactive_batch_shows_its_read_only_input_and_asks_after_escape: asking for job {:?}", job.id);
         ask_batch_interrupt(app, job.id);
         return;
     }

@@ -144,14 +144,6 @@ fn every_adjustment_layer_edits_through_properties() {
             let slider = sliders(&h).first().copied();
             if SLIDER_KINDS.contains(&kind) {
                 let r = slider.unwrap_or_else(|| panic!("{kind} {mode}: no slider in the Properties editor"));
-                let under: Vec<_> = craft::ui::runtime::pointer::shapes_at(&h.ctx, r.center())
-                    .into_iter()
-                    .map(|(owner, part)| (owner, part, h.ctx.read_response(owner).map(|resp| resp.rect)))
-                    .collect();
-                eprintln!(
-                    "DIAG every_adjustment_layer_edits_through_properties: {kind} {mode}: slider node {r:?}, shapes under its centre {under:?}, sliders {:?}",
-                    sliders(&h)
-                );
                 drag(&mut h, r.center() - vec2(r.width() * 0.2, 0.0), r.center() + vec2(r.width() * 0.2, 0.0));
             } else if kind == "gradientMap" {
                 let r = label_rect(&h, "Reverse").unwrap_or_else(|| panic!("{kind} {mode}: Reverse"));
@@ -323,15 +315,6 @@ fn open_picker(h: &mut Harness<'_, PhotocraftApp>, label: &str) -> craft::ui::di
     h.run_steps(2);
     h.get_by_role_and_label(Role::ColorWell, label).click();
     h.run_steps(3);
-    // DIAG: the pickers the app tracks and the dialog stack after the click.
-    let test = std::thread::current().name().and_then(|name| name.rsplit("::").next()).unwrap_or("").to_owned();
-    eprintln!(
-        "DIAG {test}: after the click picker {:?} targets {:?} stack {:?} answers {}",
-        crate::color_picker_ui::top(h.state()),
-        h.state().color_targets,
-        h.state().framework.dialogs.stack().ids().collect::<Vec<_>>(),
-        h.state().color_answers.len()
-    );
     crate::color_picker_ui::top(h.state()).expect("the colour well opens the Color Picker")
 }
 

@@ -653,12 +653,6 @@ fn space_hand_view_menu_keeps_escape_and_enter_from_the_pending_crop() {
     // hangs below the frame, so a point inside it is the canvas's.
     let centre = crate::crop_ui::frame(h.state()).expect("a pending crop frame").center();
     let p = screen(&h, centre.x as f32, centre.y as f32);
-    eprintln!(
-        "DIAG space_hand_view_menu_keeps_escape_and_enter_from_the_pending_crop: frame {:?} p {p:?} task bar {:?} view {:?}",
-        crate::crop_ui::frame(h.state()).map(|f| f.corners()),
-        h.state().ui.task_bar_shown,
-        testing::view(h.state()).map(|v| (v.rect, v.center, v.zoom))
-    );
     key(&mut h, Key::Space, true, Modifiers::NONE);
     right_click_at(&mut h, p);
     assert!(h.state().ui.canvas_tool_menu.as_ref().is_some_and(|m| m.kind == MenuKind::View), "Space's Hand opens the view menu");

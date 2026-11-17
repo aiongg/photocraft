@@ -270,9 +270,9 @@ pub(crate) fn cancel_window_picker(app: &mut PhotocraftApp, ctx: &egui::Context,
 
 /// Whether `window`'s picker is open, as the dialog host knows it.
 pub(crate) fn window_picker_open(app: &PhotocraftApp, window: PickWindow) -> bool {
-    app.color_targets.iter().any(|(id, t)| {
-        matches!(t, PickTarget::Window { window: w, .. } if *w == window) && app.framework.dialogs.get_by_id::<ColorPickerDialog>(*id).is_some()
-    })
+    app.color_targets
+        .iter()
+        .any(|(id, t)| matches!(t, PickTarget::Window { window: w, .. } if *w == window) && app.framework.dialogs.get_by_id::<ColorPickerDialog>(*id).is_some())
 }
 
 /// The Color Picker, when it is the top dialog (another dialog opened over it takes the input).

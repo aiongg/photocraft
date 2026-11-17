@@ -228,8 +228,6 @@ fn command_drag_over_a_guide_moves_the_guide_with_any_tool() {
         app.run("view.newGuide", json!({"orientation": "vertical", "position": 50})).unwrap();
         h.run_steps(2);
         let (from, to) = (canvas_at(&h, 50.0, 40.0), canvas_at(&h, 65.0, 40.0));
-        let before_view = testing::view(h.state()).map(|v| (v.rect, v.center, v.zoom));
-        // DIAG: the view and the guides after each step of the drag.
         h.event_modifiers(egui::Event::PointerMoved(from), Modifiers::COMMAND);
         h.run_steps(1);
         h.event_modifiers(
@@ -237,31 +235,15 @@ fn command_drag_over_a_guide_moves_the_guide_with_any_tool() {
             Modifiers::COMMAND,
         );
         h.run_steps(1);
-        eprintln!(
-            "DIAG command_drag_over_a_guide_moves_the_guide_with_any_tool: {tool:?} from {from:?} to {to:?} view {before_view:?} after press guides {:?} view {:?}",
-            guides(h.state()),
-            testing::view(h.state()).map(|v| (v.rect, v.center, v.zoom))
-        );
         for at in steps(from, to) {
             h.event_modifiers(egui::Event::PointerMoved(at), Modifiers::COMMAND);
             h.run_steps(2);
-            eprintln!(
-                "DIAG command_drag_over_a_guide_moves_the_guide_with_any_tool: {tool:?} at {at:?} guides {:?} view {:?} in gesture {}",
-                guides(h.state()),
-                testing::view(h.state()).map(|v| (v.rect, v.center, v.zoom)),
-                testing::in_gesture(h.state())
-            );
         }
         h.event_modifiers(
             egui::Event::PointerButton { pos: to, button: egui::PointerButton::Primary, pressed: false, modifiers: Modifiers::COMMAND },
             Modifiers::COMMAND,
         );
         h.run_steps(2);
-        eprintln!(
-            "DIAG command_drag_over_a_guide_moves_the_guide_with_any_tool: {tool:?} released guides {:?} view {:?}",
-            guides(h.state()),
-            testing::view(h.state()).map(|v| (v.rect, v.center, v.zoom))
-        );
         let doc = &h.state().session.active().unwrap().doc;
         let moved = doc.layer(layer).unwrap().surface().unwrap().rgba(12, 12)[3] == 0.0;
         if locked {

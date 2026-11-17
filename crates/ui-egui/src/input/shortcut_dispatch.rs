@@ -537,20 +537,6 @@ pub(crate) fn record_chrome_toggles(ctx: &egui::Context, toggles: &[(egui::Viewp
 /// group's tool on the press and releases the spring on the key-up; every other command runs on its press only.
 /// A framework command goes to [`crate::app::framework::run_command`], a PhotoCraft id to [`dispatch_as`].
 pub(crate) fn run_fired(app: &mut PhotocraftApp, ctx: &egui::Context, fired: &[Fired]) {
-    if std::thread::current().name().is_some_and(|name| name.ends_with("save_in_background_off_blocks_the_app_until_the_file_is_written")) {
-        for f in fired {
-            eprintln!(
-                "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: fired {} {:?} {:?} target {} key time {} run at {} tool {:?}",
-                f.command.id,
-                f.phase,
-                f.source,
-                f.target.is_some(),
-                f.time,
-                ctx.input(|i| i.time),
-                app.ui.tool
-            );
-        }
-    }
     for f in fired {
         if f.target.is_some() {
             continue;

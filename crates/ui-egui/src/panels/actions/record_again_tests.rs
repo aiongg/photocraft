@@ -251,13 +251,7 @@ fn filter_and_adjustment_previews_retain_permissions_before_evaluation() {
         assert!(PREVIEW_CHECKS.load(Ordering::SeqCst) > 0, "the changed actual request was refused before evaluation: {command}");
         assert_eq!(h.state().session.actions.list, original);
         assert_eq!(h.state().session.active().unwrap().revision, revision);
-        let fields = h.state().framework.dialogs.open_dialogs().into_iter().find(|d| d.id == dialog).and_then(|d| d.fields);
         let answer = confirm(&mut h, dialog);
-        eprintln!(
-            "DIAG filter_and_adjustment_previews_retain_permissions_before_evaluation: {command} answer={answer:?} held={:?} still_open={} fields={fields:?}",
-            h.state().framework.dialogs.held_state(dialog),
-            is_open(&h, dialog)
-        );
         assert!(answer.is_err(), "OK with the changed settings is refused: {command}");
         assert_eq!(h.state().session.actions.list, original);
     }

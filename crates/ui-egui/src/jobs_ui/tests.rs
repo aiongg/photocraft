@@ -441,22 +441,6 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
     while (h.query_all_by_label("Saving fg.psd").count() == 0 || h.query_by_label("Esc to cancel").is_none()) && t.elapsed() < Duration::from_secs(30) {
         h.step();
     }
-    fn cancel_text(t: Option<String>) -> bool {
-        t.is_some_and(|t| t.to_lowercase().contains("cancel") || t.contains("Saving"))
-    }
-    for n in h.query_all_by(|n| cancel_text(n.value()) || cancel_text(n.label())) {
-        let a = n.accesskit_node();
-        eprintln!(
-            "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: node role={:?} value={:?} label={:?} id={:?} hidden={} rect={:?} children={:?}",
-            a.role(),
-            a.value(),
-            a.label(),
-            a.id(),
-            a.is_hidden(),
-            n.rect(),
-            a.children().map(|c| (c.role(), c.value())).collect::<Vec<_>>()
-        );
-    }
     h.get_by_label("Esc to cancel");
     while h.query_by_label("Encoding").is_none() && t.elapsed() < Duration::from_secs(30) {
         h.step();
@@ -488,33 +472,10 @@ fn save_in_background_off_blocks_the_app_until_the_file_is_written() {
     let st = h.state().session.active().unwrap();
     assert_eq!(st.path.as_deref(), Some("/tmp/photocraft-test/fg.psd"));
     assert!(!st.is_dirty());
-    {
-        let ctx = h.ctx.clone();
-        eprintln!(
-            "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: before B tool={:?} spring={:?} focused={:?} modal={} keys_layer={} time={}",
-            h.state().ui.tool,
-            h.state().ui.spring,
-            craft::ui::runtime::focus::focused_rec(&ctx),
-            craft::ui::runtime::overlay::any_open(&ctx, craft::ui::runtime::overlay::OpenFilter::Modal),
-            craft::ui::runtime::overlay::any_open(&ctx, craft::ui::runtime::overlay::OpenFilter::Keys),
-            ctx.input(|i| i.time)
-        );
-    }
     h.key_press(egui::Key::B);
-    for step in 0..2 {
+    for _ in 0..2 {
         h.step();
-        let ctx = h.ctx.clone();
-        let keys: Vec<(egui::Key, bool)> =
-            ctx.input(|i| i.events.iter().filter_map(|e| if let egui::Event::Key { key, pressed, .. } = e { Some((*key, *pressed)) } else { None }).collect());
-        eprintln!(
-            "DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: step {step} time={} pass={} key events this pass={keys:?} tool={:?} spring={:?}",
-            ctx.input(|i| i.time),
-            ctx.cumulative_pass_nr(),
-            h.state().ui.tool,
-            h.state().ui.spring
-        );
     }
-    eprintln!("DIAG save_in_background_off_blocks_the_app_until_the_file_is_written: after B tool={:?} spring={:?}", h.state().ui.tool, h.state().ui.spring);
     assert_eq!(h.state().ui.tool, crate::state::Tool::Brush, "shortcuts work again");
 }
 
@@ -555,13 +516,6 @@ fn a_failed_save_or_one_cancelled_while_encoding_leaves_the_document_unsaved() {
     step_until(&mut h, |a| !a.saving());
     let st = h.state().session.active().unwrap();
     assert!(st.is_dirty() && st.path.is_none());
-    eprintln!(
-        "DIAG a_failed_save_or_one_cancelled_while_encoding_leaves_the_document_unsaved: status={:?} error={} posted={} shown={:?}",
-        h.state().ui.status,
-        h.state().ui.status_error,
-        crate::notices::shown_titled(h.state(), "Save failed: disk full"),
-        crate::notices::shown(h.state(), &h.ctx)
-    );
     assert!(noticed(&h, "disk full"), "the failure is reported");
 
     gates.encode.store(false, Ordering::Relaxed);

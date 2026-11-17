@@ -250,10 +250,6 @@ fn reopening_the_actions_panel_keeps_the_selected_set_and_empty_sets() {
     show_panel(&mut app, "actions", Some(true)).unwrap();
     app.ui.actions.panel.selected = Some(ActionSelection::Set("Web".into()));
     // Essentials keeps Actions with History as an icon, whose Window menu row only closes its flyout: close the panel.
-    eprintln!(
-        "DIAG reopening_the_actions_panel_keeps_the_selected_set_and_empty_sets: in a flyout {}",
-        app.ui.docking.layout.opens_in_flyout(&"actions".to_owned())
-    );
     apply(&mut app, vec![DockAction::close("actions".to_owned())]).unwrap();
     assert!(!is_shown(&app, "actions"), "closed");
     show_panel(&mut app, "actions", Some(true)).unwrap();

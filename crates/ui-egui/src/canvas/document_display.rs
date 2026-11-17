@@ -350,22 +350,6 @@ pub(crate) fn show(app: &mut PhotocraftApp, ui: &mut egui::Ui, view: &mut View, 
                 crate::alt_grab::watch(app, ui.ctx(), egui::Id::unique(("pc-alt-grab", host.idx)), input.rect, tool, active);
             }
             hosted = Some(tools::run(app, ui, host, &input, body_shown));
-            let secondary_or_space = ui.input(|i| {
-                i.events.iter().any(|e| {
-                    matches!(e, egui::Event::PointerButton { button: egui::PointerButton::Secondary, .. } | egui::Event::Key { key: egui::Key::Space, .. })
-                })
-            });
-            if app.ui.tool == crate::state::Tool::Crop && secondary_or_space {
-                eprintln!(
-                    "DIAG space_hand_view_menu_keeps_escape_and_enter_from_the_pending_crop: held {:?} host.context {:?} overlay_context {:?} focused {:?} pending {} events {:?}",
-                    app.canvas_tools.momentary.held(),
-                    hosted.as_ref().and_then(|h| h.context),
-                    overlay_context,
-                    ui.ctx().memory(|m| m.focused()),
-                    crate::crop_ui::pending(app),
-                    ui.input(|i| i.events.clone()),
-                );
-            }
         }
         // The picture shows the document as the tools left it: a commit (a crop) can replace it.
         let current = app.session.documents().get(idx).map(|state| std::sync::Arc::clone(&state.doc));

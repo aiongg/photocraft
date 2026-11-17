@@ -189,19 +189,6 @@ fn custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened() {
     set_fields(h.state_mut(), id, json!({"dryRun": true}));
     // A new dialog draws its first pass hidden while it sizes itself, as at the harness start.
     h.run_steps(4);
-    {
-        use egui_kittest::kittest::NodeT;
-        let open: Vec<_> =
-            h.state().framework.dialogs.open_dialogs().into_iter().map(|d| (d.id, d.key, d.fields.and_then(|f| f.get("paper").cloned()))).collect();
-        let windows: Vec<_> = h
-            .query_all_by(|n| matches!(n.role(), egui::accesskit::Role::Dialog | egui::accesskit::Role::Window | egui::accesskit::Role::ComboBox))
-            .map(|n| (n.accesskit_node().role(), n.accesskit_node().label(), n.accesskit_node().value(), n.rect()))
-            .collect();
-        eprintln!(
-            "DIAG custom_paper_ui_edits_reach_preview_and_pdf_and_restore_when_reopened: new {id:?} open {open:?} nodes {windows:?} letter {}",
-            shown(&h, "Letter")
-        );
-    }
     assert!(shown(&h, "Custom"), "reopening array-valued settings must show Custom");
     assert_eq!(fields(&h, id)["paper"], json!([522.0, 666.0]));
     std::fs::remove_file(output).unwrap();

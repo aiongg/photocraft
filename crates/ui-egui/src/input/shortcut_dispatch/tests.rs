@@ -211,16 +211,8 @@ fn every_displayed_shortcut_dispatches_from_where_focus_usually_is() {
             // A press the focused component holds (the Layers rows' stacking and visibility keys)
             // is the component's and reaches no app command.
             let held = focus_holds(&h.ctx, chord.clone());
-            let focused_before = focus::focused_rec(&h.ctx).map(|rec| (rec.stop.keys.owner, rec.stop.keys.chrome_key));
             press(&mut h, &sc);
             let log = take_log(&h.ctx);
-            if ["Tab", "Shift+Tab", "F", "Shift+F", "Alt+Shift+,"].contains(&sc.as_str()) {
-                eprintln!(
-                    "DIAG every_displayed_shortcut_dispatches_from_where_focus_usually_is: {place:?} {sc} ({id}) held {held} typing {typing} focused before {focused_before:?} after {:?} log {log:?} screen mode {:?}",
-                    focus::focused_rec(&h.ctx).map(|rec| (rec.stop.keys.owner, rec.stop.keys.chrome_key)),
-                    h.state().ui.view.screen_mode
-                );
-            }
             if typing && !chord.has_command() && !chord.is_function_key() {
                 // A focused text field keeps its typing / editing keys: nothing may fire.
                 if !log.is_empty() {
