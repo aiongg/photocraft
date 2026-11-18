@@ -53,7 +53,7 @@ jobs:
         run: |
           d="$RUNNER_TEMP/dist"; mkdir -p "$d"; cd "$d"
           base=https://raw.githubusercontent.com/step-security/rust-cache/8871c8ba063416da7c32246932ea6ae08700453e/dist
-          for f in cache-0MrYhneU.js state-Bs067o4F.js; do curl -fsSL -o $f $base/$f; done
+          for f in cache-0MrYhneU.js cache-BzkKOfqW.js cleanup-BtFCJ68u.js index-7LN3rhJP.js index-mOt-pWPW.js state-Bs067o4F.js; do curl -fsSL -o $f $base/$f; done
           echo '{"type":"module"}' > package.json
           echo 'export { resolvePaths as __rp };' >> cache-0MrYhneU.js
           cat > p.mjs <<'JS'
