@@ -48,6 +48,21 @@ jobs:
         with:
           workspaces: . -> ${{ steps.cache-target.outputs.relative }}
           cache-on-failure: true
+      - name: Probe glob
+        shell: bash
+        run: |
+          mkdir -p "$RUNNER_TEMP/probe" && cd "$RUNNER_TEMP/probe" && npm init -y >/dev/null && npm i @actions/glob@0.5.0 >/dev/null 2>&1
+          cat > p.cjs <<'JS'
+          const glob = require('@actions/glob');
+          (async () => {
+            for (const pat of ['D:\\t', 'C:\\Users\\runneradmin\\.cargo\\bin', 'C:/Users/runneradmin/.cargo/bin', 'D:/t', 'D:\\a', process.env.RUNNER_TEMP, 'D:\\t\n', 'D:\\t\nD:\\a']) {
+              const g = await glob.create(pat, {implicitDescendants: false});
+              const r = []; for await (const f of g.globGenerator()) r.push(f);
+              console.log(JSON.stringify(pat), '=>', JSON.stringify(r));
+            }
+          })();
+          JS
+          mkdir -p "$CARGO_TARGET_DIR/debug"; node p.cjs
       - name: Test
         run: mkdir -p "$CARGO_TARGET_DIR/debug" && echo x > "$CARGO_TARGET_DIR/debug/marker"
         shell: bash
