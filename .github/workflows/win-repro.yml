@@ -1,0 +1,56 @@
+name: win-repro
+
+# Runs one Windows test with the same setup as ci.yml's Windows integration leg, nothing else.
+# Scratch branch on the fork only: set TEST to the nextest filter to run.
+on:
+  push:
+    branches: [win-repro]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+env:
+  TEST: "test(remove_channel_target)"
+
+jobs:
+  repro:
+    name: win-repro
+    runs-on: windows-latest
+    timeout-minutes: 90
+    env:
+      RUSTC_WRAPPER: ""
+      CARGO_PROFILE_DEV_DEBUG: "0"
+      CARGO_TARGET_DIR: 'D:\t'
+      CRAFT_FONTS_DIR: ${{ github.workspace }}/craft-fonts
+      CRAFT_FONTS_REQUIRED: "1"
+      PHOTOCRAFT_NO_PRINT: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: storytold/craft-fonts
+          ref: cc9269cd8d8258785dac603fba3122e5d2556795
+          path: craft-fonts
+          persist-credentials: false
+      - uses: storytold/craft-common-actions/actions/checkout-craft-i18n@main
+      - uses: step-security/dtolnay-rust-toolchain@8dd607977d06adf4ed49b190381e74c17a9dd25f # v1.0.0
+        with:
+          toolchain: stable
+      - name: Target directory for the dependency cache
+        id: cache-target
+        run: echo "relative=$(realpath -m --relative-to="$(cygpath -u "$GITHUB_WORKSPACE")" "$(cygpath -u "$CARGO_TARGET_DIR")")" >> "$GITHUB_OUTPUT"
+        shell: bash
+      # Saves even when the test fails, so the next push on this branch builds warm.
+      - uses: step-security/rust-cache@8871c8ba063416da7c32246932ea6ae08700453e # v2.9.2
+        with:
+          workspaces: . -> ${{ steps.cache-target.outputs.relative }}
+          cache-on-failure: true
+      - uses: step-security/taiki-e-install-action@76747d22a7567cc4438546a84f11bdf18e670ab8 # v2.87.32
+        with:
+          tool: cargo-nextest@0.9.150
+      - name: Test
+        run: cargo nextest run --profile ci -p photocraft-ui-egui -p photocraft -p xtask --locked --test it -E "$TEST" --no-fail-fast
+        shell: bash
