@@ -44,29 +44,10 @@ jobs:
         run: echo "relative=$(realpath -m --relative-to="$(cygpath -u "$GITHUB_WORKSPACE")" "$(cygpath -u "$CARGO_TARGET_DIR")")" >> "$GITHUB_OUTPUT"
         shell: bash
       # Saves even when the test fails, so the next push on this branch builds warm.
-      - uses: step-security/rust-cache@8871c8ba063416da7c32246932ea6ae08700453e # v2.9.2
+      - uses: step-security/rust-cache@851174d9a2fdc03e0896e02844dcc61d81dd7851 # v2.9.1
         with:
           workspaces: . -> ${{ steps.cache-target.outputs.relative }}
           cache-on-failure: true
-      - name: Probe bundled glob
-        shell: bash
-        run: |
-          d="$RUNNER_TEMP/dist"; mkdir -p "$d"; cd "$d"
-          base=https://raw.githubusercontent.com/step-security/rust-cache/8871c8ba063416da7c32246932ea6ae08700453e/dist
-          for f in cache-0MrYhneU.js cache-BzkKOfqW.js cleanup-BtFCJ68u.js index-7LN3rhJP.js index-mOt-pWPW.js state-Bs067o4F.js; do curl -fsSL -o $f $base/$f; done
-          echo '{"type":"module"}' > package.json
-          echo 'export { resolvePaths as __rp };' >> cache-0MrYhneU.js
-          cat > p.mjs <<'JS'
-          import { __rp } from './cache-0MrYhneU.js';
-          const sets = [
-            ['D:\\t'],
-            ['C:\\Users\\runneradmin\\.cargo\\bin'],
-            ['C:\\Users\\runneradmin\\.cargo\\bin','C:\\Users\\runneradmin\\.cargo\\registry','D:\\t'],
-          ];
-          for (const s of sets) console.log('RESULT', JSON.stringify(s), JSON.stringify(await __rp(s)));
-          process.exit(0);
-          JS
-          mkdir -p "$CARGO_TARGET_DIR/debug"; node p.mjs 2>&1 | head -20
       - name: Test
         run: mkdir -p "$CARGO_TARGET_DIR/debug" && echo x > "$CARGO_TARGET_DIR/debug/marker"
         shell: bash
