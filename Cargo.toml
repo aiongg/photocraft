@@ -346,21 +346,53 @@ hayro-jbig2 = { git = "https://github.com/storytold/craft-libs", rev = "7efbe8bb
 hayro-cmap = { git = "https://github.com/storytold/craft-libs", rev = "7efbe8bb611f0f7e123def8ba17eaaf956a9ddec" }
 hayro-postscript = { git = "https://github.com/storytold/craft-libs", rev = "7efbe8bb611f0f7e123def8ba17eaaf956a9ddec" }
 linesweeper = { git = "https://github.com/storytold/craft-libs", rev = "7efbe8bb611f0f7e123def8ba17eaaf956a9ddec" }
-ecolor = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-emath = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-epaint = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-epaint_default_fonts = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui-winit = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui-wgpu = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui_glow = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui_extras = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui_kittest = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui_system_font_provider = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-eframe = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui_demo_lib = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
-egui_inspection = { git = "https://github.com/storytold/egui.git", rev = "7e1c30d142bc7879d043e74b5ceb3ecfe7f51329" }
+ecolor = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+emath = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+epaint = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+epaint_default_fonts = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui-winit = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui-wgpu = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui_glow = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui_extras = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui_kittest = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui_system_font_provider = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+eframe = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui_demo_lib = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
+egui_inspection = { git = "https://github.com/storytold/egui.git", rev = "bcdeb7bb828147c04969f580291654924f1f3f4d" }
 winit = { git = "https://github.com/storytold/winit.git", rev = "a517b3846ee8457d84ee4975110bfda6797c44dc" }
 
 
 
+# Spike: the craft-libs memoized-view branch (memo-spike-pc on the aiongg fork).
+[patch."https://github.com/storytold/craft-libs"]
+craft = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-affinity = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-cms = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-crs = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-docpath = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-file-formats = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-heif = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-i18n = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-image-codecs = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-ipp = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-jpeg = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-kra = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-metadata = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-ora = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-pcraft-bundle = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-pcraft-format = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-pdf = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-pdn = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-plist = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-print = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-psd = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-raw = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-svg = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-tiff = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-tracked = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-ui-macros = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-update = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-xcf = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-xml = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
+craft-zip = { git = "https://github.com/aiongg/craft-libs", rev = "1c51f199d1e1c402d8cc691cbc0153ec33f4220e" }
