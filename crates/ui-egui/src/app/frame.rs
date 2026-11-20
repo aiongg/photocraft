@@ -5,7 +5,7 @@ use super::{
 use craft::ui::contract::Bind;
 use craft::ui::runtime::env::WindowKey;
 use craft::ui::runtime::windows::WindowHost;
-use craft::ui::shell::{AppShell, slots};
+use craft::ui::shell::AppShell;
 
 impl PhotocraftApp {
     /// Close this frame's stage record (`frame_stages`): keep it if it was slow, and hand it to

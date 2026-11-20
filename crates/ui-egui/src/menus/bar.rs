@@ -26,8 +26,9 @@ pub fn menu_bar(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
     let (gate, _) = menu_gate(app);
     let ctx = ui.ctx().clone();
     let model = items::model(app, &ctx);
-    let english = english_of(model);
-    MenuBarUi::new(&model.bar).english(&english).mnemonics(&TOP_PREFERRED).help_search(true).keyboard(!(gate.modal || gate.recording_shortcut)).show(ui);
+    // The English-label hook is left out: `MenuBarUi::english` takes only a capture-free fn, and the English names
+    // live in the per-language menu model (memo-spike blocker Q5).
+    MenuBarUi::new(&model.bar).mnemonics(&TOP_PREFERRED).help_search(true).keyboard(!(gate.modal || gate.recording_shortcut)).show(ui);
 }
 
 /// The English name of a command or menu title of `model`, for the bar's and the palette's search.
