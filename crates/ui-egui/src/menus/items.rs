@@ -1,5 +1,3 @@
-use std::collections::HashMap;
-
 use craft::i18n::Words;
 use craft::keymap::{Chord, CommandRef, Mods};
 use craft::menu::{
@@ -51,42 +49,34 @@ const PLACE_AFTER: &[(&str, &str)] = &[
 pub struct MenuModel {
     /// [`crate::native_menu::state_hash`] of the state the model was built from.
     state: u64,
-    /// The English label each row was built from, by [`command_key`] (`rows` hold the labels as shown).
-    english: HashMap<(String, String), String>,
-    /// The English title of each menu and submenu, by its title as shown.
-    english_titles: HashMap<String, String>,
-    /// The rows with labels as shown, after the user's Edit › Menus customization.
+    /// The rows with labels as shown, after the user's Edit › Menus customization; each translated label carries its
+    /// English name.
     pub rows: Vec<Row>,
-    /// The menus laid out for this platform, titles as shown.
+    /// The menus laid out for this platform, titles as shown, each translated title and label with its English name.
     pub bar: MenuBar,
 }
 
-impl MenuModel {
-    /// The English label of the row that runs `command`.
-    pub(super) fn english_label(&self, command: &CommandRef) -> Option<String> {
-        self.english.get(&command_key(command)).cloned()
-    }
-
-    /// The English title of a menu or submenu shown as `title`.
-    pub(super) fn english_title(&self, title: &str) -> Option<String> {
-        self.english_titles.get(title).cloned()
-    }
-}
-
-/// The key of a command in the English-name map: its id and its parameters, since one id (`app.theme`) runs many rows.
-fn command_key(command: &CommandRef) -> (String, String) {
-    (command.id.clone(), command.params.to_string())
-}
-
-/// Records the English label of every item under `node`, for the commands the framework lays out itself.
-fn collect_english(node: &Node, english: &mut HashMap<(String, String), String>) {
-    match node {
-        Node::Item(item) => {
-            english.insert(command_key(&item.command), item.label.clone());
+/// `shown` with the English name of each item and submenu whose label `english`, the same node built in English,
+/// words differently.
+fn with_english(mut shown: Node, english: &Node) -> Node {
+    fn name(node: &mut Node, english: &Node) {
+        match (node, english) {
+            (Node::Item(item), Node::Item(en)) => {
+                if item.label != en.label {
+                    item.english = Some(en.label.clone());
+                }
+            }
+            (Node::Submenu { label, english, children, .. }, Node::Submenu { label: en_label, children: en_children, .. }) => {
+                if label != en_label {
+                    *english = Some(en_label.clone());
+                }
+                children.iter_mut().zip(en_children).for_each(|(child, en)| name(child, en));
+            }
+            _ => {}
         }
-        Node::Submenu { children, .. } => children.iter().for_each(|child| collect_english(child, english)),
-        _ => {}
     }
+    name(&mut shown, english);
+    shown
 }
 
 /// The model for the app's current state. It is rebuilt when the hash of its inputs changes; a
@@ -347,23 +337,28 @@ pub(super) fn menu_tint(name: &str) -> Option<egui::Color32> {
     })
 }
 
-/// Translates the titles of menus and submenus, recording each one's English title.
-fn translate_titles(bar: &mut MenuBar, lang: crate::i18n::Lang, english: &mut HashMap<String, String>) {
-    fn level(nodes: &mut [Node], lang: crate::i18n::Lang, english: &mut HashMap<String, String>) {
+/// Translates the titles of menus and submenus, each translated one keeping its English title.
+fn translate_titles(bar: &mut MenuBar, lang: crate::i18n::Lang) {
+    /// `title` as shown in `lang`, and its English name when the two differ.
+    fn translate(title: &mut String, english: &mut Option<String>, lang: crate::i18n::Lang) {
+        let shown = crate::i18n::tr(lang, title).to_string();
+        if shown != *title {
+            *english = Some(std::mem::replace(title, shown));
+        }
+    }
+    fn level(nodes: &mut [Node], lang: crate::i18n::Lang) {
         for node in nodes {
-            if let Node::Submenu { label, children, .. } = node {
-                let shown = crate::i18n::tr(lang, label).to_string();
-                english.insert(shown.clone(), std::mem::replace(label, shown));
-                level(children, lang, english);
+            if let Node::Submenu { label, english, children, .. } = node {
+                translate(label, english, lang);
+                level(children, lang);
             }
         }
     }
     for menu in &mut bar.menus {
         if menu.role != MenuRole::App {
-            let shown = crate::i18n::tr(lang, &menu.title).to_string();
-            english.insert(shown.clone(), std::mem::replace(&mut menu.title, shown));
+            translate(&mut menu.title, &mut menu.english, lang);
         }
-        level(&mut menu.children, lang, english);
+        level(&mut menu.children, lang);
     }
 }
 
@@ -378,13 +373,14 @@ fn put_in_window(bar: &mut MenuBar, node: Node) {
 fn build(app: &PhotocraftApp, state: u64) -> MenuModel {
     let lang = crate::i18n::current();
     let mut rows = menu_rows(app);
-    let mut english = HashMap::new();
     for row in &mut rows {
         if row.label == "---" {
             continue;
         }
-        english.insert(command_key(&row.command), row.label.clone());
-        row.label = translated_menu_label(lang, &row.command.id, &row.label);
+        let shown = translated_menu_label(lang, &row.command.id, &row.label);
+        if shown != row.label {
+            row.english = Some(std::mem::replace(&mut row.label, shown));
+        }
         if let Some(tip) = row.tooltip.take() {
             row.tooltip = Some(crate::i18n::tr(lang, &tip).to_string());
         }
@@ -401,8 +397,7 @@ fn build(app: &PhotocraftApp, state: u64) -> MenuModel {
     let i18n = crate::i18n::framework_i18n();
     let words = Words::from_i18n(i18n.clone(), i18n.from_code(lang.code()).unwrap_or_else(|| i18n.system_lang()));
     let themes = crate::prefs_ui::theme_menu(app);
-    collect_english(&themes.submenu(&Words::english().set::<ThemeLabels>()), &mut english);
-    put_in_window(&mut bar, themes.submenu(&words.set::<ThemeLabels>()));
+    put_in_window(&mut bar, with_english(themes.submenu(&words.set::<ThemeLabels>()), &themes.submenu(&Words::english().set::<ThemeLabels>())));
     // Production shows Language only in the macOS app menu.
     let pref = &app.session.prefs().interface.language;
     let choice = if pref == "auto" { LanguageChoice::Automatic } else { LanguageChoice::Code(pref.clone()) };
@@ -412,7 +407,6 @@ fn build(app: &PhotocraftApp, state: u64) -> MenuModel {
     let keys = |chord: &Chord| craft::ui::runtime::commands::holder(app.ctx(), chord);
     let options = LayoutOptions::new(crate::native_menu::APP_NAME).label(&label).keys(&keys);
     let mut bar = layout(&bar, Target::current(), &options).bar;
-    let mut english_titles = HashMap::new();
-    translate_titles(&mut bar, lang, &mut english_titles);
-    MenuModel { state, english, english_titles, rows, bar }
+    translate_titles(&mut bar, lang);
+    MenuModel { state, rows, bar }
 }
