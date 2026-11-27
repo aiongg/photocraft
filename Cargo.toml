@@ -11,11 +11,11 @@ rust-version = "1.95"
 
 [workspace.dependencies]
 craft-ui = { git = "https://github.com/storytold/craft-libs", rev = "6e03f65bf45181db77ba6229716e6624db9eb25b", features = ["serde"] }
-# Spike g1b: the rt runtime and its egui embed. T6 repoints craft-ui-embed-egui to spike-g1b-cl once T2 merges there.
-craft-ui-rt = { path = "../g1b-resolve-cl/crates/ui-rt" }
-craft-ui-render-epaint = { path = "../g1b-resolve-cl/crates/ui-render-epaint" }
-craft-rt-layers = { path = "../g1b-resolve-cl/crates/rt-layers" }
-craft-ui-embed-egui = { path = "../g1b-resolve-cl/crates/ui-embed-egui" }
+# Spike g1b: the rt runtime and its egui embed, from the craft-libs spike worktree.
+craft-ui-rt = { path = "../spike-g1b-cl/crates/ui-rt" }
+craft-ui-render-epaint = { path = "../spike-g1b-cl/crates/ui-render-epaint" }
+craft-rt-layers = { path = "../spike-g1b-cl/crates/rt-layers" }
+craft-ui-embed-egui = { path = "../spike-g1b-cl/crates/ui-embed-egui" }
 # internal
 photocraft-geom = { path = "crates/geom" }
 photocraft-color = { path = "crates/color" }
