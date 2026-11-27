@@ -417,6 +417,8 @@ pub struct PhotocraftApp {
     pub(crate) reorder_preview: Option<layers_panel_ui::ReorderPreview>,
     /// Whether the currently dragged layer is over a valid destination this frame.
     pub(crate) reorder_preview_hit: bool,
+    /// The Layers panel rows on the rt runtime (spike g1b), created on first show.
+    pub(crate) layers_rt: Option<panels::layers_rt::LayersRt>,
     /// Patch Tool drag: the healed document at the pointer (`patch_preview`).
     pub(crate) patch_preview: Option<patch_preview::PatchPreview>,
     /// Content-Aware Move drag or box shown with its result (`cam_preview`).

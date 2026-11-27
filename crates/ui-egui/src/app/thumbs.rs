@@ -40,9 +40,7 @@ impl PhotocraftApp {
     /// area it frames: the canvas, or with Clip Thumbnails to Layer Bounds the layer's pixels.
     pub fn layer_thumb(&mut self, ctx: &egui::Context, doc: &Document, layer: &photocraft_doc::Layer) -> (egui::TextureId, photocraft_geom::Rect) {
         let clip = self.session.prefs().interface.clip_thumbnails_to_layer_bounds;
-        // Key by content, not document revision: COW tiles change pointer only when their pixels
-        // change, so unrelated edits (e.g. painting another layer) don't rebuild this thumbnail.
-        let rev = layer.surface().map_or(0, surface_fingerprint) ^ (doc.size.width as u64) << 40 ^ u64::from(clip) << 63;
+        let rev = layer_thumb_rev(doc, layer, clip);
         let key = (layer.id, mask_thumbs_ui::THUMB_LAYER);
         if let Some((r, tex)) = self.thumbs.get(&key)
             && *r == rev
@@ -50,15 +48,7 @@ impl PhotocraftApp {
         {
             return (tex.id(), *frame);
         }
-        let canvas = doc.bounds();
-        let frame = layer_thumb_frame(layer, canvas, clip);
-        let mut px = [0.0f32; 8];
-        let img = thumb_image(frame, 64, |x, y| {
-            let Some(s) = layer.surface() else { return [0.0; 4] };
-            let n = s.channels();
-            s.read_pixel(x, y, &mut px[..n]);
-            photocraft_raster::to_rgba(&s.format(), &px[..n])
-        });
+        let (frame, img) = layer_thumb_image(doc, layer, clip);
         self.thumb_frames.insert(layer.id, frame);
         (self.store_thumb(ctx, key, rev, img), frame)
     }
@@ -152,6 +142,28 @@ pub fn surface_fingerprint(s: &photocraft_raster::Surface) -> u64 {
         h = (h ^ p ^ ((c.tx as u64) << 32 | c.ty as u32 as u64)).wrapping_mul(0x100_0000_01b3);
     }
     h
+}
+
+/// What a layer thumbnail's pixels depend on, keyed by content, not document revision: COW tiles
+/// change pointer only when their pixels change, so unrelated edits (e.g. painting another layer)
+/// don't rebuild this thumbnail.
+pub(crate) fn layer_thumb_rev(doc: &Document, layer: &photocraft_doc::Layer, clip: bool) -> u64 {
+    layer.surface().map_or(0, surface_fingerprint) ^ (doc.size.width as u64) << 40 ^ u64::from(clip) << 63
+}
+
+/// The 64px letterboxed thumbnail of a pixel-ish layer and the document area it frames (the
+/// canvas, or with `clip` the layer's pixels). The egui store (`layer_thumb`) and the rt Layers
+/// panel's image store both take this image.
+pub(crate) fn layer_thumb_image(doc: &Document, layer: &photocraft_doc::Layer, clip: bool) -> (photocraft_geom::Rect, egui::ColorImage) {
+    let frame = layer_thumb_frame(layer, doc.bounds(), clip);
+    let mut px = [0.0f32; 8];
+    let img = thumb_image(frame, 64, |x, y| {
+        let Some(s) = layer.surface() else { return [0.0; 4] };
+        let n = s.channels();
+        s.read_pixel(x, y, &mut px[..n]);
+        photocraft_raster::to_rgba(&s.format(), &px[..n])
+    });
+    (frame, img)
 }
 
 /// The document area a layer thumbnail frames: the canvas, or with `clip` the layer's pixels on

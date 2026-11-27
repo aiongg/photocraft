@@ -21,7 +21,7 @@ mod input;
 mod prefs;
 mod screenshot;
 mod targets;
-mod thumbs;
+pub(crate) mod thumbs;
 mod view;
 mod window;
 
@@ -73,6 +73,7 @@ impl PhotocraftApp {
             blend_preview: None,
             reorder_preview: None,
             reorder_preview_hit: false,
+            layers_rt: None,
             patch_preview: None,
             cam_preview: None,
             magnetic: Default::default(),

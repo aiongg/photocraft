@@ -242,123 +242,131 @@ pub(super) fn layers(app: &mut PhotocraftApp, ui: &mut egui::Ui) {
         inactive_blend_rows(ui, t.pro);
     }
 
-    // Top of the stack first, groups above their contents, closed groups' contents hidden (#126).
-    let rows = crate::layer_tree_ui::panel_rows(app, &doc);
     let ctx = ui.ctx().clone();
     let footer = widgets::footer_height(ui) + ui.spacing().item_spacing.y;
     let fill = ui.available_height() > footer + 60.0;
     let rows_h = if fill { ui.available_height() - footer } else { f32::INFINITY };
-    egui::ScrollArea::vertical()
-        // Keep each document's position independent, even when tab indices change (#5522).
-        .id_salt(("layer-rows", doc.id.0))
-        .max_height(rows_h)
-        .min_scrolled_height(if fill { rows_h } else { 0.0 })
-        .auto_shrink([false, !fill])
-        .show(ui, |ui| {
-            // The drag keys are set only by actual layer-row and fx drags, not clicks or
-            // ordinary scrolling. The ScrollArea applies this to its own content.
-            // An fx drag that never saw its release (the panel was hidden) must not outlive the button.
-            if !ctx.input(|i| i.pointer.primary_down() || i.pointer.any_released()) {
-                ctx.data_mut(|d| d.remove::<FxDrag>(fx_drag_key()));
-                ctx.data_mut(|d| d.remove::<MaskDrag>(mask_drag_key()));
-                ctx.data_mut(|d| d.remove::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()));
-            }
-            let held = ctx.data(|d| {
-                d.get_temp::<u64>(egui::Id::unique("layer-drag")).is_some()
-                    || d.get_temp::<FxDrag>(fx_drag_key()).is_some()
-                    || d.get_temp::<MaskDrag>(mask_drag_key()).is_some()
-                    || d.get_temp::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()).is_some()
-            });
-            let dragging = held && ctx.input(|i| i.pointer.primary_down());
-            let pointer = ctx.input(|i| i.pointer.interact_pos());
-            let delta = layer_drag_edge_scroll(pointer, ui.clip_rect(), dragging, ctx.input(|i| i.stable_dt));
-            if delta != 0.0 {
-                ui.scroll_with_delta(vec2(0.0, delta));
-                ctx.request_repaint();
-            }
-            let filter = crate::layer_filter_ui::Filter::with_selection(app, &doc, &selection);
-            let fx_collapsed = app.session.active().map(|d| d.fx_collapsed.clone()).unwrap_or_default();
-            crate::layer_row_ui::begin(ui.ctx());
-            // The drawn rows, top to bottom (#1721): the space between them and below the last
-            // one is a drop zone too.
-            let mut drawn: Vec<(LayerId, Rect)> = Vec::new();
-            for &(depth, l) in &rows {
-                // Select › Isolate Layers.
-                if !photocraft_engine::select_extra_cmds::isolation_shows(&doc, &isolated, l.id) {
-                    continue;
+    if super::layers_rt::enabled() {
+        // The rows on the rt runtime: the same rect the egui rows' scroll area takes.
+        let height = if fill { rows_h } else { 60.0 };
+        let revision = app.session.active().map_or(0, |st| st.revision);
+        let rt_rows = super::layers_rt::Rows { doc: &doc, revision, selection: &selection, active, isolated: &isolated, height };
+        super::layers_rt::show(app, ui, &rt_rows, &mut actions);
+    } else {
+        // Top of the stack first, groups above their contents, closed groups' contents hidden (#126).
+        let rows = crate::layer_tree_ui::panel_rows(app, &doc);
+        egui::ScrollArea::vertical()
+            // Keep each document's position independent, even when tab indices change (#5522).
+            .id_salt(("layer-rows", doc.id.0))
+            .max_height(rows_h)
+            .min_scrolled_height(if fill { rows_h } else { 0.0 })
+            .auto_shrink([false, !fill])
+            .show(ui, |ui| {
+                // The drag keys are set only by actual layer-row and fx drags, not clicks or
+                // ordinary scrolling. The ScrollArea applies this to its own content.
+                // An fx drag that never saw its release (the panel was hidden) must not outlive the button.
+                if !ctx.input(|i| i.pointer.primary_down() || i.pointer.any_released()) {
+                    ctx.data_mut(|d| d.remove::<FxDrag>(fx_drag_key()));
+                    ctx.data_mut(|d| d.remove::<MaskDrag>(mask_drag_key()));
+                    ctx.data_mut(|d| d.remove::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()));
                 }
-                if !filter.shows(l) {
-                    continue;
+                let held = ctx.data(|d| {
+                    d.get_temp::<u64>(egui::Id::unique("layer-drag")).is_some()
+                        || d.get_temp::<FxDrag>(fx_drag_key()).is_some()
+                        || d.get_temp::<MaskDrag>(mask_drag_key()).is_some()
+                        || d.get_temp::<crate::smart_ui::FilterDrag>(crate::smart_ui::drag_key()).is_some()
+                });
+                let dragging = held && ctx.input(|i| i.pointer.primary_down());
+                let pointer = ctx.input(|i| i.pointer.interact_pos());
+                let delta = layer_drag_edge_scroll(pointer, ui.clip_rect(), dragging, ctx.input(|i| i.stable_dt));
+                if delta != 0.0 {
+                    ui.scroll_with_delta(vec2(0.0, delta));
+                    ctx.request_repaint();
                 }
-                let row = RowSel { selected: selection.contains(&l.id), primary: active == Some(l.id), multi: selection.len() > 1 };
-                let top = ui.cursor().top();
-                drawn.push((l.id, layer_row(app, &ctx, ui, &doc, l, depth, row, &mut actions)));
-                if reveal == Some(l.id) {
-                    crate::layer_reveal::scroll_to_row(ui, top);
-                }
-                if !l.effects.items.is_empty() && fx_collapsed.iter().all(|id| *id != l.id) {
-                    effect_rows(app, ui, l, depth, &mut actions);
-                }
-                if !fx_collapsed.contains(&l.id) {
-                    crate::smart_ui::filter_rows(app, ui, &doc, l, depth, &mut actions);
-                }
-            }
-            // The bottom of everything drawn: the last layer's effect and Smart Filter rows sit
-            // under its own row (#8764).
-            let rows_bottom = ui.min_rect().bottom();
-            // #1721: the list takes drops everywhere, not only on a row (Photoshop): the space
-            // between two rows lands above the lower one, the empty space below the bottom-most
-            // row below it. Both copy with ⌥ held, move without.
-            for w in drawn.windows(2) {
-                let gap = Rect::from_min_max(pos2(w[0].1.left(), w[0].1.bottom()), pos2(w[0].1.right(), w[1].1.top()));
-                layer_drop_zone(app, &ctx, ui, gap, (w[1].0, w[1].1), "above", &mut actions);
-            }
-            if let Some(&(last, last_rect)) = drawn.last() {
-                let below = Rect::from_min_max(pos2(last_rect.left(), last_rect.bottom()), pos2(last_rect.right(), ui.clip_rect().bottom()));
-                layer_drop_zone(app, &ctx, ui, below, (last, last_rect), "below", &mut actions);
-                // A click on that empty space deselects every layer, as in Photoshop (#8100). It
-                // starts under the last layer's sub-rows, which take their own clicks.
-                let empty = Rect::from_min_max(pos2(below.left(), rows_bottom), below.max);
-                if empty.height() > 0.0 {
-                    let response = ui.interact(empty, ui.scope_id().with("layers-empty-space"), Sense::click());
-                    if response.clicked() && !selection.is_empty() {
-                        actions.push(("select.deselectLayers".into(), json!({})));
+                let filter = crate::layer_filter_ui::Filter::with_selection(app, &doc, &selection);
+                let fx_collapsed = app.session.active().map(|d| d.fx_collapsed.clone()).unwrap_or_default();
+                crate::layer_row_ui::begin(ui.ctx());
+                // The drawn rows, top to bottom (#1721): the space between them and below the last
+                // one is a drop zone too.
+                let mut drawn: Vec<(LayerId, Rect)> = Vec::new();
+                for &(depth, l) in &rows {
+                    // Select › Isolate Layers.
+                    if !photocraft_engine::select_extra_cmds::isolation_shows(&doc, &isolated, l.id) {
+                        continue;
                     }
-                    // A right-click there opens the thumbnail size and clipping choices (#11404).
-                    response.context_menu(|ui| super::layers_empty_menu::show(app, ui));
+                    if !filter.shows(l) {
+                        continue;
+                    }
+                    let row = RowSel { selected: selection.contains(&l.id), primary: active == Some(l.id), multi: selection.len() > 1 };
+                    let top = ui.cursor().top();
+                    drawn.push((l.id, layer_row(app, &ctx, ui, &doc, l, depth, row, &mut actions)));
+                    if reveal == Some(l.id) {
+                        crate::layer_reveal::scroll_to_row(ui, top);
+                    }
+                    if !l.effects.items.is_empty() && fx_collapsed.iter().all(|id| *id != l.id) {
+                        effect_rows(app, ui, l, depth, &mut actions);
+                    }
+                    if !fx_collapsed.contains(&l.id) {
+                        crate::smart_ui::filter_rows(app, ui, &doc, l, depth, &mut actions);
+                    }
                 }
-            } else {
-                // No row drawn (a filter that matches no layer): the whole list is empty space,
-                // and its right-click opens the same menu.
-                let empty = Rect::from_min_max(pos2(ui.max_rect().left(), rows_bottom), pos2(ui.max_rect().right(), ui.clip_rect().bottom()));
-                if empty.height() > 0.0 && empty.width() > 0.0 {
-                    let response = ui.interact(empty, ui.scope_id().with("layers-empty-space"), Sense::click());
-                    response.context_menu(|ui| super::layers_empty_menu::show(app, ui));
+                // The bottom of everything drawn: the last layer's effect and Smart Filter rows sit
+                // under its own row (#8764).
+                let rows_bottom = ui.min_rect().bottom();
+                // #1721: the list takes drops everywhere, not only on a row (Photoshop): the space
+                // between two rows lands above the lower one, the empty space below the bottom-most
+                // row below it. Both copy with ⌥ held, move without.
+                for w in drawn.windows(2) {
+                    let gap = Rect::from_min_max(pos2(w[0].1.left(), w[0].1.bottom()), pos2(w[0].1.right(), w[1].1.top()));
+                    layer_drop_zone(app, &ctx, ui, gap, (w[1].0, w[1].1), "above", &mut actions);
                 }
-            }
-            // Tab / ⇧Tab in a rename: rename the layer below / above next, as in Photoshop. The
-            // Background isn't renamed in place (double-clicking it converts it), so it ends there.
-            if let Some((from, up)) = crate::layer_row_ui::take_next_rename(ui.ctx())
-                && let Some(at) = drawn.iter().position(|(id, _)| id.0 == from)
-                && let Some(&(next, _)) = if up { at.checked_sub(1).and_then(|i| drawn.get(i)) } else { drawn.get(at + 1) }
-                && let Some(l) = doc.layer(next).filter(|l| !crate::doc_props_ui::is_background(&doc, l))
-                && let Some(done) = crate::layer_row_ui::start_rename(ui.ctx(), next.0, &l.name)
-            {
-                actions.push(done);
-            }
-            // ⌥-click the line between two layers: clip / release the upper one (#967).
-            crate::clip_line_ui::show(ui, &doc, &mut actions);
-            // A rename whose row is gone (deleted, filtered out, inside a closed group) ends,
-            // committed: nothing else could commit or cancel it.
-            if let Some(layer) = crate::layer_row_ui::renaming(ui.ctx())
-                && !crate::layer_row_ui::recorded(ui.ctx()).iter().any(|r| r.layer == layer)
-                && let Some(done) = crate::layer_row_ui::end_rename(ui.ctx(), true)
-            {
-                actions.push(done);
-            }
-            // Likewise a selected smart filter whose row is gone.
-            crate::smart_ui::forget_hidden(ui.ctx(), doc.id);
-        });
+                if let Some(&(last, last_rect)) = drawn.last() {
+                    let below = Rect::from_min_max(pos2(last_rect.left(), last_rect.bottom()), pos2(last_rect.right(), ui.clip_rect().bottom()));
+                    layer_drop_zone(app, &ctx, ui, below, (last, last_rect), "below", &mut actions);
+                    // A click on that empty space deselects every layer, as in Photoshop (#8100). It
+                    // starts under the last layer's sub-rows, which take their own clicks.
+                    let empty = Rect::from_min_max(pos2(below.left(), rows_bottom), below.max);
+                    if empty.height() > 0.0 {
+                        let response = ui.interact(empty, ui.scope_id().with("layers-empty-space"), Sense::click());
+                        if response.clicked() && !selection.is_empty() {
+                            actions.push(("select.deselectLayers".into(), json!({})));
+                        }
+                        // A right-click there opens the thumbnail size and clipping choices (#11404).
+                        response.context_menu(|ui| super::layers_empty_menu::show(app, ui));
+                    }
+                } else {
+                    // No row drawn (a filter that matches no layer): the whole list is empty space,
+                    // and its right-click opens the same menu.
+                    let empty = Rect::from_min_max(pos2(ui.max_rect().left(), rows_bottom), pos2(ui.max_rect().right(), ui.clip_rect().bottom()));
+                    if empty.height() > 0.0 && empty.width() > 0.0 {
+                        let response = ui.interact(empty, ui.scope_id().with("layers-empty-space"), Sense::click());
+                        response.context_menu(|ui| super::layers_empty_menu::show(app, ui));
+                    }
+                }
+                // Tab / ⇧Tab in a rename: rename the layer below / above next, as in Photoshop. The
+                // Background isn't renamed in place (double-clicking it converts it), so it ends there.
+                if let Some((from, up)) = crate::layer_row_ui::take_next_rename(ui.ctx())
+                    && let Some(at) = drawn.iter().position(|(id, _)| id.0 == from)
+                    && let Some(&(next, _)) = if up { at.checked_sub(1).and_then(|i| drawn.get(i)) } else { drawn.get(at + 1) }
+                    && let Some(l) = doc.layer(next).filter(|l| !crate::doc_props_ui::is_background(&doc, l))
+                    && let Some(done) = crate::layer_row_ui::start_rename(ui.ctx(), next.0, &l.name)
+                {
+                    actions.push(done);
+                }
+                // ⌥-click the line between two layers: clip / release the upper one (#967).
+                crate::clip_line_ui::show(ui, &doc, &mut actions);
+                // A rename whose row is gone (deleted, filtered out, inside a closed group) ends,
+                // committed: nothing else could commit or cancel it.
+                if let Some(layer) = crate::layer_row_ui::renaming(ui.ctx())
+                    && !crate::layer_row_ui::recorded(ui.ctx()).iter().any(|r| r.layer == layer)
+                    && let Some(done) = crate::layer_row_ui::end_rename(ui.ctx(), true)
+                {
+                    actions.push(done);
+                }
+                // Likewise a selected smart filter whose row is gone.
+                crate::smart_ui::forget_hidden(ui.ctx(), doc.id);
+            });
+    }
     // Leaving the list or hovering an invalid target immediately cancels the temporary
     // image. The release still uses the actual command, not the preview snapshot.
     if !app.reorder_preview_hit {

@@ -13,6 +13,11 @@ craft-print = { workspace = true }
 craft-ui = { workspace = true }
 # Interface translations over the embedded craft-i18n catalogs (`build.rs`, `src/i18n.rs`).
 craft-i18n = { workspace = true }
+# Spike g1b: the Layers list on the rt runtime inside egui.
+craft-ui-rt = { workspace = true }
+craft-ui-render-epaint = { workspace = true }
+craft-rt-layers = { workspace = true }
+craft-ui-embed-egui = { workspace = true }
 photocraft-geom = { workspace = true }
 photocraft-color = { workspace = true }
 photocraft-cms = { workspace = true }
