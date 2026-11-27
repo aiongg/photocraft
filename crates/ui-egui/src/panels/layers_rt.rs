@@ -8,7 +8,7 @@ mod actions;
 mod model;
 mod theme;
 
-use craft_rt_layers::{Doc, DocCell, LayersPanel};
+use craft_rt_layers::{Doc, DocCell, List};
 use craft_ui_embed_egui::{EmbedStats, EmbeddedWindow};
 use craft_ui_rt::Os;
 use photocraft_doc::{Document, LayerId};
@@ -41,7 +41,7 @@ impl LayersRt {
         let cell = DocCell::create(window.runtime_mut().store_mut(), Doc::from_rows(Vec::new(), [], None));
         let os = Os::current();
         window.set_root(move |cx| {
-            cx.child(LayersPanel { doc: cell, os });
+            cx.child(List { doc: cell, os });
         });
         LayersRt { window, cell, key: None, theme: None, thumbs: model::Thumbs::default(), eye_sweep: None, stats: None }
     }
